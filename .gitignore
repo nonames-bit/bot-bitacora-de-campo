@@ -1,0 +1,50 @@
+# .gitignore para Proyectos (Optimizado para Google Drive y Git)
+
+# Entornos Virtuales y Dependencias Pesadas
+.venv/
+venv/
+env/
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+
+# IDEs y Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Graphify y Grafos Locales
+graphify-out/
+*.graphml
+
+# Compilación y Salidas
+build/
+dist/
+bin/
+obj/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Google Drive y Archivos Temporales de Sistema
+.tmp.driveupload/
+*.tmp.driveupload
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Logs y Archivos de Depuración
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Archivos de Secretos y Configuración Local
+.env
+.env.local
+*.local
