@@ -1,7 +1,7 @@
 ﻿---
 description: Especialista que escribe el código fuente en src/
 mode: subagent
-model: Gemini 3.7 flash
+model: google/gemini-3.7-flash
 color: "#22C55E"
 permission:
   edit: allow

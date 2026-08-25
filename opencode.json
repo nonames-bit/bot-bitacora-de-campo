@@ -3,6 +3,17 @@
   "model": "opencode-go/Ox alpha",
   "small_model": "opencode-go/deepseek-v4-flash",
   "default_agent": "director",
+  "agent": {
+    "build": {
+      "model": "opencode-go/qwen3.8-max"
+    },
+    "plan": {
+      "model": "opencode-go/kimi-k3"
+    },
+    "arquitecto": {
+      "model": "google/gemini-3.7-flash"
+    }
+  },
   "mcp": {
     "archivos": {
       "type": "local",

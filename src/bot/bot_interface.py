@@ -1,0 +1,196 @@
+"""Interfaz principal del bot: enrutamiento de mensajes y registro de eventos."""
+from __future__ import annotations
+
+from datetime import date
+from typing import Optional
+
+from ..db.database import Database
+from ..engine.growth_engine import gmd
+from ..engine.health_engine import fecha_fin_retiro
+from ..engine.query_engine import QueryEngine
+from ..engine.reproductive_engine import (fecha_ecografia, fecha_estimada_parto,
+                                          fecha_palpacion, fecha_secado,
+                                          programar_inseminacion)
+from ..parsers.event_parser import EventParser, ParsedEvent
+from ..parsers.media_handler import (MediaError, extract_image_info,
+                                     transcribe_audio)
+from ..utils import iso, to_date
+
+
+class Bot:
+    """Procesa mensajes (texto, audio, imagen), guarda en SQLite y responde."""
+
+    def __init__(self, db: Database, hoy: Optional[date] = None):
+        self.db = db
+        self.hoy = hoy or date.today()
+        self.parser = EventParser(hoy=self.hoy)
+        self.queries = QueryEngine(db, hoy=self.hoy)
+
+    # ------------------------------------------------------------------ #
+    # Entradas
+    # ------------------------------------------------------------------ #
+    def procesar_texto(self, texto: str) -> str:
+        ev = self.parser.parse(texto)
+        if ev.tipo == "consulta":
+            return self.queries.responder(texto)
+        if ev.tipo == "desconocido":
+            return "No pude interpretar ese mensaje. Intente una nota como " \
+                   "'pario la 47, ternero macho' o una pregunta."
+        self._registrar(ev)
+        self._generar_alertas(ev)
+        return self._confirmacion(ev)
+
+    def procesar_audio(self, audio_path: str) -> str:
+        try:
+            transcript = transcribe_audio(audio_path)
+        except MediaError as e:
+            return f"No se pudo transcribir el audio: {e}"
+        return self.procesar_texto(transcript.texto)
+
+    def procesar_imagen(self, image_path: str) -> str:
+        try:
+            info = extract_image_info(image_path)
+        except MediaError as e:
+            return f"No se pudo procesar la imagen: {e}"
+        if info.texto_detectado:
+            return self.procesar_texto(info.texto_detectado)
+        partes = []
+        if info.tags:
+            partes.append("arete(s): " + ", ".join(info.tags))
+        if info.frascos:
+            partes.append("frasco(s): " + ", ".join(info.frascos))
+        if partes:
+            return "Foto recibida. " + "; ".join(partes) + "."
+        return "Foto recibida, sin información relevante detectada."
+
+    # ------------------------------------------------------------------ #
+    # Registro de eventos en SQLite
+    # ------------------------------------------------------------------ #
+    def _registrar(self, ev: ParsedEvent) -> None:
+        d = ev.datos
+        if ev.tipo == "parto":
+            self.db.registrar_parto(
+                vaca_tag=ev.animal_tag, fecha=ev.fecha,
+                sexo_cria=d.get("sexo_cria"), estado_cria=d.get("estado_cria", "VIVO"),
+                peso_nacimiento=d.get("peso_nacimiento"), id_cria_tag=d.get("id_cria"),
+            )
+        elif ev.tipo == "muerte":
+            self.db.registrar_muerte(
+                animal_tag=ev.animal_tag, fecha=ev.fecha,
+                causa_presunta=d.get("causa_presunta"),
+            )
+        elif ev.tipo == "servicio":
+            self.db.registrar_servicio(
+                vaca_tag=ev.animal_tag, fecha=ev.fecha,
+                tipo_servicio=d.get("tipo_servicio", "IA"),
+                toro_pajilla=d.get("toro_pajilla"), raza_toro=d.get("raza_toro"),
+                fep_calculada=fecha_estimada_parto(ev.fecha), estado="SERVIDA",
+            )
+        elif ev.tipo == "celo":
+            self.db.registrar_celo(
+                vaca_tag=ev.animal_tag, fecha=ev.fecha, am_pm=d.get("am_pm"),
+            )
+        elif ev.tipo == "tratamiento":
+            dias = d.get("dias_retiro")
+            leche = d.get("dias_retiro_leche") or 0
+            carne = d.get("dias_retiro_carne", dias) or 0
+            self.db.registrar_tratamiento(
+                animal_tag=ev.animal_tag, fecha=ev.fecha,
+                producto=d.get("producto"), dosis=d.get("dosis"), via=d.get("via"),
+                dias_retiro_leche=leche, dias_retiro_carne=carne,
+                fecha_fin_retiro_leche=fecha_fin_retiro(ev.fecha, leche) if leche else None,
+                fecha_fin_retiro_carne=fecha_fin_retiro(ev.fecha, carne) if carne else None,
+            )
+        elif ev.tipo == "pesaje":
+            gmd_calc = self._calcular_gmd(ev.animal_tag, ev.fecha, d.get("peso_kg"))
+            self.db.registrar_pesaje(
+                animal_tag=ev.animal_tag, fecha=ev.fecha, peso_kg=d.get("peso_kg"),
+                gmd_calculada=gmd_calc, evento=d.get("evento"),
+            )
+        elif ev.tipo == "traslado":
+            self.db.registrar_traslado(
+                animal_tag=ev.animal_tag, fecha=ev.fecha, lote=d.get("lote"),
+                potrero_origen=d.get("potrero_origen"),
+                potrero_destino=d.get("potrero_destino"),
+            )
+        elif ev.tipo == "movimiento":
+            notas = None
+            if d.get("cantidad"):
+                notas = f"{d['cantidad']} animales"
+            self.db.registrar_movimiento(
+                animal_tag=ev.animal_tag, fecha=ev.fecha,
+                tipo_movimiento=d.get("tipo_movimiento"),
+                procedencia_destino=d.get("procedencia_destino"), notas=notas,
+            )
+
+    def _calcular_gmd(self, tag, fecha, peso) -> Optional[float]:
+        if not tag or peso is None:
+            return None
+        previos = self.db.ultimos_pesajes(tag, 1)
+        if not previos:
+            return None
+        prev = previos[0]
+        d1, d2 = to_date(prev["fecha"]), to_date(fecha)
+        if d1 and d2 and (d2 - d1).days > 0 and prev["peso_kg"] is not None:
+            return gmd(float(peso), float(prev["peso_kg"]), (d2 - d1).days)
+        return None
+
+    # ------------------------------------------------------------------ #
+    # Alertas automáticas
+    # ------------------------------------------------------------------ #
+    def _generar_alertas(self, ev: ParsedEvent) -> None:
+        tag = ev.animal_tag
+        if ev.tipo == "servicio":
+            fep = fecha_estimada_parto(ev.fecha)
+            self.db.registrar_alerta(tag, "ECOGRAFIA", fecha_ecografia(ev.fecha),
+                                     descripcion="Ecografía programada (día 35)")
+            self.db.registrar_alerta(tag, "PALPACION", fecha_palpacion(ev.fecha),
+                                     descripcion="Palpación rectal programada (día 60)")
+            self.db.registrar_alerta(tag, "SECADO", fecha_secado(fep),
+                                     descripcion="Secado programado (FEP - 60 días)")
+            self.db.registrar_alerta(tag, "PARTO_ESPERADO", fep,
+                                     descripcion="Fecha estimada de parto")
+        elif ev.tipo == "celo":
+            prog = programar_inseminacion(ev.fecha, ev.datos.get("am_pm"))
+            if prog["fecha"]:
+                self.db.registrar_alerta(
+                    tag, "INSEMINACION_PROGRAMADA", prog["fecha"],
+                    descripcion=f"Inseminación programada (regla AM-PM) en la {prog['franja']}")
+        elif ev.tipo == "tratamiento":
+            d = ev.datos
+            dias = d.get("dias_retiro")
+            leche = d.get("dias_retiro_leche") or 0
+            carne = d.get("dias_retiro_carne", dias) or 0
+            if leche:
+                self.db.registrar_alerta(tag, "RETIRO_LECHE",
+                                         fecha_fin_retiro(ev.fecha, leche),
+                                         descripcion="Fin del retiro de leche")
+            if carne:
+                self.db.registrar_alerta(tag, "RETIRO_CARNE",
+                                         fecha_fin_retiro(ev.fecha, carne),
+                                         descripcion="Fin del retiro de carne")
+
+    # ------------------------------------------------------------------ #
+    # Respuestas
+    # ------------------------------------------------------------------ #
+    def _confirmacion(self, ev: ParsedEvent) -> str:
+        d = ev.datos
+        tag = ev.animal_tag or "lote"
+        if ev.tipo == "parto":
+            sexo = d.get("sexo_cria") or "?"
+            return f"Registrado parto de la {tag} (cría {sexo.lower()})."
+        if ev.tipo == "muerte":
+            return f"Registrada muerte del animal {tag}."
+        if ev.tipo == "servicio":
+            return f"Registrado servicio ({d.get('tipo_servicio', 'IA')}) de la {tag}."
+        if ev.tipo == "celo":
+            return f"Registrado celo de la {tag}."
+        if ev.tipo == "tratamiento":
+            return f"Registrado tratamiento de {tag}: {d.get('producto') or 'fármaco'}."
+        if ev.tipo == "pesaje":
+            return f"Registrado pesaje de la {tag}: {d.get('peso_kg')} kg."
+        if ev.tipo == "traslado":
+            return f"Registrado traslado (lote {d.get('lote') or '?'})."
+        if ev.tipo == "movimiento":
+            return f"Registrado movimiento ({d.get('tipo_movimiento', '')})."
+        return "Evento registrado."

@@ -1,7 +1,7 @@
 ﻿---
 description: Documentador que redacta README y notas técnicas al cierre de la tarea
 mode: subagent
-model: opencode-go/Qwen3.8 Max
+model: opencode-go/qwen3.8-max
 color: "#3B82F6"
 permission:
   edit: allow

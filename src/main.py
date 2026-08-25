@@ -1,0 +1,55 @@
+"""Punto de entrada del bot de bitácora de campo zootécnico."""
+from __future__ import annotations
+
+import argparse
+import sys
+
+from src.bot.bot_interface import Bot
+from src.db.database import Database
+from src.importers.dbf_importer import import_zip
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Bot de bitácora de campo zootécnico (texto, audio, imagen)."
+    )
+    parser.add_argument("--db", default="bitacora.db", help="Ruta de la base SQLite")
+    parser.add_argument("--importar", help="Ruta al Zip de datos DBF (Software Ganadero)")
+    parser.add_argument("--texto", help="Procesa un mensaje de texto y termina")
+    parser.add_argument("--audio", help="Procesa un archivo de audio")
+    parser.add_argument("--imagen", help="Procesa un archivo de imagen")
+    args = parser.parse_args(argv)
+
+    db = Database(args.db)
+    db.create_tables()
+
+    if args.importar:
+        conteos = import_zip(db, args.importar)
+        print("Importación completada:", conteos)
+
+    bot = Bot(db)
+
+    if args.texto:
+        print(bot.procesar_texto(args.texto))
+    elif args.audio:
+        print(bot.procesar_audio(args.audio))
+    elif args.imagen:
+        print(bot.procesar_imagen(args.imagen))
+    else:
+        print("Modo interactivo. Escriba una nota o una pregunta (Ctrl+C para salir).")
+        try:
+            while True:
+                entrada = input("> ").strip()
+                if entrada.lower() in ("salir", "exit", "q"):
+                    break
+                if entrada:
+                    print(bot.procesar_texto(entrada))
+        except (KeyboardInterrupt, EOFError):
+            print()
+
+    db.close()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

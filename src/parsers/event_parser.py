@@ -1,0 +1,142 @@
+"""Parser de eventos de campo en lenguaje natural.
+
+Convierte una nota de voz/texto de un mayordomo en un :class:`ParsedEvent`
+estructurado y normalizado, listo para persistir en SQLite.
+"""
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Optional
+
+from ..utils import iso, normalizar, parse_fecha
+from . import nlp_engine as nlu
+
+
+@dataclass
+class ParsedEvent:
+    """Evento normalizado extraído de una nota de campo."""
+    tipo: str
+    texto: str = ""
+    animal_tag: Optional[str] = None
+    fecha: Optional[str] = None  # ISO YYYY-MM-DD
+    datos: dict = field(default_factory=dict)
+
+    def get(self, clave, default=None):
+        return self.datos.get(clave, default)
+
+
+# Palabras que marcan una cría muerta / aborto.
+MUERTE_CRIA_RE = re.compile(r"\b(?:nacio muert|naci[oó] muert|aborto|muert[oa])\b")
+
+
+def _causa_muerte(texto_norm: str) -> Optional[str]:
+    """Aísla la causa presunta tras el verbo de muerte."""
+    t = texto_norm
+    t = re.sub(r"\bse murio (?:el|la)\s+[a-z0-9]+\b", "", t)
+    t = re.sub(r"\bmurio (?:el|la)\s+[a-z0-9]+\b", "", t)
+    t = re.sub(r"\bse murio\b", "", t)
+    t = re.sub(r"\bmurio\b", "", t)
+    t = re.sub(r"^\s*(?:por|de)\s+", "", t)
+    t = t.strip(" ,.;:-").strip()
+    return t or None
+
+
+class EventParser:
+    """Clasifica y normaliza notas de campo en eventos estructurados."""
+
+    def __init__(self, hoy: date | None = None):
+        self.hoy = hoy or date.today()
+
+    def parse(self, texto: str) -> ParsedEvent:
+        if texto is None:
+            texto = ""
+        t = normalizar(texto)
+        fecha = iso(parse_fecha(texto, self.hoy) or self.hoy)
+
+        if nlu.es_consulta(texto):
+            return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
+
+        intento = nlu.clasificar(texto)
+        if intento is None:
+            return ParsedEvent(tipo="desconocido", texto=texto, fecha=fecha)
+
+        tag = nlu.extraer_tag(texto)
+        ev = ParsedEvent(tipo=intento, texto=texto, animal_tag=tag, fecha=fecha)
+
+        handler = getattr(self, f"_parse_{intento}", None)
+        if handler:
+            handler(ev, t)
+        return ev
+
+    # ------------------------------------------------------------------ #
+    # Handlers por evento
+    # ------------------------------------------------------------------ #
+    def _parse_parto(self, ev: ParsedEvent, t: str) -> None:
+        sexo = nlu.extraer_sexo_cria(t)
+        estado = "MUERTO" if MUERTE_CRIA_RE.search(t) else "VIVO"
+        peso = nlu.extraer_peso(t)
+        ev.datos["sexo_cria"] = sexo
+        ev.datos["estado_cria"] = estado
+        ev.datos["peso_nacimiento"] = peso
+        # Una segunda mención numérica puede ser el tag de la cría.
+        tags = nlu.extraer_tags(t)
+        if len(tags) >= 2:
+            ev.datos["id_cria"] = tags[1]
+
+    def _parse_muerte(self, ev: ParsedEvent, t: str) -> None:
+        ev.datos["causa_presunta"] = _causa_muerte(t)
+
+    def _parse_servicio(self, ev: ParsedEvent, t: str) -> None:
+        tipo = "MONTA" if re.search(r"\bmont", t) else "IA"
+        toro = nlu.extraer_toro(t)
+        ev.datos["tipo_servicio"] = tipo
+        ev.datos["toro_pajilla"] = toro["toro"]
+        ev.datos["raza_toro"] = toro["raza"]
+
+    def _parse_celo(self, ev: ParsedEvent, t: str) -> None:
+        ev.datos["am_pm"] = nlu.extraer_am_pm(t)
+
+    def _parse_tratamiento(self, ev: ParsedEvent, t: str) -> None:
+        producto = nlu.extraer_producto(t)
+        dosis = nlu.extraer_dosis(t)
+        via = nlu.extraer_via(t)
+        dias = nlu.extraer_dias_retiro(t)
+        ev.datos["producto"] = producto
+        ev.datos["dosis"] = dosis
+        ev.datos["via"] = via
+        ev.datos["dias_retiro"] = dias
+        # Desglose leche/carne: leche solo si se menciona; carne por defecto.
+        retiro = nlu.retiro_leche_carne(t, dias)
+        ev.datos["dias_retiro_leche"] = retiro["dias_retiro_leche"]
+        ev.datos["dias_retiro_carne"] = retiro["dias_retiro_carne"]
+
+    def _parse_pesaje(self, ev: ParsedEvent, t: str) -> None:
+        peso = nlu.extraer_peso(t)
+        evento = "Control"
+        if re.search(r"\bdestete\b", t):
+            evento = "DESTETE"
+        elif re.search(r"\bnacimiento\b|\bnaci[oó]\b", t):
+            evento = "NACIMIENTO"
+        ev.datos["peso_kg"] = peso
+        ev.datos["evento"] = evento
+
+    def _parse_traslado(self, ev: ParsedEvent, t: str) -> None:
+        potreros = nlu.extraer_potreros(t)
+        ev.datos["lote"] = nlu.extraer_lote(t)
+        ev.datos["potrero_origen"] = potreros[0] if len(potreros) >= 1 else None
+        ev.datos["potrero_destino"] = potreros[1] if len(potreros) >= 2 else None
+
+    def _parse_movimiento(self, ev: ParsedEvent, t: str) -> None:
+        if re.search(r"\bcompra|compr[aeoó]|subasta|comprad[oa]", t):
+            tipo = "COMPRA"
+        elif re.search(r"\bventa|vend[ió]|vendid", t):
+            tipo = "VENTA"
+        elif re.search(r"\bsalio|salieron|sali[oó]", t):
+            tipo = "SALIDA"
+        else:
+            tipo = "ENTRADA"
+        ev.datos["tipo_movimiento"] = tipo
+        ev.datos["cantidad"] = nlu.extraer_cantidad(t)
+        ev.datos["procedencia_destino"] = "Subasta" if re.search(r"\bsubasta\b", t) else None
