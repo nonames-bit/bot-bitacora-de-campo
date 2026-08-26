@@ -13,14 +13,20 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Bot de bitácora de campo zootécnico (texto, audio, imagen)."
     )
-    parser.add_argument("--db", default="bitacora.db", help="Ruta de la base SQLite")
+    parser.add_argument("--db", default=None, help="Ruta de la base SQLite")
+    parser.add_argument("--server", action="store_true", help="Inicia el bot de Telegram en modo servidor")
     parser.add_argument("--importar", help="Ruta al Zip de datos DBF (Software Ganadero)")
     parser.add_argument("--texto", help="Procesa un mensaje de texto y termina")
     parser.add_argument("--audio", help="Procesa un archivo de audio")
     parser.add_argument("--imagen", help="Procesa un archivo de imagen")
     args = parser.parse_args(argv)
 
-    db = Database(args.db)
+    if args.server:
+        from src.server.telegram_bot import correr
+        correr(db_path=args.db)
+        return 0
+
+    db = Database(args.db or "bitacora.db")
     db.create_tables()
 
     if args.importar:

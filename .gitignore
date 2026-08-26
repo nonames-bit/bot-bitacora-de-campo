@@ -44,6 +44,12 @@ Desktop.ini
 npm-debug.log*
 yarn-debug.log*
 
+# Datos locales, multimedia y backups
+data/
+media/
+backups/
+src/server/users.json
+
 # Archivos de Secretos y Configuración Local
 .env
 .env.local

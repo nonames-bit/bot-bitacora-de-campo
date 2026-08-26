@@ -1,0 +1,12 @@
+[
+  {
+    "user_id": 111111111,
+    "nombre": "Duenio",
+    "rol": "OWNER"
+  },
+  {
+    "user_id": 222222222,
+    "nombre": "Mayordomo",
+    "rol": "TRABAJADOR"
+  }
+]

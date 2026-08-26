@@ -153,8 +153,10 @@ def import_causas(db: Database, records) -> dict:
     return causas
 
 
-def import_potreros(db: Database, records) -> int:
-    n = 0
+def import_potreros(db: Database, records) -> dict:
+    """Siembra potreros de forma idempotente y devuelve conteo de nuevos y duplicados."""
+    nuevos = 0
+    duplicados = 0
     for r in records:
         codigo = (r.get("CODPOT") or "").strip()
         nombre = (r.get("NOMPOT") or "").strip()
@@ -184,8 +186,10 @@ def import_potreros(db: Database, records) -> int:
                 dias_reposo=dias_reposo,
                 dias_ocupacion=dias_ocupacion,
             )
-            n += 1
-    return n
+            nuevos += 1
+        else:
+            duplicados += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
 def _entero(v) -> Optional[int]:
@@ -198,15 +202,22 @@ def _entero(v) -> Optional[int]:
 
 
 def import_animales(db: Database, records, causas: dict) -> dict:
-    """Siembra animales y muertes; devuelve conteos."""
+    """Siembra animales y muertes; devuelve conteos con nuevos y duplicados."""
     tags = []  # para segunda pasada de madre/padre
-    muertes = 0
+    nuevos_animales = 0
+    duplicados_animales = 0
     for r in records:
         tag = (r.get("CODANI") or "").strip()
         if not tag:
             continue
         sexo = {"H": "Hembra", "M": "Macho"}.get((r.get("SEXO") or "").strip(),
                                                   (r.get("SEXO") or "").strip() or None)
+        existente = db.animal_id(tag)
+        if existente is None:
+            nuevos_animales += 1
+        else:
+            duplicados_animales += 1
+
         db.registrar_animal(
             tag=tag,
             nombre=(r.get("NOMANI") or "").strip() or None,
@@ -218,6 +229,9 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             notas=(r.get("OBS") or "").strip() or None,
         )
         tags.append((tag, r))
+
+    nuevas_muertes = 0
+    duplicadas_muertes = 0
     # Segunda pasada: enlazar madre/padre ya presentes.
     for tag, r in tags:
         madre = (r.get("MADRE") or "").strip()
@@ -226,25 +240,44 @@ def import_animales(db: Database, records, causas: dict) -> dict:
         if aid is None:
             continue
         if madre and db.animal_id(madre):
-            db.execute("UPDATE animales SET madre_id = ? WHERE id_animal = ?",
+            db.execute("UPDATE animales SET madre_id = ? WHERE id_animal = ? AND madre_id IS NULL",
                        (db.animal_id(madre), aid))
         if padre and db.animal_id(padre):
-            db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ?",
+            db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ? AND padre_id IS NULL",
                        (db.animal_id(padre), aid))
         # Muerte: TIPO == 'M' con fecha de muerte y causa.
         if (r.get("TIPO") or "").strip() == "M" and r.get("FECMUERTE"):
-            causa_cod = (r.get("CAU") or "").strip()
-            db.registrar_muerte(
-                animal_tag=tag, fecha=r.get("FECMUERTE"),
-                causa_presunta=causas.get(causa_cod) or causa_cod or None,
-                notas=(r.get("MOTIVO") or "").strip() or None,
-            )
-            muertes += 1
-    return {"animales": len(tags), "muertes": muertes}
+            fec = iso(r.get("FECMUERTE"))
+            if fec is not None:
+                existe = db.query_one(
+                    "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha = ? LIMIT 1",
+                    (aid, fec),
+                )
+            else:
+                existe = db.query_one(
+                    "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha IS NULL LIMIT 1",
+                    (aid,),
+                )
+            if existe:
+                duplicadas_muertes += 1
+            else:
+                causa_cod = (r.get("CAU") or "").strip()
+                db.registrar_muerte(
+                    animal_tag=tag, fecha=r.get("FECMUERTE"),
+                    causa_presunta=causas.get(causa_cod) or causa_cod or None,
+                    notas=(r.get("MOTIVO") or "").strip() or None,
+                )
+                nuevas_muertes += 1
+    return {
+        "animales": {"nuevos": nuevos_animales, "duplicados": duplicados_animales},
+        "muertes": {"nuevos": nuevas_muertes, "duplicados": duplicadas_muertes},
+    }
 
 
-def import_partos(db: Database, records) -> int:
-    n = 0
+def import_partos(db: Database, records) -> dict:
+    """Siembra partos deduplicando por vaca_id + fecha (+ id_cria)."""
+    nuevos = 0
+    duplicados = 0
     for r in records:
         vaca = (r.get("CODANI") or "").strip()
         if not vaca:
@@ -255,32 +288,82 @@ def import_partos(db: Database, records) -> int:
         if peso is not None and float(peso) <= 0:
             peso = None
         id_cria_tag = (r.get("HIJO") or "").strip() or None
-        if id_cria_tag:
-            _get_or_create_animal(db, id_cria_tag, sexo=sexo_cria)
+
+        # Resolver tag -> id ANTES del chequeo
+        vaca_id = db.resolve_animal(vaca, crear=True, sexo="Hembra")
+        id_cria = db.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria) if id_cria_tag else None
+        fec = iso(r.get("FECHA"))
+
+        if id_cria is not None:
+            if fec is not None:
+                existe = db.query_one(
+                    "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha = ? AND id_cria = ? LIMIT 1",
+                    (vaca_id, fec, id_cria),
+                )
+            else:
+                existe = db.query_one(
+                    "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha IS NULL AND id_cria = ? LIMIT 1",
+                    (vaca_id, id_cria),
+                )
+        else:
+            if fec is not None:
+                existe = db.query_one(
+                    "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha = ? AND id_cria IS NULL LIMIT 1",
+                    (vaca_id, fec),
+                )
+            else:
+                existe = db.query_one(
+                    "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha IS NULL AND id_cria IS NULL LIMIT 1",
+                    (vaca_id,),
+                )
+
+        if existe:
+            duplicados += 1
+            continue
+
         db.registrar_parto(
             vaca_tag=vaca, fecha=r.get("FECHA"), sexo_cria=sexo_cria,
             estado_cria=estado, peso_nacimiento=peso,
             id_cria_tag=id_cria_tag,
             notas=(r.get("DETALLE") or "").strip() or None,
         )
-        n += 1
-    return n
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
-def import_celos(db: Database, records) -> int:
-    n = 0
+def import_celos(db: Database, records) -> dict:
+    """Siembra celos deduplicando por vaca_id + fecha."""
+    nuevos = 0
+    duplicados = 0
     for r in records:
         vaca = (r.get("CODANI") or "").strip()
         if not vaca:
             continue
+        vaca_id = db.resolve_animal(vaca, crear=True, sexo="Hembra")
+        fec = iso(r.get("FECHA"))
+        if fec is not None:
+            existe = db.query_one(
+                "SELECT 1 FROM celos WHERE vaca_id = ? AND fecha = ? LIMIT 1",
+                (vaca_id, fec),
+            )
+        else:
+            existe = db.query_one(
+                "SELECT 1 FROM celos WHERE vaca_id = ? AND fecha IS NULL LIMIT 1",
+                (vaca_id,),
+            )
+
+        if existe:
+            duplicados += 1
+            continue
+
         hora = r.get("HORA")
         am_pm = _am_pm(hora)
         db.registrar_celo(
             vaca_tag=vaca, fecha=r.get("FECHA"), am_pm=am_pm,
             notas=(r.get("DETALLE") or "").strip() or None,
         )
-        n += 1
-    return n
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
 def _am_pm(hora) -> Optional[str]:
@@ -299,8 +382,10 @@ def _am_pm(hora) -> Optional[str]:
     return None
 
 
-def import_servicios(db: Database, records) -> int:
-    n = 0
+def import_servicios(db: Database, records) -> dict:
+    """Siembra servicios e inseminaciones deduplicando por vaca_id + fecha + tipo_servicio."""
+    nuevos = 0
+    duplicados = 0
     for r in records:
         vaca = (r.get("CODANI") or "").strip()
         if not vaca:
@@ -308,6 +393,24 @@ def import_servicios(db: Database, records) -> int:
         tipo = (r.get("TIPO") or "").strip().upper()
         tipo_servicio = "MONTA" if tipo == "MN" else "IA"
         fecha = r.get("FECHA")
+        fec = iso(fecha)
+        vaca_id = db.resolve_animal(vaca, crear=True, sexo="Hembra")
+
+        if fec is not None:
+            existe = db.query_one(
+                "SELECT 1 FROM servicios WHERE vaca_id = ? AND fecha = ? AND tipo_servicio = ? LIMIT 1",
+                (vaca_id, fec, tipo_servicio),
+            )
+        else:
+            existe = db.query_one(
+                "SELECT 1 FROM servicios WHERE vaca_id = ? AND fecha IS NULL AND tipo_servicio = ? LIMIT 1",
+                (vaca_id, tipo_servicio),
+            )
+
+        if existe:
+            duplicados += 1
+            continue
+
         fep = fecha_estimada_parto(fecha)
         db.registrar_servicio(
             vaca_tag=vaca, fecha=fecha, tipo_servicio=tipo_servicio,
@@ -317,12 +420,14 @@ def import_servicios(db: Database, records) -> int:
             fep_calculada=fep,
             estado=(r.get("EST") or "").strip() or None,
         )
-        n += 1
-    return n
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
-def import_pesajes(db: Database, records) -> int:
-    n = 0
+def import_pesajes(db: Database, records) -> dict:
+    """Siembra pesajes con GMD deduplicando por animal_id + fecha + peso_kg."""
+    nuevos = 0
+    duplicados = 0
     ultimo: dict[int, tuple[Optional[str], float]] = {}
     for r in records:
         tag = (r.get("CODANI") or "").strip()
@@ -330,26 +435,48 @@ def import_pesajes(db: Database, records) -> int:
         if not tag or peso is None:
             continue
         fecha = r.get("FECHA")
+        fec = iso(fecha)
+        peso_float = float(peso)
         aid = _get_or_create_animal(db, tag)
+        if aid is None:
+            continue
+
+        if fec is not None:
+            existe = db.query_one(
+                "SELECT 1 FROM pesajes WHERE animal_id = ? AND fecha = ? AND peso_kg = ? LIMIT 1",
+                (aid, fec, peso_float),
+            )
+        else:
+            existe = db.query_one(
+                "SELECT 1 FROM pesajes WHERE animal_id = ? AND fecha IS NULL AND peso_kg = ? LIMIT 1",
+                (aid, peso_float),
+            )
+
         gmd_calc = None
-        if aid is not None and aid in ultimo:
+        if aid in ultimo:
             f_ant, p_ant = ultimo[aid]
             d1, d2 = to_date(f_ant), to_date(fecha)
             if d1 and d2 and (d2 - d1).days > 0:
-                gmd_calc = gmd(float(peso), p_ant, (d2 - d1).days)
-        if aid is not None:
-            ultimo[aid] = (fecha, float(peso))
+                gmd_calc = gmd(peso_float, p_ant, (d2 - d1).days)
+        ultimo[aid] = (fecha, peso_float)
+
+        if existe:
+            duplicados += 1
+            continue
+
         db.registrar_pesaje(
-            animal_tag=tag, fecha=fecha, peso_kg=float(peso),
+            animal_tag=tag, fecha=fecha, peso_kg=peso_float,
             gmd_calculada=gmd_calc,
             evento=(r.get("EVENTO") or "").strip() or None,
         )
-        n += 1
-    return n
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
-def import_traslados(db: Database, records) -> int:
-    n = 0
+def import_traslados(db: Database, records) -> dict:
+    """Siembra traslados deduplicando por animal_id + fecha (+ potrero_destino)."""
+    nuevos = 0
+    duplicados = 0
     for r in records:
         tag = (r.get("CODANI") or "").strip()
         if not tag:
@@ -358,14 +485,49 @@ def import_traslados(db: Database, records) -> int:
         potrero = (r.get("CODPOT") or "").strip() or None
         origen = potrero if tipmov == "S" else None
         destino = potrero if tipmov == "I" else None
+
+        aid = _get_or_create_animal(db, tag)
+        if aid is None:
+            continue
+
+        destino_id = db.resolve_potrero(destino) if destino else None
+        fec = iso(r.get("FECHA"))
+
+        if destino_id is not None:
+            if fec is not None:
+                existe = db.query_one(
+                    "SELECT 1 FROM traslados WHERE animal_id = ? AND fecha = ? AND potrero_destino = ? LIMIT 1",
+                    (aid, fec, destino_id),
+                )
+            else:
+                existe = db.query_one(
+                    "SELECT 1 FROM traslados WHERE animal_id = ? AND fecha IS NULL AND potrero_destino = ? LIMIT 1",
+                    (aid, destino_id),
+                )
+        else:
+            if fec is not None:
+                existe = db.query_one(
+                    "SELECT 1 FROM traslados WHERE animal_id = ? AND fecha = ? LIMIT 1",
+                    (aid, fec),
+                )
+            else:
+                existe = db.query_one(
+                    "SELECT 1 FROM traslados WHERE animal_id = ? AND fecha IS NULL LIMIT 1",
+                    (aid,),
+                )
+
+        if existe:
+            duplicados += 1
+            continue
+
         db.registrar_traslado(
             animal_tag=tag, fecha=r.get("FECHA"),
             lote=(r.get("LOTE") or "").strip() or None,
             potrero_origen=origen, potrero_destino=destino,
             motivo=(r.get("REGISTROTR") or "").strip() or None,
         )
-        n += 1
-    return n
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +563,7 @@ def import_zip(db: Database, zip_path: str) -> dict:
         names = outer.namelist()
         if "Dbf.zip" in names:
             with zipfile.ZipFile(outer.open("Dbf.zip")) as inner:
-                dbf_data = {n: inner.read(n) for n in DBF_REQUERIDOS}
+                dbf_data = {n: inner.read(n) for n in DBF_REQUERIDOS if n in inner.namelist()}
         else:
             dbf_data = {n: outer.read(n) for n in DBF_REQUERIDOS if n in names}
     return import_dbfs(db, dbf_data)

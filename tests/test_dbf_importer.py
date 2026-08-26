@@ -5,9 +5,9 @@ import struct
 import pytest
 
 from src.importers.dbf_importer import (
-    DBFReader, import_animales, import_causas, import_celos, import_partos,
-    import_pesajes, import_potreros, import_servicios, import_traslados,
-    import_zip,
+    DBFReader, import_animales, import_causas, import_celos, import_dbfs,
+    import_partos, import_pesajes, import_potreros, import_servicios,
+    import_traslados, import_zip,
 )
 
 
@@ -33,7 +33,8 @@ def build_dbf(fields, records):
         out += b"\x20"  # registro activo
         for (name, ftype, flen, fdec), val in zip(fields, rec):
             if ftype == "N":
-                out += str(val).encode("ascii").rjust(flen, b" ")
+                # Datos en latin-1 (convención DBF), igual que decodifica DBFReader.
+                out += str(val).encode("latin-1").rjust(flen, b" ")
             elif ftype == "T":
                 # Campo DateTime (8 bytes): día juliano + milisegundos.
                 if isinstance(val, tuple):
@@ -41,7 +42,7 @@ def build_dbf(fields, records):
                 else:
                     out += val
             else:
-                out += str(val).encode("ascii").ljust(flen, b" ")
+                out += str(val).encode("latin-1").ljust(flen, b" ")
     return bytes(out)
 
 
@@ -87,9 +88,10 @@ def test_import_causas(db):
 
 
 def test_import_potreros(db):
-    import_potreros(db, [{"CODPOT": "01", "NOMPOT": "Norte", "HAS": 10.0,
-                          "KGHA": 5000.0, "PASTO1": "", "TIPO": "L",
-                          "FEC_ENT": "2026-01-01", "FEC_SAL": None, "DIA_OCU": 30}])
+    res = import_potreros(db, [{"CODPOT": "01", "NOMPOT": "Norte", "HAS": 10.0,
+                                "KGHA": 5000.0, "PASTO1": "", "TIPO": "L",
+                                "FEC_ENT": "2026-01-01", "FEC_SAL": None, "DIA_OCU": 30}])
+    assert res == {"nuevos": 1, "duplicados": 0}
     pot = db.query_one("SELECT * FROM potreros WHERE codigo = '01'")
     assert pot is not None
     assert pot["area_has"] == 10.0
@@ -108,8 +110,8 @@ def test_import_animales_y_muertes(db):
          "MADRE": "", "PADRE": "", "TIPO": "M", "FECMUERTE": "20260507",
          "CAU": "19", "MOTIVO": "se rodo"},
     ], causas)
-    assert conteos["animales"] == 1
-    assert conteos["muertes"] == 1
+    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0}
+    assert conteos["muertes"] == {"nuevos": 1, "duplicados": 0}
     animal = db.get_animal("47")
     assert animal["sexo"] == "Hembra"
     muerte = db.query_one("SELECT * FROM muertes")
@@ -117,17 +119,63 @@ def test_import_animales_y_muertes(db):
 
 
 def test_import_partos(db):
-    import_partos(db, [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "M",
-                        "ABORTO": "", "PESNAC": 35.0, "HIJO": "480", "DETALLE": ""}])
+    res = import_partos(db, [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "M",
+                              "ABORTO": "", "PESNAC": 35.0, "HIJO": "480", "DETALLE": ""}])
+    assert res == {"nuevos": 1, "duplicados": 0}
     parto = db.query_one("SELECT * FROM partos")
     assert parto["sexo_cria"] == "Macho"
     assert parto["estado_cria"] == "VIVO"
     assert db.get_animal("480") is not None
 
 
+def test_import_partos_mismo_dia_con_y_sin_cria_no_colisionan(db):
+    # 1. Parto con cría
+    r1 = [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "M",
+           "ABORTO": "", "PESNAC": 35.0, "HIJO": "480", "DETALLE": "con cria"}]
+    res1 = import_partos(db, r1)
+    assert res1 == {"nuevos": 1, "duplicados": 0}
+
+    # 2. Parto mismo día sin cría (no debe colisionar con el anterior)
+    r2 = [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "",
+           "ABORTO": "S", "PESNAC": 0, "HIJO": "", "DETALLE": "sin cria"}]
+    res2 = import_partos(db, r2)
+    assert res2 == {"nuevos": 1, "duplicados": 0}
+
+    assert db.count("partos") == 2
+
+    # 3. Re-importar ambos debe dar 0 nuevos y 2 duplicados
+    res3 = import_partos(db, r1 + r2)
+    assert res3 == {"nuevos": 0, "duplicados": 2}
+
+
+def test_import_animales_preserva_madre_padre_existentes(db):
+    db.registrar_animal(tag="100", sexo="Hembra")
+    db.registrar_animal(tag="200", sexo="Macho")
+    db.registrar_animal(tag="101", sexo="Hembra")
+    db.registrar_animal(tag="201", sexo="Macho")
+    db.registrar_animal(tag="50", sexo="Hembra")
+
+    id_50 = db.animal_id("50")
+    id_100 = db.animal_id("100")
+    id_200 = db.animal_id("200")
+    db.execute("UPDATE animales SET madre_id = ?, padre_id = ? WHERE id_animal = ?", (id_100, id_200, id_50))
+
+    import_animales(db, [
+        {"CODANI": "50", "NOMANI": "Vaca 50", "SEXO": "H", "TIPORAZA": "T",
+         "FECNACE": "20200101", "CODPOT": "01", "ESTADO": "1", "OBS": "",
+         "MADRE": "101", "PADRE": "201", "TIPO": "", "FECMUERTE": "",
+         "CAU": "", "MOTIVO": ""},
+    ], {})
+
+    ani = db.query_one("SELECT madre_id, padre_id FROM animales WHERE tag = '50'")
+    assert ani["madre_id"] == id_100
+    assert ani["padre_id"] == id_200
+
+
 def test_import_servicios(db):
-    import_servicios(db, [{"CODANI": "47", "FECHA": "2026-08-15", "TIPO": "IA",
-                           "TORO": "502", "INSEMINA": "01", "EST": ""}])
+    res = import_servicios(db, [{"CODANI": "47", "FECHA": "2026-08-15", "TIPO": "IA",
+                                 "TORO": "502", "INSEMINA": "01", "EST": ""}])
+    assert res == {"nuevos": 1, "duplicados": 0}
     s = db.query_one("SELECT * FROM servicios")
     assert s["tipo_servicio"] == "IA"
     assert s["toro_pajilla"] == "502"
@@ -135,27 +183,115 @@ def test_import_servicios(db):
 
 
 def test_import_pesajes_con_gmd(db):
-    import_pesajes(db, [
+    res = import_pesajes(db, [
         {"CODANI": "12", "FECHA": "2026-01-01", "PESO": 350.0, "EVENTO": "Control"},
         {"CODANI": "12", "FECHA": "2026-03-11", "PESO": 420.0, "EVENTO": "Control"},
     ])
+    assert res == {"nuevos": 2, "duplicados": 0}
     pesajes = db.query("SELECT * FROM pesajes ORDER BY fecha")
     assert len(pesajes) == 2
     assert pesajes[1]["gmd_calculada"] == pytest.approx(70.0 / 69.0, rel=1e-3)
 
 
 def test_import_celos(db):
-    import_celos(db, [{"CODANI": "47", "FECHA": "2026-03-01",
-                       "HORA": "09:00:00 AM", "DETALLE": ""}])
+    res = import_celos(db, [{"CODANI": "47", "FECHA": "2026-03-01",
+                             "HORA": "09:00:00 AM", "DETALLE": ""}])
+    assert res == {"nuevos": 1, "duplicados": 0}
     celo = db.query_one("SELECT * FROM celos")
     assert celo["am_pm"] == "AM"
 
 
 def test_import_traslados(db):
-    import_traslados(db, [{"CODANI": "47", "FECHA": "2026-06-01", "TIPMOV": "S",
-                           "CODPOT": "01", "LOTE": "2", "REGISTROTR": ""}])
+    res = import_traslados(db, [{"CODANI": "47", "FECHA": "2026-06-01", "TIPMOV": "S",
+                                 "CODPOT": "01", "LOTE": "2", "REGISTROTR": ""}])
+    assert res == {"nuevos": 1, "duplicados": 0}
     tr = db.query_one("SELECT * FROM traslados")
     assert tr["lote"] == "2"
+
+
+def test_import_doble_deduplicacion_completa(db):
+    """Importar dos veces el mismo set de DBFs debe dar en la 2da pasada 0 nuevos y todo duplicados."""
+    causas_dbf = build_dbf(
+        [("CODIGO", "C", 5, 0), ("DESC", "C", 30, 0)],
+        [("19", "ACCIDENTE")],
+    )
+    potrero_dbf = build_dbf(
+        [("CODPOT", "C", 5, 0), ("NOMPOT", "C", 20, 0), ("HAS", "N", 6, 2), ("KGHA", "N", 8, 2),
+         ("PASTO1", "C", 10, 0), ("TIPO", "C", 5, 0), ("FEC_ENT", "D", 8, 0), ("FEC_SAL", "D", 8, 0), ("DIA_OCU", "N", 4, 0)],
+        [("01", "Norte", 10.0, 5000.0, "Brachiaria", "L", "20260101", "", 30)],
+    )
+    hoja_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("NOMANI", "C", 20, 0), ("SEXO", "C", 1, 0), ("TIPORAZA", "C", 10, 0),
+         ("FECNACE", "D", 8, 0), ("CODPOT", "C", 5, 0), ("ESTADO", "C", 5, 0), ("OBS", "C", 30, 0),
+         ("MADRE", "C", 10, 0), ("PADRE", "C", 10, 0), ("TIPO", "C", 1, 0), ("FECMUERTE", "D", 8, 0),
+         ("CAU", "C", 5, 0), ("MOTIVO", "C", 30, 0)],
+        [("47", "Mariposa", "H", "Cebú", "20200101", "01", "1", "", "", "", "M", "20260507", "19", "accidente")],
+    )
+    partos_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("FECHA", "D", 8, 0), ("CRIA", "C", 1, 0),
+         ("ABORTO", "C", 1, 0), ("PESNAC", "N", 6, 2), ("HIJO", "C", 10, 0), ("DETALLE", "C", 30, 0)],
+        [("47", "20260501", "M", "", 35.0, "480", "parto normal")],
+    )
+    celos_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("FECHA", "D", 8, 0), ("HORA", "C", 15, 0), ("DETALLE", "C", 30, 0)],
+        [("47", "20260301", "09:00:00 AM", "celo detectado")],
+    )
+    iamn_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("FECHA", "D", 8, 0), ("TIPO", "C", 2, 0),
+         ("TORO", "C", 10, 0), ("INSEMINA", "C", 10, 0), ("EST", "C", 5, 0)],
+        [("47", "20260815", "IA", "502", "01", "")],
+    )
+    pesos_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("FECHA", "D", 8, 0), ("PESO", "N", 6, 2), ("EVENTO", "C", 20, 0)],
+        [("47", "20260101", 350.0, "Control"), ("47", "20260311", 420.0, "Control")],
+    )
+    traslado_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("FECHA", "D", 8, 0), ("TIPMOV", "C", 1, 0),
+         ("CODPOT", "C", 5, 0), ("LOTE", "C", 5, 0), ("REGISTROTR", "C", 30, 0)],
+        [("47", "20260601", "S", "01", "2", "rotacion")],
+    )
+
+    dbf_data = {
+        "causas.dbf": causas_dbf,
+        "potrero.dbf": potrero_dbf,
+        "hoja.dbf": hoja_dbf,
+        "partos.dbf": partos_dbf,
+        "celos.dbf": celos_dbf,
+        "iamn.dbf": iamn_dbf,
+        "pesos.dbf": pesos_dbf,
+        "traslado.dbf": traslado_dbf,
+    }
+
+    # Primera pasada: todo nuevo
+    p1 = import_dbfs(db, dbf_data)
+    for tabla, res in p1.items():
+        assert res["nuevos"] > 0, f"Tabla {tabla} no insertó registros nuevos en pasada 1"
+        assert res["duplicados"] == 0, f"Tabla {tabla} reportó duplicados en pasada 1"
+
+    conteo_animales_p1 = db.count("animales")
+    conteo_partos_p1 = db.count("partos")
+    conteo_celos_p1 = db.count("celos")
+    conteo_servicios_p1 = db.count("servicios")
+    conteo_pesajes_p1 = db.count("pesajes")
+    conteo_traslados_p1 = db.count("traslados")
+    conteo_muertes_p1 = db.count("muertes")
+    conteo_potreros_p1 = db.count("potreros")
+
+    # Segunda pasada: todo duplicado, cero filas nuevas
+    p2 = import_dbfs(db, dbf_data)
+    for tabla, res in p2.items():
+        assert res["nuevos"] == 0, f"Tabla {tabla} insertó filas nuevas en pasada 2"
+        assert res["duplicados"] > 0, f"Tabla {tabla} no contó duplicados en pasada 2"
+
+    # Los conteos en base de datos deben ser exactamente iguales
+    assert db.count("animales") == conteo_animales_p1
+    assert db.count("partos") == conteo_partos_p1
+    assert db.count("celos") == conteo_celos_p1
+    assert db.count("servicios") == conteo_servicios_p1
+    assert db.count("pesajes") == conteo_pesajes_p1
+    assert db.count("traslados") == conteo_traslados_p1
+    assert db.count("muertes") == conteo_muertes_p1
+    assert db.count("potreros") == conteo_potreros_p1
 
 
 # ---------------------------------------------------------------------------
@@ -170,3 +306,9 @@ def test_import_zip_real(db):
     assert db.count("animales") > 0
     assert db.count("partos") > 0
     assert "animales" in conteos
+    assert conteos["animales"]["nuevos"] > 0
+
+    # Segunda pasada sobre el mismo archivo zip: cero nuevos
+    conteos2 = import_zip(db, zip_path)
+    assert conteos2["animales"]["nuevos"] == 0
+    assert conteos2["animales"]["duplicados"] > 0
