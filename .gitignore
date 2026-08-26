@@ -54,3 +54,6 @@ src/server/users.json
 .env
 .env.local
 *.local
+
+# Backup real de Software Ganadero (datos de produccion, fuera del control de versiones)
+docs/*.Zip
