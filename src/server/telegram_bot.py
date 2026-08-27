@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import zipfile
+from datetime import date
 from typing import Optional
 
 from ..bot.bot_interface import Bot
@@ -291,6 +292,30 @@ def descartar_backup_pendiente(uploads_dir: str = "data/uploads") -> bool:
     return eliminado
 
 
+def parsear_args_reporte(args) -> Optional[tuple[int, str]]:
+    """Interpreta los argumentos de /reporte -> (días, etiqueta) o None si inválido.
+
+    - Sin argumentos: semanal (7 días).
+    - "diario": 1 día.
+    - N numérico: N días.
+    - Cualquier otro caso: None.
+    """
+    if not args:
+        return (7, "semanal")
+    if len(args) > 1:
+        return None
+    arg = args[0]
+    if arg == "diario":
+        return (1, "diario")
+    try:
+        dias = int(arg)
+    except (ValueError, TypeError):
+        return None
+    if dias < 1:
+        return None
+    return (dias, f"{dias}d")
+
+
 # ---------------------------------------------------------------------- #
 # Construcción del Bot de Telegram (SDK python-telegram-bot)
 # ---------------------------------------------------------------------- #
@@ -301,6 +326,7 @@ def construir_application(
     media_dir: str = "media",
     log_file: str = "bot.log",
     uploads_dir: str = "data/uploads",
+    reportes_dir: str = "data/reportes",
 ):
     """Construye y configura la Application de Telegram con todos los handlers."""
     try:
@@ -539,7 +565,40 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
-    async def cmd_fase2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def cmd_reporte(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+
+            parsed = parsear_args_reporte(context.args)
+            if parsed is None:
+                await update.message.reply_text(
+                    "Uso: /reporte (semanal por defecto) · /reporte diario · /reporte <N> días"
+                )
+                return
+
+            dias, etiqueta = parsed
+            # Import perezoso para no requerir reportlab salvo que se use /reporte.
+            from ..reports import generar_pdf
+
+            fecha_hoy = date.today()
+            ruta = os.path.join(reportes_dir, f"reporte_{etiqueta}_{fecha_hoy.isoformat()}.pdf")
+            generar_pdf(db, dias, ruta, hoy=fecha_hoy)
+            with open(ruta, "rb") as f:
+                contenido = f.read()
+            await update.message.reply_document(
+                document=contenido, filename=os.path.basename(ruta)
+            )
+        except Exception as e:
+            logger.error("Error en cmd_reporte: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error al generar el reporte: {e}")
+
+    async def cmd_exportar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
                 return
@@ -549,7 +608,7 @@ def construir_application(
                 return
             await update.message.reply_text("⏳ Disponible en Fase 2.")
         except Exception as e:
-            logger.error("Error en cmd_fase2: %s", e, exc_info=True)
+            logger.error("Error en cmd_exportar: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -693,7 +752,8 @@ def construir_application(
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))
-    app.add_handler(CommandHandler(["reporte", "exportar"], cmd_fase2))
+    app.add_handler(CommandHandler("reporte", cmd_reporte))
+    app.add_handler(CommandHandler("exportar", cmd_exportar))
     app.add_handler(CommandHandler("importar", cmd_importar))
     app.add_handler(CommandHandler("confirmar_importar", cmd_confirmar_importar))
     app.add_handler(CommandHandler("descartar_backup", cmd_descartar_backup))
@@ -720,6 +780,7 @@ def correr(
     media_dir: Optional[str] = None,
     log_file: Optional[str] = None,
     uploads_dir: Optional[str] = None,
+    reportes_dir: Optional[str] = None,
 ) -> None:
     """Inicia el bot de Telegram en modo polling con la configuración provista."""
     try:
@@ -739,6 +800,7 @@ def correr(
     media_dir = media_dir or os.getenv("MEDIA_DIR", "media")
     log_file = log_file or os.getenv("LOG_FILE", "bot.log")
     uploads_dir = uploads_dir or os.getenv("UPLOADS_DIR", "data/uploads")
+    reportes_dir = reportes_dir or os.getenv("REPORTES_DIR", "data/reportes")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -765,6 +827,7 @@ def correr(
         media_dir=media_dir,
         log_file=log_file,
         uploads_dir=uploads_dir,
+        reportes_dir=reportes_dir,
     )
     logger.info("Bot de Telegram iniciado correctamente con polling...")
     app.run_polling(drop_pending_updates=True)
