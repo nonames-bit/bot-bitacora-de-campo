@@ -131,6 +131,15 @@ def test_formatear_potreros(db):
     assert "Potrero Norte" in resp
 
 
+def test_formatear_potreros_con_argumento(db):
+    db.registrar_potrero(nombre="Olegario 1", codigo="01")
+    db.registrar_animal("JA400", potrero="01", estado="ACTIVO")
+    resp = formatear_potreros(db, potrero="olegario 1")
+    assert "Olegario 1" in resp
+    assert "1 animal" in resp
+    assert "JA400" in resp
+
+
 def test_formatear_ayuda():
     ayuda_owner = formatear_ayuda("OWNER")
     assert "Propietario / OWNER" in ayuda_owner

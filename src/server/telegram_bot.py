@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import sys
 import time
 import zipfile
@@ -58,9 +59,17 @@ def formatear_historial(db: Database, tag: str, hoy=None) -> str:
     return qe.responder(f"¿cuál es el historial de la {tag_limpio}?")
 
 
-def formatear_potreros(db: Database, hoy=None) -> str:
-    """Devuelve el estado de los potreros listos delegando en el motor de consultas."""
+def formatear_potreros(db: Database, potrero: Optional[str | date] = None, hoy=None) -> str:
+    """Devuelve el estado de los potreros listos o los animales en un potrero específico delegando en el motor de consultas."""
+    if isinstance(potrero, date):
+        hoy = potrero
+        potrero = None
     qe = QueryEngine(db, hoy=hoy)
+    if potrero and str(potrero).strip():
+        p_str = str(potrero).strip()
+        if not re.search(r"\bpotrero", p_str, re.IGNORECASE):
+            p_str = f"potrero {p_str}"
+        return qe.responder(f"animales en {p_str}")
     return qe.responder("¿qué potreros están listos para pastoreo?")
 
 
@@ -608,7 +617,8 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            msg = formatear_potreros(db)
+            arg_potrero = " ".join(context.args).strip() if context.args else None
+            msg = formatear_potreros(db, potrero=arg_potrero)
             await update.message.reply_text(msg)
         except Exception as e:
             logger.error("Error en cmd_potreros: %s", e, exc_info=True)

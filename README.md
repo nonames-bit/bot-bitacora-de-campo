@@ -43,6 +43,7 @@ El bot responde preguntas en lenguaje natural consultando la base de datos, entr
 - «¿qué animales están en retiro?»
 - «¿qué vacas tienen palpación pendiente?»
 - «¿qué potreros están listos?»
+- «¿qué vacas están en el potrero olegario 1?» (búsqueda de animales por potrero)
 - «¿cuál es el historial de la vaca 47?» (historial de animales)
 - «¿cuánto pesó la 12 y cuál fue su ganancia diaria?»
 - «¿cuándo le toca el secado a la 47?»
@@ -84,7 +85,7 @@ implementado todavía.
 | `/historial <tag>` / `/consulta <tag>` | ✅ | ✅ | ✅ |
 | `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
 | `/alertas` | ✅ | ✅ | — |
-| `/potreros` | ✅ | ✅ | — |
+| `/potreros` / `/potreros <nombre>` | ✅ | ✅ | — |
 | `/animales` | ✅ | ✅ | — |
 | `/status` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
@@ -175,7 +176,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **151 pruebas en verde**
+- **Pruebas:** Pytest — **171 pruebas en verde**
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -231,19 +232,19 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Integración de Whisper local (`faster-whisper` / `openai-whisper`) para transcripción de audio en español (`es`)
   - [x] Procesamiento automático en tiempo real de notas de voz en Telegram y CLI con ejecución de eventos y respuestas
   - [x] Resolución flexible de tags alfanuméricos (`N069`, `N-069`, `N 069`) y permisos ampliados para `/consulta`
+- [x] **Integración LLM con NVIDIA NIM (build.nvidia.com)**:
+  - [x] Conector HTTP para modelos en la nube de NVIDIA (ej. `meta/llama-3.3-70b-instruct`, `mistralai/mistral-nemo-12b-instruct`) con fallback automático y sin dependencias pesadas (`src/llm/`).
+  - [x] Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 LLM NVIDIA para jerga compleja, notas con múltiples eventos zootécnicos y extracción JSON estructurada.
+  - [x] Soporte para notas compuestas con múltiples eventos en un solo mensaje y persistencia automática en SQLite.
+  - [x] Configuración de variables de entorno `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env`.
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
-- [x] Suite de pruebas con pytest: **157 pruebas pasando en verde**
+- [x] Suite de pruebas con pytest: **171 pruebas pasando en verde**
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
-- [ ] **Integración LLM con NVIDIA NIM (build.nvidia.com):**
-  - Conector para modelos en la nube de NVIDIA (ej. `meta/llama-3.3-70b-instruct`, `mistralai/mistral-nemo-12b-instruct`) con API Key gratuita.
-  - Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 LLM NVIDIA para jerga de campo compleja, notas con múltiples eventos y extracción JSON estructurada.
-  - Variable de entorno `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env`.
 - [ ] **Fase 3 (Parte 2) — OCR para Fotos:**
   - Reconocimiento de aretes/tags y frascos de medicamentos en fotos de campo.
 
 ### 📋 Hoja de Ruta Pendiente
-- [ ] Pruebas end-to-end de la capa híbrida NLU + LLM NVIDIA.
 - [ ] OCR visual en imágenes de campo.
 
 ---
@@ -261,6 +262,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 │   ├── db/              # Modelos y base de datos SQLite (incluye tabla fotos)
 │   ├── engine/          # Motores reproductivo, sanitario, pasturas, crecimiento, consultas
 │   ├── parsers/         # Parser NLU de eventos + manejador multimodal
+│   ├── llm/               # Cliente NVIDIA NIM + arquitectura NLU híbrida (Capa 1 regex + Capa 2 LLM)
 │   ├── importers/       # Importador DBF nativo (TP/SG)
 │   ├── exporters/       # Exportador DBF nativo y empaquetador ZIP (Fase 2)
 │   ├── reports/         # Generador de reportes en PDF con reportlab (Fase 2)

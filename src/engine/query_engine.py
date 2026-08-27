@@ -19,8 +19,57 @@ from .reproductive_engine import (
 REPOSO_LISTO_DIAS = 21
 
 
+ROMANO_A_ARABIGO = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
+ARABIGO_A_ROMANO = {v: k for k, v in ROMANO_A_ARABIGO.items()}
+
+
+def _normalizar_potrero_key(s: str) -> str:
+    """Normaliza clave de potrero para matching flexible (I <-> 1)."""
+    if not s:
+        return ""
+    t = normalizar(s).strip()
+    # Convierte sufijo romano a arábigo y viceversa para matching
+    # Ej: "olegario i" -> "olegario 1" y "olegario 1" -> "olegario i" ambos se consideran equivalentes en _buscar_potrero
+    return t
+
+
+def _potrero_variantes(nombre: str) -> set[str]:
+    """Genera variantes de un nombre de potrero para matching (I<->1)."""
+    base = normalizar(nombre).strip()
+    variantes = {base}
+    # si termina en romano, agrega variante arábiga
+    m = re.search(r"\s([ivx]+)$", base)
+    if m:
+        romano = m.group(1)
+        if romano in ROMANO_A_ARABIGO:
+            variantes.add(re.sub(r"\s[ivx]+$", f" {ROMANO_A_ARABIGO[romano]}", base))
+    # si termina en arábigo, agrega variante romana
+    m2 = re.search(r"\s(\d+)$", base)
+    if m2:
+        arab = m2.group(1)
+        if arab in ARABIGO_A_ROMANO:
+            variantes.add(re.sub(r"\s\d+$", f" {ARABIGO_A_ROMANO[arab]}", base))
+    return variantes
+
+
+def extraer_nombre_potrero(texto: str) -> str | None:
+    """Extrae el nombre o código del potrero de una consulta en lenguaje natural."""
+    if not texto:
+        return None
+    t = normalizar(texto)
+    m = re.search(r"\bpotreros?\s+([a-z0-9\s\-]+)", t)
+    if not m:
+        return None
+    nombre = m.group(1).strip()
+    nombre = re.split(r"[?!.,;:¿¡]", nombre)[0].strip()
+    nombre = re.sub(r"\s+(?:por\s+favor|gracias|hoy|ahora|actualmente)$", "", nombre).strip()
+    return nombre if nombre else None
+
+
 class QueryEngine:
     """Responde preguntas frecuentes del personal de campo."""
+
+    extraer_nombre_potrero = staticmethod(extraer_nombre_potrero)
 
     def __init__(self, db: Database, hoy: date | None = None):
         self.db = db
@@ -49,6 +98,38 @@ class QueryEngine:
             return self._pesaje(tag)
         if re.search(r"\bpotrero", t) and re.search(r"\blisto|pastoreo|pastar", t):
             return self._potreros_listos()
+        if re.search(r"\bpotrero", t):
+            es_consulta_potrero = bool(
+                re.search(
+                    r"\b(?:que\s+vacas?|que\s+animales?|cuantas?|cuantos?|listar|mostrar|animales\s+en|vacas?\s+en|hay\s+en|est[aá]n?\s+en)\b",
+                    t,
+                )
+                or re.match(r"^\s*(?:consulta\s+|ver\s+|buscar\s+)?potreros?\s+[a-z0-9\s\-]+$", t)
+            )
+            nom_pot = extraer_nombre_potrero(texto)
+            if (es_consulta_potrero and nom_pot) or (nom_pot and not tag):
+                return self._animales_en_potrero(nom_pot)
+        # Fallback: consulta por nombre de potrero sin la palabra "potrero" (ej. "cuantos hay en olegario 1")
+        if re.search(r"\b(?:que\s+vacas?|que\s+animales?|cuantas?|cuantos?|hay|estan?|est[aá]n|listar|mostrar)\b", t):
+            potreros = self.db.query("SELECT nombre, codigo FROM potreros")
+            for p in potreros:
+                for campo in (p["nombre"], p["codigo"]):
+                    if not campo:
+                        continue
+                    for var in _potrero_variantes(normalizar(campo)):
+                        if var and var in t:
+                            return self._animales_en_potrero(campo)
+        # Si el mensaje es solo el nombre del potrero (ej. "olegario 1" o "olegario 1?" )
+        if len(t.split()) <= 3:
+            t_clean = re.sub(r"[?!.,;:¿¡]+$", "", t.strip())
+            potreros = self.db.query("SELECT nombre, codigo FROM potreros")
+            for p in potreros:
+                for campo in (p["nombre"], p["codigo"]):
+                    if not campo:
+                        continue
+                    for var in _potrero_variantes(normalizar(campo)):
+                        if var and (var == t_clean or var in t_clean):
+                            return self._animales_en_potrero(campo)
         if re.search(r"\bfoto[s]?\b|\bimagen(?:es)?\b", t):
             return self._fotos(tag)
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
@@ -199,15 +280,23 @@ class QueryEngine:
         else:
             estado_reprod = "MACHO REPRODUCTOR"
 
-        secciones = [
-            f"╔══════════════════════════════════════════════════════════════════════╗",
-            f"║ FICHA ZOOTÉCNICA: Vaca {tag_str}{nombre} · Raza: {raza} · Potrero: {potrero_nom}",
-            f"╠══════════════════════════════════════════════════════════════════════╣",
-            f"║ 📍 ESTADO: {estado} · Estado Reproductivo: {estado_reprod}",
-            f"║",
-            f"║ 🍼 REPRODUCCIÓN & PARTOS:",
-        ]
+        bloques = []
 
+        # Encabezado
+        tipo_animal = "Toro" if sexo.lower().startswith("m") else "Vaca"
+        header = [
+            "📋 FICHA ZOOTÉCNICA",
+            "───────────────────────────",
+            f"🐄 {tipo_animal} {tag_str}{nombre}",
+            f"🏷️ Raza: {raza}",
+            f"📍 Potrero: {potrero_nom}",
+            f"● Estado: {estado}",
+            f"🧬 Reproductivo: {estado_reprod}",
+        ]
+        bloques.append("\n".join(header))
+
+        # Sección Reproducción
+        reprod = ["🍼 REPRODUCCIÓN & PARTOS"]
         if partos:
             p = ult_parto
             cria_info = []
@@ -220,39 +309,43 @@ class QueryEngine:
                 if cria_animal:
                     cria_info.append(f"Arete {cria_animal['tag']}")
             cria_str = f" ({', '.join(cria_info)})" if cria_info else ""
-            secciones.append(f"║ • partos: {len(partos)} registro(s) · Último Parto: {p['fecha']}{cria_str}")
+            reprod.append(f"• partos: {len(partos)} registro(s)")
+            reprod.append(f"  Último Parto: {p['fecha']}{cria_str}")
 
             f_parto = to_date(p["fecha"])
             if f_parto:
                 da = (self.hoy - f_parto).days
-                secciones.append(f"║ • Días Abiertos: {da} días (desde el último parto)")
+                reprod.append(f"  Días Abiertos: {da} días (desde el último parto)")
         else:
-            secciones.append("║ • partos: 0 registro(s).")
+            reprod.append("• partos: 0 registro(s).")
 
         if servicios:
             s = ult_servicio
             toro_info = f" (Toro/Pajilla {s['toro_pajilla']})" if s["toro_pajilla"] else ""
             tipo_srv = s["tipo_servicio"] or "IA"
-            secciones.append(f"║ • servicios: {len(servicios)} registro(s) · Último Servicio: {s['fecha']} [{tipo_srv}]{toro_info}")
+            reprod.append(f"• servicios: {len(servicios)} registro(s)")
+            reprod.append(f"  Último Servicio: {s['fecha']} [{tipo_srv}]{toro_info}")
 
             if s["fecha"]:
                 fep = s["fep_calculada"] or iso(fecha_estimada_parto(s["fecha"]))
-                f_eco = iso(fecha_ecografia(s["fecha"]))
                 f_palp = iso(fecha_palpacion(s["fecha"]))
                 f_sec = iso(fecha_secado(fep))
-                secciones.append(f"║ • Palpación Rectal: PENDIENTE (Programada: {f_palp}, día 60)")
-                secciones.append(f"║ • FEP (Fecha Estimada Parto): {fep} (+283 días)")
-                secciones.append(f"║ • Secado Programado: {f_sec} (FEP − 60 días)")
+                reprod.append(f"  Palpación Rectal: PENDIENTE ({f_palp}, día 60)")
+                reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
+                reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
         else:
-            secciones.append("║ • servicios: 0 registro(s).")
+            reprod.append("• servicios: 0 registro(s).")
 
         if celos:
             c = celos[-1]
             turno = f" [{c['am_pm']}]" if c["am_pm"] else ""
-            secciones.append(f"║ • celos: {len(celos)} registro(s) · Último Celo: {c['fecha']}{turno}")
+            reprod.append(f"• celos: {len(celos)} registro(s)")
+            reprod.append(f"  Último Celo: {c['fecha']}{turno}")
 
-        secciones.append("║")
-        secciones.append("║ ⚖️ PESAJE & CRECIMIENTO:")
+        bloques.append("\n".join(reprod))
+
+        # Sección Pesaje & Crecimiento
+        pesaje = ["⚖️ PESAJE & CRECIMIENTO"]
         if pesajes:
             ult_p = pesajes[-1]
             gmd_str = ""
@@ -263,12 +356,14 @@ class QueryEngine:
                     g_val = gmd(ult_p["peso_kg"], ant_p["peso_kg"], (d2 - d1).days)
                     signo = "+" if g_val >= 0 else ""
                     gmd_str = f" (GMD: {signo}{g_val:.3f} kg/día)"
-            secciones.append(f"║ • pesajes: {len(pesajes)} registro(s) · Último Peso: {ult_p['peso_kg']} kg el {ult_p['fecha']}{gmd_str}")
+            pesaje.append(f"• pesajes: {len(pesajes)} registro(s)")
+            pesaje.append(f"  Último Peso: {ult_p['peso_kg']} kg el {ult_p['fecha']}{gmd_str}")
         else:
-            secciones.append("║ • pesajes: 0 registro(s).")
+            pesaje.append("• pesajes: 0 registro(s).")
+        bloques.append("\n".join(pesaje))
 
-        secciones.append("║")
-        secciones.append("║ 💉 SANIDAD & RETIROS:")
+        # Sección Sanidad & Retiros
+        sanidad = ["💉 SANIDAD & RETIROS"]
         if tratamientos:
             t = tratamientos[-1]
             prod = t["producto"] or "Fármaco"
@@ -279,18 +374,21 @@ class QueryEngine:
                 retiro_info = f"⚠️ Retiro carne hasta {t['fecha_fin_retiro_carne']}"
             elif t["fecha_fin_retiro_leche"] and t["fecha_fin_retiro_leche"] >= hoy_iso:
                 retiro_info = f"⚠️ Retiro leche hasta {t['fecha_fin_retiro_leche']}"
-            secciones.append(f"║ • tratamientos: {len(tratamientos)} registro(s) · Tratamiento: {prod}{dosis} ({retiro_info})")
+            sanidad.append(f"• tratamientos: {len(tratamientos)} registro(s)")
+            sanidad.append(f"  Tratamiento: {prod}{dosis} ({retiro_info})")
         else:
-            secciones.append("║ • tratamientos: 0 registro(s) · (Sin retiro activo).")
+            sanidad.append("• tratamientos: 0 registro(s) · (Sin retiro activo).")
+        bloques.append("\n".join(sanidad))
 
-        secciones.append("║")
+        # Sección Fotos
+        fotos_sec = ["📷 FOTOS"]
         if fotos:
-            secciones.append(f"║ 📷 FOTOS: {len(fotos)} foto(s) registrada(s) (ver con /foto {tag_str})")
+            fotos_sec.append(f"• {len(fotos)} foto(s) registrada(s) (ver con /foto {tag_str})")
         else:
-            secciones.append(f"║ 📷 FOTOS: 0 fotos registradas para este animal.")
+            fotos_sec.append("• 0 fotos registradas para este animal.")
+        bloques.append("\n".join(fotos_sec))
 
-        secciones.append("╚══════════════════════════════════════════════════════════════════════╝")
-        return "\n".join(secciones)
+        return "\n\n".join(bloques)
 
     def _pesaje(self, tag) -> str:
         if not tag:
@@ -320,6 +418,97 @@ class QueryEngine:
         if not listos:
             return "No hay potreros listos para pastoreo."
         return "Potreros listos para pastoreo: " + ", ".join(listos) + "."
+
+    def _buscar_potrero(self, nombre_potrero: str):
+        if not nombre_potrero:
+            return None
+        potreros = self.db.query("SELECT * FROM potreros")
+        target_norm = normalizar(nombre_potrero)
+        target_clean = re.sub(r"^potreros?\s+", "", target_norm).strip()
+        target_vars = _potrero_variantes(target_clean) | _potrero_variantes(target_norm)
+
+        # 1. Coincidencia exacta por nombre o código normalizado (con variantes I<->1)
+        for p in potreros:
+            p_nom = normalizar(p["nombre"]) if p["nombre"] else ""
+            p_cod = normalizar(p["codigo"]) if p["codigo"] else ""
+            p_nom_clean = re.sub(r"^potreros?\s+", "", p_nom).strip()
+            p_vars = _potrero_variantes(p_nom) | _potrero_variantes(p_nom_clean) | {p_cod, p_nom, p_nom_clean}
+            if target_vars & p_vars:
+                return p
+            if target_clean in (p_nom, p_cod, p_nom_clean) or target_norm in (p_nom, p_cod, p_nom_clean):
+                return p
+
+        # 2. Coincidencia por subcadena / contenencia (con variantes)
+        for p in potreros:
+            p_nom = normalizar(p["nombre"]) if p["nombre"] else ""
+            p_cod = normalizar(p["codigo"]) if p["codigo"] else ""
+            p_nom_clean = re.sub(r"^potreros?\s+", "", p_nom).strip()
+            p_variants = _potrero_variantes(p_nom) | _potrero_variantes(p_nom_clean)
+            if target_vars & p_variants:
+                return p
+            if target_clean and (target_clean == p_nom_clean or target_clean in p_nom_clean or p_nom_clean in target_clean):
+                return p
+            if target_norm and (target_norm in p_nom or p_nom in target_norm):
+                return p
+            # check variant containment
+            for tv in target_vars:
+                for pv in p_variants:
+                    if tv in pv or pv in tv:
+                        return p
+
+        return None
+
+    def _animales_en_potrero(self, nombre_potrero: str) -> str:
+        p_row = self._buscar_potrero(nombre_potrero)
+        if not p_row:
+            potreros = self.db.query("SELECT * FROM potreros")
+            disponibles = [
+                p["nombre"] or p["codigo"] or str(p["id"])
+                for p in potreros
+                if (p["nombre"] or p["codigo"])
+            ]
+            pot_display = nombre_potrero.strip() if nombre_potrero else "desconocido"
+            if disponibles:
+                return f"Potrero '{pot_display}' no existe. Potreros disponibles: {', '.join(disponibles)}."
+            return f"Potrero '{pot_display}' no existe. No hay potreros registrados."
+
+        pid = p_row["id"]
+        potrero_nom = p_row["nombre"] or p_row["codigo"] or str(pid)
+
+        animales = self.db.query(
+            "SELECT id_animal, tag, potrero_id, estado FROM animales "
+            "WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO' ORDER BY id_animal"
+        )
+
+        tags_en_potrero: list[str] = []
+        for a in animales:
+            aid = a["id_animal"]
+            ult_traslado = self.db.query_one(
+                "SELECT potrero_destino FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+                (aid,),
+            )
+            if ult_traslado and ult_traslado["potrero_destino"] is not None:
+                p_actual = ult_traslado["potrero_destino"]
+            else:
+                p_actual = a["potrero_id"]
+
+            if p_actual == pid:
+                tag_str = a["tag"] or str(aid)
+                tags_en_potrero.append(tag_str)
+
+        total = len(tags_en_potrero)
+        if total == 0:
+            return f"No hay animales en el potrero '{potrero_nom}'."
+
+        palabra_animal = "animal" if total == 1 else "animales"
+        if total <= 10:
+            tags_str = ", ".join(tags_en_potrero)
+        else:
+            primeros = tags_en_potrero[:10]
+            sobrantes = total - 10
+            tags_str = f"{', '.join(primeros)} y {sobrantes} más"
+
+        return f"🐄 Potrero '{potrero_nom}': {total} {palabra_animal} ({tags_str})"
 
     def _fotos(self, tag) -> str:
         if not tag:

@@ -150,7 +150,36 @@ Entrada de Texto / Foto
 
 ---
 
-## 🛡️ 5. Matriz de Roles y Permisos (RBAC)
+## 🤖 5. Arquitectura NLU Híbrida (NVIDIA NIM)
+
+El parser implementa dos capas para maximizar velocidad y comprensión de jerga de campo:
+
+| Capa | Motor | Cuándo se activa | Latencia | Dependencias |
+|------|:-----:|---|:---:|---|
+| **Capa 1** | Regex local (`src/parsers/nlp_engine.py`) | Siempre (intento rápido) | <1 ms | Ninguna |
+| **Capa 2** | LLM NVIDIA NIM (`src/llm/nvidia_client.py`) | Texto sin intención conocida, >20 palabras, o múltiples eventos ("y también vacune...") | 800–2500 ms | `NVIDIA_API_KEY` configurada |
+
+- **Endpoint:** `https://integrate.api.nvidia.com/v1/chat/completions` (OpenAI-compatible)
+- **Modelo por defecto:** `meta/llama-3.3-70b-instruct` (configurable vía `NVIDIA_MODEL`; alternativa `mistralai/mistral-nemo-12b-instruct`)
+- **Variables:** `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env` (`NVIDIA_BASE_URL` opcional)
+- **Prompt:** System prompt zootécnico que obliga al LLM a responder solo JSON `{eventos:[{tipo, animal_tag, fecha, datos}]}` para los 8 eventos; soporta notas con múltiples eventos en un solo mensaje.
+- **Fallback:** Si no hay API key (o es placeholder), timeout, error HTTP/URLError o JSON inválido → retorno silencioso a Capa 1 sin tumbar el bot. Logging en `bitacora.llm` sin exponer la key.
+- **Integración:** `EventParser.parse()` retorna `ParsedEvent | list[ParsedEvent]`; `Bot.procesar_texto()` itera y persiste cada evento con sus alertas (`src/bot/bot_interface.py`).
+
+```text
+Texto "parió la 47 y vacune la 12 con 20ml"
+        │
+        ▼
+  EventParser._should_try_llm()? --sí--> try_llm_parse() --> LLM (NIM) --> [parto 47, tratamiento 12]
+        │                                   │ fallo/timeout/sin key
+        │                                   └──────────► fallback
+        ▼
+     regex local (capa 1)
+```
+
+---
+
+## 🛡️ 6. Matriz de Roles y Permisos (RBAC)
 
 | Comando / Recurso | 👑 OWNER | 🛠️ ADMIN | 📋 TRABAJADOR |
 |---|:---:|:---:|:---:|

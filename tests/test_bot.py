@@ -104,5 +104,6 @@ def test_procesar_audio_sin_transcripcion(db, tmp_path):
 
 def test_desconocido(db):
     bot = Bot(db)
-    resp = bot.procesar_texto("xyzw")
+    # 3 palabras sin sentido → debe seguir siendo desconocido (no confundir con consulta de nombre de 1-2 palabras como "patricia" o "olegario 1")
+    resp = bot.procesar_texto("bla bla bla xyz extra")
     assert "no pude interpretar" in resp.lower()

@@ -30,15 +30,26 @@ class Bot:
     # Entradas
     # ------------------------------------------------------------------ #
     def procesar_texto(self, texto: str) -> str:
-        ev = self.parser.parse(texto)
-        if ev.tipo == "consulta":
-            return self.queries.responder(texto)
-        if ev.tipo == "desconocido":
+        resultado = self.parser.parse(texto)
+        eventos = resultado if isinstance(resultado, list) else [resultado]
+
+        respuestas: list[str] = []
+        for ev in eventos:
+            if ev.tipo == "consulta":
+                respuestas.append(self.queries.responder(ev.texto or texto))
+            elif ev.tipo == "desconocido":
+                if len(eventos) == 1:
+                    return "No pude interpretar ese mensaje. Intente una nota como " \
+                           "'pario la 47, ternero macho' o una pregunta."
+            else:
+                self._registrar(ev)
+                self._generar_alertas(ev)
+                respuestas.append(self._confirmacion(ev))
+
+        if not respuestas:
             return "No pude interpretar ese mensaje. Intente una nota como " \
                    "'pario la 47, ternero macho' o una pregunta."
-        self._registrar(ev)
-        self._generar_alertas(ev)
-        return self._confirmacion(ev)
+        return "\n".join(respuestas)
 
     def procesar_audio(self, audio_path: str) -> str:
         try:

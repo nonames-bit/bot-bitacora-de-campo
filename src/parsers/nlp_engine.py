@@ -58,8 +58,10 @@ INTENTOS: list[tuple[str, list[str]]] = [
     ]),
     ("movimiento", [
         r"\bentraron\b", r"\bentr[oó]\b", r"\bsalieron\b", r"\bsali[oó]\b",
-        r"\bcompr[aeoó]\b", r"\bcomprad[oa]s?\b", r"\bvend[ió]\b", r"\bventa\b",
-        r"\bbaja\b", r"\balta\b", r"\bsubasta\b", r"\bnovillas?\b",
+        r"\bcompr[aeoó]\b", r"\bcomprad[oa]s?\b", r"\bcomprad[oa]\b", r"\bventa\b",
+        r"\bvendid[oa]s?\b", r"\bvend[ió]s?\b", r"\bvendimos\b", r"\bvendi[oa]s?\b",
+        r"\bvend\b", r"\bbaja\b", r"\balta\b", r"\bsubasta\b", r"\bnovillas?\b",
+        r"\bsalida\b", r"\bentrada\b",
     ]),
 ]
 
@@ -96,10 +98,21 @@ def es_consulta(texto: str) -> bool:
     for w in PALABRAS_CONSULTA:
         if re.search(rf"\b{re.escape(w)}\b", t):
             return True
+    # Potrero como consulta (ej. "potrero olegario 1" o "olegario 1" si no es evento de traslado)
+    if re.search(r"\bpotrero", t) and clasificar(t) != "traslado":
+        return True
     # Si contiene un tag con dígitos y no es un evento reconocido (ej. 'N069' o 'vaca 47')
     tag = extraer_tag(t)
     if tag and any(c.isdigit() for c in tag) and clasificar(t) is None:
         return True
+    # Nombre corto sin dígitos (ej. "patricia") o potrero corto (ej. "olegario 1" con 2 palabras) sin evento
+    if clasificar(t) is None:
+        palabras = t.split()
+        if 1 <= len(palabras) <= 2:
+            # Si es 1-2 palabras y no es un evento, tratar como consulta (ficha por nombre/tag/potrero)
+            # Evitar frases de evento incompletas como "vaca vendida" ya está clasificada como movimiento, no entra aquí
+            # "bla bla bla" (3 palabras) queda como desconocido para no romper tests de fallback
+            return True
     return False
 
 

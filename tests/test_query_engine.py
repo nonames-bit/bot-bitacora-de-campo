@@ -120,3 +120,96 @@ def test_consulta_animal_alfanumerico(db):
     assert "N069" in resp3
 
 
+def test_animales_en_potrero(db):
+    db.registrar_potrero(nombre="Olegario 1", codigo="01")
+    db.registrar_potrero(nombre="Bajo", codigo="02")
+    db.registrar_animal("JA400", potrero="01", estado="ACTIVO")
+    db.registrar_animal("N067", potrero="01", estado="ACTIVO")
+    db.registrar_animal("47", potrero="01", estado="ACTIVO")
+    db.registrar_animal("99", potrero="02", estado="ACTIVO")
+
+    qe = QueryEngine(db, hoy=HOY)
+
+    # Consulta en lenguaje natural
+    resp1 = qe.responder("que vacas hay en el potrero olegario 1")
+    assert "Olegario 1" in resp1
+    assert "3 animales" in resp1
+    assert "JA400" in resp1
+    assert "N067" in resp1
+    assert "47" in resp1
+    assert "99" not in resp1
+
+    # Otra variante zootécnica
+    resp2 = qe.responder("¿qué vaca está en el potrero olegario 1?")
+    assert "3 animales" in resp2
+    assert "JA400" in resp2
+
+    # Directo comando o texto
+    resp3 = qe.responder("potrero olegario 1")
+    assert "3 animales" in resp3
+    assert "JA400" in resp3
+
+
+def test_animales_en_potrero_con_traslado(db):
+    db.registrar_potrero(nombre="Olegario 1", codigo="01")
+    db.registrar_potrero(nombre="Santa Martha", codigo="02")
+    db.registrar_animal("JA400", potrero="01", estado="ACTIVO")
+    db.registrar_animal("N067", potrero="01", estado="ACTIVO")
+
+    # Trasladar JA400 de Olegario 1 a Santa Martha
+    db.registrar_traslado("JA400", fecha="2026-08-25", potrero_origen="01", potrero_destino="02")
+
+    qe = QueryEngine(db, hoy=HOY)
+
+    resp_orig = qe.responder("que vacas hay en el potrero olegario 1")
+    assert "1 animal" in resp_orig
+    assert "N067" in resp_orig
+    assert "JA400" not in resp_orig
+
+    resp_dest = qe.responder("que vacas estan en potrero santa martha")
+    assert "1 animal" in resp_dest
+    assert "JA400" in resp_dest
+
+
+def test_animales_en_potrero_inexistente_o_vacio(db):
+    db.registrar_potrero(nombre="Olegario 1", codigo="01")
+    db.registrar_potrero(nombre="Bajo", codigo="02")
+    qe = QueryEngine(db, hoy=HOY)
+
+    # Inexistente
+    resp_inex = qe.responder("que vacas hay en el potrero fantasma")
+    assert "fantasma" in resp_inex
+    assert "no existe" in resp_inex
+    assert "Potreros disponibles" in resp_inex
+    assert "Olegario 1" in resp_inex
+
+    # Existente pero vacío
+    resp_vacio = qe.responder("que vacas hay en el potrero bajo")
+    assert "No hay animales en el potrero" in resp_vacio
+    assert "Bajo" in resp_vacio
+
+
+def test_animales_en_potrero_mas_de_diez(db):
+    db.registrar_potrero(nombre="Olegario 1", codigo="01")
+    for i in range(1, 16):
+        db.registrar_animal(f"TAG{i:02d}", potrero="01", estado="ACTIVO")
+
+    qe = QueryEngine(db, hoy=HOY)
+    resp = qe.responder("cuantas vacas hay en el potrero olegario 1")
+    assert "15 animales" in resp
+    assert "TAG01" in resp
+    assert "TAG10" in resp
+    assert "y 5 más" in resp
+
+
+def test_extraer_nombre_potrero_helper():
+    from src.engine.query_engine import extraer_nombre_potrero
+
+    assert extraer_nombre_potrero("que vaca está en el potrero olegario 1") == "olegario 1"
+    assert extraer_nombre_potrero("¿qué vacas hay en el potrero santa martha?") == "santa martha"
+    assert extraer_nombre_potrero("animales en potrero norte") == "norte"
+    assert extraer_nombre_potrero("potrero olegario-1") == "olegario-1"
+    assert extraer_nombre_potrero("¿cuándo parió la 47?") is None
+
+
+

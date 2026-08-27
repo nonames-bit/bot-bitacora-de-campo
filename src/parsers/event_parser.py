@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Optional
+from typing import Optional, Union
 
 from ..utils import iso, normalizar, parse_fecha
 from . import nlp_engine as nlu
@@ -44,12 +44,54 @@ def _causa_muerte(texto_norm: str) -> Optional[str]:
 
 
 class EventParser:
-    """Clasifica y normaliza notas de campo en eventos estructurados."""
+    """Clasifica y normaliza notas de campo en eventos estructurados.
 
-    def __init__(self, hoy: date | None = None):
+    Implementa arquitectura NLU híbrida:
+    - Capa 1: Expresiones regulares locales rápidas (sub-milisegundo).
+    - Capa 2: LLM NVIDIA NIM en la nube para jerga compleja y múltiples eventos.
+    """
+
+    def __init__(self, hoy: date | None = None, use_llm: bool = True):
         self.hoy = hoy or date.today()
+        self.use_llm = use_llm
 
-    def parse(self, texto: str) -> ParsedEvent:
+    def _should_try_llm(self, texto: str, intento_regex: Optional[str]) -> bool:
+        """Determina si la nota amerita consultar la Capa 2 (LLM en la nube)."""
+        if not self.use_llm:
+            return False
+
+        t = normalizar(texto)
+        palabras = t.split()
+
+        # 1. Si regex no identificó intención conocida
+        if intento_regex is None:
+            return True
+
+        # 2. Nota larga (> 20 palabras)
+        if len(palabras) > 20:
+            return True
+
+        # 3. Conectores que sugieren múltiples eventos
+        conectores_multiples = (
+            r"\by\s+tambien\b", r"\by\s+ademas\b", r"\by\s+luego\b", r"\by\s+despues\b",
+            r"\by\s+vacun", r"\by\s+insemin", r"\by\s+pari", r"\by\s+pes",
+            r"\by\s+le\s+puse\b", r"\by\s+se\s+muri", r"\by\s+traslad", r"\by\s+pase\b",
+            r"\by\s+le\s+di\b", r"\by\s+compre\b", r"\by\s+vendi\b",
+        )
+        for c in conectores_multiples:
+            if re.search(c, t):
+                return True
+
+        # 4. Múltiples tags mencionados con múltiples intenciones posibles
+        tags = nlu.extraer_tags(t)
+        if len(tags) >= 2 and len(palabras) > 8:
+            coincidencias = sum(1 for _, patrones in nlu.INTENTOS if any(re.search(p, t) for p in patrones))
+            if coincidencias >= 2:
+                return True
+
+        return False
+
+    def parse(self, texto: str) -> Union[ParsedEvent, list[ParsedEvent]]:
         if texto is None:
             texto = ""
         t = normalizar(texto)
@@ -59,6 +101,18 @@ class EventParser:
             return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
 
         intento = nlu.clasificar(texto)
+
+        # Capa 2: Si el texto es complejo o desconocido, intentar LLM si está configurado
+        if self._should_try_llm(texto, intento):
+            try:
+                from ..llm.nvidia_client import try_llm_parse
+                llm_res = try_llm_parse(texto, hoy=self.hoy)
+                if llm_res is not None:
+                    return llm_res
+            except Exception:
+                pass  # Fallback silencioso a Capa 1 (regex)
+
+        # Capa 1: Regex local rápida
         if intento is None:
             return ParsedEvent(tipo="desconocido", texto=texto, fecha=fecha)
 
@@ -69,6 +123,13 @@ class EventParser:
         if handler:
             handler(ev, t)
         return ev
+
+    def parse_events(self, texto: str) -> list[ParsedEvent]:
+        """Garantiza retornar una lista de ParsedEvent (1 o más)."""
+        res = self.parse(texto)
+        if isinstance(res, list):
+            return res
+        return [res]
 
     # ------------------------------------------------------------------ #
     # Handlers por evento
