@@ -41,6 +41,8 @@ class QueryEngine:
             return self._pesaje(tag)
         if re.search(r"\bpotrero", t) and re.search(r"\blisto|pastoreo|pastar", t):
             return self._potreros_listos()
+        if re.search(r"\bfoto[s]?\b|\bimagen(?:es)?\b", t):
+            return self._fotos(tag)
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
             return self._ultimo_parto(tag)
         return self._ayuda()
@@ -168,6 +170,18 @@ class QueryEngine:
         if not listos:
             return "No hay potreros listos para pastoreo."
         return "Potreros listos para pastoreo: " + ", ".join(listos) + "."
+
+    def _fotos(self, tag) -> str:
+        if not tag:
+            fotos = self.db.ultimas_fotos(5)
+            if not fotos:
+                return "No hay fotos registradas en la bitácora."
+            tags = [f["tag"] or "?" for f in fotos]
+            return f"Hay {len(fotos)} fotos recientes (animales: {', '.join(tags)}). Usa /fotos para verlas."
+        fotos = self.db.fotos_de(tag, 5)
+        if not fotos:
+            return f"No hay fotos registradas para la {tag}."
+        return f"Hay {len(fotos)} foto(s) de la {tag}. Puedes verlas con el comando /foto {tag}."
 
     def _ayuda(self) -> str:
         return (

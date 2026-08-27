@@ -47,21 +47,42 @@ class Bot:
             return f"No se pudo transcribir el audio: {e}"
         return self.procesar_texto(transcript.texto)
 
-    def procesar_imagen(self, image_path: str) -> str:
+    def procesar_imagen(self, image_path: str, caption: Optional[str] = None,
+                        animal_tag: Optional[str] = None, user_id: Optional[int] = None) -> str:
+        tag = animal_tag
+        texto_evento = caption or ""
+        info = None
         try:
             info = extract_image_info(image_path)
-        except MediaError as e:
-            return f"No se pudo procesar la imagen: {e}"
-        if info.texto_detectado:
-            return self.procesar_texto(info.texto_detectado)
-        partes = []
-        if info.tags:
-            partes.append("arete(s): " + ", ".join(info.tags))
-        if info.frascos:
-            partes.append("frasco(s): " + ", ".join(info.frascos))
-        if partes:
-            return "Foto recibida. " + "; ".join(partes) + "."
-        return "Foto recibida, sin información relevante detectada."
+            if info.tags and not tag:
+                tag = info.tags[0]
+            if info.texto_detectado:
+                texto_evento = info.texto_detectado
+        except MediaError:
+            pass
+
+        self.db.registrar_foto(
+            ruta=image_path, animal_tag=tag, fecha=iso(self.hoy),
+            caption=caption or (info.texto_detectado if info else None),
+            user_id=user_id,
+        )
+
+        if texto_evento:
+            return self.procesar_texto(texto_evento)
+
+        if info:
+            partes = []
+            if info.tags:
+                partes.append("arete(s): " + ", ".join(info.tags))
+            if info.frascos:
+                partes.append("frasco(s): " + ", ".join(info.frascos))
+            if partes:
+                return "Foto recibida. " + "; ".join(partes) + "."
+            return "Foto recibida, sin información relevante detectada."
+
+        if tag:
+            return f"📷 Foto recibida y asociada al animal {tag}."
+        return "📷 Foto recibida y guardada."
 
     # ------------------------------------------------------------------ #
     # Registro de eventos en SQLite

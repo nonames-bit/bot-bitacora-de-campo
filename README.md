@@ -87,12 +87,13 @@ implementado todavía.
 | `/animales` | ✅ | ✅ | — |
 | `/status` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
+| `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
+| `/reporte` [diario\|semanal\|N] | ✅ | ✅ | — |
+| `/exportar` | ✅ | ✅ | — |
 | `/importar` (guía) | ✅ | ✅ | — |
 | Enviar archivo `.zip` como documento | ✅ | ✅ | — |
 | `/confirmar_importar` | ✅ | ✅ | — |
 | `/descartar_backup` | ✅ | ✅ | — |
-| `/reporte` *(stub Fase 2)* | ✅ | ✅ | — |
-| `/exportar` *(stub Fase 2)* | ✅ | ✅ | — |
 | `/agregar_usuario` | ✅ | — | — |
 | `/quitar_usuario` | ✅ | — | — |
 | `/logs` | ✅ | — | — |
@@ -100,15 +101,17 @@ implementado todavía.
 ### Comandos principales
 
 - **Todos los roles:** `/start` y `/help` (ayuda adaptada al rol), **texto libre**
-  con los 8 eventos zootécnicos, **nota de voz** y **foto** (se guardan en `media/`;
-  la transcripción automática llega en una fase posterior).
+  con los 8 eventos zootécnicos, **nota de voz**, **foto** (con detección de tag y eventos
+  en el pie de foto; se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
+  consultar imágenes de los animales.
 - **OWNER y ADMIN:** `/alertas`, `/historial <tag>`, `/potreros`, `/animales`,
-  `/status`, `/usuarios`, `/importar` (guía de importación), enviar el `.zip` del
-  backup directamente como documento por el chat, `/confirmar_importar` (procesa el
-  backup pendiente) y `/descartar_backup` (elimina el backup pendiente sin procesar).
+  `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF),
+  `/exportar` (genera y envía el archivo ZIP con las 8 tablas DBF para Software Ganadero),
+  `/importar` (guía de importación), enviar el `.zip` del backup directamente como
+  documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
+  `/descartar_backup` (elimina el backup pendiente sin procesar).
   Límite de Telegram: **20 MB**; archivos más pesados se suben por SSH y se importan
-  con `scripts/importar_backup.sh`. Los stubs `/reporte` y `/exportar` (**Fase 2**)
-  aún no tienen funcionalidad.
+  con `scripts/importar_backup.sh` (ver [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)).
 - **Solo OWNER:** `/agregar_usuario <user_id> <ROL> [nombre]`,
   `/quitar_usuario <user_id>` y `/logs`.
 
@@ -170,7 +173,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **122 pruebas en verde**
+- **Pruebas:** Pytest — **140 pruebas en verde**
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -193,7 +196,12 @@ python -m src.importers.dbf_importer
 #    Equivalente con la ruta explícita del Zip:
 python src/main.py --importar docs/Datos20260823.Zip
 
-# 4. Ejecución de la suite de pruebas
+# 4. Exportación de SQLite a paquete ZIP para Software Ganadero (Fase 2)
+python src/main.py --exportar
+#    O con ruta personalizada:
+python src/main.py --exportar data/exports/MiBackup.Zip
+
+# 5. Ejecución de la suite de pruebas
 pytest
 ```
 
@@ -205,21 +213,25 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 ## 📍 Estado Actual
 
 ### ✅ Completado
-- [x] Modelos y base SQLite (`src/db/`): animales, partos, celos, servicios, tratamientos, pesajes, potreros, traslados y alertas
-- [x] Motores (`src/engine/`): reproductivo, sanitario, pasturas, crecimiento y consultas (Q&A)
+- [x] Modelos y base SQLite (`src/db/`): animales, partos, celos, servicios, tratamientos, pesajes, potreros, traslados, alertas y fotos
+- [x] Motores (`src/engine/`): reproductivo, sanitario, pasturas, crecimiento y consultas (Q&A con soporte de fotos)
 - [x] Parser NLU de 8 eventos + manejador multimodal de voz/foto/texto (`src/parsers/`)
 - [x] Importador DBF nativo de backups TP/SG (`src/importers/`)
 - [x] Interfaz del bot (CLI interactivo y flags) (`src/bot/`)
 - [x] **Fase 1 — Bot de Telegram multiusuario** (`src/server/`): RBAC (OWNER/ADMIN/TRABAJADOR), scripts de despliegue VPS (`scripts/`) y backup diario automático
 - [x] **Fase 1.1 — Sincronización de backups**: importador DBF deduplicado (llaves naturales animal+fecha+tipo) y flujo `/importar` por Telegram en dos pasos (`/confirmar_importar` / `/descartar_backup`)
-- [x] Suite de pruebas con pytest: **122 pruebas pasando en verde** (98 previas + 18 de Fase 1 + 6 de Fase 1.1)
+- [x] **Fase 2 — Reportes PDF, Fotos y Exportador DBF**:
+  - [x] Reportes en PDF (`src/reports/`): comando `/reporte` con resúmenes diarios, semanales o personalizados, tablas zootécnicas y alertas
+  - [x] Gestión de fotos vinculadas a animales: almacenamiento en `media/`, registro en SQLite, detección en captions y comando `/fotos [tag]`
+  - [x] Exportador DBF nativo (`src/exporters/`): serializador `DBFWriter` para las 8 tablas y exportación de paquetes ZIP vía `/exportar` y CLI `--exportar`
+- [x] Suite de pruebas con pytest: **140 pruebas pasando en verde** (98 previas + 18 de Fase 1 + 6 de Fase 1.1 + 18 de Fase 2)
 
 ### ⏳ En Progreso
 - [ ] Integración con Whisper/OCR reales (actualmente simulados vía archivos `.txt` acompañantes)
 
 ### 📋 Tareas Pendientes
 - [ ] Documentación y diagramas en `docs/` (Fase 1 añadió `DESPLIEGUE_DIGITALOCEAN.md` y `TELEGRAM_GUIA_USUARIO.md`; faltan diagramas)
-- [ ] **Fase 2:** fotos consultables desde el bot, reportes PDF y exportador DBF compatible con Software Ganadero (sin subida automática)
+- [ ] **Fase 3:** Whisper real local para notas de voz y OCR de aretes
 
 ---
 
@@ -229,20 +241,22 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 ├── AGENTS.md            # Reglas e instrucciones para IAs
 ├── CLAUDE.md            # Guía para Claude Code
 ├── README.md            # Estado y especificaciones del proyecto
-├── requirements.txt     # Dependencias Python (pytest, python-telegram-bot, python-dotenv)
+├── requirements.txt     # Dependencias Python (pytest, python-telegram-bot, python-dotenv, reportlab)
 ├── .env.example         # Plantilla de variables de entorno (TELEGRAM_TOKEN, etc.)
 ├── src/                 # Código fuente principal
-│   ├── main.py          # Punto de entrada (CLI y flag --server)
-│   ├── db/              # Modelos y base de datos SQLite
+│   ├── main.py          # Punto de entrada (CLI y flags --server, --importar, --exportar)
+│   ├── db/              # Modelos y base de datos SQLite (incluye tabla fotos)
 │   ├── engine/          # Motores reproductivo, sanitario, pasturas, crecimiento, consultas
 │   ├── parsers/         # Parser NLU de eventos + manejador multimodal
 │   ├── importers/       # Importador DBF nativo (TP/SG)
+│   ├── exporters/       # Exportador DBF nativo y empaquetador ZIP (Fase 2)
+│   ├── reports/         # Generador de reportes en PDF con reportlab (Fase 2)
 │   ├── bot/             # Interfaz del bot (CLI)
-│   └── server/          # Bot de Telegram + autenticación RBAC (Fase 1)
-├── docs/                # Documentación y backups (Datos20260823.Zip)
-├── tests/               # Pruebas y validación (pytest)
+│   └── server/          # Bot de Telegram + autenticación RBAC (Fases 1, 1.1, 2)
+├── docs/                # Documentación y guías
+├── tests/               # Pruebas y validación (pytest — 140 pruebas)
 └── scripts/             # Automatizaciones VPS y utilidades
-    ├── setup_vps.sh         # Configuración inicial del droplet (Ubuntu 22.04)
+    ├── setup_vps.sh         # Configuración inicial del droplet (Ubuntu 22.04 / 24.04)
     ├── iniciar_bot.sh       # Arranque del bot en modo servidor
     ├── backup_diario.sh     # Respaldo diario de SQLite (retención 30 días)
     └── importar_backup.sh   # Importación de backups DBF (Software Ganadero)

@@ -6,6 +6,7 @@ import sys
 
 from src.bot.bot_interface import Bot
 from src.db.database import Database
+from src.exporters.dbf_exporter import export_zip
 from src.importers.dbf_importer import import_zip
 
 
@@ -16,6 +17,7 @@ def main(argv=None) -> int:
     parser.add_argument("--db", default=None, help="Ruta de la base SQLite")
     parser.add_argument("--server", action="store_true", help="Inicia el bot de Telegram en modo servidor")
     parser.add_argument("--importar", help="Ruta al Zip de datos DBF (Software Ganadero)")
+    parser.add_argument("--exportar", nargs="?", const="AUTO", help="Exporta la base SQLite a un paquete Zip compatible con Software Ganadero")
     parser.add_argument("--texto", help="Procesa un mensaje de texto y termina")
     parser.add_argument("--audio", help="Procesa un archivo de audio")
     parser.add_argument("--imagen", help="Procesa un archivo de imagen")
@@ -33,7 +35,16 @@ def main(argv=None) -> int:
         conteos = import_zip(db, args.importar)
         print("Importación completada:", conteos)
 
+    if args.exportar:
+        out_path = None if args.exportar == "AUTO" else args.exportar
+        zip_generado = export_zip(db, out_path)
+        print(f"Exportación completada exitosamente: {zip_generado}")
+
     bot = Bot(db)
+
+    if args.exportar and not (args.texto or args.audio or args.imagen):
+        db.close()
+        return 0
 
     if args.texto:
         print(bot.procesar_texto(args.texto))

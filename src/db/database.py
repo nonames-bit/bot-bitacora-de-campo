@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import date
 from typing import Any, Optional
 
 from ..utils import iso, to_date
@@ -234,6 +235,32 @@ class Database:
             descripcion=descripcion,
         ))
 
+    def registrar_foto(self, ruta: str, animal_tag=None, fecha=None,
+                       caption=None, user_id=None, notas=None) -> int:
+        tag_str = str(animal_tag).strip() if animal_tag else None
+        animal_id = self.resolve_animal(tag_str, crear=True) if tag_str else None
+        fecha_iso = iso(fecha) or date.today().isoformat()
+        return self.insert("fotos", dict(
+            animal_id=animal_id, tag=tag_str, fecha=fecha_iso,
+            ruta=ruta, caption=caption, user_id=user_id, notas=notas,
+        ))
+
+    def fotos_de(self, animal_tag_or_id, limit: int = 5) -> list[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        tag_str = str(animal_tag_or_id).strip()
+        if aid is not None:
+            return self.query(
+                "SELECT * FROM fotos WHERE animal_id = ? OR tag = ? ORDER BY id DESC LIMIT ?",
+                (aid, tag_str, limit),
+            )
+        return self.query(
+            "SELECT * FROM fotos WHERE tag = ? ORDER BY id DESC LIMIT ?",
+            (tag_str, limit),
+        )
+
+    def ultimas_fotos(self, limit: int = 10) -> list[sqlite3.Row]:
+        return self.query("SELECT * FROM fotos ORDER BY id DESC LIMIT ?", (limit,))
+
     # ------------------------------------------------------------------ #
     # Consultas frecuentes
     # ------------------------------------------------------------------ #
@@ -265,6 +292,7 @@ class Database:
         aid = self.resolve_animal(animal_tag_or_id)
         if aid is None:
             return {}
+        tag = self.get_animal(aid)["tag"] if self.get_animal(aid) else str(aid)
         return {
             "partos": self.query("SELECT * FROM partos WHERE vaca_id = ? OR id_cria = ? ORDER BY fecha", (aid, aid)),
             "servicios": self.query("SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha", (aid,)),
@@ -274,6 +302,7 @@ class Database:
             "traslados": self.query("SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "pesajes": self.query("SELECT * FROM pesajes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "movimientos": self.query("SELECT * FROM movimientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
+            "fotos": self.query("SELECT * FROM fotos WHERE animal_id = ? OR tag = ? ORDER BY fecha", (aid, tag)),
         }
 
     # ------------------------------------------------------------------ #

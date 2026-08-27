@@ -128,12 +128,23 @@ CREATE TABLE IF NOT EXISTS alertas (
     estado TEXT,
     descripcion TEXT
 );
+
+CREATE TABLE IF NOT EXISTS fotos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER,
+    tag TEXT,
+    fecha TEXT,
+    ruta TEXT NOT NULL,
+    caption TEXT,
+    user_id INTEGER,
+    notas TEXT
+);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "pesajes", "movimientos", "alertas",
+    "tratamientos", "traslados", "pesajes", "movimientos", "alertas", "fotos",
 ]
 
 
@@ -261,3 +272,16 @@ class Potrero:
     dias_reposo: Optional[int] = None
     dias_ocupacion: Optional[int] = None
     id: Optional[int] = None
+
+
+@dataclass
+class Foto:
+    ruta: str
+    animal_id: Optional[int] = None
+    tag: Optional[str] = None
+    fecha: Optional[str] = None
+    caption: Optional[str] = None
+    user_id: Optional[int] = None
+    notas: Optional[str] = None
+    id: Optional[int] = None
+

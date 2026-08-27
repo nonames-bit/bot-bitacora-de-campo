@@ -13,6 +13,7 @@ from ..bot.bot_interface import Bot
 from ..db.database import Database
 from ..engine.query_engine import QueryEngine
 from ..importers.dbf_importer import import_zip
+from ..parsers import nlp_engine as nlu
 from .auth import Auth
 
 logger = logging.getLogger("bitacora.bot")
@@ -150,10 +151,11 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• /historial <tag> - Historial de un animal\n"
             "• /potreros - Potreros listos para pastoreo\n"
             "• /animales - Resumen de inventario\n"
+            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
             "• /status - Estado del sistema y base de datos\n"
             "• /usuarios - Lista de usuarios y roles\n"
-            "• /reporte - Generar reporte (Fase 2)\n"
-            "• /exportar - Exportar datos (Fase 2)\n"
+            "• /reporte [diario|semanal|N] - Generar reporte en PDF\n"
+            "• /exportar - Descargar backup ZIP para Software Ganadero\n"
             "• /importar - Instrucciones para importar backup DBF\n"
             "• /confirmar_importar - Procesar backup subido\n"
             "• /descartar_backup - Eliminar backup pendiente\n\n"
@@ -174,10 +176,11 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• /historial <tag> - Historial de un animal\n"
             "• /potreros - Potreros listos para pastoreo\n"
             "• /animales - Resumen de inventario\n"
+            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
             "• /status - Estado del sistema y base de datos\n"
             "• /usuarios - Lista de usuarios y roles\n"
-            "• /reporte - Generar reporte (Fase 2)\n"
-            "• /exportar - Exportar datos (Fase 2)\n"
+            "• /reporte [diario|semanal|N] - Generar reporte en PDF\n"
+            "• /exportar - Descargar backup ZIP para Software Ganadero\n"
             "• /importar - Instrucciones para importar backup DBF\n"
             "• /confirmar_importar - Procesar backup subido\n"
             "• /descartar_backup - Eliminar backup pendiente"
@@ -407,10 +410,33 @@ def construir_application(
             foto = photos[-1]
             os.makedirs(media_dir, exist_ok=True)
             ts = int(time.time())
-            dest_path = os.path.join(media_dir, f"foto_{user_id}_{ts}.jpg")
+            caption = (update.message.caption or "").strip()
+            tag = nlu.extraer_tag(caption) if caption else None
+
+            dest_path = os.path.join(media_dir, f"foto_{tag or user_id}_{ts}.jpg")
             archivo = await context.bot.get_file(foto.file_id)
             await archivo.download_to_drive(dest_path)
-            await update.message.reply_text("📷 Foto recibida y guardada.")
+
+            # Registrar en la base de datos
+            db.registrar_foto(
+                ruta=dest_path,
+                animal_tag=tag,
+                caption=caption or None,
+                user_id=user_id,
+                fecha=date.today().isoformat(),
+            )
+
+            # Si el caption contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
+            if caption and nlu.clasificar(caption) is not None:
+                bot_engine = Bot(db)
+                resp_evento = bot_engine.procesar_texto(caption)
+                await update.message.reply_text(
+                    f"📷 Foto registrada y vinculada a {tag or 'evento'}.\n\n{resp_evento}"
+                )
+            elif tag:
+                await update.message.reply_text(f"📷 Foto guardada y vinculada a la {tag}.")
+            else:
+                await update.message.reply_text("📷 Foto recibida y guardada en la bitácora.")
         except Exception as e:
             logger.error("Error en handle_photo: %s", e, exc_info=True)
             if update.message:
@@ -598,6 +624,53 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error al generar el reporte: {e}")
 
+    async def cmd_fotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+
+            tag = context.args[0].strip() if context.args else None
+            if tag:
+                filas = db.fotos_de(tag, limit=3)
+                if not filas:
+                    await update.message.reply_text(f"📷 No hay fotos registradas para el animal {tag}.")
+                    return
+                for r in filas:
+                    ruta = r["ruta"]
+                    fec = r["fecha"] or "sin fecha"
+                    cap = f" ({r['caption']})" if r["caption"] else ""
+                    pie = f"📷 Animal {tag} - {fec}{cap}"
+                    if os.path.exists(ruta):
+                        with open(ruta, "rb") as f:
+                            await update.message.reply_photo(photo=f, caption=pie)
+                    else:
+                        await update.message.reply_text(f"📷 Registro de foto ({fec}), pero el archivo local no está disponible.")
+            else:
+                # Mostrar últimas fotos registradas
+                filas = db.ultimas_fotos(limit=5)
+                if not filas:
+                    await update.message.reply_text("📷 No hay fotos registradas en la bitácora.")
+                    return
+                for r in filas:
+                    ruta = r["ruta"]
+                    tag_foto = r["tag"] or "Sin tag"
+                    fec = r["fecha"] or "sin fecha"
+                    cap = f" - {r['caption']}" if r["caption"] else ""
+                    pie = f"📷 Tag {tag_foto} [{fec}]{cap}"
+                    if os.path.exists(ruta):
+                        with open(ruta, "rb") as f:
+                            await update.message.reply_photo(photo=f, caption=pie)
+                    else:
+                        await update.message.reply_text(f"📷 Foto {tag_foto} [{fec}] (archivo no disponible en servidor).")
+        except Exception as e:
+            logger.error("Error en cmd_fotos: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error al consultar fotos: {e}")
+
     async def cmd_exportar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -606,11 +679,28 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            await update.message.reply_text("⏳ Disponible en Fase 2.")
+
+            from ..exporters import export_zip
+
+            exports_dir = os.path.join(os.path.dirname(uploads_dir), "exports")
+            os.makedirs(exports_dir, exist_ok=True)
+            hoy_str = date.today().strftime("%Y%m%d")
+            ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
+
+            zip_generado = export_zip(db, ruta_zip)
+            with open(zip_generado, "rb") as f:
+                contenido = f.read()
+
+            tam_mb = len(contenido) / (1024 * 1024)
+            await update.message.reply_document(
+                document=contenido,
+                filename=os.path.basename(zip_generado),
+                caption=f"📦 Exportación de Software Ganadero SG ({tam_mb:.2f} MB).\nContiene las 8 tablas DBF listas para sincronización."
+            )
         except Exception as e:
             logger.error("Error en cmd_exportar: %s", e, exc_info=True)
             if update.message:
-                await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error al exportar: {e}")
 
     async def cmd_importar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
@@ -750,6 +840,7 @@ def construir_application(
     app.add_handler(CommandHandler("historial", cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler("animales", cmd_animales))
+    app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
     app.add_handler(CommandHandler("status", cmd_status))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))
     app.add_handler(CommandHandler("reporte", cmd_reporte))
