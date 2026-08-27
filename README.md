@@ -234,11 +234,17 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
 - [x] Suite de pruebas con pytest: **157 pruebas pasando en verde**
 
-### ⏳ En Progreso
-- [ ] OCR de aretes y frascos de medicamentos en fotos (Fase 3 Parte 2)
+### ⏳ En Progreso / Planificado para la Próxima Sesión
+- [ ] **Integración LLM con NVIDIA NIM (build.nvidia.com):**
+  - Conector para modelos en la nube de NVIDIA (ej. `meta/llama-3.3-70b-instruct`, `mistralai/mistral-nemo-12b-instruct`) con API Key gratuita.
+  - Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 LLM NVIDIA para jerga de campo compleja, notas con múltiples eventos y extracción JSON estructurada.
+  - Variable de entorno `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env`.
+- [ ] **Fase 3 (Parte 2) — OCR para Fotos:**
+  - Reconocimiento de aretes/tags y frascos de medicamentos en fotos de campo.
 
-### 📋 Tareas Pendientes
-- [ ] **Fase 3 (Parte 2):** OCR real de aretes y frascos en fotos de campo
+### 📋 Hoja de Ruta Pendiente
+- [ ] Pruebas end-to-end de la capa híbrida NLU + LLM NVIDIA.
+- [ ] OCR visual en imágenes de campo.
 
 ---
 
