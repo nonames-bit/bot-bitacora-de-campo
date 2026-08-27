@@ -126,3 +126,14 @@ def test_registrar_foto_y_consultas(db):
     assert "fotos" in h
     assert len(h["fotos"]) == 1
 
+
+def test_resolver_animal_tags_flexibles(db):
+    aid = db.registrar_animal("N-069", nombre="Negra")
+    assert db.animal_id("N069") == aid
+    assert db.animal_id("n069") == aid
+    assert db.animal_id("N-069") == aid
+    assert db.animal_id("N 069") == aid
+    assert db.animal_id("Negra") == aid
+    assert db.resolve_animal("n069") == aid
+
+

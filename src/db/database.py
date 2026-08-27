@@ -60,11 +60,27 @@ class Database:
     # Resolución de identificadores
     # ------------------------------------------------------------------ #
     def animal_id(self, tag) -> Optional[int]:
-        if tag is None or tag == "":
+        if tag is None:
             return None
         t = str(tag).strip()
+        if not t:
+            return None
         row = self.query_one(
             "SELECT id_animal FROM animales WHERE tag = ? OR UPPER(tag) = UPPER(?) LIMIT 1", (t, t)
+        )
+        if row:
+            return int(row["id_animal"])
+
+        # Intentar coincidencia normalizada (sin guiones ni espacios)
+        t_clean = t.upper().replace("-", "").replace(" ", "").replace(".", "")
+        row = self.query_one(
+            """
+            SELECT id_animal FROM animales
+            WHERE REPLACE(REPLACE(REPLACE(UPPER(tag), '-', ''), ' ', ''), '.', '') = ?
+               OR UPPER(nombre) = UPPER(?)
+            LIMIT 1
+            """,
+            (t_clean, t),
         )
         return int(row["id_animal"]) if row else None
 

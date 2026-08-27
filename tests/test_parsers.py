@@ -151,3 +151,32 @@ def test_extraer_tag_alfanumerico_y_limpieza_timestamp(parser):
     ev_directo = parser.parse("N069")
     assert ev_directo.tipo == "consulta"
 
+
+def test_transcribe_audio_sidecar(tmp_path):
+    from src.parsers.media_handler import transcribe_audio, MediaError
+    audio = tmp_path / "nota_voz.ogg"
+    audio.write_bytes(b"dummy audio")
+    sidecar = tmp_path / "nota_voz.ogg.txt"
+    sidecar.write_text("pario la 47 ternero macho", encoding="utf-8")
+
+    res = transcribe_audio(str(audio))
+    assert res.texto == "pario la 47 ternero macho"
+    assert res.origen == "sidecar"
+
+
+def test_transcribe_audio_transcriber_callback():
+    from src.parsers.media_handler import transcribe_audio
+    dummy_audio = "fake_audio.ogg"
+    res = transcribe_audio(dummy_audio, transcriber=lambda p: "se murio el 105")
+    assert res.texto == "se murio el 105"
+    assert res.origen == "transcriber"
+
+
+def test_transcribe_audio_sin_transcripcion_error(tmp_path):
+    from src.parsers.media_handler import transcribe_audio, MediaError
+    import pytest
+    audio_inexistente = str(tmp_path / "sin_texto.ogg")
+    with pytest.raises(MediaError):
+        transcribe_audio(audio_inexistente)
+
+

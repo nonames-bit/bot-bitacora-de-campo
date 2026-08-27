@@ -14,6 +14,7 @@ from ..db.database import Database
 from ..engine.query_engine import QueryEngine
 from ..importers.dbf_importer import import_zip
 from ..parsers import nlp_engine as nlu
+from ..parsers.media_handler import MediaError, transcribe_audio
 from .auth import Auth
 
 logger = logging.getLogger("bitacora.bot")
@@ -219,8 +220,10 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "📝 Bitácora & Consultas:\n"
             "• Envía notas de texto de eventos (partos, celos, servicios, tratamientos, pesajes, etc.)\n"
             "• Haz preguntas en lenguaje natural (ej. '¿cuándo parió la 47?')\n"
-            "• Envía notas de voz con reportes de campo\n"
+            "• Envía notas de voz con reportes de campo (transcripción automática)\n"
             "• Envía fotos de aretes o tratamientos\n"
+            "• /consulta <tag> o /historial <tag> - Consultar ficha zootécnica de un animal\n"
+            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
             "• /start o /help - Mostrar esta ayuda"
         )
     return "⛔ No autorizado."
@@ -416,9 +419,24 @@ def construir_application(
             dest_path = os.path.join(media_dir, f"voz_{user_id}_{ts}.ogg")
             archivo = await context.bot.get_file(voice.file_id)
             await archivo.download_to_drive(dest_path)
-            await update.message.reply_text(
-                "🎤 Audio recibido y guardado. La transcripción automática llega en Fase 3."
-            )
+
+            bot_engine = Bot(db)
+            try:
+                transcript = transcribe_audio(dest_path)
+                texto_audio = transcript.texto.strip()
+                if texto_audio:
+                    resp_evento = bot_engine.procesar_texto(texto_audio)
+                    await update.message.reply_text(
+                        f"🎤 Audio transcrito:\n«{texto_audio}»\n\n{resp_evento}"
+                    )
+                else:
+                    await update.message.reply_text(
+                        "🎤 Audio recibido, pero no se detectaron palabras legibles en la grabación."
+                    )
+            except MediaError as me:
+                await update.message.reply_text(
+                    f"🎤 Audio recibido y guardado ({os.path.basename(dest_path)}).\n⚠️ Nota: {me}"
+                )
         except Exception as e:
             logger.error("Error en handle_voice: %s", e, exc_info=True)
             if update.message:
@@ -545,7 +563,7 @@ def construir_application(
             if not update.effective_user or not update.message:
                 return
             user_id = update.effective_user.id
-            if not auth.puede_administrar(user_id):
+            if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
 

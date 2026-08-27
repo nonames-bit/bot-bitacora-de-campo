@@ -268,3 +268,22 @@ def test_formatear_fotos_vacio_y_con_datos(db):
     assert "Últimas fotos registradas (1)" in resp_ultimas
     assert "Tag 47" in resp_ultimas
 
+
+def test_ayuda_trabajador_incluye_consulta_y_fotos():
+    ayuda = formatear_ayuda("TRABAJADOR")
+    assert "/consulta" in ayuda
+    assert "/fotos" in ayuda
+    assert "transcripción automática" in ayuda
+
+
+def test_formatear_historial_con_tag_alfanumerico(db):
+    db.registrar_animal(tag="N069", nombre="Negra", raza="Gyr")
+    db.registrar_parto(vaca_tag="N069", fecha="2026-08-23", sexo_cria="Macho")
+
+    resp = formatear_historial(db, "N069")
+    assert "FICHA ZOOTÉCNICA" in resp
+    assert "N069" in resp
+    assert "Negra" in resp
+    assert "partos: 1" in resp
+
+

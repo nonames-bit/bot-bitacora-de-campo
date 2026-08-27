@@ -7,12 +7,19 @@ dependencias externas.
 """
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+logger = logging.getLogger("bitacora.media")
+
 AUDIO_EXT = (".wav", ".ogg", ".mp3", ".m4a", ".opus", ".webm", ".oga")
 IMAGE_EXT = (".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif")
+
+# Singleton de modelo Whisper en memoria para reutilización eficiente
+_WHISPER_MODEL = None
+_WHISPER_BACKEND = None
 
 
 class MediaError(Exception):
@@ -47,24 +54,95 @@ def _read_sidecar(path: str) -> Optional[str]:
     return None
 
 
+def _get_whisper_model():
+    """Carga y cachea el modelo Whisper disponible (faster-whisper o openai-whisper)."""
+    global _WHISPER_MODEL, _WHISPER_BACKEND
+    if _WHISPER_MODEL is not None:
+        return _WHISPER_MODEL, _WHISPER_BACKEND
+
+    model_size = os.getenv("WHISPER_MODEL", "base")
+    device = os.getenv("WHISPER_DEVICE", "cpu")
+    compute_type = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
+
+    # 1. Intentar faster-whisper (más rápido y ligero en CPU)
+    try:
+        from faster_whisper import WhisperModel
+        logger.info("Cargando modelo faster-whisper ('%s', device='%s', compute_type='%s')...",
+                    model_size, device, compute_type)
+        _WHISPER_MODEL = WhisperModel(model_size, device=device, compute_type=compute_type)
+        _WHISPER_BACKEND = "faster-whisper"
+        return _WHISPER_MODEL, _WHISPER_BACKEND
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Fallo al inicializar faster-whisper: %s", e)
+
+    # 2. Intentar openai-whisper
+    try:
+        import whisper
+        logger.info("Cargando modelo openai-whisper ('%s')...", model_size)
+        _WHISPER_MODEL = whisper.load_model(model_size)
+        _WHISPER_BACKEND = "openai-whisper"
+        return _WHISPER_MODEL, _WHISPER_BACKEND
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.warning("Fallo al inicializar openai-whisper: %s", e)
+
+    return None, None
+
+
+def _transcribe_with_local_whisper(audio_path: str) -> Optional[AudioTranscript]:
+    """Ejecuta transcripción con el modelo Whisper local si está disponible."""
+    model, backend = _get_whisper_model()
+    if model is None:
+        return None
+
+    try:
+        if backend == "faster-whisper":
+            segments, info = model.transcribe(audio_path, language="es", beam_size=5)
+            texto = " ".join(seg.text.strip() for seg in segments).strip()
+            conf = getattr(info, "avg_logprob", 1.0)
+            return AudioTranscript(texto=texto, origen=f"faster-whisper ({getattr(info, 'language', 'es')})", confianza=float(conf))
+        elif backend == "openai-whisper":
+            result = model.transcribe(audio_path, language="es")
+            texto = result.get("text", "").strip()
+            return AudioTranscript(texto=texto, origen="openai-whisper (es)")
+    except Exception as e:
+        logger.error("Error transcribiendo audio con %s: %s", backend, e)
+        raise MediaError(f"Error en transcripción Whisper: {e}") from e
+
+    return None
+
+
 def transcribe_audio(audio_path: str,
                      transcriber: Optional[Callable[[str], str]] = None) -> AudioTranscript:
     """Transcribe un audio a texto.
 
-    Si se inyecta ``transcriber`` (por ejemplo un stub de Whisper) se usa este;
-    en su defecto se busca un ``.txt`` acompañante con la transcripción.
+    Prioridad:
+    1. Transcriber inyectado explícitamente (callback/stub).
+    2. Archivo sidecar ``.txt`` acompañante (si existe).
+    3. Whisper local (faster-whisper / openai-whisper).
     """
     if audio_path.endswith(".txt"):
         with open(audio_path, encoding="utf-8") as f:
             return AudioTranscript(f.read().strip(), origen="sidecar-txt")
-    sidecar = _read_sidecar(audio_path)
+
     if transcriber is not None:
         return AudioTranscript(transcriber(audio_path), origen="transcriber")
+
+    sidecar = _read_sidecar(audio_path)
     if sidecar is not None:
         return AudioTranscript(sidecar, origen="sidecar")
+
+    # Intentar Whisper real local
+    res = _transcribe_with_local_whisper(audio_path)
+    if res is not None:
+        return res
+
     raise MediaError(
-        f"Whisper no disponible y no hay transcripción para '{audio_path}'. "
-        f"Proporcione un archivo {audio_path}.txt o un transcriber."
+        f"Whisper no está instalado y no hay transcripción acompañante para '{audio_path}'. "
+        f"Instala faster-whisper ('pip install faster-whisper') o proporciona {audio_path}.txt."
     )
 
 

@@ -1,4 +1,4 @@
-﻿# 🚀 Bot de Bitácora de Campo Ganadero
+# 🚀 Bot de Bitácora de Campo Ganadero
 
 > **Dominio:** [FINCA] Finca y Gestión Agropecuaria > Gestión Integral (todos los módulos de Finca)  
 > **Fecha de Creación:** 2026-08-24  
@@ -79,15 +79,15 @@ implementado todavía.
 |------------------|:--------:|:---------:|:--------------:|
 | `/start`, `/help` | ✅ | ✅ | ✅ |
 | Texto libre (8 eventos) | ✅ | ✅ | ✅ |
-| Nota de voz | ✅ | ✅ | ✅ |
+| Nota de voz (Whisper) | ✅ | ✅ | ✅ |
 | Foto | ✅ | ✅ | ✅ |
+| `/historial <tag>` / `/consulta <tag>` | ✅ | ✅ | ✅ |
+| `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
 | `/alertas` | ✅ | ✅ | — |
-| `/historial <tag>` | ✅ | ✅ | — |
 | `/potreros` | ✅ | ✅ | — |
 | `/animales` | ✅ | ✅ | — |
 | `/status` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
-| `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
 | `/reporte` [diario\|semanal\|N] | ✅ | ✅ | — |
 | `/exportar` | ✅ | ✅ | — |
 | `/importar` (guía) | ✅ | ✅ | — |
@@ -101,7 +101,9 @@ implementado todavía.
 ### Comandos principales
 
 - **Todos los roles:** `/start` y `/help` (ayuda adaptada al rol), **texto libre**
-  con los 8 eventos zootécnicos, **nota de voz**, **foto** (con detección de tag y eventos
+  con los 8 eventos zootécnicos, **nota de voz** (transcripción automática con Whisper
+  y ejecución del evento o consulta), `/consulta <tag>` / `/historial <tag>` (ficha zootécnica
+  completa del animal), **foto** (con detección de tag y eventos
   en el pie de foto; se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
   consultar imágenes de los animales.
 - **OWNER y ADMIN:** `/alertas`, `/historial <tag>`, `/potreros`, `/animales`,
@@ -225,14 +227,18 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Gestión de fotos vinculadas a animales: almacenamiento en `media/`, registro en SQLite, detección en captions y comando `/fotos [tag]`
   - [x] Exportador DBF nativo (`src/exporters/`): serializador `DBFWriter` para las 8 tablas y exportación de paquetes ZIP vía `/exportar` y CLI `--exportar`
   - [x] Exportadores adicionales CSV y JSON vía `/exportar csv` y `/exportar json`
+- [x] **Fase 3 (Parte 1) — Notas de Voz con Whisper**:
+  - [x] Integración de Whisper local (`faster-whisper` / `openai-whisper`) para transcripción de audio en español (`es`)
+  - [x] Procesamiento automático en tiempo real de notas de voz en Telegram y CLI con ejecución de eventos y respuestas
+  - [x] Resolución flexible de tags alfanuméricos (`N069`, `N-069`, `N 069`) y permisos ampliados para `/consulta`
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
-- [x] Suite de pruebas con pytest: **151 pruebas pasando en verde** (98 previas + 18 de Fase 1 + 6 de Fase 1.1 + 29 de Fase 2 y validaciones)
+- [x] Suite de pruebas con pytest: **157 pruebas pasando en verde**
 
 ### ⏳ En Progreso
-- [ ] Integración con Whisper/OCR reales (actualmente simulados vía archivos `.txt` acompañantes)
+- [ ] OCR de aretes y frascos de medicamentos en fotos (Fase 3 Parte 2)
 
 ### 📋 Tareas Pendientes
-- [ ] **Fase 3:** Whisper real local para notas de voz y OCR de aretes
+- [ ] **Fase 3 (Parte 2):** OCR real de aretes y frascos en fotos de campo
 
 ---
 
