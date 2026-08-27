@@ -137,3 +137,17 @@ def test_parse_fecha_hoy(parser):
     ev = parser.parse("pario la 47 hoy")
     assert ev.fecha is not None
     assert ev.fecha == parser.hoy.isoformat()
+
+
+def test_extraer_tag_alfanumerico_y_limpieza_timestamp(parser):
+    assert nlu.extraer_tag("consulta N069") == "n069"
+    assert nlu.extraer_tag("/consulta N06910:13 PM") == "n069"
+    assert nlu.extraer_tag("N069") == "n069"
+    assert nlu.extraer_tag("ficha de la N069 10:13 PM") == "n069"
+
+    ev = parser.parse("consulta N069")
+    assert ev.tipo == "consulta"
+
+    ev_directo = parser.parse("N069")
+    assert ev_directo.tipo == "consulta"
+

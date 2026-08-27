@@ -18,6 +18,8 @@ PALABRAS_CONSULTA = (
     "que", "cual", "cuales", "cuando", "cuanto", "cuantos", "cuantas",
     "como", "quien", "quienes", "donde", "adonde", "porque", "existe",
     "existen", "hay", "tiene", "tienen", "cual es", "historial",
+    "consulta", "consultar", "ficha", "info", "informacion", "hoja de vida",
+    "buscar", "ver", "muestrame", "dame",
 )
 
 # Intenciones en orden de prioridad (la primera que haga match gana).
@@ -67,7 +69,9 @@ INTENTOS: list[tuple[str, list[str]]] = [
 PREFIJOS_TAG = (
     "la", "el", "vaca", "vacas", "animal", "ternera", "ternero", "becerro",
     "becerra", "novilla", "novillo", "vaquilla", "vaquillona", "cria",
-    "torete", "a la", "a el", "de la", "de el",
+    "torete", "a la", "a el", "de la", "de el", "consulta", "consultar",
+    "ficha", "historial", "info", "informacion", "arete", "tag", "numero",
+    "nro", "ver", "buscar",
 )
 
 # Palabras que no son tags de animal aunque vayan precedidas de "la"/"el".
@@ -76,18 +80,26 @@ PALABRAS_NO_TAG = {
     "pradera", "subasta", "finca", "norte", "sur", "bajo", "alto",
     "vaca", "vacas", "animal", "animales", "ternera", "ternero", "becerro",
     "becerra", "novilla", "novillo", "vaquilla", "vaquillona", "cria",
-    "toro", "torete", "cria", "crias",
+    "toro", "torete", "cria", "crias", "parto", "celo", "servicio",
+    "tratamiento", "pesaje", "traslado", "muerte", "movimiento",
 }
 
 
 def es_consulta(texto: str) -> bool:
     """Determina si el mensaje es una pregunta/consulta y no un evento."""
+    if not texto:
+        return False
     t = normalizar(texto)
-    if "?" in t:
+    t = re.sub(r"\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b", "", t, flags=re.IGNORECASE).strip()
+    if "?" in t or "¿" in t:
         return True
     for w in PALABRAS_CONSULTA:
-        if re.match(rf"^{re.escape(w)}\b", t):
+        if re.search(rf"\b{re.escape(w)}\b", t):
             return True
+    # Si contiene un tag con dígitos y no es un evento reconocido (ej. 'N069' o 'vaca 47')
+    tag = extraer_tag(t)
+    if tag and any(c.isdigit() for c in tag) and clasificar(t) is None:
+        return True
     return False
 
 
@@ -102,17 +114,43 @@ def clasificar(texto: str) -> Optional[str]:
 
 
 def extraer_tags(texto: str) -> list[str]:
-    """Extrae los tags de animales mencionados (ej. 'la 47' → '47')."""
+    """Extrae los tags de animales mencionados (ej. 'la 47' → '47', 'N069' → 'n069')."""
+    if not texto:
+        return []
     t = normalizar(texto)
+    # Limpiar timestamp si viene pegado al final (ej. N06910:13 PM o 10:13)
+    t = re.sub(r"\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b", "", t, flags=re.IGNORECASE).strip()
+    # Limpiar comando /consulta o /historial al inicio
+    t = re.sub(r"^/[a-z_]+\s*", "", t).strip()
+
     tags: list[str] = []
+
+    # 1. Búsqueda por prefijo
     for pref in PREFIJOS_TAG:
-        pat = rf"\b{re.escape(pref)}\s+([a-z0-9]{{1,12}})\b"
+        pat = rf"\b{re.escape(pref)}\s+([a-z0-9\-]{{1,12}})\b"
         for m in re.finditer(pat, t):
-            val = m.group(1)
-            if val in PALABRAS_NO_TAG:
+            val = m.group(1).strip("-")
+            val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
+            if val in PALABRAS_NO_TAG or not val:
                 continue
             if val not in tags:
                 tags.append(val)
+
+    # 2. Búsqueda de identificadores alfanuméricos con letras y dígitos (ej. n069, a301, h12, n-069)
+    for m in re.finditer(r"\b([a-z]{1,3}-?\d{1,6})\b", t):
+        val = m.group(1).strip("-")
+        val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
+        if val not in PALABRAS_NO_TAG and val and val not in tags:
+            tags.append(val)
+
+    # 3. Si el texto completo es sólo un número o código simple (ej. "47" o "N069")
+    palabras = t.split()
+    if len(palabras) == 1:
+        val = palabras[0].strip()
+        val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
+        if val not in PALABRAS_NO_TAG and val and val not in tags:
+            tags.append(val)
+
     return tags
 
 

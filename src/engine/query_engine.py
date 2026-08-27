@@ -41,9 +41,9 @@ class QueryEngine:
             return self._secado(tag)
         if re.search(r"\bretiro\b", t):
             return self._en_retiro()
-        if re.search(r"\b(?:historial|ficha|hoja de vida|consulta|info|informacion|datos)\b", t) and tag:
+        if re.search(r"\b(?:historial|ficha|hoja de vida|consulta|info|informacion|datos|buscar|ver)\b", t) and tag:
             return self._historial(tag)
-        if re.search(r"\bhistorial\b|\bficha\b", t):
+        if re.search(r"\b(?:historial|ficha|consulta)\b", t):
             return self._historial(tag)
         if re.search(r"\bpes[oó]\b|\bganancia\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
@@ -53,6 +53,8 @@ class QueryEngine:
             return self._fotos(tag)
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
             return self._ultimo_parto(tag)
+        if tag and len(t.split()) <= 2 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto)\b", t):
+            return self._historial(tag)
         return self._ayuda()
 
     # ------------------------------------------------------------------ #

@@ -62,8 +62,9 @@ class Database:
     def animal_id(self, tag) -> Optional[int]:
         if tag is None or tag == "":
             return None
+        t = str(tag).strip()
         row = self.query_one(
-            "SELECT id_animal FROM animales WHERE tag = ?", (str(tag).strip(),)
+            "SELECT id_animal FROM animales WHERE tag = ? OR UPPER(tag) = UPPER(?) LIMIT 1", (t, t)
         )
         return int(row["id_animal"]) if row else None
 

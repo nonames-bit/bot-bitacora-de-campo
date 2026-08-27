@@ -548,12 +548,35 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            if not context.args or len(context.args) != 1:
-                await update.message.reply_text("Uso: /historial <tag>")
+
+            raw_text = update.message.text or ""
+            # Limpiar posibles timestamps de copy-paste (ej. 10:13 PM)
+            clean_text = re.sub(r"\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b", "", raw_text, flags=re.IGNORECASE).strip()
+
+            tag = None
+            if context.args:
+                arg0 = context.args[0]
+                # Si el timestamp quedó adherido (ej. N06910:13)
+                arg_clean = re.sub(r"\d{1,2}:\d{2}.*", "", arg0, flags=re.IGNORECASE).strip()
+                tag = arg_clean or arg0
+            if not tag:
+                tag = nlu.extraer_tag(clean_text)
+
+            if not tag:
+                await update.message.reply_text("Uso: /consulta <tag> o /historial <tag> (ej. /consulta N069)")
                 return
-            tag = context.args[0]
+
             msg = formatear_historial(db, tag)
             await update.message.reply_text(msg)
+
+            # Si el animal tiene fotos registradas y el archivo existe, enviar foto
+            fotos = db.fotos_de(tag, limit=1)
+            if fotos and fotos[0]["ruta"] and os.path.exists(fotos[0]["ruta"]):
+                try:
+                    with open(fotos[0]["ruta"], "rb") as f:
+                        await update.message.reply_photo(photo=f, caption=f"📷 Foto {tag}")
+                except Exception:
+                    pass
         except Exception as e:
             logger.error("Error en cmd_historial: %s", e, exc_info=True)
             if update.message:
@@ -893,7 +916,7 @@ def construir_application(
     # Handlers de comandos
     app.add_handler(CommandHandler(["start", "help"], cmd_start_help))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
-    app.add_handler(CommandHandler("historial", cmd_historial))
+    app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal", "buscar"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))

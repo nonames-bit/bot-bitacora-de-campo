@@ -99,3 +99,24 @@ def test_consulta_fotos(db):
     resp_nadie = qe.responder("fotos de la 999")
     assert "No hay fotos registradas para la 999" in resp_nadie
 
+
+def test_consulta_animal_alfanumerico(db):
+    db.registrar_animal("N069", nombre="Paloma", sexo="Hembra", raza="Brahman")
+    db.registrar_parto("N069", fecha="2026-05-10", sexo_cria="Macho", peso_nacimiento=34.0)
+    qe = QueryEngine(db, hoy=HOY)
+
+    resp1 = qe.responder("consulta N069")
+    assert "FICHA ZOOTÉCNICA" in resp1
+    assert "N069" in resp1
+    assert "Paloma" in resp1
+    assert "Días Abiertos" in resp1
+
+    resp2 = qe.responder("/consulta N06910:13 PM")
+    assert "FICHA ZOOTÉCNICA" in resp2
+    assert "N069" in resp2
+
+    resp3 = qe.responder("N069")
+    assert "FICHA ZOOTÉCNICA" in resp3
+    assert "N069" in resp3
+
+
