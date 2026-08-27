@@ -61,40 +61,42 @@ def formatear_potreros(db: Database, hoy=None) -> str:
     return qe.responder("¿qué potreros están listos para pastoreo?")
 
 
+def _contar_activos(db: Database) -> int:
+    """Cuenta los animales con estado ACTIVO (inventario vivo actual)."""
+    row = db.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO'")
+    return int(row["n"]) if row else 0
+
+
 def formatear_animales(db: Database) -> str:
-    """Genera un resumen del inventario de animales por sexo y estado."""
+    """Genera un resumen del inventario de animales activos y del histórico."""
     total = db.count("animales")
     if total == 0:
         return "📊 Inventario de animales: 0 registrados."
 
-    filas_sexo = db.query("SELECT sexo, COUNT(*) as c FROM animales GROUP BY sexo")
-    sexos: dict[str, int] = {}
+    activos = _contar_activos(db)
+    filas_sexo = db.query(
+        "SELECT sexo, COUNT(*) as c FROM animales WHERE estado = 'ACTIVO' GROUP BY sexo"
+    )
+    hembras = 0
+    machos = 0
     for r in filas_sexo:
         s = (r["sexo"] or "Sin especificar").strip()
-        sexos[s] = sexos.get(s, 0) + int(r["c"])
+        if s == "Hembra":
+            hembras = int(r["c"])
+        elif s == "Macho":
+            machos = int(r["c"])
 
-    filas_estado = db.query(
-        "SELECT estado, COUNT(*) as c FROM animales WHERE estado IS NOT NULL AND estado != '' GROUP BY estado"
-    )
-    estados_str = (
-        ", ".join(f"{r['estado']}: {r['c']}" for r in filas_estado)
-        if filas_estado
-        else "Sin estados registrados"
-    )
-
-    partes_sexo = [f"{k}: {v}" for k, v in sorted(sexos.items())]
     lineas = [
         "📊 Inventario de Animales:",
-        f"• Total: {total}",
-        f"• Sexo: {', '.join(partes_sexo)}",
-        f"• Estados: {estados_str}",
+        f"🐄 Activos: {activos} (♀ {hembras} · ♂ {machos}) · Histórico total: {total}",
     ]
     return "\n".join(lineas)
 
 
 def formatear_status(db: Database, db_path: Optional[str] = None) -> str:
     """Genera un reporte del estado del sistema, conteos y tamaño de base de datos."""
-    n_animales = db.count("animales")
+    n_activos = _contar_activos(db)
+    n_total_animales = db.count("animales")
     tablas_eventos = [
         "partos", "servicios", "celos", "tratamientos",
         "pesajes", "traslados", "muertes", "movimientos",
@@ -112,7 +114,8 @@ def formatear_status(db: Database, db_path: Optional[str] = None) -> str:
 
     lineas = [
         "🖥️ Estado del Sistema:",
-        f"• Animales registrados: {n_animales}",
+        f"• Animales activos: {n_activos}",
+        f"• Histórico total de animales: {n_total_animales}",
         f"• Total de eventos zootécnicos: {total_eventos}",
         f"• Alertas pendientes: {n_alertas}",
         f"• Tamaño de base de datos: {size_str}",

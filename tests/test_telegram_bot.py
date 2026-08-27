@@ -51,21 +51,34 @@ def test_formatear_animales_con_datos(db):
     db.registrar_animal(tag="201", sexo="Macho", estado="DESCARTADO")
 
     resp = formatear_animales(db)
-    assert "Total: 3" in resp
-    assert "Hembra: 2" in resp
-    assert "Macho: 1" in resp
-    assert "ACTIVO: 2" in resp
-    assert "DESCARTADO: 1" in resp
+    assert "Activos: 2" in resp
+    assert "♀ 2" in resp
+    assert "♂ 0" in resp
+    assert "Histórico total: 3" in resp
+
+
+def test_formatear_animales_cuenta_solo_activos(db):
+    db.registrar_animal(tag="101", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal(tag="102", sexo="Macho", estado="ACTIVO")
+    db.registrar_animal(tag="103", sexo="Hembra", estado="MUERTO")
+    db.registrar_animal(tag="104", sexo="Macho", estado="VENDIDO")
+
+    resp = formatear_animales(db)
+    assert "Activos: 2" in resp
+    assert "♀ 1" in resp
+    assert "♂ 1" in resp
+    assert "Histórico total: 4" in resp
 
 
 def test_formatear_status_memoria_y_archivo(db, tmp_path):
     # En memoria
-    db.registrar_animal(tag="47")
+    db.registrar_animal(tag="47", estado="ACTIVO")
     db.registrar_parto("47", "2026-01-01", sexo_cria="Macho")
     db.registrar_alerta("47", "SECADO", "2026-11-01")
 
     resp_mem = formatear_status(db, ":memory:")
-    assert "Animales registrados: 1" in resp_mem
+    assert "Animales activos: 1" in resp_mem
+    assert "Histórico total de animales: 1" in resp_mem
     assert "Total de eventos zootécnicos: 1" in resp_mem
     assert "Alertas pendientes: 1" in resp_mem
     assert "en memoria" in resp_mem

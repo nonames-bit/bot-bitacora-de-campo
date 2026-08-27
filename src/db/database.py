@@ -75,7 +75,12 @@ class Database:
             return None
         aid = self.animal_id(tag)
         if aid is None and crear:
-            aid = self.insert("animales", {"tag": tag, **campos})
+            datos = {"tag": tag, **campos}
+            # Los animales creados sin estado explícito (ej. crías de partos
+            # registrados por Telegram) se consideran ACTIVOS por defecto.
+            if "estado" not in datos:
+                datos["estado"] = "ACTIVO"
+            aid = self.insert("animales", datos)
         return aid
 
     def get_animal(self, tag_or_id) -> Optional[sqlite3.Row]:

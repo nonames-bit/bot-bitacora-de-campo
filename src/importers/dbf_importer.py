@@ -28,6 +28,24 @@ TIPO_NUM = ("N", "F")
 TIPO_ENTERO = "I"
 TIPO_DATETIME = "T"
 
+# Convención SG (Software Ganadero): el discriminador real del estado de un
+# animal en ``hoja.dbf`` es el campo TIPO, no ESTADO (que suele llegar vacío o
+# NULL). La regla es: '' (vivo/activo), M (muerto), V (vendido), T (trasladado)
+# y O (otro). Cualquier valor desconocido se interpreta como ACTIVO por
+# seguridad (default seguro).
+TIPO_A_ESTADO = {
+    "": "ACTIVO",
+    "M": "MUERTO",
+    "V": "VENDIDO",
+    "T": "TRASLADADO",
+    "O": "OTRO",
+}
+
+
+def _estado_desde_tipo(tipo) -> str:
+    """Deriva el estado del animal desde el campo TIPO de SG (strip + upper)."""
+    return TIPO_A_ESTADO.get((tipo or "").strip().upper(), "ACTIVO")
+
 
 def _dbf_fecha(raw: str) -> Optional[str]:
     """Convierte una fecha DBF 'YYYYMMDD' a ISO 'YYYY-MM-DD' (o None)."""
@@ -225,7 +243,7 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             raza=(r.get("TIPORAZA") or "").strip() or None,
             fecha_nacimiento=r.get("FECNACE"),
             potrero=(r.get("CODPOT") or "").strip() or None,
-            estado=(r.get("ESTADO") or "").strip() or None,
+            estado=_estado_desde_tipo(r.get("TIPO")),
             notas=(r.get("OBS") or "").strip() or None,
         )
         tags.append((tag, r))

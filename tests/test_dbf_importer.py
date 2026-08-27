@@ -118,6 +118,26 @@ def test_import_animales_y_muertes(db):
     assert muerte["causa_presunta"] == "ACCIDENTE"
 
 
+def test_import_animales_estado_desde_tipo(db):
+    """El campo TIPO de SG determina el estado del animal (no ESTADO)."""
+    base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
+            "FECMUERTE": "", "CAU": "", "MOTIVO": ""}
+    registros = [
+        {**base, "CODANI": "1", "TIPO": "V"},
+        {**base, "CODANI": "2", "TIPO": "M"},
+        {**base, "CODANI": "3", "TIPO": "T"},
+        {**base, "CODANI": "4", "TIPO": "O"},
+        {**base, "CODANI": "5", "TIPO": ""},
+        {**base, "CODANI": "6", "TIPO": "x"},  # desconocido -> ACTIVO
+    ]
+    import_animales(db, registros, {})
+    esperados = {"1": "VENDIDO", "2": "MUERTO", "3": "TRASLADADO",
+                 "4": "OTRO", "5": "ACTIVO", "6": "ACTIVO"}
+    for tag, estado in esperados.items():
+        assert db.get_animal(tag)["estado"] == estado, f"tag {tag}"
+
+
 def test_import_partos(db):
     res = import_partos(db, [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "M",
                               "ABORTO": "", "PESNAC": 35.0, "HIJO": "480", "DETALLE": ""}])

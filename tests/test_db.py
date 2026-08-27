@@ -24,6 +24,17 @@ def test_resolver_animal_id(db):
     assert db.resolve_animal("9999") is None
 
 
+def test_resolve_animal_crear_asigna_activo_por_defecto(db):
+    aid = db.resolve_animal("500", crear=True)
+    assert aid is not None
+    assert db.get_animal("500")["estado"] == "ACTIVO"
+
+
+def test_resolve_animal_crear_respeta_estado_explicito(db):
+    db.resolve_animal("501", crear=True, estado="MUERTO")
+    assert db.get_animal("501")["estado"] == "MUERTO"
+
+
 def test_registrar_parto_enlaza_cria(db):
     db.registrar_parto(vaca_tag="47", fecha="2026-08-24", sexo_cria="Macho",
                        estado_cria="VIVO", peso_nacimiento=35.0, id_cria_tag="480")
