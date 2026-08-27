@@ -95,6 +95,34 @@ def formatear_animales(db: Database) -> str:
     return "\n".join(lineas)
 
 
+def formatear_fotos(db: Database, tag: Optional[str] = None, limite: int = 5) -> str:
+    """Genera un reporte en texto de las fotos registradas en la bitácora."""
+    if tag:
+        tag_str = tag.strip()
+        filas = db.fotos_de(tag_str, limit=limite)
+        if not filas:
+            return f"No hay fotos registradas para el animal {tag_str}."
+        lineas = [f"📷 Fotos de la {tag_str} ({len(filas)}):"]
+        for r in filas:
+            fec = r["fecha"] or "sin fecha"
+            nom = os.path.basename(r["ruta"]) if r["ruta"] else "foto"
+            cap = f" - {r['caption']}" if r["caption"] else ""
+            lineas.append(f"• [{fec}] {nom}{cap}")
+        return "\n".join(lineas)
+
+    filas = db.ultimas_fotos(limit=limite)
+    if not filas:
+        return "No hay fotos registradas en la bitácora."
+    lineas = [f"📷 Últimas fotos registradas ({len(filas)}):"]
+    for r in filas:
+        t = r["tag"] or "Sin tag"
+        fec = r["fecha"] or "sin fecha"
+        nom = os.path.basename(r["ruta"]) if r["ruta"] else "foto"
+        cap = f" - {r['caption']}" if r["caption"] else ""
+        lineas.append(f"• [{fec}] Tag {t}: {nom}{cap}")
+    return "\n".join(lineas)
+
+
 def formatear_status(db: Database, db_path: Optional[str] = None) -> str:
     """Genera un reporte del estado del sistema, conteos y tamaño de base de datos."""
     n_activos = _contar_activos(db)
@@ -680,14 +708,42 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
 
-            from ..exporters import export_zip
+            from ..exporters import (
+                export_csv_zip,
+                export_json_zip,
+                export_zip,
+                parsear_args_exportar,
+            )
 
+            parsed = parsear_args_exportar(context.args)
+            if parsed is None:
+                await update.message.reply_text(
+                    "Uso: /exportar (DBF/Software Ganadero por defecto) · /exportar csv · /exportar json"
+                )
+                return
+
+            formato, etiqueta = parsed
             exports_dir = os.path.join(os.path.dirname(uploads_dir), "exports")
             os.makedirs(exports_dir, exist_ok=True)
             hoy_str = date.today().strftime("%Y%m%d")
-            ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
 
-            zip_generado = export_zip(db, ruta_zip)
+            if formato == "dbf":
+                ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
+                zip_generado = export_zip(db, ruta_zip)
+                desc = "📦 Exportación para Software Ganadero SG (8 tablas DBF)."
+            elif formato == "csv":
+                ruta_zip = os.path.join(exports_dir, f"bitacora_csv_{hoy_str}.zip")
+                zip_generado = export_csv_zip(db, ruta_zip)
+                desc = "📊 Exportación de bitácora en formato CSV (todas las tablas)."
+            elif formato == "json":
+                ruta_zip = os.path.join(exports_dir, f"bitacora_json_{hoy_str}.zip")
+                zip_generado = export_json_zip(db, ruta_zip)
+                desc = "📄 Exportación de bitácora en formato JSON."
+            else:
+                ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
+                zip_generado = export_zip(db, ruta_zip)
+                desc = "📦 Exportación para Software Ganadero SG."
+
             with open(zip_generado, "rb") as f:
                 contenido = f.read()
 
@@ -695,7 +751,7 @@ def construir_application(
             await update.message.reply_document(
                 document=contenido,
                 filename=os.path.basename(zip_generado),
-                caption=f"📦 Exportación de Software Ganadero SG ({tam_mb:.2f} MB).\nContiene las 8 tablas DBF listas para sincronización."
+                caption=f"{desc} ({tam_mb:.2f} MB)",
             )
         except Exception as e:
             logger.error("Error en cmd_exportar: %s", e, exc_info=True)

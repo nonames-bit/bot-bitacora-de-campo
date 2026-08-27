@@ -173,7 +173,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **140 pruebas en verde**
+- **Pruebas:** Pytest — **149 pruebas en verde**
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -224,13 +224,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Reportes en PDF (`src/reports/`): comando `/reporte` con resúmenes diarios, semanales o personalizados, tablas zootécnicas y alertas
   - [x] Gestión de fotos vinculadas a animales: almacenamiento en `media/`, registro en SQLite, detección en captions y comando `/fotos [tag]`
   - [x] Exportador DBF nativo (`src/exporters/`): serializador `DBFWriter` para las 8 tablas y exportación de paquetes ZIP vía `/exportar` y CLI `--exportar`
-- [x] Suite de pruebas con pytest: **140 pruebas pasando en verde** (98 previas + 18 de Fase 1 + 6 de Fase 1.1 + 18 de Fase 2)
+  - [x] Exportadores adicionales CSV y JSON vía `/exportar csv` y `/exportar json`
+- [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
+- [x] Suite de pruebas con pytest: **149 pruebas pasando en verde** (98 previas + 18 de Fase 1 + 6 de Fase 1.1 + 27 de Fase 2 y validaciones)
 
 ### ⏳ En Progreso
 - [ ] Integración con Whisper/OCR reales (actualmente simulados vía archivos `.txt` acompañantes)
 
 ### 📋 Tareas Pendientes
-- [ ] Documentación y diagramas en `docs/` (Fase 1 añadió `DESPLIEGUE_DIGITALOCEAN.md` y `TELEGRAM_GUIA_USUARIO.md`; faltan diagramas)
 - [ ] **Fase 3:** Whisper real local para notas de voz y OCR de aretes
 
 ---
@@ -253,8 +254,8 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 │   ├── reports/         # Generador de reportes en PDF con reportlab (Fase 2)
 │   ├── bot/             # Interfaz del bot (CLI)
 │   └── server/          # Bot de Telegram + autenticación RBAC (Fases 1, 1.1, 2)
-├── docs/                # Documentación y guías
-├── tests/               # Pruebas y validación (pytest — 140 pruebas)
+├── docs/                # Documentación, diagramas y guías
+├── tests/               # Pruebas y validación (pytest — 149 pruebas)
 └── scripts/             # Automatizaciones VPS y utilidades
     ├── setup_vps.sh         # Configuración inicial del droplet (Ubuntu 22.04 / 24.04)
     ├── iniciar_bot.sh       # Arranque del bot en modo servidor

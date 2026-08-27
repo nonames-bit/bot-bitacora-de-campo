@@ -10,6 +10,7 @@ from src.server.telegram_bot import (
     formatear_alertas,
     formatear_animales,
     formatear_ayuda,
+    formatear_fotos,
     formatear_historial,
     formatear_instrucciones_importar,
     formatear_potreros,
@@ -249,3 +250,21 @@ def test_gestion_backup_pendiente(tmp_path):
     assert eliminado is True
     assert not zip_fake.exists()
     assert obtener_backup_pendiente(uploads_dir=uploads_dir) is None
+
+
+def test_formatear_fotos_vacio_y_con_datos(db):
+    assert "No hay fotos registradas" in formatear_fotos(db)
+    assert "No hay fotos registradas para el animal 47" in formatear_fotos(db, "47")
+
+    db.registrar_animal("47")
+    db.registrar_foto("media/f1.jpg", animal_tag="47", caption="Foto lateral")
+
+    resp_vaca = formatear_fotos(db, "47")
+    assert "Fotos de la 47 (1)" in resp_vaca
+    assert "f1.jpg" in resp_vaca
+    assert "Foto lateral" in resp_vaca
+
+    resp_ultimas = formatear_fotos(db)
+    assert "Últimas fotos registradas (1)" in resp_ultimas
+    assert "Tag 47" in resp_ultimas
+

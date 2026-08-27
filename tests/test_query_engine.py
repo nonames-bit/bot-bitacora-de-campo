@@ -81,3 +81,19 @@ def test_inseminacion_sin_pendientes(db):
 def test_sin_datos(db):
     qe = QueryEngine(db, hoy=HOY)
     assert "No hay registro de parto" in qe.responder("¿cuándo parió la 47?")
+
+
+def test_consulta_fotos(db):
+    db.registrar_animal("47")
+    db.registrar_foto("media/f1.jpg", animal_tag="47", caption="Arete visible")
+    qe = QueryEngine(db, hoy=HOY)
+
+    resp_vaca = qe.responder("¿hay fotos de la 47?")
+    assert "1 foto(s) de la 47" in resp_vaca
+
+    resp_gen = qe.responder("muéstrame las fotos registradas")
+    assert "Hay 1 fotos recientes" in resp_gen
+
+    resp_nadie = qe.responder("fotos de la 999")
+    assert "No hay fotos registradas para la 999" in resp_nadie
+

@@ -106,3 +106,23 @@ def test_verificar_consanguinidad(db):
     db.registrar_animal("X", sexo="Hembra")
     db.registrar_animal("Y", sexo="Macho")
     assert db.verificar_consanguinidad("X", "Y") is False
+
+
+def test_registrar_foto_y_consultas(db):
+    db.registrar_animal("47")
+    fid = db.registrar_foto("media/foto_47_1.jpg", animal_tag="47", fecha="2026-08-25", caption="Ubre sana")
+    assert isinstance(fid, int)
+
+    fotos_47 = db.fotos_de("47")
+    assert len(fotos_47) == 1
+    assert fotos_47[0]["caption"] == "Ubre sana"
+    assert fotos_47[0]["ruta"] == "media/foto_47_1.jpg"
+
+    ultimas = db.ultimas_fotos(5)
+    assert len(ultimas) == 1
+    assert ultimas[0]["tag"] == "47"
+
+    h = db.historial("47")
+    assert "fotos" in h
+    assert len(h["fotos"]) == 1
+
