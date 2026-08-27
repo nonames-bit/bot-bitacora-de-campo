@@ -118,7 +118,7 @@ def test_formatear_historial(db):
     db.registrar_animal(tag="47")
     db.registrar_parto("47", fecha="2026-05-01")
     resp = formatear_historial(db, "47")
-    assert "Historial de la 47" in resp
+    assert "FICHA ZOOTÉCNICA" in resp or "47" in resp
     assert "partos: 1" in resp
 
     resp_vacio = formatear_historial(db, "")

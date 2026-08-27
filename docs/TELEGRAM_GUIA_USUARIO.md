@@ -70,14 +70,33 @@ Dígale qué animales entraron o salieron de la finca.
 ## 3. También puede mandar notas de voz y fotos 🎤📷
 
 - **Nota de voz:** mantenga presionado el micrófono y cuente la novedad hablando.
-  El bot la guarda. *(La transcripción automática —que el bot la escriba solo—
-  llega después, en una próxima fase.)*
+  El bot la guarda. *(La transcripción automática llega en la Fase 3 con Whisper).*
 - **Foto:** saque una foto del arete, del frasco del remedio o del animal y
-  mándela. El bot la guarda. *(Poder verlas de nuevo desde el bot llega después.)*
+  mándela con un texto (ej. `vaca 47` o `pario la 47 ternero macho`). El bot la guarda
+  y la vincula a la base de datos.
+- **Ver fotos:** escriba `/fotos 47` o `/fotos` para ver las imágenes guardadas.
 
-> ✍️ Mientras la voz no se transcriba sola, si la novedad es importante
-> (un parto, un tratamiento), escríbala también en texto para que quede anotada
-> de una vez.
+---
+
+## 4. Comandos de Consulta y Administración (Dueño y Administrador)
+
+| Comando | Para qué sirve | Ejemplo de uso |
+|---|---|---|
+| `/reporte` | Genera y envía el **Reporte en PDF** (semanal por defecto). | `/reporte`, `/reporte diario`, `/reporte 15` |
+| `/exportar` | Descarga el **Backup ZIP** para Software Ganadero. | `/exportar`, `/exportar csv`, `/exportar json` |
+| `/fotos <tag>` | Consulta las fotos guardadas de un animal o las recientes. | `/fotos 47`, `/fotos` |
+| `/alertas` | Muestra las alertas pendientes (ecografías, palpaciones, secado). | `/alertas` |
+| `/historial <tag>` | Ficha completa con todos los eventos de un animal. | `/historial 47` |
+| `/potreros` | Muestra qué potreros cumplieron su tiempo de reposo Voisin. | `/potreros` |
+| `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |
+| `/status` | Estado de la base de datos, total de eventos y peso del archivo. | `/status` |
+| `/importar` | Muestra la guía para subir un backup `.zip` de Software Ganadero. | `/importar` |
+| `/confirmar_importar` | Procesa el archivo `.zip` subido sin duplicar registros. | `/confirmar_importar` |
+| `/descartar_backup` | Elimina el backup pendiente sin procesar. | `/descartar_backup` |
+| `/usuarios` | Lista los usuarios autorizados en el bot. | `/usuarios` |
+| `/agregar_usuario` *(Solo OWNER)* | Autoriza a un trabajador o administrador. | `/agregar_usuario 123456 TRABAJADOR Carlos` |
+| `/quitar_usuario` *(Solo OWNER)* | Revoca el acceso a un usuario. | `/quitar_usuario 123456` |
+| `/logs` *(Solo OWNER)* | Ver las últimas líneas del registro del sistema. | `/logs` |
 
 ---
 

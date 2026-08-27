@@ -45,8 +45,10 @@ def test_en_retiro(qe):
 
 def test_historial(qe):
     resp = qe.responder("¿cuál es el historial de la vaca 47?")
+    assert "FICHA ZOOTÉCNICA" in resp
     assert "partos: 1" in resp
     assert "servicios: 1" in resp
+    assert "Días Abiertos" in resp
 
 
 def test_pesaje_y_ganancia(qe):
