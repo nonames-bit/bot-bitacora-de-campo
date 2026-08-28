@@ -146,6 +146,37 @@ def _fmt_es_co(num: int | float) -> str:
     return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _obtener_fecha_ultimo_backup(db: Database, db_path: Optional[str] = None) -> str:
+    """Obtiene la fecha del último backup o evento registrado para el pie de status."""
+    if db_path and db_path != ":memory:" and os.path.exists(db_path):
+        try:
+            mtime = os.path.getmtime(db_path)
+            from datetime import datetime
+            return datetime.fromtimestamp(mtime).strftime("%d/%m %H:%M")
+        except Exception:
+            pass
+    try:
+        row = db.query_one("""
+            SELECT MAX(f) as max_f FROM (
+                SELECT MAX(fecha) as f FROM partos
+                UNION
+                SELECT MAX(fecha) as f FROM servicios
+                UNION
+                SELECT MAX(fecha) as f FROM pesajes
+                UNION
+                SELECT MAX(fecha) as f FROM traslados
+            )
+        """)
+        if row and row["max_f"]:
+            d = to_date(row["max_f"])
+            if d:
+                return d.strftime("%d/%m")
+    except Exception:
+        pass
+    from datetime import datetime
+    return datetime.now().strftime("%d/%m %H:%M")
+
+
 def formatear_status(
     db: Database, db_path: Optional[str] = None, hoy: Optional[date] = None
 ) -> str:
@@ -154,7 +185,6 @@ def formatear_status(
         hoy = date.today()
 
     n_activos = _contar_activos(db)
-    n_total_animales = db.count("animales")
 
     fecha_30d = iso(add_days(hoy, -30))
     row_partos = db.query_one("SELECT COUNT(*) as n FROM partos WHERE fecha >= ?", (fecha_30d,))
@@ -166,7 +196,7 @@ def formatear_status(
     )
     n_destetes_30d = int(row_destetes["n"]) if row_destetes else 0
 
-    # Potrero con más animales (conteo por potrero_id o último traslado)
+    # Potrero con más animales activos (conteo por potrero_id o último traslado)
     animales = db.query(
         "SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'"
     )
@@ -183,15 +213,20 @@ def formatear_status(
 
     pot_mas_animales_str = "Ninguno"
     if conteo_potreros:
-        max_pid, max_cnt = max(conteo_potreros.items(), key=lambda item: item[1])
-        prow = db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (max_pid,))
-        if prow:
-            p_nom = prow["nombre"] or prow["codigo"] or f"ID {max_pid}"
-            pot_mas_animales_str = f"{p_nom} ({_fmt_es_co(max_cnt)})"
+        # Considerar solo potreros con al menos 1 animal activo
+        pot_validos = {pid: cnt for pid, cnt in conteo_potreros.items() if cnt > 0}
+        if pot_validos:
+            max_pid, max_cnt = max(pot_validos.items(), key=lambda item: item[1])
+            prow = db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (max_pid,))
+            if prow:
+                p_nom = prow["nombre"] or prow["codigo"] or f"ID {max_pid}"
+                pot_mas_animales_str = f"{p_nom} ({_fmt_es_co(max_cnt)})"
 
-    # Potrero con más reposo (MAX dias_reposo)
+    # Potrero con más reposo de la finca activa (filtro estricto <= 365 días para descartar reposos absurdos/históricos)
     p_reposo = db.query_one(
-        "SELECT nombre, codigo, dias_reposo FROM potreros WHERE dias_reposo IS NOT NULL ORDER BY dias_reposo DESC LIMIT 1"
+        "SELECT nombre, codigo, dias_reposo FROM potreros "
+        "WHERE dias_reposo IS NOT NULL AND dias_reposo >= 0 AND dias_reposo <= 365 "
+        "ORDER BY dias_reposo DESC LIMIT 1"
     )
     if p_reposo and p_reposo["dias_reposo"] is not None:
         p_rep_nom = p_reposo["nombre"] or p_reposo["codigo"] or "Potrero"
@@ -217,19 +252,17 @@ def formatear_status(
     except Exception:
         mem_str = "0 MB"
 
-    from datetime import datetime
-    ts_str = datetime.now().strftime("%d/%m %H:%M")
+    ts_str = _obtener_fecha_ultimo_backup(db, db_path)
 
     lineas_pre = [
-        f"Activos:              {_fmt_es_co(n_activos)}",
-        f"Histórico:            {_fmt_es_co(n_total_animales)}",
-        f"Partos últimos 30d:   {_fmt_es_co(n_partos_30d)}",
-        f"Destetes últimos 30d: {_fmt_es_co(n_destetes_30d)}",
-        f"Potrero + animales:   {pot_mas_animales_str}",
-        f"Potrero + reposo:     {pot_mas_reposo_str}",
-        f"Alertas pendientes:   {_fmt_es_co(n_alertas)}",
-        f"Tamaño DB:            {size_str}",
-        f"Memoria:              {mem_str}",
+        f"Activos: {_fmt_es_co(n_activos)} (GANADERIA-JA 01-JA)",
+        f"Partos últimos 30d:           {_fmt_es_co(n_partos_30d)}",
+        f"Destetes últimos 30d:         {_fmt_es_co(n_destetes_30d)}",
+        f"Potrero + animales:           {pot_mas_animales_str}",
+        f"Potrero + reposo:             {pot_mas_reposo_str}",
+        f"Alertas pendientes:           {_fmt_es_co(n_alertas)}",
+        f"Tamaño DB:                    {size_str}",
+        f"Memoria:                      {mem_str}",
     ]
     cuerpo = "\n".join(lineas_pre)
     return (

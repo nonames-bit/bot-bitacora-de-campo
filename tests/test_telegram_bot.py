@@ -81,8 +81,8 @@ def test_formatear_status_memoria_y_archivo(db, tmp_path):
     db.registrar_alerta("47", "SECADO", "2026-11-01")
 
     resp_mem = formatear_status(db, ":memory:", hoy=date(2026, 9, 1))
-    assert "Activos:" in resp_mem
-    assert "Histórico:" in resp_mem
+    assert "Activos" in resp_mem and "GANADERIA-JA" in resp_mem
+    assert "Histórico:" not in resp_mem
     assert "Partos últimos 30d:" in resp_mem
     assert "Destetes últimos 30d:" in resp_mem
     assert "Norte (35d)" in resp_mem
@@ -100,6 +100,29 @@ def test_formatear_status_memoria_y_archivo(db, tmp_path):
     resp_file = formatear_status(db_fisica, str(db_file))
     assert "MB" in resp_file
     db_fisica.close()
+
+
+def test_formatear_status_filtrado_finca_y_sin_historico(db):
+    # Base con animales activos, históricos y potrero abandonado con reposo absurdo (>365d)
+    db.registrar_animal(tag="A1", estado="ACTIVO", potrero="01")
+    db.registrar_animal(tag="A2", estado="ACTIVO", potrero="01")
+    db.registrar_animal(tag="H1", estado="MUERTO", potrero="01")
+    db.registrar_animal(tag="H2", estado="VENDIDO", potrero="02")
+
+    # Potrero activo con reposo real de 45 días
+    db.registrar_potrero(nombre="POTRERO CASA", codigo="01", dias_reposo=45)
+    # Potrero histórico/abandonado con 3.232 días de reposo (no debe mostrarse)
+    db.registrar_potrero(nombre="JARA", codigo="99", dias_reposo=3232)
+
+    resp = formatear_status(db, hoy=date(2026, 9, 1))
+
+    # 1. Muestra Activos con nombre/código de finca
+    assert "Activos" in resp and "GANADERIA-JA" in resp and "2" in resp
+    # 2. No muestra Histórico
+    assert "Histórico:" not in resp
+    # 3. Potrero con más reposo no debe ser JARA sino POTRERO CASA
+    assert "POTRERO CASA (45d)" in resp
+    assert "JARA" not in resp
 
 
 def test_formatear_usuarios(tmp_path):
