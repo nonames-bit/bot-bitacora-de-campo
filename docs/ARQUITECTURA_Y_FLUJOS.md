@@ -149,6 +149,12 @@ Entrada de Texto / Foto
    - Vía Lenguaje Natural: `¿hay fotos de la 47?` responde con la cantidad y disponibilidad de fotos registradas.
    - Vía Historial: `/historial 47` incluye el conteo de fotos en la ficha del animal.
 
+### 4.1 Ficha Zootécnica y `/status` (GANADERIA-JA 01-JA)
+
+- **Edad humana** (`formatear_edad_zootecnica` en `src/engine/query_engine.py`): `🎂 Edad: 7 años 3 meses (2.667 días)` / `8 meses (243 días)` / `12 días`, inferida desde `animales.fecha_nacimiento` o `partos.fecha` de la madre (<450d). Visible en header de `/historial`.
+- **Estados SG fieles**: `CRÍA MACHO (<8m)`, `LEVANTE (8-18m)`, `TORETE (18-30m)`, `TORO (>30m)` / `CRÍA HEMBRA`, `NOVILLA LEVANTE (12-18m)`, `NOVILLA VIENTRE (≥18m)`, `VACA PARIDA (≤305d)` vs `VACA SECA/ESCOTERA (>305d)`. Partos/días abiertos solo para hembras; partos autorreferenciados (`vaca_id == id_cria`) se excluyen y se bloquean para machos.
+- **`/status` filtrado por finca**: `Activos: 338 (GANADERIA-JA 01-JA)` sin `Histórico`; `Potrero + reposo` ignora reposos absurdos `>365d` (ej. JARA 3.232d histórico) y `Potrero + animales` cuenta solo `estado='ACTIVO'` por último traslado; `Actualizado` usa `mtime` de `data/bitacora.db` (fecha del último backup SG) con fallback a `MAX(partos.fecha)`.
+
 ---
 
 ## 🤖 5. Arquitectura NLU Híbrida Multi-Agente (Gemini)
