@@ -304,7 +304,15 @@ class QueryEngine:
 
         # Historial de eventos (machos no tienen partos dados por ellos ni servicios de hembra)
         h = self.db.historial(tag_str)
-        partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != p.get("id_cria")]
+        def _row_get(row, key, default=None):
+            try:
+                return row[key]
+            except Exception:
+                try:
+                    return row.get(key, default)  # type: ignore
+                except Exception:
+                    return default
+        partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != _row_get(p, "id_cria")]
         servicios = [] if es_macho else h.get("servicios", [])
         celos = [] if es_macho else h.get("celos", [])
         tratamientos = h.get("tratamientos", [])

@@ -138,21 +138,26 @@ def extraer_tags(texto: str) -> list[str]:
 
     tags: list[str] = []
 
-    # 1. Búsqueda por prefijo
+    # 1. Búsqueda por prefijo (soporta tags con guion y guion bajo, ej. M_DESCONOCIDO, CRIA_01, N-069)
     for pref in PREFIJOS_TAG:
-        pat = rf"\b{re.escape(pref)}\s+([a-z0-9\-]{{1,12}})\b"
+        pat = rf"\b{re.escape(pref)}\s+([a-z0-9\-_]{{1,12}})\b"
         for m in re.finditer(pat, t):
-            val = m.group(1).strip("-")
+            val = m.group(1).strip("-_")
             val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
             if val in PALABRAS_NO_TAG or not val:
                 continue
             if val not in tags:
                 tags.append(val)
 
-    # 2. Búsqueda de identificadores alfanuméricos con letras y dígitos (ej. n069, a301, h12, n-069)
-    for m in re.finditer(r"\b([a-z]{1,3}-?\d{1,6})\b", t):
-        val = m.group(1).strip("-")
+    # 2. Búsqueda de identificadores alfanuméricos con letras y dígitos (ej. n069, a301, h12, n-069, cria_01)
+    for m in re.finditer(r"\b([a-z]{1,3}[-_]?[a-z0-9_]{0,9}\d{1,6})\b", t):
+        val = m.group(1).strip("-_")
         val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
+        if val not in PALABRAS_NO_TAG and val and val not in tags:
+            tags.append(val)
+    # Fallback genérico para tags con guion bajo sin dígito obligatorio (ej. m_desconocido)
+    for m in re.finditer(r"\b([a-z]+_[a-z0-9_]{1,11})\b", t):
+        val = m.group(1).strip("-_")
         if val not in PALABRAS_NO_TAG and val and val not in tags:
             tags.append(val)
 
