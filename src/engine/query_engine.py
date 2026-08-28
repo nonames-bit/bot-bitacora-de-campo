@@ -665,7 +665,7 @@ class QueryEngine:
 
         animales = self.db.query(
             "SELECT id_animal, tag, potrero_id, estado FROM animales "
-            "WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO' ORDER BY id_animal"
+            "WHERE estado = 'ACTIVO' ORDER BY id_animal"
         )
 
         tags_en_potrero: list[str] = []

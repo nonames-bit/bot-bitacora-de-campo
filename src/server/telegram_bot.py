@@ -167,7 +167,7 @@ def formatear_status(
 
     # Potrero con más animales (conteo por potrero_id o último traslado)
     animales = db.query(
-        "SELECT id_animal, potrero_id FROM animales WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO'"
+        "SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'"
     )
     conteo_potreros: dict[int, int] = {}
     for a in animales:

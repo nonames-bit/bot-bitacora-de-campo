@@ -23,6 +23,10 @@ Este archivo define las reglas de comportamiento, estándares y herramientas par
   - `docs/`: Documentación técnica, diagramas y especificaciones.
   - `tests/`: Pruebas unitarias, scripts de simulación o validaciones.
   - `scripts/`: Utilidades y scripts de automatización.
+- **Regla Fundamental de Inventario (Hato Activo vs Histórico)**:
+  - En Software Ganadero (SG), la base contiene todo el histórico (animales muertos, vendidos, descartados o con estado NULL).
+  - **Toda consulta de inventario presente, conteos de hato, animales por potrero, ocupación o estado actual DEBE filtrar estrictamente por `estado = 'ACTIVO'`** (NUNCA usar `COALESCE(estado, 'ACTIVO')` ni omitir el filtro de estado, para no inflar el inventario sumando registros históricos).
+  - Las consultas históricas puntuales (genealogía, partos pasados, fichas por tag) sí pueden consultar cualquier animal independientemente de su estado.
 
 ---
 

@@ -10,6 +10,11 @@ Este proyecto sigue los estándares y reglas definidos en [AGENTS.md](./AGENTS.m
 
 ## Reglas Especificas del Dominio
 
+### ⚠️ Regla Fundamental de Inventario (Hato Activo vs Histórico)
+- Toda consulta de inventario presente, conteos de hato, animales por potrero, ocupación o estado actual **DEBE filtrar estrictamente por `estado = 'ACTIVO'`**.
+- **NUNCA usar `COALESCE(estado, 'ACTIVO')`** ni omitir el filtro de estado en consultas presentes, para evitar sumar animales históricos/muertos/vendidos/NULL.
+- Las consultas históricas puntuales (genealogía, partos pasados, fichas por arete) sí pueden consultar cualquier animal independientemente de su estado.
+
 ## 🧬 Dominio: Finca > Reproducción & Inseminación Artificial
 
 ### Metodología Zootécnica
