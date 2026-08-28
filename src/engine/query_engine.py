@@ -442,18 +442,18 @@ class QueryEngine:
         return "Potreros listos para pastoreo: " + ", ".join(listos) + "."
 
     def _inventario_general(self) -> str:
-        total = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO'")
+        total = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO'")
         n_total = int(total["n"]) if total else 0
         if n_total == 0:
             return "📊 Inventario: 0 animales activos en la finca."
-        hembras = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
-        machos = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='MACHO'")
+        hembras = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+        machos = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='MACHO'")
         n_hembras = int(hembras["n"]) if hembras else 0
         n_machos = int(machos["n"]) if machos else 0
         # Terneros aproximados: <12 meses
         terneros = 0
         try:
-            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL")
             for r in rows:
                 fn = to_date(r["fecha_nacimiento"])
                 if fn and (self.hoy - fn).days < 365:
@@ -463,28 +463,28 @@ class QueryEngine:
         detalle = f"🐄 Total en finca: {n_total} animales"
         partes = []
         if n_hembras:
-            partes.append(f"{n_hembras} vacas/hembras")
+            partes.append(f"{n_hembras} vacas")
         if n_machos:
-            partes.append(f"{n_machos} toros/machos")
-        if terneros:
-            partes.append(f"{terneros} terneros <12m")
+            partes.append(f"{n_machos} toros")
         if partes:
             detalle += f" ({', '.join(partes)})"
+        if terneros:
+            detalle += f" — {terneros} terneros <12m incluidos"
         return detalle + "."
 
     def _inventario_categoria(self, categoria: str) -> str:
         cat = categoria.lower()
         if cat in ("vacas", "vaca"):
-            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='HEMBRA'")
             n = int(row["n"]) if row else 0
             return f"🐄 Total vacas (hembras activas): {n}."
         if cat in ("toros", "toro"):
-            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='MACHO'")
+            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='MACHO'")
             n = int(row["n"]) if row else 0
             return f"🐂 Total toros (machos activos): {n}."
         if cat in ("novillas", "novilla"):
             # Novillas: hembras sin partos
-            hembras = self.db.query("SELECT id_animal FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+            hembras = self.db.query("SELECT id_animal FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='HEMBRA'")
             count = 0
             for h in hembras:
                 aid = h["id_animal"]
@@ -493,7 +493,7 @@ class QueryEngine:
                     count += 1
             return f"🐄 Total novillas (hembras sin parto): {count}."
         if cat in ("terneros", "ternero", "terneras"):
-            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL")
             count = 0
             for r in rows:
                 fn = to_date(r["fecha_nacimiento"])
@@ -511,7 +511,7 @@ class QueryEngine:
         if not potreros:
             return "No hay potreros registrados."
         # contar animales por potrero (usando potrero_id o último traslado)
-        animales = self.db.query("SELECT id_animal, potrero_id FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO'")
+        animales = self.db.query("SELECT id_animal, potrero_id FROM animales WHERE estado='ACTIVO'")
         conteo = {}
         for a in animales:
             aid = a["id_animal"]
