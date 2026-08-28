@@ -229,8 +229,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] **Fase 2 — Reportes PDF, Fotos y Exportador DBF**:
   - [x] Reportes en PDF (`src/reports/`): comando `/reporte` con resúmenes diarios, semanales o personalizados, tablas zootécnicas y alertas
   - [x] Gestión de fotos vinculadas a animales: almacenamiento en `media/`, registro en SQLite, detección en captions y comando `/fotos [tag]`
+  - [x] Extracción e importación idempotente de `Fotos.Zip` desde backups de Software Ganadero (`src/importers/dbf_importer.py`)
   - [x] Exportador DBF nativo (`src/exporters/`): serializador `DBFWriter` para las 8 tablas y exportación de paquetes ZIP vía `/exportar` y CLI `--exportar`
   - [x] Exportadores adicionales CSV y JSON vía `/exportar csv` y `/exportar json`
+- [x] **Optimización UI Móvil y Motor de Consultas**:
+  - [x] Ficha zootécnica (`_historial`) reformateada para lectura rápida en móvil con etiquetas HTML `<b>`, saltos dobles y estructura por dominios.
+  - [x] Inventario por potrero deduplicado y agrupado por nombre normalizado, vista compacta de potreros ocupados en bloque `<pre>` con números alineados en formato `es-CO` y filtro para vacíos.
 - [x] **Fase 3 (Parte 1) — Notas de Voz con Whisper**:
   - [x] Integración de Whisper local (`faster-whisper` / `openai-whisper`) para transcripción de audio en español (`es`)
   - [x] Procesamiento automático en tiempo real de notas de voz en Telegram y CLI con ejecución de eventos y respuestas

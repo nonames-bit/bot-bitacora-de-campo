@@ -224,5 +224,113 @@ def test_fallback_ayuda_y_sugerencias(qe):
     assert sugerencias[2][1] == "cmd:ayuda"
 
 
+def test_inventario_potreros_agrupado_y_ordenado(db):
+    # Registrar potreros duplicados / variantes de caso
+    db.registrar_potrero(nombre="LECHERAS", codigo="01")
+    db.registrar_potrero(nombre="lecheras", codigo="02")
+    db.registrar_potrero(nombre="OLEGARIO II", codigo="03")
+    db.registrar_potrero(nombre="Olegario II", codigo="04")
+    db.registrar_potrero(nombre="PLAN VERSALLES", codigo="05")
+    db.registrar_potrero(nombre="POTRERO VACIO 1", codigo="06")
+    db.registrar_potrero(nombre="POTRERO VACIO 2", codigo="07")
+
+    # Asignar animales:
+    # LECHERAS (01): 3 animales, lecheras (02): 2 animales -> Total LECHERAS = 5
+    for i in range(1, 4):
+        db.registrar_animal(f"LEC_A_{i}", potrero="01", estado="ACTIVO")
+    for i in range(1, 3):
+        db.registrar_animal(f"LEC_B_{i}", potrero="02", estado="ACTIVO")
+
+    # OLEGARIO II (03): 1 animal, Olegario II (04): 1 animal -> Total OLEGARIO II = 2
+    db.registrar_animal("OLEG_1", potrero="03", estado="ACTIVO")
+    db.registrar_animal("OLEG_2", potrero="04", estado="ACTIVO")
+
+    # PLAN VERSALLES (05): 10 animales -> Total PLAN VERSALLES = 10
+    for i in range(1, 11):
+        db.registrar_animal(f"VERS_{i}", potrero="05", estado="ACTIVO")
+
+    qe = QueryEngine(db, hoy=HOY)
+    resp = qe.responder("inventario potreros")
+
+    # Verifica encabezado y bloque pre
+    assert "Inventario por potrero — Ocupados (3)" in resp
+    assert "<pre>" in resp
+    assert "</pre>" in resp
+
+    # Verifica orden descendente: PLAN VERSALLES (10) -> LECHERAS (5) -> OLEGARIO II (2)
+    idx_versalles = resp.find("PLAN VERSALLES")
+    idx_lecheras = resp.find("LECHERAS")
+    idx_olegario = resp.find("OLEGARIO II")
+    assert idx_versalles != -1
+    assert idx_lecheras != -1
+    assert idx_olegario != -1
+    assert idx_versalles < idx_lecheras < idx_olegario
+
+    # Verifica conteo de vacíos
+    assert "Vacíos: 2" in resp
+    assert "/potreros vacios" in resp
+
+
+def test_inventario_potreros_vacios_y_sin_potreros(db):
+    qe = QueryEngine(db, hoy=HOY)
+    # Sin potreros registrados
+    assert "No hay potreros registrados" in qe.responder("inventario potreros")
+
+    # Registrar potreros sin animales
+    db.registrar_potrero(nombre="Norte", codigo="01")
+    db.registrar_potrero(nombre="Sur", codigo="02")
+
+    # Consulta inventario normal cuando todos están vacíos
+    resp_todos_vacios = qe.responder("inventario potreros")
+    assert "Todos los potreros (2) están vacíos" in resp_todos_vacios
+
+    # Consulta explícita de vacíos
+    resp_vacios = qe.responder("potreros vacios")
+    assert "Inventario por potrero — Vacíos (2)" in resp_vacios
+    assert "NORTE" in resp_vacios
+    assert "SUR" in resp_vacios
+
+
+def test_ficha_zootecnica_formato_movil(db):
+    db.registrar_animal("JA26", nombre="Patricia", sexo="Hembra", raza="Gyr")
+    db.registrar_parto("JA26", fecha="2026-04-10", sexo_cria="Hembra", peso_nacimiento=32.0)
+    db.registrar_servicio("JA26", fecha="2026-07-01", tipo_servicio="IA", toro_pajilla="T-99")
+    db.registrar_celo("JA26", fecha="2026-06-30", am_pm="AM")
+    db.registrar_pesaje("JA26", fecha="2026-01-01", peso_kg=400.0)
+    db.registrar_pesaje("JA26", fecha="2026-06-01", peso_kg=460.0)
+    db.registrar_tratamiento("JA26", fecha="2026-08-25", producto="Oxitetraciclina", dosis="20ml", dias_retiro_carne=28, fecha_fin_retiro_carne="2026-09-22")
+    db.registrar_foto("media/ja26.jpg", animal_tag="JA26", caption="Foto lateral")
+
+    qe = QueryEngine(db, hoy=HOY)
+    resp = qe.responder("ficha JA26")
+
+    # Header
+    assert "FICHA ZOOTÉCNICA" in resp
+    assert "JA26" in resp
+    assert "Patricia" in resp
+    assert "Gyr" in resp
+    assert "───────────────────" in resp
+
+    # Secciones
+    assert "REPRODUCCIÓN & PARTOS" in resp
+    assert "partos: 1" in resp
+    assert "Días Abiertos" in resp
+    assert "servicios: 1" in resp
+    assert "FEP (Fecha Estimada Parto)" in resp
+    assert "celos: 1" in resp
+
+    assert "PESAJE & CRECIMIENTO" in resp
+    assert "pesajes: 2" in resp
+    assert "460" in resp
+    assert "GMD:" in resp
+
+    assert "SANIDAD & RETIROS" in resp
+    assert "Oxitetraciclina" in resp
+    assert "Retiro carne hasta 2026-09-22" in resp
+
+    assert "FOTOS" in resp
+    assert "1 foto(s) registrada(s)" in resp
+
+
 
 

@@ -101,8 +101,9 @@ class QueryEngine:
             # inventario por potrero tiene prioridad si menciona potrero
             if re.search(r"\bpotrero", t):
                 # "inventario potreros" o "total por potrero"
-                if re.search(r"\b(?:total|inventario|listar|mostrar)\b", t):
-                    return self._inventario_potreros()
+                if re.search(r"\b(?:total|inventario|listar|mostrar|resumen|conteo|distribuci[oó]n)\b", t):
+                    mostrar_vacios = bool(re.search(r"\bvac[ií]os?\b", t))
+                    return self._inventario_potreros(mostrar_vacios=mostrar_vacios)
             # conteos de ganado por categoría (ganado, gaando typo, animal, inventario)
             if re.search(r"\b(?:ganado|ganad|ga+ndo|animal|inventario)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
                 # si menciona categoría específica, delegar con filtro
@@ -118,6 +119,8 @@ class QueryEngine:
             # fallback para "total ganado" con typo gaando / ga+ndo
             if re.search(r"\bga+ndo\b", t) or re.search(r"\bga+n?ado\b", t):
                 return self._inventario_general()
+        if re.search(r"\bpotrero", t) and re.search(r"\bvac[ií]os?\b", t):
+            return self._inventario_potreros(mostrar_vacios=True)
         if re.search(r"\bpotrero", t) and re.search(r"\blisto|pastoreo|pastar", t):
             return self._potreros_listos()
         if re.search(r"\bpotrero", t):
@@ -306,19 +309,20 @@ class QueryEngine:
 
         # Encabezado
         tipo_animal = "Toro" if sexo.lower().startswith("m") else "Vaca"
+        nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
         header = [
-            "📋 FICHA ZOOTÉCNICA",
-            "───────────────────────────",
-            f"🐄 {tipo_animal} {tag_str}{nombre}",
-            f"🏷️ Raza: {raza}",
-            f"📍 Potrero: {potrero_nom}",
-            f"● Estado: {estado}",
-            f"🧬 Reproductivo: {estado_reprod}",
+            "📋 <b>FICHA ZOOTÉCNICA</b>",
+            f"🐄 <b>{tipo_animal} {tag_str}{nom_txt}</b>",
+            f"🏷️ <b>Raza:</b> {raza}",
+            f"📍 <b>Potrero:</b> {potrero_nom}",
+            f"● <b>Estado:</b> {estado}",
+            f"🧬 <b>Reproductivo:</b> {estado_reprod}",
+            "───────────────────",
         ]
         bloques.append("\n".join(header))
 
         # Sección Reproducción
-        reprod = ["🍼 REPRODUCCIÓN & PARTOS"]
+        reprod = ["🍼 <b>REPRODUCCIÓN & PARTOS</b>"]
         if partos:
             p = ult_parto
             cria_info = []
@@ -367,7 +371,7 @@ class QueryEngine:
         bloques.append("\n".join(reprod))
 
         # Sección Pesaje & Crecimiento
-        pesaje = ["⚖️ PESAJE & CRECIMIENTO"]
+        pesaje = ["⚖️ <b>PESAJE & CRECIMIENTO</b>"]
         if pesajes:
             ult_p = pesajes[-1]
             gmd_str = ""
@@ -385,7 +389,7 @@ class QueryEngine:
         bloques.append("\n".join(pesaje))
 
         # Sección Sanidad & Retiros
-        sanidad = ["💉 SANIDAD & RETIROS"]
+        sanidad = ["💉 <b>SANIDAD & RETIROS</b>"]
         if tratamientos:
             t = tratamientos[-1]
             prod = t["producto"] or "Fármaco"
@@ -403,7 +407,7 @@ class QueryEngine:
         bloques.append("\n".join(sanidad))
 
         # Sección Fotos
-        fotos_sec = ["📷 FOTOS"]
+        fotos_sec = ["📷 <b>FOTOS</b>"]
         if fotos:
             fotos_sec.append(f"• {len(fotos)} foto(s) registrada(s) (ver con /foto {tag_str})")
         else:
@@ -506,26 +510,101 @@ class QueryEngine:
             return f"🐄 Total terneros (<12 meses): {count}."
         return self._inventario_general()
 
-    def _inventario_potreros(self) -> str:
-        potreros = self.db.query("SELECT * FROM potreros ORDER BY nombre")
+    def _inventario_potreros(self, mostrar_vacios: bool = False) -> str:
+        potreros = self.db.query("SELECT * FROM potreros")
         if not potreros:
             return "No hay potreros registrados."
-        # contar animales por potrero (usando potrero_id o último traslado)
-        animales = self.db.query("SELECT id_animal, potrero_id FROM animales WHERE estado='ACTIVO'")
-        conteo = {}
+
+        potreros_by_id = {p["id"]: p for p in potreros}
+
+        # Agrupación por nombre normalizado (case-insensitive, sin duplicados)
+        grupos: dict[str, dict] = {}
+        for p in potreros:
+            raw_nom = (p["nombre"] or p["codigo"] or str(p["id"])).strip()
+            norm = normalizar(raw_nom).strip().upper()
+            if not norm:
+                norm = f"POTRERO {p['id']}"
+            if norm not in grupos:
+                grupos[norm] = {
+                    "display": raw_nom.upper(),
+                    "ids": set(),
+                    "total": 0,
+                }
+            grupos[norm]["ids"].add(p["id"])
+
+        # Contar animales activos por potrero (usando último traslado o potrero_id)
+        animales = self.db.query(
+            "SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'"
+        )
         for a in animales:
             aid = a["id_animal"]
-            ult = self.db.query_one("SELECT potrero_destino FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1", (aid,))
-            pid = ult["potrero_destino"] if ult and ult["potrero_destino"] is not None else a["potrero_id"]
-            if pid is not None:
-                conteo[pid] = conteo.get(pid, 0) + 1
-        lineas = ["📍 Inventario por potrero:"]
-        for p in potreros:
-            pid = p["id"]
-            nombre = p["nombre"] or p["codigo"] or str(pid)
-            n = conteo.get(pid, 0)
-            lineas.append(f"• {nombre}: {n} animales")
-        # potreros sin animales quedan con 0
+            ult = self.db.query_one(
+                "SELECT potrero_destino FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1",
+                (aid,),
+            )
+            pid = ult["potrero_destino"] if (ult and ult["potrero_destino"] is not None) else a["potrero_id"]
+            if pid is not None and pid in potreros_by_id:
+                p_row = potreros_by_id[pid]
+                raw_nom = (p_row["nombre"] or p_row["codigo"] or str(pid)).strip()
+                norm = normalizar(raw_nom).strip().upper()
+                if norm in grupos:
+                    grupos[norm]["total"] += 1
+                else:
+                    grupos[norm] = {"display": raw_nom.upper(), "ids": {pid}, "total": 1}
+
+        ocupados = [g for g in grupos.values() if g["total"] > 0]
+        vacios = [g for g in grupos.values() if g["total"] == 0]
+
+        # Ordenar ocupados descendente por total, luego alfabéticamente
+        ocupados.sort(key=lambda x: (-x["total"], x["display"]))
+        # Ordenar vacíos alfabéticamente
+        vacios.sort(key=lambda x: x["display"])
+
+        if not ocupados and not vacios:
+            return "No hay potreros registrados."
+
+        def fmt_num(n: int) -> str:
+            return f"{n:,}".replace(",", ".")
+
+        if mostrar_vacios:
+            if not vacios:
+                return (
+                    f"📍 <b>Inventario por potrero — Vacíos (0)</b>\n\n"
+                    f"Todos los {len(ocupados)} potreros tienen animales asignados."
+                )
+            pre_lines = [v["display"] for v in vacios]
+            lineas = [
+                f"📍 <b>Inventario por potrero — Vacíos ({len(vacios)})</b>",
+                "<pre>",
+                "\n".join(pre_lines),
+                "</pre>",
+                f"Ocupados: {len(ocupados)} (ver con /potreros o inventario potreros)",
+            ]
+            return "\n".join(lineas)
+
+        if not ocupados:
+            return f"📍 <b>Inventario por potrero:</b> Todos los potreros ({len(vacios)}) están vacíos."
+
+        max_nom_w = max(len(o["display"]) for o in ocupados)
+        max_num_w = max(len(fmt_num(o["total"])) for o in ocupados)
+        col_w = max(max_nom_w, 16)
+
+        pre_lines = []
+        for o in ocupados:
+            nom = o["display"].ljust(col_w)
+            num = fmt_num(o["total"]).rjust(max_num_w)
+            pre_lines.append(f"{nom}  {num}")
+
+        total_animales = sum(o["total"] for o in ocupados)
+        total_str = fmt_num(total_animales)
+
+        lineas = [
+            f"📍 <b>Inventario por potrero — Ocupados ({len(ocupados)})</b>",
+            "<pre>",
+            "\n".join(pre_lines),
+            "</pre>",
+            f"Vacíos: {len(vacios)} (ver con /potreros vacios) · Total en potreros: {total_str}",
+        ]
         return "\n".join(lineas)
 
     def _buscar_potrero(self, nombre_potrero: str):

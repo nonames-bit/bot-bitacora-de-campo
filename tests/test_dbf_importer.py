@@ -6,7 +6,7 @@ import pytest
 
 from src.importers.dbf_importer import (
     DBFReader, import_animales, import_causas, import_celos, import_dbfs,
-    import_partos, import_pesajes, import_potreros, import_servicios,
+    import_fotos, import_partos, import_pesajes, import_potreros, import_servicios,
     import_traslados, import_zip,
 )
 
@@ -332,3 +332,96 @@ def test_import_zip_real(db):
     conteos2 = import_zip(db, zip_path)
     assert conteos2["animales"]["nuevos"] == 0
     assert conteos2["animales"]["duplicados"] > 0
+
+
+def test_import_fotos_directo_e_idempotente(db, tmp_path):
+    import io
+    import zipfile
+
+    # Crear ZIP en memoria con fotos simuladas
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("a001.jpg", b"fake_jpg_content_1")
+        zf.writestr("4145-8.jpg", b"fake_jpg_content_2")
+        zf.writestr("subfolder/c99.png", b"fake_png_content_3")
+        zf.writestr("ignore.txt", b"not_an_image")
+    fotos_zip_bytes = buf.getvalue()
+
+    media_dir = str(tmp_path / "media_test")
+
+    # Primera pasada: 3 fotos nuevas (a001, 4145-8, c99)
+    res1 = import_fotos(db, fotos_zip_bytes, media_dir=media_dir)
+    assert res1["nuevos"] == 3
+    assert res1["duplicados"] == 0
+    assert db.count("fotos") == 3
+
+    # Verificar que los archivos existen en disco
+    assert os.path.exists(os.path.join(media_dir, "a001.jpg"))
+    assert os.path.exists(os.path.join(media_dir, "4145-8.jpg"))
+    assert os.path.exists(os.path.join(media_dir, "c99.png"))
+
+    # Verificar tags derivados
+    f_a001 = db.query_one("SELECT * FROM fotos WHERE tag = 'a001'")
+    assert f_a001 is not None
+    assert "a001.jpg" in f_a001["ruta"]
+
+    f_4145 = db.query_one("SELECT * FROM fotos WHERE tag = '4145-8'")
+    assert f_4145 is not None
+    assert "4145-8.jpg" in f_4145["ruta"]
+
+    # Segunda pasada: 0 nuevos, 3 duplicados
+    res2 = import_fotos(db, fotos_zip_bytes, media_dir=media_dir)
+    assert res2["nuevos"] == 0
+    assert res2["duplicados"] == 3
+    assert db.count("fotos") == 3
+
+
+def test_import_outer_zip_con_fotos_zip(db, tmp_path):
+    import io
+    import zipfile
+
+    # 1. Crear Dbf.zip interno
+    causas_dbf = build_dbf(
+        [("CODIGO", "C", 5, 0), ("DESC", "C", 30, 0)],
+        [("19", "ACCIDENTE")],
+    )
+    hoja_dbf = build_dbf(
+        [("CODANI", "C", 10, 0), ("NOMANI", "C", 20, 0), ("SEXO", "C", 1, 0), ("TIPORAZA", "C", 10, 0),
+         ("FECNACE", "D", 8, 0), ("CODPOT", "C", 5, 0), ("ESTADO", "C", 5, 0), ("OBS", "C", 30, 0),
+         ("MADRE", "C", 10, 0), ("PADRE", "C", 10, 0), ("TIPO", "C", 1, 0), ("FECMUERTE", "D", 8, 0),
+         ("CAU", "C", 5, 0), ("MOTIVO", "C", 30, 0)],
+        [("A001", "Vaca A001", "H", "Brahman", "20200101", "", "1", "", "", "", "", "", "", "")],
+    )
+    buf_dbf = io.BytesIO()
+    with zipfile.ZipFile(buf_dbf, "w") as z_dbf:
+        z_dbf.writestr("causas.dbf", causas_dbf)
+        z_dbf.writestr("hoja.dbf", hoja_dbf)
+
+    # 2. Crear Fotos.Zip interno
+    buf_fotos = io.BytesIO()
+    with zipfile.ZipFile(buf_fotos, "w") as z_fotos:
+        z_fotos.writestr("a001.jpg", b"jpg_data_a001")
+        z_fotos.writestr("4145-8.jpg", b"jpg_data_4145")
+
+    # 3. Crear outer ZIP
+    outer_path = str(tmp_path / "BackupCompleto.Zip")
+    with zipfile.ZipFile(outer_path, "w") as z_outer:
+        z_outer.writestr("Dbf.zip", buf_dbf.getvalue())
+        z_outer.writestr("Fotos.Zip", buf_fotos.getvalue())
+
+    media_dir = str(tmp_path / "media_outer")
+
+    # Importar outer zip
+    conteos = import_zip(db, outer_path, media_dir=media_dir)
+    assert "animales" in conteos
+    assert conteos["animales"]["nuevos"] == 1
+    assert "fotos" in conteos
+    assert conteos["fotos"]["nuevos"] == 2
+    assert conteos["fotos"]["duplicados"] == 0
+
+    # Re-importar: todo duplicado
+    conteos2 = import_zip(db, outer_path, media_dir=media_dir)
+    assert conteos2["animales"]["nuevos"] == 0
+    assert conteos2["fotos"]["nuevos"] == 0
+    assert conteos2["fotos"]["duplicados"] == 2
+

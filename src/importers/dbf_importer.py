@@ -7,6 +7,8 @@ la base de datos SQLite del bot. No requiere bibliotecas externas.
 """
 from __future__ import annotations
 
+import io
+import os
 import struct
 import zipfile
 from datetime import date
@@ -552,8 +554,86 @@ def import_traslados(db: Database, records) -> dict:
 # Orquestación
 # ---------------------------------------------------------------------------
 
-def import_dbfs(db: Database, dbf_data: dict[str, bytes]) -> dict:
-    """Siembra la base de datos a partir de un dict {nombre.dbf: bytes}."""
+def import_fotos(
+    db: Database,
+    fotos_source: bytes | dict[str, bytes] | zipfile.ZipFile,
+    media_dir: str = "media",
+) -> dict:
+    """Extrae imágenes de Fotos.Zip a media_dir y registra fotos en SQLite de forma idempotente."""
+    os.makedirs(media_dir, exist_ok=True)
+    nuevos = 0
+    duplicados = 0
+
+    fotos_map: dict[str, bytes] = {}
+    if isinstance(fotos_source, bytes):
+        try:
+            with zipfile.ZipFile(io.BytesIO(fotos_source)) as zf:
+                for name in zf.namelist():
+                    if not name.endswith("/") and not os.path.basename(name).startswith("._"):
+                        ext = os.path.splitext(name)[1].lower()
+                        if ext in (".jpg", ".jpeg", ".png", ".bmp"):
+                            fotos_map[os.path.basename(name)] = zf.read(name)
+        except Exception:
+            return {"nuevos": 0, "duplicados": 0}
+    elif isinstance(fotos_source, zipfile.ZipFile):
+        for name in fotos_source.namelist():
+            if not name.endswith("/") and not os.path.basename(name).startswith("._"):
+                ext = os.path.splitext(name)[1].lower()
+                if ext in (".jpg", ".jpeg", ".png", ".bmp"):
+                    fotos_map[os.path.basename(name)] = fotos_source.read(name)
+    elif isinstance(fotos_source, dict):
+        fotos_map = fotos_source
+
+    for fname, data in fotos_map.items():
+        base_name = os.path.basename(fname).strip()
+        if not base_name or base_name.startswith("."):
+            continue
+        ext = os.path.splitext(base_name)[1].lower()
+        if ext not in (".jpg", ".jpeg", ".png", ".bmp"):
+            continue
+
+        tag = os.path.splitext(base_name)[0].strip()
+        if not tag:
+            continue
+
+        dest_path = os.path.join(media_dir, base_name)
+        dest_norm = dest_path.replace("\\", "/")
+
+        # Guardar en disco si no existe o difiere en tamaño
+        try:
+            if not os.path.exists(dest_path) or os.path.getsize(dest_path) != len(data):
+                with open(dest_path, "wb") as f:
+                    f.write(data)
+        except Exception:
+            pass
+
+        # Idempotencia: comprobar si ya existe en tabla fotos (por ruta o por tag y sufijo/caption)
+        existe = db.query_one(
+            "SELECT 1 FROM fotos WHERE ruta = ? OR ruta = ? OR (tag = ? AND (ruta LIKE ? OR caption = 'Backup SG')) LIMIT 1",
+            (dest_norm, dest_path, tag, f"%{base_name}"),
+        )
+
+        if existe:
+            duplicados += 1
+        else:
+            db.registrar_foto(
+                ruta=dest_norm,
+                animal_tag=tag,
+                caption="Backup SG",
+                notas="Importado desde Fotos.Zip",
+            )
+            nuevos += 1
+
+    return {"nuevos": nuevos, "duplicados": duplicados}
+
+
+def import_dbfs(
+    db: Database,
+    dbf_data: dict[str, bytes],
+    fotos_data: Optional[bytes | dict[str, bytes]] = None,
+    media_dir: str = "media",
+) -> dict:
+    """Siembra la base de datos a partir de un dict {nombre.dbf: bytes} y opcionalmente fotos."""
     lectores = {n: DBFReader(dbf_data[n]) for n in DBF_REQUERIDOS if n in dbf_data}
     conteos: dict = {}
 
@@ -572,16 +652,46 @@ def import_dbfs(db: Database, dbf_data: dict[str, bytes]) -> dict:
         conteos["pesajes"] = import_pesajes(db, lectores["pesos.dbf"].records())
     if "traslado.dbf" in lectores:
         conteos["traslados"] = import_traslados(db, lectores["traslado.dbf"].records())
+
+    # Fotos si vienen en fotos_data o en dbf_data ("Fotos.Zip" o "fotos.zip")
+    fotos_source = fotos_data
+    if fotos_source is None:
+        for k in dbf_data:
+            if k.lower() in ("fotos.zip", "foto.zip") or k.lower().endswith("fotos.zip"):
+                fotos_source = dbf_data[k]
+                break
+
+    if fotos_source:
+        conteos["fotos"] = import_fotos(db, fotos_source, media_dir=media_dir)
+
     return conteos
 
 
-def import_zip(db: Database, zip_path: str) -> dict:
-    """Lee ``Datos20260823.Zip`` (con ``Dbf.zip`` interno) y siembra la DB."""
+def import_zip(db: Database, zip_path: str, media_dir: str = "media") -> dict:
+    """Lee ``Datos20260823.Zip`` (con ``Dbf.zip`` y opcionalmente ``Fotos.Zip`` internos) y siembra la DB."""
+    fotos_raw = None
     with zipfile.ZipFile(zip_path) as outer:
         names = outer.namelist()
-        if "Dbf.zip" in names:
-            with zipfile.ZipFile(outer.open("Dbf.zip")) as inner:
-                dbf_data = {n: inner.read(n) for n in DBF_REQUERIDOS if n in inner.namelist()}
+        names_lower = {os.path.basename(n).lower(): n for n in names}
+
+        if "dbf.zip" in names_lower:
+            dbf_zip_name = names_lower["dbf.zip"]
+            with zipfile.ZipFile(outer.open(dbf_zip_name)) as inner:
+                inner_names_lower = {os.path.basename(n).lower(): n for n in inner.namelist()}
+                dbf_data = {}
+                for req in DBF_REQUERIDOS:
+                    if req.lower() in inner_names_lower:
+                        actual_name = inner_names_lower[req.lower()]
+                        dbf_data[req] = inner.read(actual_name)
         else:
-            dbf_data = {n: outer.read(n) for n in DBF_REQUERIDOS if n in names}
-    return import_dbfs(db, dbf_data)
+            dbf_data = {}
+            for req in DBF_REQUERIDOS:
+                if req.lower() in names_lower:
+                    actual_name = names_lower[req.lower()]
+                    dbf_data[req] = outer.read(actual_name)
+
+        if "fotos.zip" in names_lower:
+            fotos_zip_name = names_lower["fotos.zip"]
+            fotos_raw = outer.read(fotos_zip_name)
+
+    return import_dbfs(db, dbf_data, fotos_data=fotos_raw, media_dir=media_dir)

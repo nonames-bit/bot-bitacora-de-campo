@@ -61,13 +61,17 @@ def formatear_historial(db: Database, tag: str, hoy=None) -> str:
 
 
 def formatear_potreros(db: Database, potrero: Optional[str | date] = None, hoy=None) -> str:
-    """Devuelve el estado de los potreros listos o los animales en un potrero específico delegando en el motor de consultas."""
+    """Devuelve el estado de los potreros listos, vacíos o los animales en un potrero específico delegando en el motor de consultas."""
     if isinstance(potrero, date):
         hoy = potrero
         potrero = None
     qe = QueryEngine(db, hoy=hoy)
     if potrero and str(potrero).strip():
         p_str = str(potrero).strip()
+        if p_str.lower() in ("vacios", "vacio", "vacíos", "vacío"):
+            return qe.responder("potreros vacios")
+        if p_str.lower() in ("inventario", "todos", "ocupados"):
+            return qe.responder("inventario potreros")
         if not re.search(r"\bpotrero", p_str, re.IGNORECASE):
             p_str = f"potrero {p_str}"
         return qe.responder(f"animales en {p_str}")
@@ -500,7 +504,13 @@ def construir_application(
                 await update.message.reply_text(respuesta, reply_markup=reply_markup)
                 return
 
-            await update.message.reply_text(respuesta)
+            if "<pre>" in respuesta or "<b>" in respuesta or "FICHA ZOOTÉCNICA" in respuesta:
+                try:
+                    await update.message.reply_text(respuesta, parse_mode="HTML")
+                except Exception:
+                    await update.message.reply_text(respuesta)
+            else:
+                await update.message.reply_text(respuesta)
 
             # Botón de fotos si la respuesta es una ficha zootécnica
             if "FICHA ZOOTÉCNICA" in respuesta:
@@ -708,7 +718,10 @@ def construir_application(
                 return
 
             msg = formatear_historial(db, tag)
-            await update.message.reply_text(msg)
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(msg)
 
             # Botón para ver fotos si el animal tiene registros fotográficos
             fotos = db.fotos_de(tag)
@@ -741,7 +754,10 @@ def construir_application(
                 return
             arg_potrero = " ".join(context.args).strip() if context.args else None
             msg = formatear_potreros(db, potrero=arg_potrero)
-            await update.message.reply_text(msg)
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(msg)
         except Exception as e:
             logger.error("Error en cmd_potreros: %s", e, exc_info=True)
             if update.message:
