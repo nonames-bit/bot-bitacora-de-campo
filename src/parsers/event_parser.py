@@ -48,7 +48,8 @@ class EventParser:
 
     Implementa arquitectura NLU híbrida:
     - Capa 1: Expresiones regulares locales rápidas (sub-milisegundo).
-    - Capa 2: LLM NVIDIA NIM en la nube para jerga compleja y múltiples eventos.
+    - Capa 2: Multi-agente Gemini en la nube (router determinista + extractores
+      por dominio) para jerga compleja y múltiples eventos.
     """
 
     def __init__(self, hoy: date | None = None, use_llm: bool = True):
@@ -102,11 +103,11 @@ class EventParser:
 
         intento = nlu.clasificar(texto)
 
-        # Capa 2: Si el texto es complejo o desconocido, intentar LLM si está configurado
+        # Capa 2: Si el texto es complejo o desconocido, intentar LLM híbrido (Gemini primero, luego NVIDIA)
         if self._should_try_llm(texto, intento):
             try:
-                from ..llm.nvidia_client import try_llm_parse
-                llm_res = try_llm_parse(texto, hoy=self.hoy)
+                from ..llm import try_hybrid_parse
+                llm_res = try_hybrid_parse(texto, hoy=self.hoy)
                 if llm_res is not None:
                     return llm_res
             except Exception:

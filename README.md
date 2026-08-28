@@ -43,10 +43,13 @@ El bot responde preguntas en lenguaje natural consultando la base de datos, entr
 - «¿qué animales están en retiro?»
 - «¿qué vacas tienen palpación pendiente?»
 - «¿qué potreros están listos?»
-- «¿qué vacas están en el potrero olegario 1?» (búsqueda de animales por potrero)
-- «¿cuál es el historial de la vaca 47?» (historial de animales)
+- «¿qué vacas están en el potrero olegario 1?» (búsqueda de animales por potrero, soporta `olegario 1 = OLEGARIO I` y `patricia → JA26`)
+- «¿cuál es el historial de la vaca 47?» (historial de animales, también por nombre `patricia`)
 - «¿cuánto pesó la 12 y cuál fue su ganancia diaria?»
 - «¿cuándo le toca el secado a la 47?»
+- «¿cuánto ganado hay en la finca?» / «total ganado» / «inventario total» (conteo activo con desglose vacas/toros/terneros, tolera typo `gaando`)
+- «¿cuántas vacas/terneros/novillas hay?» (conteos por categoría)
+- «¿inventario por potrero?» (lista cada potrero con su total)
 
 ---
 
@@ -232,11 +235,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Integración de Whisper local (`faster-whisper` / `openai-whisper`) para transcripción de audio en español (`es`)
   - [x] Procesamiento automático en tiempo real de notas de voz en Telegram y CLI con ejecución de eventos y respuestas
   - [x] Resolución flexible de tags alfanuméricos (`N069`, `N-069`, `N 069`) y permisos ampliados para `/consulta`
-- [x] **Integración LLM con NVIDIA NIM (build.nvidia.com)**:
-  - [x] Conector HTTP para modelos en la nube de NVIDIA (ej. `meta/llama-3.3-70b-instruct`, `mistralai/mistral-nemo-12b-instruct`) con fallback automático y sin dependencias pesadas (`src/llm/`).
-  - [x] Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 LLM NVIDIA para jerga compleja, notas con múltiples eventos zootécnicos y extracción JSON estructurada.
-  - [x] Soporte para notas compuestas con múltiples eventos en un solo mensaje y persistencia automática en SQLite.
-  - [x] Configuración de variables de entorno `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env`.
+- [x] **Integración LLM multi-agente con Gemini (Google AI Studio)**:
+  - [x] Router determinista (regex, sin llamada LLM) que agrupa los 8 eventos zootécnicos en 3 dominios (reproducción, sanidad, manejo) y despacha extractores especializados, sin dependencias pesadas (`src/llm/`).
+  - [x] Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 multi-agente Gemini con `responseSchema` (JSON garantizado) para jerga compleja y notas con múltiples eventos zootécnicos.
+  - [x] Ejecución en paralelo (`ThreadPoolExecutor`) de los extractores cuando una nota toca varios dominios a la vez; agente clasificador LLM como respaldo cuando el router no reconoce ningún dominio.
+  - [x] Configuración de variables de entorno `GEMINI_API_KEY` y `GEMINI_MODEL` en `.env`.
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
 - [x] Suite de pruebas con pytest: **171 pruebas pasando en verde**
 
@@ -262,7 +265,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 │   ├── db/              # Modelos y base de datos SQLite (incluye tabla fotos)
 │   ├── engine/          # Motores reproductivo, sanitario, pasturas, crecimiento, consultas
 │   ├── parsers/         # Parser NLU de eventos + manejador multimodal
-│   ├── llm/               # Cliente NVIDIA NIM + arquitectura NLU híbrida (Capa 1 regex + Capa 2 LLM)
+│   ├── llm/               # Router + agentes Gemini multi-dominio + arquitectura NLU híbrida (Capa 1 regex + Capa 2 LLM)
 │   ├── importers/       # Importador DBF nativo (TP/SG)
 │   ├── exporters/       # Exportador DBF nativo y empaquetador ZIP (Fase 2)
 │   ├── reports/         # Generador de reportes en PDF con reportlab (Fase 2)

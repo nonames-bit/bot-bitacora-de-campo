@@ -150,27 +150,46 @@ Entrada de Texto / Foto
 
 ---
 
-## 🤖 5. Arquitectura NLU Híbrida (NVIDIA NIM)
+## 🤖 5. Arquitectura NLU Híbrida Multi-Agente (Gemini)
 
 El parser implementa dos capas para maximizar velocidad y comprensión de jerga de campo:
 
 | Capa | Motor | Cuándo se activa | Latencia | Dependencias |
 |------|:-----:|---|:---:|---|
 | **Capa 1** | Regex local (`src/parsers/nlp_engine.py`) | Siempre (intento rápido) | <1 ms | Ninguna |
-| **Capa 2** | LLM NVIDIA NIM (`src/llm/nvidia_client.py`) | Texto sin intención conocida, >20 palabras, o múltiples eventos ("y también vacune...") | 800–2500 ms | `NVIDIA_API_KEY` configurada |
+| **Capa 2** | Multi-agente Gemini (`src/llm/orchestrator.py`) | Texto sin intención conocida, >20 palabras, o múltiples eventos ("y también vacune...") | 800–3000 ms | `GEMINI_API_KEY` configurada |
 
-- **Endpoint:** `https://integrate.api.nvidia.com/v1/chat/completions` (OpenAI-compatible)
-- **Modelo por defecto:** `meta/llama-3.3-70b-instruct` (configurable vía `NVIDIA_MODEL`; alternativa `mistralai/mistral-nemo-12b-instruct`)
-- **Variables:** `NVIDIA_API_KEY` y `NVIDIA_MODEL` en `.env` (`NVIDIA_BASE_URL` opcional)
-- **Prompt:** System prompt zootécnico que obliga al LLM a responder solo JSON `{eventos:[{tipo, animal_tag, fecha, datos}]}` para los 8 eventos; soporta notas con múltiples eventos en un solo mensaje.
-- **Fallback:** Si no hay API key (o es placeholder), timeout, error HTTP/URLError o JSON inválido → retorno silencioso a Capa 1 sin tumbar el bot. Logging en `bitacora.llm` sin exponer la key.
-- **Integración:** `EventParser.parse()` retorna `ParsedEvent | list[ParsedEvent]`; `Bot.procesar_texto()` itera y persiste cada evento con sus alertas (`src/bot/bot_interface.py`).
+**Capa 2 — arquitectura multi-agente:**
+1. **Router determinista** (`src/llm/router.py`, sin llamada LLM): agrupa los 8 tipos de evento en 3 dominios — `reproduccion` (parto, servicio, celo), `sanidad` (tratamiento, muerte), `manejo` (pesaje, traslado, movimiento) — escaneando los mismos patrones de `nlu.INTENTOS` que usa la Capa 1.
+2. Si detecta **1 dominio** → 1 llamada al extractor de ese dominio (`reproduccion.py` / `sanidad.py` / `manejo.py`).
+3. Si detecta **≥2 dominios** → llamadas EN PARALELO (`ThreadPoolExecutor`) a cada extractor implicado; resultados combinados preservando el orden de dominios (determinista, no depende de cuál responda primero por red).
+4. Si **no detecta ningún dominio** → 1 llamada al **Agente Clasificador** (`src/llm/clasificador.py`), que devuelve los dominios aplicables, y luego se invoca a los extractores correspondientes.
+5. Cada extractor de dominio usa `generationConfig.responseSchema` + `responseMimeType: application/json` para garantizar salida JSON conforme al schema (`src/llm/schemas.py`) — ya no hace falta parseo manual de markdown/JSON embebido en texto libre.
+
+- **Endpoint:** `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+- **Modelo por defecto:** `gemini-2.5-flash` (configurable vía `GEMINI_MODEL`)
+- **Variables:** `GEMINI_API_KEY` y `GEMINI_MODEL` en `.env`
+- **Validación:** normalización determinista (no LLM) por dominio — sexo_cria/estado_cria/tipo_servicio/am_pm en `reproduccion.py`, retiro leche/carne en `sanidad.py`, peso_kg/cantidad en `manejo.py`.
+- **Fallback:** Si no hay API key (o placeholder), timeout, error HTTP/URLError, o fallo de un dominio en la ejecución paralela → retorno silencioso a Capa 1 sin tumbar el bot (en fallo parcial, se conservan los eventos de los dominios que sí respondieron). Logging en `bitacora.llm` sin exponer la key.
+- **Integración:** `EventParser.parse()` retorna `ParsedEvent | list[ParsedEvent]`; `Bot.procesar_texto()` itera y persiste cada evento con sus alertas (`src/bot/bot_interface.py`) — sin cambios en este contrato.
 
 ```text
 Texto "parió la 47 y vacune la 12 con 20ml"
         │
         ▼
-  EventParser._should_try_llm()? --sí--> try_llm_parse() --> LLM (NIM) --> [parto 47, tratamiento 12]
+  EventParser._should_try_llm()? --sí--> try_multiagent_parse()
+        │                                   │
+        │                          router.dominios_detectados()
+        │                                   │
+        │                    {"reproduccion", "sanidad"} (2 dominios)
+        │                                   │
+        │                     ┌─────────────┴─────────────┐
+        │                     ▼ (paralelo)                 ▼ (paralelo)
+        │              reproduccion.parse()          sanidad.parse()
+        │                  [parto 47]                [tratamiento 12]
+        │                     └─────────────┬─────────────┘
+        │                                   ▼
+        │                        combinar → [parto 47, tratamiento 12]
         │                                   │ fallo/timeout/sin key
         │                                   └──────────► fallback
         ▼

@@ -60,7 +60,7 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\bentraron\b", r"\bentr[oó]\b", r"\bsalieron\b", r"\bsali[oó]\b",
         r"\bcompr[aeoó]\b", r"\bcomprad[oa]s?\b", r"\bcomprad[oa]\b", r"\bventa\b",
         r"\bvendid[oa]s?\b", r"\bvend[ió]s?\b", r"\bvendimos\b", r"\bvendi[oa]s?\b",
-        r"\bvend\b", r"\bbaja\b", r"\balta\b", r"\bsubasta\b", r"\bnovillas?\b",
+        r"\bvend\b", r"\bbaja\b", r"\balta\b", r"\bsubasta\b",
         r"\bsalida\b", r"\bentrada\b",
     ]),
 ]

@@ -1,0 +1,117 @@
+"""Cliente HTTP puro para Gemini (Google AI Studio, generativelanguage.googleapis.com).
+
+Sin SDK, solo urllib.request + json, siguiendo la convención del proyecto de
+no depender de librerías pesadas para la integración LLM.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import urllib.error
+import urllib.request
+from typing import Optional, Union
+
+logger = logging.getLogger("bitacora.llm")
+
+DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+
+
+class GeminiClient:
+    """Cliente para la API de Gemini (Google AI Studio)."""
+
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: Optional[str] = None,
+        timeout: float = 30.0,
+    ):
+        raw_key = api_key or os.getenv("GEMINI_API_KEY", "")
+        # Deshabilitado si es placeholder o vacía
+        if raw_key in ("pegar_aqui_tu_clave_de_gemini", "") or not raw_key.strip():
+            self.api_key: Optional[str] = None
+        else:
+            self.api_key = raw_key.strip()
+
+        self.model = model or os.getenv("GEMINI_MODEL") or DEFAULT_MODEL
+        self.timeout = timeout
+
+    def is_available(self) -> bool:
+        """Indica si el cliente cuenta con una API key configurada."""
+        return bool(self.api_key and len(self.api_key) > 5)
+
+    def generate_structured(
+        self,
+        system_instruction: str,
+        user_text: str,
+        response_schema: dict,
+        temperature: float = 0.1,
+        max_output_tokens: int = 1024,
+    ) -> Optional[Union[dict, list]]:
+        """Llama a generateContent pidiendo JSON conforme a ``response_schema``.
+
+        Devuelve el JSON ya parseado (dict o list) o ``None`` ante cualquier
+        fallo (sin API key, error de red/HTTP, timeout o respuesta malformada).
+        Nunca lanza excepción hacia arriba.
+        """
+        if not self.is_available():
+            return None
+        if not user_text or not user_text.strip():
+            return None
+
+        url = DEFAULT_API_URL.format(model=self.model)
+        payload = {
+            "system_instruction": {"parts": [{"text": system_instruction}]},
+            "contents": [{"role": "user", "parts": [{"text": user_text}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_output_tokens,
+                "responseMimeType": "application/json",
+                "responseSchema": response_schema,
+            },
+        }
+
+        req = urllib.request.Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key,
+                "Accept": "application/json",
+                "User-Agent": "BitacoraCampo-Gemini/1.0",
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = resp.read().decode("utf-8")
+                data = json.loads(body)
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    logger.warning("Respuesta Gemini sin candidates")
+                    return None
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if not parts:
+                    logger.warning("Respuesta Gemini sin parts")
+                    return None
+                text = parts[0].get("text", "")
+                if not text:
+                    return None
+                return json.loads(text)
+        except urllib.error.HTTPError as he:
+            logger.warning("Error HTTP en Gemini (%s): %s", he.code, he.reason)
+            return None
+        except urllib.error.URLError as ue:
+            logger.warning("Error de red al conectar con Gemini: %s", ue.reason)
+            return None
+        except TimeoutError:
+            logger.warning("Timeout al conectar con Gemini (>%ss)", self.timeout)
+            return None
+        except (json.JSONDecodeError, KeyError, IndexError) as pe:
+            logger.warning("Respuesta Gemini malformada: %s", pe)
+            return None
+        except Exception as e:
+            logger.warning("Excepción inesperada en Gemini: %s", e)
+            return None

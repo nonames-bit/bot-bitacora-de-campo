@@ -96,6 +96,28 @@ class QueryEngine:
             return self._historial(tag)
         if re.search(r"\bpes[oó]\b|\bganancia\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
+        # Inventario / conteos (consultas diarias: total ganado, total vacas, novillas, inventario potreros) — incluye typo gaando
+        if re.search(r"\b(?:total|totales|inventario|cuantos?|cuantas?|cuanto)\b", t) or re.search(r"\bganad", t) or re.search(r"\bga+ndo\b", t):
+            # inventario por potrero tiene prioridad si menciona potrero
+            if re.search(r"\bpotrero", t):
+                # "inventario potreros" o "total por potrero"
+                if re.search(r"\b(?:total|inventario|listar|mostrar)\b", t):
+                    return self._inventario_potreros()
+            # conteos de ganado por categoría (ganado, gaando typo, animal, inventario)
+            if re.search(r"\b(?:ganado|ganad|ga+ndo|animal|inventario)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
+                # si menciona categoría específica, delegar con filtro
+                if re.search(r"\bterner", t):
+                    return self._inventario_categoria("terneros")
+                if re.search(r"\bnovill", t):
+                    return self._inventario_categoria("novillas")
+                if re.search(r"\bvaca", t):
+                    return self._inventario_categoria("vacas")
+                if re.search(r"\btoro", t):
+                    return self._inventario_categoria("toros")
+                return self._inventario_general()
+            # fallback para "total ganado" con typo gaando / ga+ndo
+            if re.search(r"\bga+ndo\b", t) or re.search(r"\bga+n?ado\b", t):
+                return self._inventario_general()
         if re.search(r"\bpotrero", t) and re.search(r"\blisto|pastoreo|pastar", t):
             return self._potreros_listos()
         if re.search(r"\bpotrero", t):
@@ -418,6 +440,93 @@ class QueryEngine:
         if not listos:
             return "No hay potreros listos para pastoreo."
         return "Potreros listos para pastoreo: " + ", ".join(listos) + "."
+
+    def _inventario_general(self) -> str:
+        total = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO'")
+        n_total = int(total["n"]) if total else 0
+        if n_total == 0:
+            return "📊 Inventario: 0 animales activos en la finca."
+        hembras = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+        machos = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='MACHO'")
+        n_hembras = int(hembras["n"]) if hembras else 0
+        n_machos = int(machos["n"]) if machos else 0
+        # Terneros aproximados: <12 meses
+        terneros = 0
+        try:
+            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            for r in rows:
+                fn = to_date(r["fecha_nacimiento"])
+                if fn and (self.hoy - fn).days < 365:
+                    terneros += 1
+        except Exception:
+            terneros = 0
+        detalle = f"🐄 Total en finca: {n_total} animales"
+        partes = []
+        if n_hembras:
+            partes.append(f"{n_hembras} vacas/hembras")
+        if n_machos:
+            partes.append(f"{n_machos} toros/machos")
+        if terneros:
+            partes.append(f"{terneros} terneros <12m")
+        if partes:
+            detalle += f" ({', '.join(partes)})"
+        return detalle + "."
+
+    def _inventario_categoria(self, categoria: str) -> str:
+        cat = categoria.lower()
+        if cat in ("vacas", "vaca"):
+            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+            n = int(row["n"]) if row else 0
+            return f"🐄 Total vacas (hembras activas): {n}."
+        if cat in ("toros", "toro"):
+            row = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='MACHO'")
+            n = int(row["n"]) if row else 0
+            return f"🐂 Total toros (machos activos): {n}."
+        if cat in ("novillas", "novilla"):
+            # Novillas: hembras sin partos
+            hembras = self.db.query("SELECT id_animal FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND UPPER(sexo)='HEMBRA'")
+            count = 0
+            for h in hembras:
+                aid = h["id_animal"]
+                has_parto = self.db.query_one("SELECT 1 FROM partos WHERE vaca_id=? LIMIT 1", (aid,))
+                if not has_parto:
+                    count += 1
+            return f"🐄 Total novillas (hembras sin parto): {count}."
+        if cat in ("terneros", "ternero", "terneras"):
+            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            count = 0
+            for r in rows:
+                fn = to_date(r["fecha_nacimiento"])
+                if fn and (self.hoy - fn).days < 365:
+                    count += 1
+            # Fallback si no hay fecha_nacimiento: contar crías con id_cria no nulo en partos
+            if count == 0:
+                row = self.db.query_one("SELECT COUNT(DISTINCT id_cria) as n FROM partos WHERE id_cria IS NOT NULL")
+                count = int(row["n"]) if row and row["n"] else 0
+            return f"🐄 Total terneros (<12 meses): {count}."
+        return self._inventario_general()
+
+    def _inventario_potreros(self) -> str:
+        potreros = self.db.query("SELECT * FROM potreros ORDER BY nombre")
+        if not potreros:
+            return "No hay potreros registrados."
+        # contar animales por potrero (usando potrero_id o último traslado)
+        animales = self.db.query("SELECT id_animal, potrero_id FROM animales WHERE COALESCE(estado,'ACTIVO')='ACTIVO'")
+        conteo = {}
+        for a in animales:
+            aid = a["id_animal"]
+            ult = self.db.query_one("SELECT potrero_destino FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1", (aid,))
+            pid = ult["potrero_destino"] if ult and ult["potrero_destino"] is not None else a["potrero_id"]
+            if pid is not None:
+                conteo[pid] = conteo.get(pid, 0) + 1
+        lineas = ["📍 Inventario por potrero:"]
+        for p in potreros:
+            pid = p["id"]
+            nombre = p["nombre"] or p["codigo"] or str(pid)
+            n = conteo.get(pid, 0)
+            lineas.append(f"• {nombre}: {n} animales")
+        # potreros sin animales quedan con 0
+        return "\n".join(lineas)
 
     def _buscar_potrero(self, nombre_potrero: str):
         if not nombre_potrero:
