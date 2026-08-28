@@ -332,5 +332,197 @@ def test_ficha_zootecnica_formato_movil(db):
     assert "1 foto(s) registrada(s)" in resp
 
 
+def test_ficha_vaca_parida_y_cria_ternero(db):
+    # Caso reportado por Jaime: JA400 (Madre) y V008 (Cría macho nacida el 2026-01-08)
+    db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="01")
+    db.registrar_potrero(nombre="CORRAL SANTAMARTHA", codigo="02")
+
+    db.registrar_animal(
+        "JA400",
+        nombre="PACHITA HIJA JANGO 3/4 GIRO",
+        sexo="Hembra",
+        raza="Gyr",
+        potrero="01",
+        estado="ACTIVO",
+    )
+    # Partos anteriores
+    db.registrar_parto("JA400", fecha="2024-01-10", sexo_cria="Hembra")
+    db.registrar_parto("JA400", fecha="2025-01-05", sexo_cria="Hembra")
+    # Último parto con cría macho V008 el 2026-01-08
+    db.registrar_parto(
+        "JA400",
+        fecha="2026-01-08",
+        sexo_cria="Macho",
+        peso_nacimiento=34.0,
+        id_cria_tag="V008",
+    )
+    db.registrar_animal("V008", sexo="Macho", potrero="02", estado="ACTIVO")
+
+    # Fecha de consulta: 2026-08-28 (232 días desde el parto)
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+
+    # Ficha de la vaca madre JA400
+    resp_ja400 = qe.responder("ficha JA400")
+    assert "FICHA ZOOTÉCNICA" in resp_ja400
+    assert "Vaca JA400" in resp_ja400
+    assert "PACHITA HIJA JANGO 3/4 GIRO" in resp_ja400
+    assert "PARIDA SIN PALPAR" in resp_ja400
+    assert "partos: 3 registro(s)" in resp_ja400
+    assert "Último Parto: 2026-01-08 (Cría macho, 34.0 kg, Arete V008)" in resp_ja400
+    assert "Días Abiertos: 232 días" in resp_ja400
+
+    # Ficha de la cría macho V008
+    resp_v008 = qe.responder("ficha V008")
+    assert "FICHA ZOOTÉCNICA" in resp_v008
+    assert "Ternero V008" in resp_v008
+    assert "Toro V008" not in resp_v008
+    assert "MACHO REPRODUCTOR" not in resp_v008
+    assert "CRÍA / LEVANTE" in resp_v008
+    assert "partos: 0 registro(s)" in resp_v008
+    assert "Días Abiertos" not in resp_v008
+    assert "Último Parto" not in resp_v008
+    assert "Madre: JA400" in resp_v008
+
+
+def test_ficha_macho_clasificacion_etaria(db):
+    # Ternero (<12 meses), Novillo (12-24 meses), Toro (>=24 meses)
+    db.registrar_animal("T01", sexo="Macho", fecha_nacimiento="2026-03-01")  # ~6 meses -> Ternero
+    db.registrar_animal("N01", sexo="Macho", fecha_nacimiento="2025-01-01")  # ~20 meses -> Novillo
+    db.registrar_animal("TORO1", sexo="Macho", fecha_nacimiento="2023-01-01")  # ~3.5 años -> Toro
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+
+    resp_t01 = qe.responder("ficha T01")
+    assert "Ternero T01" in resp_t01
+    assert "CRÍA / LEVANTE" in resp_t01
+    assert "partos: 0" in resp_t01
+    assert "Días Abiertos" not in resp_t01
+
+    resp_n01 = qe.responder("ficha N01")
+    assert "Novillo N01" in resp_n01
+    assert "CEBA / LEVANTE" in resp_n01
+    assert "partos: 0" in resp_n01
+
+    resp_toro = qe.responder("ficha TORO1")
+    assert "Toro TORO1" in resp_toro
+    assert "MACHO REPRODUCTOR" in resp_toro
+    assert "partos: 0" in resp_toro
+
+
+def test_ficha_ternero_v009_madre_ja400(db):
+    # Caso reportado por Jaime: JA400 (Madre) y V009 (Cría macho nacida el 2026-03-02)
+    db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="01")
+    db.registrar_potrero(nombre="CORRAL SANTAMARTHA", codigo="02")
+
+    db.registrar_animal(
+        "JA400",
+        nombre="PACHITA HIJA JANGO 3/4 GIRO",
+        sexo="Hembra",
+        raza="Gyr",
+        potrero="01",
+        estado="ACTIVO",
+    )
+    # Parto de la madre JA400 con cría macho V009 el 2026-03-02
+    db.registrar_parto(
+        "JA400",
+        fecha="2026-03-02",
+        sexo_cria="Macho",
+        peso_nacimiento=33.0,
+        id_cria_tag="V009",
+    )
+    db.registrar_animal("V009", sexo="Macho", potrero="02", estado="ACTIVO")
+
+    # Fecha de consulta: 2026-08-28 (179 días desde el parto)
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+
+    resp_v009 = qe.responder("ficha V009")
+    assert "FICHA ZOOTÉCNICA" in resp_v009
+    assert "Ternero V009" in resp_v009
+    assert "Toro V009" not in resp_v009
+    assert "MACHO REPRODUCTOR" not in resp_v009
+    assert "CRÍA / LEVANTE" in resp_v009
+    assert "partos: 0 registro(s)" in resp_v009
+    assert "servicios: 0 registro(s)" in resp_v009
+    assert "Días Abiertos" not in resp_v009
+    assert "Último Parto" not in resp_v009
+    assert "Madre: JA400" in resp_v009
+    assert "Fecha: 2026-03-02" in resp_v009
+
+
+def test_ficha_v009_con_parto_autorreferenciado_corrupto(db):
+    # Simula caso corrupto donde V009 existía como registro de parto autorreferenciado
+    v009_id = db.registrar_animal("V009", sexo="Macho", fecha_nacimiento="2026-03-02", estado="ACTIVO")
+    ja400_id = db.registrar_animal("JA400", sexo="Hembra", estado="ACTIVO")
+    db.execute("UPDATE animales SET madre_id = ? WHERE id_animal = ?", (ja400_id, v009_id))
+
+    # Insertar manualmente un parto corrupto autorreferenciado (vaca_id = V009, id_cria = V009)
+    db.execute(
+        "INSERT INTO partos (vaca_id, id_cria, fecha, sexo_cria, peso_nacimiento) VALUES (?, ?, '2026-03-02', 'Macho', 33.0)",
+        (v009_id, v009_id),
+    )
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha V009")
+
+    assert "Ternero V009" in resp
+    assert "Toro V009" not in resp
+    assert "MACHO REPRODUCTOR" not in resp
+    assert "CRÍA / LEVANTE" in resp
+    assert "partos: 0 registro(s)" in resp
+    assert "Días Abiertos" not in resp
+    assert "Último Parto" not in resp
+    assert "Madre: JA400" in resp
+
+
+def test_ficha_v009_sin_fecha_nacimiento_infiere_parto_madre(db):
+    # V009 sin fecha_nacimiento en tabla animales, pero con madre JA400 con parto el 2026-03-02
+    ja400_id = db.registrar_animal("JA400", sexo="Hembra", estado="ACTIVO")
+    v009_id = db.registrar_animal("V009", sexo="Macho", madre_tag="JA400", estado="ACTIVO")
+    db.execute(
+        "INSERT INTO partos (vaca_id, id_cria, fecha, sexo_cria, peso_nacimiento) VALUES (?, ?, '2026-03-02', 'Macho', 33.0)",
+        (ja400_id, v009_id),
+    )
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha V009")
+
+    assert "Ternero V009" in resp
+    assert "CRÍA / LEVANTE" in resp
+    assert "Madre: JA400" in resp
+    assert "Fecha: 2026-03-02" in resp
+
+
+def test_ficha_macho_edad_desconocida_sin_madre(db):
+    # Macho sin fecha de nacimiento ni madre registrada -> no debe clasificarse como Toro reproductor
+    db.registrar_animal("M_DESCONOCIDO", sexo="Macho", estado="ACTIVO")
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha M_DESCONOCIDO")
+
+    assert "Macho joven M_DESCONOCIDO" in resp
+    assert "Toro M_DESCONOCIDO" not in resp
+    assert "MACHO REPRODUCTOR" not in resp
+    assert "LEVANTE / EDAD POR CONFIRMAR" in resp
+    assert "partos: 0 registro(s)" in resp
+
+
+def test_ficha_macho_sexo_indefinido_infiere_macho_desde_parto(db):
+    # Animal con sexo 'I' en la tabla pero con registro de parto que indica sexo_cria 'Macho'
+    ja400_id = db.registrar_animal("JA400", sexo="Hembra", estado="ACTIVO")
+    cria_id = db.registrar_animal("CRIA_01", sexo="I", madre_tag="JA400", estado="ACTIVO")
+    db.execute(
+        "INSERT INTO partos (vaca_id, id_cria, fecha, sexo_cria, peso_nacimiento) VALUES (?, ?, '2026-03-02', 'Macho', 33.0)",
+        (ja400_id, cria_id),
+    )
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha CRIA_01")
+
+    assert "Ternero CRIA_01" in resp
+    assert "Vaca CRIA_01" not in resp
+    assert "partos: 0 registro(s)" in resp
+    assert "Días Abiertos" not in resp
+
+
+
 
 

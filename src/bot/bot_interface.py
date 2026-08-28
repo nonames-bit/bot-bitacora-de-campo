@@ -67,15 +67,17 @@ class Bot:
             info = extract_image_info(image_path)
             if info.tags and not tag:
                 tag = info.tags[0]
-            if info.texto_detectado:
+            if info.texto_detectado and not texto_evento:
                 texto_evento = info.texto_detectado
         except MediaError:
             pass
 
+        ocr_txt = info.ocr_text if info and info.ocr_text else None
         self.db.registrar_foto(
             ruta=image_path, animal_tag=tag, fecha=iso(self.hoy),
             caption=caption or (info.texto_detectado if info else None),
             user_id=user_id,
+            ocr_text=ocr_txt,
         )
 
         if texto_evento:

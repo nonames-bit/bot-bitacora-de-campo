@@ -22,6 +22,20 @@ class Database:
     # ------------------------------------------------------------------ #
     def create_tables(self) -> "Database":
         self.conn.executescript(SCHEMA_SQL)
+        # Migración idempotente para columnas añadidas
+        try:
+            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()]
+            if "ocr_text" not in cols:
+                self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
+        except Exception:
+            pass
+        # Saneamiento idempotente de autorreferencias corruptas
+        try:
+            self.conn.execute("UPDATE animales SET madre_id = NULL WHERE madre_id = id_animal")
+            self.conn.execute("UPDATE animales SET padre_id = NULL WHERE padre_id = id_animal")
+            self.conn.execute("DELETE FROM partos WHERE vaca_id = id_cria AND vaca_id IS NOT NULL")
+        except Exception:
+            pass
         self.conn.commit()
         return self
 
@@ -132,15 +146,29 @@ class Database:
     def registrar_animal(self, tag, nombre=None, sexo=None, raza=None,
                          fecha_nacimiento=None, madre_tag=None, padre_tag=None,
                          potrero=None, estado=None, notas=None) -> int:
+        tag_str = str(tag).strip()
+        existente = self.animal_id(tag_str)
+
         madre_id = self.resolve_animal(madre_tag) if madre_tag else None
         padre_id = self.resolve_animal(padre_tag) if padre_tag else None
         potrero_id = self.resolve_potrero(potrero) if potrero else None
+
+        # Evitar autorreferencias (un animal no puede ser su propio padre ni madre)
+        if madre_tag and str(madre_tag).strip().upper() == tag_str.upper():
+            madre_id = None
+        if padre_tag and str(padre_tag).strip().upper() == tag_str.upper():
+            padre_id = None
+        if existente is not None:
+            if madre_id == existente:
+                madre_id = None
+            if padre_id == existente:
+                padre_id = None
+
         campos = dict(
             nombre=nombre, sexo=sexo, raza=raza,
             fecha_nacimiento=iso(fecha_nacimiento), madre_id=madre_id,
             padre_id=padre_id, potrero_id=potrero_id, estado=estado, notas=notas,
         )
-        existente = self.animal_id(tag)
         if existente is not None:
             sets = ", ".join(f"{k} = ?" for k, v in campos.items() if v is not None)
             vals = tuple(v for v in campos.values() if v is not None)
@@ -149,7 +177,7 @@ class Database:
                     f"UPDATE animales SET {sets} WHERE id_animal = ?", vals + (existente,)
                 )
             return existente
-        return self.insert("animales", {"tag": str(tag).strip(), **campos})
+        return self.insert("animales", {"tag": tag_str, **campos})
 
     def registrar_potrero(self, nombre=None, codigo=None, area_has=None,
                           tipo_pasto=None, aforo_kg_m2=None, fecha_entrada=None,
@@ -165,12 +193,38 @@ class Database:
     def registrar_parto(self, vaca_tag, fecha=None, sexo_cria=None,
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
                         notas=None) -> int:
+        tag_vaca_clean = str(vaca_tag).strip() if vaca_tag is not None else ""
+        tag_cria_clean = str(id_cria_tag).strip() if id_cria_tag is not None else ""
+
+        # Protección contra autorreferencias: si vaca y cría tienen el mismo tag
+        if tag_cria_clean and tag_vaca_clean.upper() == tag_cria_clean.upper():
+            id_cria = self.resolve_animal(tag_cria_clean, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha))
+            if id_cria is not None:
+                if sexo_cria:
+                    self.execute("UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria))
+                if fecha:
+                    self.execute("UPDATE animales SET fecha_nacimiento = COALESCE(fecha_nacimiento, ?) WHERE id_animal = ?", (iso(fecha), id_cria))
+            return 0
+
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
-        id_cria = self.resolve_animal(id_cria_tag, crear=True) if id_cria_tag else None
-        if id_cria is not None and vaca_id is not None:
-            self.execute(
-                "UPDATE animales SET madre_id = ? WHERE id_animal = ?", (vaca_id, id_cria)
-            )
+        id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
+
+        if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
+            return 0
+
+        if id_cria is not None:
+            if vaca_id is not None and id_cria != vaca_id:
+                self.execute(
+                    "UPDATE animales SET madre_id = COALESCE(madre_id, ?) WHERE id_animal = ? AND (madre_id IS NULL OR madre_id != ?)", (vaca_id, id_cria, id_cria)
+                )
+            if sexo_cria:
+                self.execute(
+                    "UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria)
+                )
+            if fecha:
+                self.execute(
+                    "UPDATE animales SET fecha_nacimiento = COALESCE(fecha_nacimiento, ?) WHERE id_animal = ?", (iso(fecha), id_cria)
+                )
         return self.insert("partos", dict(
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,
@@ -253,13 +307,14 @@ class Database:
         ))
 
     def registrar_foto(self, ruta: str, animal_tag=None, fecha=None,
-                       caption=None, user_id=None, notas=None) -> int:
+                       caption=None, user_id=None, notas=None, ocr_text=None) -> int:
         tag_str = str(animal_tag).strip() if animal_tag else None
         animal_id = self.resolve_animal(tag_str, crear=True) if tag_str else None
         fecha_iso = iso(fecha) or date.today().isoformat()
         return self.insert("fotos", dict(
             animal_id=animal_id, tag=tag_str, fecha=fecha_iso,
             ruta=ruta, caption=caption, user_id=user_id, notas=notas,
+            ocr_text=ocr_text,
         ))
 
     def fotos_de(self, animal_tag_or_id, limit: int = 5) -> list[sqlite3.Row]:
@@ -285,13 +340,21 @@ class Database:
         aid = self.resolve_animal(animal_tag_or_id)
         if aid is None:
             return None
+        animal = self.get_animal(aid)
+        if animal and (animal["sexo"] or "").strip().lower().startswith("m"):
+            # Machos nunca tienen partos propios
+            return None
         return self.query_one(
-            "SELECT * FROM partos WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
+            "SELECT * FROM partos WHERE vaca_id = ? AND (id_cria IS NULL OR id_cria != ?) ORDER BY fecha DESC LIMIT 1", (aid, aid)
         )
 
     def ultimo_servicio(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
         aid = self.resolve_animal(animal_tag_or_id)
         if aid is None:
+            return None
+        animal = self.get_animal(aid)
+        if animal and (animal["sexo"] or "").strip().lower().startswith("m"):
+            # Machos nunca tienen servicios reproductivos de hembra
             return None
         return self.query_one(
             "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
@@ -309,11 +372,24 @@ class Database:
         aid = self.resolve_animal(animal_tag_or_id)
         if aid is None:
             return {}
-        tag = self.get_animal(aid)["tag"] if self.get_animal(aid) else str(aid)
+        animal = self.get_animal(aid)
+        tag = animal["tag"] if animal else str(aid)
+        es_macho = bool(animal and (animal["sexo"] or "").strip().lower().startswith("m"))
+
+        partos_propios = [] if es_macho else self.query(
+            "SELECT * FROM partos WHERE vaca_id = ? AND (id_cria IS NULL OR id_cria != ?) ORDER BY fecha", (aid, aid)
+        )
+        servicios = [] if es_macho else self.query(
+            "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha", (aid,)
+        )
+        celos = [] if es_macho else self.query(
+            "SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha", (aid,)
+        )
         return {
-            "partos": self.query("SELECT * FROM partos WHERE vaca_id = ? OR id_cria = ? ORDER BY fecha", (aid, aid)),
-            "servicios": self.query("SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha", (aid,)),
-            "celos": self.query("SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha", (aid,)),
+            "partos": partos_propios,
+            "nacimiento": self.query("SELECT * FROM partos WHERE id_cria = ? ORDER BY fecha", (aid,)),
+            "servicios": servicios,
+            "celos": celos,
             "muertes": self.query("SELECT * FROM muertes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "tratamientos": self.query("SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "traslados": self.query("SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha", (aid,)),
@@ -340,7 +416,7 @@ class Database:
                 if row is None:
                     continue
                 for pid in (row["madre_id"], row["padre_id"]):
-                    if pid is not None and pid not in vistos:
+                    if pid is not None and pid != aid and pid not in vistos:
                         vistos.add(pid)
                         nuevos.add(pid)
             frontera = nuevos

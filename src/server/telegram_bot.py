@@ -15,7 +15,8 @@ from ..db.database import Database
 from ..engine.query_engine import QueryEngine
 from ..importers.dbf_importer import import_zip
 from ..parsers import nlp_engine as nlu
-from ..parsers.media_handler import MediaError, transcribe_audio
+from ..parsers.media_handler import (MediaError, extract_image_info,
+                                      transcribe_audio)
 from ..utils import add_days, iso
 from .auth import Auth
 
@@ -596,6 +597,20 @@ def construir_application(
             archivo = await context.bot.get_file(foto.file_id)
             await archivo.download_to_drive(dest_path)
 
+            # Extraer información visual con OCR
+            ocr_text = ""
+            ocr_tags = []
+            ocr_med = None
+            try:
+                img_info = extract_image_info(dest_path)
+                ocr_text = img_info.ocr_text or img_info.texto_detectado or ""
+                ocr_tags = img_info.tags
+                ocr_med = img_info.medicamento
+                if not tag and ocr_tags:
+                    tag = ocr_tags[0]
+            except Exception:
+                pass
+
             # Registrar en la base de datos
             db.registrar_foto(
                 ruta=dest_path,
@@ -603,19 +618,39 @@ def construir_application(
                 caption=caption or None,
                 user_id=user_id,
                 fecha=date.today().isoformat(),
+                ocr_text=ocr_text or None,
             )
 
-            # Si el caption contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
-            if caption and nlu.clasificar(caption) is not None:
+            # Construir texto consolidado para NLU
+            texto_consolidado = f"{caption} {ocr_text}".strip() if caption else ocr_text
+
+            # Mensajes de detección OCR para feedback al usuario
+            ocr_feedback = []
+            if ocr_tags:
+                ocr_feedback.append(f"🔍 OCR detectó tag {', '.join(ocr_tags)}")
+            if ocr_med and ocr_med.get("producto"):
+                detalles_med = [ocr_med['producto']]
+                if ocr_med.get("dosis"):
+                    detalles_med.append(f"dosis {ocr_med['dosis']}")
+                if ocr_med.get("via"):
+                    detalles_med.append(f"vía {ocr_med['via']}")
+                if ocr_med.get("lote"):
+                    detalles_med.append(f"lote {ocr_med['lote']}")
+                ocr_feedback.append(f"💊 OCR detectó medicamento: {', '.join(detalles_med)}")
+
+            str_feedback = ("\n" + "\n".join(ocr_feedback)) if ocr_feedback else ""
+
+            # Si el caption o OCR contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
+            if texto_consolidado and nlu.clasificar(texto_consolidado) is not None:
                 bot_engine = Bot(db)
-                resp_evento = bot_engine.procesar_texto(caption)
+                resp_evento = bot_engine.procesar_texto(texto_consolidado)
                 await update.message.reply_text(
-                    f"📷 Foto registrada y vinculada a {tag or 'evento'}.\n\n{resp_evento}"
+                    f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
                 )
             elif tag:
-                await update.message.reply_text(f"📷 Foto guardada y vinculada a la {tag}.")
+                await update.message.reply_text(f"📷 Foto guardada y vinculada a la {tag}.{str_feedback}")
             else:
-                await update.message.reply_text("📷 Foto recibida y guardada en la bitácora.")
+                await update.message.reply_text(f"📷 Foto recibida y guardada en la bitácora.{str_feedback}")
         except Exception as e:
             logger.error("Error en handle_photo: %s", e, exc_info=True)
             if update.message:

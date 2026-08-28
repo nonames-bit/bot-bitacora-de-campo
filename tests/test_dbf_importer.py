@@ -148,6 +148,14 @@ def test_import_partos(db):
     assert db.get_animal("480") is not None
 
 
+def test_import_partos_ignora_autorreferencia_corrupta(db):
+    # Caso donde el DBF corrupto tiene CODANI == HIJO (vaca_tag == cria_tag)
+    res = import_partos(db, [{"CODANI": "V009", "FECHA": "2026-03-02", "CRIA": "M",
+                              "ABORTO": "", "PESNAC": 33.0, "HIJO": "V009", "DETALLE": "corrupto"}])
+    assert res == {"nuevos": 0, "duplicados": 0}
+    assert db.count("partos") == 0
+
+
 def test_import_partos_mismo_dia_con_y_sin_cria_no_colisionan(db):
     # 1. Parto con cría
     r1 = [{"CODANI": "47", "FECHA": "2026-05-01", "CRIA": "M",

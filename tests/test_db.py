@@ -46,6 +46,31 @@ def test_registrar_parto_enlaza_cria(db):
     assert cria is not None
     vaca = db.get_animal("47")
     assert cria["madre_id"] == vaca["id_animal"]
+    assert cria["sexo"] == "Macho"
+    assert cria["fecha_nacimiento"] == "2026-08-24"
+
+    # En historial, la cría no tiene partos propios pero sí registro de nacimiento
+    h_cria = db.historial("480")
+    assert len(h_cria["partos"]) == 0
+    assert len(h_cria["nacimiento"]) == 1
+
+
+def test_registrar_parto_autorreferenciado_proteccion(db):
+    # Intentar registrar parto donde vaca_tag == id_cria_tag
+    res = db.registrar_parto(vaca_tag="V009", fecha="2026-03-02", sexo_cria="Macho", id_cria_tag="V009")
+    assert res == 0
+    assert db.count("partos") == 0
+    cria = db.get_animal("V009")
+    assert cria is not None
+    assert cria["madre_id"] is None
+    assert cria["sexo"] == "Macho"
+
+
+def test_registrar_animal_autorreferencia_madre_padre(db):
+    aid = db.registrar_animal("A01", madre_tag="A01", padre_tag="A01")
+    ani = db.get_animal("A01")
+    assert ani["madre_id"] is None
+    assert ani["padre_id"] is None
 
 
 def test_registrar_servicio(db):

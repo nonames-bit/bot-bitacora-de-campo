@@ -265,7 +265,7 @@ class QueryEngine:
         tag_str = animal["tag"] or str(tag)
         nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
         raza = animal["raza"] or "Sin especificar"
-        sexo = animal["sexo"] or "Hembra"
+        sexo_raw = animal["sexo"] or ""
         estado = animal["estado"] or "ACTIVO"
 
         potrero_nom = "No asignado"
@@ -282,21 +282,95 @@ class QueryEngine:
                 if prow:
                     potrero_nom = prow["nombre"] or prow["codigo"] or "No asignado"
 
-        # Historial de eventos
+        # Registro de nacimiento como cría (excluyendo autorreferencias)
+        p_nac = self.db.query_one(
+            "SELECT * FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
+            (aid, aid),
+        )
+        if not p_nac and animal["madre_id"] and animal["madre_id"] != aid:
+            p_nac = self.db.query_one(
+                "SELECT * FROM partos WHERE vaca_id = ? AND (id_cria = ? OR id_cria IS NULL) ORDER BY fecha DESC LIMIT 1",
+                (animal["madre_id"], aid),
+            )
+
+        # Normalización e inferencia de sexo
+        sexo_norm = sexo_raw.strip().lower()
+        if not sexo_norm or sexo_norm in ("i", "indefinido", "indeterminado", "desconocido", "?"):
+            if p_nac and p_nac["sexo_cria"]:
+                sexo_norm = p_nac["sexo_cria"].strip().lower()
+
+        es_macho = bool(sexo_norm.startswith("m") or sexo_norm in ("macho", "toro", "ternero", "novillo", "buey"))
+        es_hembra = not es_macho
+
+        # Historial de eventos (machos no tienen partos dados por ellos ni servicios de hembra)
         h = self.db.historial(tag_str)
-        partos = h.get("partos", [])
-        servicios = h.get("servicios", [])
-        celos = h.get("celos", [])
+        partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != p.get("id_cria")]
+        servicios = [] if es_macho else h.get("servicios", [])
+        celos = [] if es_macho else h.get("celos", [])
         tratamientos = h.get("tratamientos", [])
         pesajes = h.get("pesajes", [])
         fotos = h.get("fotos", [])
 
-        # Estado reproductivo
-        ult_parto = partos[-1] if partos else None
-        ult_servicio = servicios[-1] if servicios else None
+        # Cálculo de fecha de nacimiento y edad
+        f_nac = to_date(animal["fecha_nacimiento"])
+        if not f_nac and p_nac and p_nac["fecha"]:
+            f_nac = to_date(p_nac["fecha"])
 
-        estado_reprod = "VACÍA / SIN SERVICIO"
-        if sexo.lower().startswith("h"):
+        # Si aún no hay f_nac pero tiene madre_id válida, inferir desde partos recientes de la madre (<15 meses)
+        if not f_nac and animal["madre_id"] and animal["madre_id"] != aid:
+            ult_p_madre = self.db.query_one(
+                "SELECT fecha, peso_nacimiento FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                (animal["madre_id"],),
+            )
+            if ult_p_madre and ult_p_madre["fecha"]:
+                d_madre = to_date(ult_p_madre["fecha"])
+                if d_madre and (self.hoy - d_madre).days <= 450:
+                    f_nac = d_madre
+                    if not p_nac:
+                        p_nac = ult_p_madre
+
+        edad_dias = (self.hoy - f_nac).days if f_nac else None
+
+        # Categoría etaria / zootécnica
+        if es_macho:
+            if edad_dias is not None:
+                if edad_dias < 365:
+                    tipo_animal = "Ternero"
+                    estado_reprod = "CRÍA / LEVANTE"
+                elif edad_dias < 730:
+                    tipo_animal = "Novillo"
+                    estado_reprod = "CEBA / LEVANTE"
+                else:
+                    tipo_animal = "Toro"
+                    estado_reprod = "MACHO REPRODUCTOR"
+            else:
+                # Edad desconocida: evitar clasificar como Toro reproductor
+                if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
+                    tipo_animal = "Ternero"
+                    estado_reprod = "CRÍA / LEVANTE"
+                else:
+                    tipo_animal = "Macho joven"
+                    estado_reprod = "LEVANTE / EDAD POR CONFIRMAR"
+        else:
+            if partos:
+                tipo_animal = "Vaca"
+            elif edad_dias is not None:
+                if edad_dias < 365:
+                    tipo_animal = "Ternera"
+                elif edad_dias < 730:
+                    tipo_animal = "Novilla"
+                else:
+                    tipo_animal = "Novilla"
+            else:
+                if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
+                    tipo_animal = "Ternera"
+                else:
+                    tipo_animal = "Novilla"
+
+            # Estado reproductivo hembra
+            ult_parto = partos[-1] if partos else None
+            ult_servicio = servicios[-1] if servicios else None
+
             if ult_parto and not ult_servicio:
                 estado_reprod = "PARIDA SIN PALPAR"
             elif ult_parto and ult_servicio:
@@ -307,14 +381,16 @@ class QueryEngine:
             elif ult_servicio:
                 estado_reprod = "SERVIDA / PENDIENTE PALPACIÓN"
             elif not partos and not servicios:
-                estado_reprod = "NOVILLA / SIN REPORTES"
-        else:
-            estado_reprod = "MACHO REPRODUCTOR"
+                if (edad_dias is not None and edad_dias < 365) or (edad_dias is None and ((animal["madre_id"] and animal["madre_id"] != aid) or p_nac)):
+                    estado_reprod = "CRÍA / LEVANTE"
+                else:
+                    estado_reprod = "NOVILLA / SIN REPORTES"
+            else:
+                estado_reprod = "VACÍA / SIN SERVICIO"
 
         bloques = []
 
         # Encabezado
-        tipo_animal = "Toro" if sexo.lower().startswith("m") else "Vaca"
         nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
         header = [
             "📋 <b>FICHA ZOOTÉCNICA</b>",
@@ -329,50 +405,72 @@ class QueryEngine:
 
         # Sección Reproducción
         reprod = ["🍼 <b>REPRODUCCIÓN & PARTOS</b>"]
-        if partos:
-            p = ult_parto
-            cria_info = []
-            if p["sexo_cria"]:
-                cria_info.append(f"Cría {p['sexo_cria'].lower()}")
-            if p["peso_nacimiento"]:
-                cria_info.append(f"{p['peso_nacimiento']} kg")
-            if p["id_cria"]:
-                cria_animal = self.db.get_animal(p["id_cria"])
-                if cria_animal:
-                    cria_info.append(f"Arete {cria_animal['tag']}")
-            cria_str = f" ({', '.join(cria_info)})" if cria_info else ""
-            reprod.append(f"• partos: {len(partos)} registro(s)")
-            reprod.append(f"  Último Parto: {p['fecha']}{cria_str}")
+        if es_hembra:
+            if partos:
+                p = ult_parto
+                cria_info = []
+                if p["sexo_cria"]:
+                    cria_info.append(f"Cría {p['sexo_cria'].lower()}")
+                if p["peso_nacimiento"]:
+                    cria_info.append(f"{p['peso_nacimiento']} kg")
+                if p["id_cria"]:
+                    cria_animal = self.db.get_animal(p["id_cria"])
+                    if cria_animal:
+                        cria_info.append(f"Arete {cria_animal['tag']}")
+                cria_str = f" ({', '.join(cria_info)})" if cria_info else ""
+                reprod.append(f"• partos: {len(partos)} registro(s)")
+                reprod.append(f"  Último Parto: {p['fecha']}{cria_str}")
 
-            f_parto = to_date(p["fecha"])
-            if f_parto:
-                da = (self.hoy - f_parto).days
-                reprod.append(f"  Días Abiertos: {da} días (desde el último parto)")
+                f_parto = to_date(p["fecha"])
+                if f_parto:
+                    da = (self.hoy - f_parto).days
+                    reprod.append(f"  Días Abiertos: {da} días (desde el último parto)")
+            else:
+                reprod.append("• partos: 0 registro(s).")
+
+            if servicios:
+                s = ult_servicio
+                toro_info = f" (Toro/Pajilla {s['toro_pajilla']})" if s["toro_pajilla"] else ""
+                tipo_srv = s["tipo_servicio"] or "IA"
+                reprod.append(f"• servicios: {len(servicios)} registro(s)")
+                reprod.append(f"  Último Servicio: {s['fecha']} [{tipo_srv}]{toro_info}")
+
+                if s["fecha"]:
+                    fep = s["fep_calculada"] or iso(fecha_estimada_parto(s["fecha"]))
+                    f_palp = iso(fecha_palpacion(s["fecha"]))
+                    f_sec = iso(fecha_secado(fep))
+                    reprod.append(f"  Palpación Rectal: PENDIENTE ({f_palp}, día 60)")
+                    reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
+                    reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
+            else:
+                reprod.append("• servicios: 0 registro(s).")
+
+            if celos:
+                c = celos[-1]
+                turno = f" [{c['am_pm']}]" if c["am_pm"] else ""
+                reprod.append(f"• celos: {len(celos)} registro(s)")
+                reprod.append(f"  Último Celo: {c['fecha']}{turno}")
         else:
             reprod.append("• partos: 0 registro(s).")
-
-        if servicios:
-            s = ult_servicio
-            toro_info = f" (Toro/Pajilla {s['toro_pajilla']})" if s["toro_pajilla"] else ""
-            tipo_srv = s["tipo_servicio"] or "IA"
-            reprod.append(f"• servicios: {len(servicios)} registro(s)")
-            reprod.append(f"  Último Servicio: {s['fecha']} [{tipo_srv}]{toro_info}")
-
-            if s["fecha"]:
-                fep = s["fep_calculada"] or iso(fecha_estimada_parto(s["fecha"]))
-                f_palp = iso(fecha_palpacion(s["fecha"]))
-                f_sec = iso(fecha_secado(fep))
-                reprod.append(f"  Palpación Rectal: PENDIENTE ({f_palp}, día 60)")
-                reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
-                reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
-        else:
             reprod.append("• servicios: 0 registro(s).")
 
-        if celos:
-            c = celos[-1]
-            turno = f" [{c['am_pm']}]" if c["am_pm"] else ""
-            reprod.append(f"• celos: {len(celos)} registro(s)")
-            reprod.append(f"  Último Celo: {c['fecha']}{turno}")
+        # Datos de origen / nacimiento si el animal nació en la finca o tiene madre registrada
+        madre_id = animal["madre_id"] or (p_nac["vaca_id"] if p_nac else None)
+        madre_tag = None
+        if madre_id and madre_id != aid:
+            m_animal = self.db.get_animal(madre_id)
+            if m_animal and m_animal["tag"] != tag_str:
+                madre_tag = m_animal["tag"]
+
+        if f_nac or madre_tag:
+            origen_parts = []
+            if f_nac:
+                origen_parts.append(f"Fecha: {iso(f_nac)}")
+            if madre_tag:
+                origen_parts.append(f"Madre: {madre_tag}")
+            if p_nac and p_nac["peso_nacimiento"]:
+                origen_parts.append(f"Peso al nacer: {p_nac['peso_nacimiento']} kg")
+            reprod.append(f"• Origen / Nacimiento: {', '.join(origen_parts)}")
 
         bloques.append("\n".join(reprod))
 
@@ -463,9 +561,23 @@ class QueryEngine:
         # Terneros aproximados: <12 meses
         terneros = 0
         try:
-            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            rows = self.db.query("SELECT id_animal, fecha_nacimiento, madre_id FROM animales WHERE estado='ACTIVO'")
             for r in rows:
                 fn = to_date(r["fecha_nacimiento"])
+                if not fn:
+                    p = self.db.query_one(
+                        "SELECT fecha FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
+                        (r["id_animal"], r["id_animal"]),
+                    )
+                    if p and p["fecha"]:
+                        fn = to_date(p["fecha"])
+                    elif r["madre_id"] and r["madre_id"] != r["id_animal"]:
+                        p_m = self.db.query_one(
+                            "SELECT fecha FROM partos WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1",
+                            (r["madre_id"],),
+                        )
+                        if p_m and p_m["fecha"]:
+                            fn = to_date(p_m["fecha"])
                 if fn and (self.hoy - fn).days < 365:
                     terneros += 1
         except Exception:
@@ -498,20 +610,34 @@ class QueryEngine:
             count = 0
             for h in hembras:
                 aid = h["id_animal"]
-                has_parto = self.db.query_one("SELECT 1 FROM partos WHERE vaca_id=? LIMIT 1", (aid,))
+                has_parto = self.db.query_one("SELECT 1 FROM partos WHERE vaca_id=? AND (id_cria IS NULL OR id_cria != ?) LIMIT 1", (aid, aid))
                 if not has_parto:
                     count += 1
             return f"🐄 Total novillas (hembras sin parto): {count}."
         if cat in ("terneros", "ternero", "terneras"):
-            rows = self.db.query("SELECT fecha_nacimiento FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL")
+            rows = self.db.query("SELECT id_animal, fecha_nacimiento, madre_id FROM animales WHERE estado='ACTIVO'")
             count = 0
             for r in rows:
                 fn = to_date(r["fecha_nacimiento"])
+                if not fn:
+                    p = self.db.query_one(
+                        "SELECT fecha FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
+                        (r["id_animal"], r["id_animal"]),
+                    )
+                    if p and p["fecha"]:
+                        fn = to_date(p["fecha"])
+                    elif r["madre_id"] and r["madre_id"] != r["id_animal"]:
+                        p_m = self.db.query_one(
+                            "SELECT fecha FROM partos WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1",
+                            (r["madre_id"],),
+                        )
+                        if p_m and p_m["fecha"]:
+                            fn = to_date(p_m["fecha"])
                 if fn and (self.hoy - fn).days < 365:
                     count += 1
-            # Fallback si no hay fecha_nacimiento: contar crías con id_cria no nulo en partos
+            # Fallback si no hay fecha_nacimiento: contar crías con id_cria no nulo en partos de animales activos
             if count == 0:
-                row = self.db.query_one("SELECT COUNT(DISTINCT id_cria) as n FROM partos WHERE id_cria IS NOT NULL")
+                row = self.db.query_one("SELECT COUNT(DISTINCT a.id_animal) as n FROM animales a JOIN partos p ON p.id_cria = a.id_animal WHERE a.estado='ACTIVO' AND (p.vaca_id IS NULL OR p.vaca_id != p.id_cria)")
                 count = int(row["n"]) if row and row["n"] else 0
             return f"🐄 Total terneros (<12 meses): {count}."
         return self._inventario_general()

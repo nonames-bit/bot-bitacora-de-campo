@@ -138,13 +138,14 @@ Entrada de Texto / Foto
 
 ---
 
-## 📷 4. Flujo de Gestión de Fotos de Campo
+## 📷 4. Flujo de Gestión de Fotos de Campo + OCR (Fase 3.2)
 
-1. **Recepción:** El usuario envía una foto (con o sin caption).
-2. **Identificación:** Si el caption incluye el arete (ej. `vaca 47 ubre inflamada`), se asocia automáticamente a la `47`. Si contiene un evento zootécnico, también se dispara el parser del evento.
-3. **Persistencia:** La foto se almacena en `media/` y su metadata en la tabla `fotos` de SQLite.
-4. **Consulta:** 
-   - Vía Telegram: `/fotos 47` o `/fotos` envía directamente las imágenes con sus captions y fechas.
+1. **Recepción:** El usuario envía una foto (con o sin caption) por Telegram o CLI `--imagen`.
+2. **OCR (`src/ocr/ocr_engine.py`):** `OCREngine` intenta extraer texto de la imagen con backend `pytesseract` + `Pillow` (o `easyocr` secundario). Si no hay dependencias, usa fallback `sidecar .txt` (útil en tests) y degradación graceful sin tumbar el bot. `detect_tags()` reconoce `N069`, `N-069`, `JA26`, `O-123`, `47`, `patricia`; `detect_medicamento()` extrae producto, dosis (`ml/kg`), vía (`IM/SC/IV/Oral`), lote y `dias_retiro`.
+3. **Identificación:** Si el caption **o** el texto OCR incluye el arete (ej. `vaca 47 ubre inflamada` o arete visible en foto), se asocia automáticamente a la `47`. Si el OCR detecta frasco/medicamento, se dispara también el parser de tratamiento. Feedback contextual: `🔍 OCR detectó tag N069` / `💊 OCR detectó medicamento: Oxitetraciclina`.
+4. **Persistencia:** La foto se almacena en `media/` y su metadata (`ruta`, `tag`, `caption`, `ocr_text`, `user_id`, `fecha`) en la tabla `fotos` de SQLite (migración idempotente `ocr_text TEXT` vía `ALTER TABLE`).
+5. **Consulta:** 
+   - Vía Telegram: `/fotos 47` o `/fotos` envía directamente las imágenes con sus captions, ocr_text y fechas.
    - Vía Lenguaje Natural: `¿hay fotos de la 47?` responde con la cantidad y disponibilidad de fotos registradas.
    - Vía Historial: `/historial 47` incluye el conteo de fotos en la ficha del animal.
 

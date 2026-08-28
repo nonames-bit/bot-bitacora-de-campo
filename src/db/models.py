@@ -137,7 +137,8 @@ CREATE TABLE IF NOT EXISTS fotos (
     ruta TEXT NOT NULL,
     caption TEXT,
     user_id INTEGER,
-    notas TEXT
+    notas TEXT,
+    ocr_text TEXT
 );
 """
 
@@ -283,5 +284,6 @@ class Foto:
     caption: Optional[str] = None
     user_id: Optional[int] = None
     notas: Optional[str] = None
+    ocr_text: Optional[str] = None
     id: Optional[int] = None
 

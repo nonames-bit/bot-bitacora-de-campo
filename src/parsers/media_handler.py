@@ -38,6 +38,8 @@ class ImageInfo:
     tags: list[str] = field(default_factory=list)
     texto_detectado: str = ""
     frascos: list[str] = field(default_factory=list)
+    medicamento: Optional[dict] = None
+    ocr_text: str = ""
 
 
 def _read_sidecar(path: str) -> Optional[str]:
@@ -150,29 +152,62 @@ def extract_image_info(image_path: str,
                        ocr: Optional[Callable[[str], ImageInfo]] = None) -> ImageInfo:
     """Extrae información de una foto (tags, frascos de fármacos).
 
-    Si se inyecta ``ocr`` se usa; en su defecto se lee un ``.txt`` acompañante
-    donde cada línea puede ser ``tag:47``, ``frase:...`` o ``frasco:...``.
+    Prioridad:
+    1. OCR inyectado explícitamente (callback/stub).
+    2. Archivo sidecar ``.txt`` acompañante (si existe).
+    3. OCR local real (OCREngine: pytesseract / easyocr).
     """
     if ocr is not None:
         result = ocr(image_path)
         return result if isinstance(result, ImageInfo) else ImageInfo()
+
     sidecar = _read_sidecar(image_path)
-    if sidecar is None:
-        raise MediaError(
-            f"OCR no disponible y no hay descripción para '{image_path}'."
-        )
-    info = ImageInfo()
-    for line in sidecar.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("tag:"):
-            info.tags.append(line.split(":", 1)[1].strip())
-        elif line.startswith("frasco:"):
-            info.frascos.append(line.split(":", 1)[1].strip())
-        else:
-            info.texto_detectado = (info.texto_detectado + " " + line).strip()
-    return info
+    if sidecar is not None:
+        info = ImageInfo(ocr_text=sidecar)
+        from ..ocr.ocr_engine import detect_medicamento, detect_tags
+        for line in sidecar.splitlines():
+            line_s = line.strip()
+            if not line_s:
+                continue
+            if line_s.startswith("tag:"):
+                info.tags.append(line_s.split(":", 1)[1].strip())
+            elif line_s.startswith("frasco:"):
+                info.frascos.append(line_s.split(":", 1)[1].strip())
+            else:
+                info.texto_detectado = (info.texto_detectado + " " + line_s).strip()
+
+        # Enriquecer con detección automática si faltan tags o frascos explícitos
+        if not info.tags:
+            info.tags = detect_tags(sidecar)
+        med = detect_medicamento(sidecar)
+        if med and med.get("producto"):
+            info.medicamento = med
+            if med["producto"] not in info.frascos:
+                info.frascos.append(med["producto"])
+        return info
+
+    # Intentar OCR local con OCREngine
+    from ..ocr.ocr_engine import OCREngine
+    engine = OCREngine()
+    if engine.is_available():
+        texto_ocr = engine.extract_text(image_path)
+        if texto_ocr:
+            info = ImageInfo(
+                ocr_text=texto_ocr,
+                texto_detectado=texto_ocr,
+                tags=engine.detect_tags(texto_ocr),
+            )
+            med = engine.detect_medicamento(texto_ocr)
+            if med and med.get("producto"):
+                info.medicamento = med
+                info.frascos.append(med["producto"])
+            return info
+        return ImageInfo()
+
+    raise MediaError(
+        f"OCR no disponible y no hay descripción para '{image_path}'. "
+        f"Instala pytesseract ('pip install pytesseract Pillow') o proporciona {image_path}.txt."
+    )
 
 
 def es_audio(path: str) -> bool:

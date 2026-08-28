@@ -66,7 +66,9 @@ def test_historial_incluye_fotos(db):
         ruta="media/foto_33.jpg",
         animal_tag="33",
         caption="Celo AM",
+        ocr_text="TAG: 33 CELO",
     )
     h = db.historial("33")
     assert "fotos" in h
     assert len(h["fotos"]) == 1
+    assert h["fotos"][0]["ocr_text"] == "TAG: 33 CELO"

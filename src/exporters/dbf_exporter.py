@@ -204,10 +204,12 @@ def export_partos_dbf(db: Database) -> bytes:
         ("DETALLE", "C", 30, 0),
     ]
     w = DBFWriter(fields)
-    partos = db.query("SELECT * FROM partos ORDER BY fecha")
+    partos = db.query("SELECT * FROM partos WHERE vaca_id IS NOT NULL AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY fecha")
     for p in partos:
         vaca = db.get_animal(p["vaca_id"])["tag"] if p["vaca_id"] else ""
         cria_tag = db.get_animal(p["id_cria"])["tag"] if p["id_cria"] else ""
+        if vaca and cria_tag and vaca == cria_tag:
+            continue
         sexo = "H" if (p["sexo_cria"] or "").lower().startswith("h") else ("M" if p["sexo_cria"] else "")
         aborto = "T" if (p["estado_cria"] or "").upper() == "MUERTO" else ""
         w.add_record([

@@ -230,8 +230,16 @@ def import_animales(db: Database, records, causas: dict) -> dict:
         tag = (r.get("CODANI") or "").strip()
         if not tag:
             continue
-        sexo = {"H": "Hembra", "M": "Macho"}.get((r.get("SEXO") or "").strip(),
-                                                  (r.get("SEXO") or "").strip() or None)
+        raw_sex = (r.get("SEXO") or "").strip().upper()
+        if raw_sex in ("H", "HEMBRA"):
+            sexo = "Hembra"
+        elif raw_sex in ("M", "MACHO"):
+            sexo = "Macho"
+        elif raw_sex:
+            sexo = "Macho" if raw_sex.startswith("M") else ("Hembra" if raw_sex.startswith("H") else raw_sex)
+        else:
+            sexo = None
+
         existente = db.animal_id(tag)
         if existente is None:
             nuevos_animales += 1
@@ -252,19 +260,23 @@ def import_animales(db: Database, records, causas: dict) -> dict:
 
     nuevas_muertes = 0
     duplicadas_muertes = 0
-    # Segunda pasada: enlazar madre/padre ya presentes.
+    # Segunda pasada: enlazar madre/padre ya presentes (evitando autorreferencias).
     for tag, r in tags:
         madre = (r.get("MADRE") or "").strip()
         padre = (r.get("PADRE") or "").strip()
         aid = db.animal_id(tag)
         if aid is None:
             continue
-        if madre and db.animal_id(madre):
-            db.execute("UPDATE animales SET madre_id = ? WHERE id_animal = ? AND madre_id IS NULL",
-                       (db.animal_id(madre), aid))
-        if padre and db.animal_id(padre):
-            db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ? AND padre_id IS NULL",
-                       (db.animal_id(padre), aid))
+        if madre and madre.upper() != tag.upper() and db.animal_id(madre):
+            m_id = db.animal_id(madre)
+            if m_id != aid:
+                db.execute("UPDATE animales SET madre_id = ? WHERE id_animal = ? AND (madre_id IS NULL OR madre_id = ?)",
+                           (m_id, aid, aid))
+        if padre and padre.upper() != tag.upper() and db.animal_id(padre):
+            p_id = db.animal_id(padre)
+            if p_id != aid:
+                db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ? AND (padre_id IS NULL OR padre_id = ?)",
+                           (p_id, aid, aid))
         # Muerte: TIPO == 'M' con fecha de muerte y causa.
         if (r.get("TIPO") or "").strip() == "M" and r.get("FECMUERTE"):
             fec = iso(r.get("FECMUERTE"))
@@ -302,17 +314,35 @@ def import_partos(db: Database, records) -> dict:
         vaca = (r.get("CODANI") or "").strip()
         if not vaca:
             continue
-        sexo_cria = {"H": "Hembra", "M": "Macho"}.get((r.get("CRIA") or "").strip())
+        id_cria_tag = (r.get("HIJO") or "").strip() or None
+
+        # Protección autorreferencia: una cría no puede ser su propia madre
+        if id_cria_tag and vaca.upper() == id_cria_tag.upper():
+            continue
+
+        raw_sexo = (r.get("CRIA") or "").strip().upper()
+        if raw_sexo in ("M", "MACHO"):
+            sexo_cria = "Macho"
+        elif raw_sexo in ("H", "HEMBRA"):
+            sexo_cria = "Hembra"
+        elif raw_sexo:
+            sexo_cria = "Macho" if raw_sexo.startswith("M") else ("Hembra" if raw_sexo.startswith("H") else raw_sexo)
+        else:
+            sexo_cria = None
+
         estado = "MUERTO" if (r.get("ABORTO") or "").strip() else "VIVO"
         peso = r.get("PESNAC")
         if peso is not None and float(peso) <= 0:
             peso = None
-        id_cria_tag = (r.get("HIJO") or "").strip() or None
+
+        fec = iso(r.get("FECHA"))
 
         # Resolver tag -> id ANTES del chequeo
         vaca_id = db.resolve_animal(vaca, crear=True, sexo="Hembra")
-        id_cria = db.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria) if id_cria_tag else None
-        fec = iso(r.get("FECHA"))
+        id_cria = db.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=fec) if id_cria_tag else None
+
+        if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
+            continue
 
         if id_cria is not None:
             if fec is not None:
@@ -341,13 +371,16 @@ def import_partos(db: Database, records) -> dict:
             duplicados += 1
             continue
 
-        db.registrar_parto(
+        res = db.registrar_parto(
             vaca_tag=vaca, fecha=r.get("FECHA"), sexo_cria=sexo_cria,
             estado_cria=estado, peso_nacimiento=peso,
             id_cria_tag=id_cria_tag,
             notas=(r.get("DETALLE") or "").strip() or None,
         )
-        nuevos += 1
+        if res:
+            nuevos += 1
+        else:
+            duplicados += 1
     return {"nuevos": nuevos, "duplicados": duplicados}
 
 

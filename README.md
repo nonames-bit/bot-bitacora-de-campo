@@ -179,7 +179,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **171 pruebas en verde**
+- **Pruebas:** Pytest — **220 pruebas en verde**
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -239,20 +239,26 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Integración de Whisper local (`faster-whisper` / `openai-whisper`) para transcripción de audio en español (`es`)
   - [x] Procesamiento automático en tiempo real de notas de voz en Telegram y CLI con ejecución de eventos y respuestas
   - [x] Resolución flexible de tags alfanuméricos (`N069`, `N-069`, `N 069`) y permisos ampliados para `/consulta`
+- [x] **Fase 3 (Parte 2) — OCR para Fotos**:
+  - [x] Motor extensible `OCREngine` (`src/ocr/`) con backend liviano `pytesseract` / `Pillow` y fallback graceful (no-op / sidecars)
+  - [x] Detección robusta de aretes/tags alfanuméricos (`N069`, `N-069`, `JA26`, `O-123`, `47`, `patricia`)
+  - [x] Detección de frascos y fármacos veterinarios (oxitetraciclina, ivermectina, penicilina, dosis `ml/kg`, vías `IM/SC/IV`, lote y tiempos de retiro)
+  - [x] Integración en el flujo de Telegram y Bot con concatenación NLU y feedback contextual (`🔍 OCR detectó tag`, `💊 OCR detectó medicamento`)
+  - [x] Persistencia de `ocr_text` en SQLite tabla `fotos` con migración idempotente
 - [x] **Integración LLM multi-agente con Gemini (Google AI Studio)**:
   - [x] Router determinista (regex, sin llamada LLM) que agrupa los 8 eventos zootécnicos en 3 dominios (reproducción, sanidad, manejo) y despacha extractores especializados, sin dependencias pesadas (`src/llm/`).
   - [x] Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 multi-agente Gemini con `responseSchema` (JSON garantizado) para jerga compleja y notas con múltiples eventos zootécnicos.
   - [x] Ejecución en paralelo (`ThreadPoolExecutor`) de los extractores cuando una nota toca varios dominios a la vez; agente clasificador LLM como respaldo cuando el router no reconoce ningún dominio.
   - [x] Configuración de variables de entorno `GEMINI_API_KEY` y `GEMINI_MODEL` en `.env`.
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
-- [x] Suite de pruebas con pytest: **171 pruebas pasando en verde**
+- [x] Corrección zootécnica de fichas (`_historial` y `database.py`): resolución de categorías etarias (Ternero/Novillo/Toro/Vaca), aislamiento de partos/días abiertos exclusivamente para hembras y preservación del origen genealógico para crías.
+- [x] Suite de pruebas con pytest: **222 pruebas en verde**
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
-- [ ] **Fase 3 (Parte 2) — OCR para Fotos:**
-  - Reconocimiento de aretes/tags y frascos de medicamentos en fotos de campo.
+- [ ] Optimización continua y calibración de campo.
 
 ### 📋 Hoja de Ruta Pendiente
-- [ ] OCR visual en imágenes de campo.
+- [ ] Mejoras continuas en modelos de visión especializada.
 
 ---
 
@@ -266,17 +272,18 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 ├── .env.example         # Plantilla de variables de entorno (TELEGRAM_TOKEN, etc.)
 ├── src/                 # Código fuente principal
 │   ├── main.py          # Punto de entrada (CLI y flags --server, --importar, --exportar)
-│   ├── db/              # Modelos y base de datos SQLite (incluye tabla fotos)
+│   ├── db/              # Modelos y base de datos SQLite (incluye tabla fotos y columna ocr_text)
 │   ├── engine/          # Motores reproductivo, sanitario, pasturas, crecimiento, consultas
 │   ├── parsers/         # Parser NLU de eventos + manejador multimodal
-│   ├── llm/               # Router + agentes Gemini multi-dominio + arquitectura NLU híbrida (Capa 1 regex + Capa 2 LLM)
+│   ├── ocr/             # Motor OCR multi-backend (pytesseract, Pillow, easyocr) y extracción de aretes/fármacos
+│   ├── llm/             # Router + agentes Gemini multi-dominio + arquitectura NLU híbrida (Capa 1 regex + Capa 2 LLM)
 │   ├── importers/       # Importador DBF nativo (TP/SG)
 │   ├── exporters/       # Exportador DBF nativo y empaquetador ZIP (Fase 2)
 │   ├── reports/         # Generador de reportes en PDF con reportlab (Fase 2)
 │   ├── bot/             # Interfaz del bot (CLI)
 │   └── server/          # Bot de Telegram + autenticación RBAC (Fases 1, 1.1, 2)
 ├── docs/                # Documentación, diagramas y guías
-├── tests/               # Pruebas y validación (pytest — 151 pruebas)
+├── tests/               # Pruebas y validación (pytest)
 └── scripts/             # Automatizaciones VPS y utilidades
     ├── setup_vps.sh         # Configuración inicial del droplet (Ubuntu 22.04 / 24.04)
     ├── iniciar_bot.sh       # Arranque del bot en modo servidor
