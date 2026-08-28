@@ -212,4 +212,17 @@ def test_extraer_nombre_potrero_helper():
     assert extraer_nombre_potrero("¿cuándo parió la 47?") is None
 
 
+def test_fallback_ayuda_y_sugerencias(qe):
+    resp = qe.responder("asdf qwerty zxcv lorem ipsum dolor sit")
+    assert "No entendí" in resp
+    assert "asdf qwerty" in resp
+
+    sugerencias = qe.sugerencias_fallback("algo")
+    assert len(sugerencias) == 3
+    assert sugerencias[0][1] == "cmd:inventario"
+    assert sugerencias[1][1] == "cmd:historial"
+    assert sugerencias[2][1] == "cmd:ayuda"
+
+
+
 

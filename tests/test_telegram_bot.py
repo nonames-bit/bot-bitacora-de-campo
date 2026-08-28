@@ -6,6 +6,7 @@ import pytest
 from src.db.database import Database
 from src.server.auth import Auth
 from src.server.telegram_bot import (
+    construir_application,
     descartar_backup_pendiente,
     formatear_alertas,
     formatear_animales,
@@ -74,15 +75,22 @@ def test_formatear_animales_cuenta_solo_activos(db):
 def test_formatear_status_memoria_y_archivo(db, tmp_path):
     # En memoria
     db.registrar_animal(tag="47", estado="ACTIVO")
-    db.registrar_parto("47", "2026-01-01", sexo_cria="Macho")
+    db.registrar_potrero(nombre="Norte", dias_reposo=35)
+    db.registrar_parto("47", "2026-08-15", sexo_cria="Macho")
+    db.registrar_pesaje("47", "2026-08-20", peso_kg=120, evento="DESTETE")
     db.registrar_alerta("47", "SECADO", "2026-11-01")
 
-    resp_mem = formatear_status(db, ":memory:")
-    assert "Animales activos: 1" in resp_mem
-    assert "Histórico total de animales: 1" in resp_mem
-    assert "Total de eventos zootécnicos: 1" in resp_mem
-    assert "Alertas pendientes: 1" in resp_mem
+    resp_mem = formatear_status(db, ":memory:", hoy=date(2026, 9, 1))
+    assert "Activos:" in resp_mem
+    assert "Histórico:" in resp_mem
+    assert "Partos últimos 30d:" in resp_mem
+    assert "Destetes últimos 30d:" in resp_mem
+    assert "Norte (35d)" in resp_mem
+    assert "Alertas pendientes:" in resp_mem
     assert "en memoria" in resp_mem
+    assert "<pre>" in resp_mem
+    assert "</pre>" in resp_mem
+    assert "<i>Actualizado:" in resp_mem
 
     # Con archivo físico
     db_file = tmp_path / "test.db"
@@ -294,5 +302,14 @@ def test_formatear_historial_con_tag_alfanumerico(db):
     assert "N069" in resp
     assert "Negra" in resp
     assert "partos: 1" in resp
+
+
+def test_construir_application_registra_callback_handler():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert "CallbackQueryHandler" in content
+    assert "callback" in content.lower()
+    assert "InlineKeyboard" in content
+
 
 

@@ -16,6 +16,7 @@ from ..engine.query_engine import QueryEngine
 from ..importers.dbf_importer import import_zip
 from ..parsers import nlp_engine as nlu
 from ..parsers.media_handler import MediaError, transcribe_audio
+from ..utils import add_days, iso
 from .auth import Auth
 
 logger = logging.getLogger("bitacora.bot")
@@ -133,15 +134,65 @@ def formatear_fotos(db: Database, tag: Optional[str] = None, limite: int = 5) ->
     return "\n".join(lineas)
 
 
-def formatear_status(db: Database, db_path: Optional[str] = None) -> str:
-    """Genera un reporte del estado del sistema, conteos y tamaño de base de datos."""
+def _fmt_es_co(num: int | float) -> str:
+    """Formatea enteros o flotantes con separador de miles '.' (estilo es-CO)."""
+    if isinstance(num, int):
+        return f"{num:,}".replace(",", ".")
+    return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def formatear_status(
+    db: Database, db_path: Optional[str] = None, hoy: Optional[date] = None
+) -> str:
+    """Genera un reporte del estado del sistema, conteos zootécnicos y tamaño de base de datos."""
+    if hoy is None:
+        hoy = date.today()
+
     n_activos = _contar_activos(db)
     n_total_animales = db.count("animales")
-    tablas_eventos = [
-        "partos", "servicios", "celos", "tratamientos",
-        "pesajes", "traslados", "muertes", "movimientos",
-    ]
-    total_eventos = sum(db.count(t) for t in tablas_eventos)
+
+    fecha_30d = iso(add_days(hoy, -30))
+    row_partos = db.query_one("SELECT COUNT(*) as n FROM partos WHERE fecha >= ?", (fecha_30d,))
+    n_partos_30d = int(row_partos["n"]) if row_partos else 0
+
+    row_destetes = db.query_one(
+        "SELECT COUNT(*) as n FROM pesajes WHERE UPPER(evento) = 'DESTETE' AND fecha >= ?",
+        (fecha_30d,),
+    )
+    n_destetes_30d = int(row_destetes["n"]) if row_destetes else 0
+
+    # Potrero con más animales (conteo por potrero_id o último traslado)
+    animales = db.query(
+        "SELECT id_animal, potrero_id FROM animales WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO'"
+    )
+    conteo_potreros: dict[int, int] = {}
+    for a in animales:
+        aid = a["id_animal"]
+        ult = db.query_one(
+            "SELECT potrero_destino FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+            (aid,),
+        )
+        pid = ult["potrero_destino"] if ult and ult["potrero_destino"] is not None else a["potrero_id"]
+        if pid is not None:
+            conteo_potreros[pid] = conteo_potreros.get(pid, 0) + 1
+
+    pot_mas_animales_str = "Ninguno"
+    if conteo_potreros:
+        max_pid, max_cnt = max(conteo_potreros.items(), key=lambda item: item[1])
+        prow = db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (max_pid,))
+        if prow:
+            p_nom = prow["nombre"] or prow["codigo"] or f"ID {max_pid}"
+            pot_mas_animales_str = f"{p_nom} ({_fmt_es_co(max_cnt)})"
+
+    # Potrero con más reposo (MAX dias_reposo)
+    p_reposo = db.query_one(
+        "SELECT nombre, codigo, dias_reposo FROM potreros WHERE dias_reposo IS NOT NULL ORDER BY dias_reposo DESC LIMIT 1"
+    )
+    if p_reposo and p_reposo["dias_reposo"] is not None:
+        p_rep_nom = p_reposo["nombre"] or p_reposo["codigo"] or "Potrero"
+        pot_mas_reposo_str = f"{p_rep_nom} ({_fmt_es_co(p_reposo['dias_reposo'])}d)"
+    else:
+        pot_mas_reposo_str = "Ninguno"
 
     row_alertas = db.query_one("SELECT COUNT(*) as n FROM alertas WHERE estado = 'PENDIENTE'")
     n_alertas = int(row_alertas["n"]) if row_alertas else 0
@@ -152,15 +203,35 @@ def formatear_status(db: Database, db_path: Optional[str] = None) -> str:
         mb_size = bytes_size / (1024 * 1024)
         size_str = f"{mb_size:.2f} MB"
 
-    lineas = [
-        "🖥️ Estado del Sistema:",
-        f"• Animales activos: {n_activos}",
-        f"• Histórico total de animales: {n_total_animales}",
-        f"• Total de eventos zootécnicos: {total_eventos}",
-        f"• Alertas pendientes: {n_alertas}",
-        f"• Tamaño de base de datos: {size_str}",
+    mem_str = "0 MB"
+    try:
+        import psutil
+        proc = psutil.Process(os.getpid())
+        rss_mb = proc.memory_info().rss / (1024 * 1024)
+        mem_str = f"{rss_mb:.1f} MB"
+    except Exception:
+        mem_str = "0 MB"
+
+    from datetime import datetime
+    ts_str = datetime.now().strftime("%d/%m %H:%M")
+
+    lineas_pre = [
+        f"Activos:              {_fmt_es_co(n_activos)}",
+        f"Histórico:            {_fmt_es_co(n_total_animales)}",
+        f"Partos últimos 30d:   {_fmt_es_co(n_partos_30d)}",
+        f"Destetes últimos 30d: {_fmt_es_co(n_destetes_30d)}",
+        f"Potrero + animales:   {pot_mas_animales_str}",
+        f"Potrero + reposo:     {pot_mas_reposo_str}",
+        f"Alertas pendientes:   {_fmt_es_co(n_alertas)}",
+        f"Tamaño DB:            {size_str}",
+        f"Memoria:              {mem_str}",
     ]
-    return "\n".join(lineas)
+    cuerpo = "\n".join(lineas_pre)
+    return (
+        f"🖥️ <b>Estado del Sistema</b>\n"
+        f"<pre>\n{cuerpo}\n</pre>\n"
+        f"<i>Actualizado: {ts_str}</i>"
+    )
 
 
 def formatear_usuarios(auth: Auth) -> str:
@@ -373,9 +444,11 @@ def construir_application(
 ):
     """Construye y configura la Application de Telegram con todos los handlers."""
     try:
-        from telegram import Update
-        from telegram.ext import (ApplicationBuilder, CommandHandler,
-                                  ContextTypes, MessageHandler, filters)
+        from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
+                              Update)
+        from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
+                                  CommandHandler, ContextTypes, MessageHandler,
+                                  filters)
     except ImportError as e:
         raise ImportError(
             "python-telegram-bot no está instalado. Instálalo con 'pip install python-telegram-bot>=21.0'"
@@ -405,8 +478,49 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             bot_engine = Bot(db)
-            respuesta = bot_engine.procesar_texto(update.message.text)
+            raw_text = update.message.text
+            respuesta = bot_engine.procesar_texto(raw_text)
+
+            # Fallback inteligente con botones interactivos
+            if (
+                "No entendí" in respuesta
+                or "Puedo responder consultas como" in respuesta
+                or "¿Querías alguna de estas" in respuesta
+                or "No pude interpretar ese mensaje" in respuesta
+            ):
+                qe = QueryEngine(db)
+                sugerencias = qe.sugerencias_fallback(raw_text)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(texto_btn, callback_data=cb_data)
+                        for texto_btn, cb_data in sugerencias
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await update.message.reply_text(respuesta, reply_markup=reply_markup)
+                return
+
             await update.message.reply_text(respuesta)
+
+            # Botón de fotos si la respuesta es una ficha zootécnica
+            if "FICHA ZOOTÉCNICA" in respuesta:
+                tag = nlu.extraer_tag(raw_text)
+                if tag:
+                    fotos = db.fotos_de(tag)
+                    if fotos:
+                        n_fotos = len(fotos)
+                        btn_k = [
+                            [
+                                InlineKeyboardButton(
+                                    f"📷 Ver foto ({n_fotos})",
+                                    callback_data=f"foto:{tag}",
+                                )
+                            ]
+                        ]
+                        await update.message.reply_text(
+                            f"📷 Este animal tiene {n_fotos} foto(s) disponible(s).",
+                            reply_markup=InlineKeyboardMarkup(btn_k),
+                        )
         except Exception as e:
             logger.error("Error en handle_texto: %s", e, exc_info=True)
             if update.message:
@@ -596,14 +710,22 @@ def construir_application(
             msg = formatear_historial(db, tag)
             await update.message.reply_text(msg)
 
-            # Si el animal tiene fotos registradas y el archivo existe, enviar foto
-            fotos = db.fotos_de(tag, limit=1)
-            if fotos and fotos[0]["ruta"] and os.path.exists(fotos[0]["ruta"]):
-                try:
-                    with open(fotos[0]["ruta"], "rb") as f:
-                        await update.message.reply_photo(photo=f, caption=f"📷 Foto {tag}")
-                except Exception:
-                    pass
+            # Botón para ver fotos si el animal tiene registros fotográficos
+            fotos = db.fotos_de(tag)
+            if fotos:
+                n_fotos = len(fotos)
+                keyboard = [
+                    [
+                        InlineKeyboardButton(
+                            f"📷 Ver foto ({n_fotos})",
+                            callback_data=f"foto:{tag}",
+                        )
+                    ]
+                ]
+                await update.message.reply_text(
+                    f"📷 Este animal tiene {n_fotos} foto(s) disponible(s).",
+                    reply_markup=InlineKeyboardMarkup(keyboard),
+                )
         except Exception as e:
             logger.error("Error en cmd_historial: %s", e, exc_info=True)
             if update.message:
@@ -649,7 +771,7 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             msg = formatear_status(db, db.path if hasattr(db, "path") else None)
-            await update.message.reply_text(msg)
+            await update.message.reply_text(msg, parse_mode="HTML")
         except Exception as e:
             logger.error("Error en cmd_status: %s", e, exc_info=True)
             if update.message:
@@ -939,6 +1061,64 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
+    async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            query = update.callback_query
+            if not query or not query.data:
+                return
+            user_id = update.effective_user.id if update.effective_user else 0
+            if not auth.es_autorizado(user_id):
+                await query.answer("⛔ No autorizado.", show_alert=True)
+                return
+
+            data = query.data
+            if data.startswith("foto:"):
+                tag = data.split("foto:", 1)[1].strip()
+                await query.answer()
+                filas = db.fotos_de(tag, limit=5)
+                if not filas:
+                    if query.message:
+                        await query.message.reply_text(f"📷 No hay fotos registradas para el animal {tag}.")
+                    return
+                for r in filas:
+                    ruta = r["ruta"]
+                    fec = r["fecha"] or "sin fecha"
+                    cap = f" ({r['caption']})" if r.get("caption") else ""
+                    pie = f"📷 Animal {tag} - {fec}{cap}"
+                    if ruta and os.path.exists(ruta):
+                        with open(ruta, "rb") as f:
+                            if query.message:
+                                await query.message.reply_photo(photo=f, caption=pie)
+                    else:
+                        if query.message:
+                            await query.message.reply_text(
+                                f"📷 Foto {tag} [{fec}] (archivo no disponible en servidor)."
+                            )
+
+            elif data == "cmd:inventario":
+                await query.answer()
+                msg = formatear_animales(db)
+                if query.message:
+                    await query.message.reply_text(msg)
+
+            elif data == "cmd:historial":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        "📋 Para consultar la ficha de un animal, escribe:\n/historial <tag> (ej. /historial 47) o directamente el número de arete."
+                    )
+
+            elif data == "cmd:ayuda":
+                await query.answer()
+                rol = auth.rol_de(user_id)
+                if query.message:
+                    await query.message.reply_text(formatear_ayuda(rol))
+
+        except Exception as e:
+            logger.error("Error en handle_callback_query: %s", e, exc_info=True)
+            if query and query.message:
+                await query.message.reply_text(f"❌ Error: {e}")
+
     app = ApplicationBuilder().token(token).build()
 
     # Handlers de comandos
@@ -959,7 +1139,8 @@ def construir_application(
     app.add_handler(CommandHandler("quitar_usuario", cmd_quitar_usuario))
     app.add_handler(CommandHandler("logs", cmd_logs))
 
-    # Handlers de mensajes
+    # Handlers de callbacks y mensajes
+    app.add_handler(CallbackQueryHandler(handle_callback_query))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))

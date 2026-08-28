@@ -158,7 +158,7 @@ class QueryEngine:
             return self._ultimo_parto(tag)
         if tag and len(t.split()) <= 2 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto)\b", t):
             return self._historial(tag)
-        return self._ayuda()
+        return self._ayuda(texto)
 
     # ------------------------------------------------------------------ #
     def _ultimo_parto(self, tag) -> str:
@@ -631,16 +631,19 @@ class QueryEngine:
             return f"No hay fotos registradas para la {tag}."
         return f"Hay {len(fotos)} foto(s) de la {tag}. Puedes verlas con el comando /foto {tag}."
 
-    def _ayuda(self) -> str:
-        return (
-            "Puedo responder consultas como: '¿cuándo parió la 47?', "
-            "'¿qué vacas tienen palpación pendiente?', '¿qué vacas debo "
-            "inseminar?', '¿a qué vacas les toca servicio/IA?', '¿cuándo le "
-            "toca el secado a la 47?', '¿qué animales están en tiempo de "
-            "retiro?', '¿cuál es el historial de la vaca 47?', '¿cuánto pesó "
-            "la 12 y cuál fue su ganancia diaria?' y '¿qué potreros están "
-            "listos para pastoreo?'."
-        )
+    def _ayuda(self, texto: str = "") -> str:
+        t = texto.strip() if texto else ""
+        if t:
+            return f"❓ No entendí \"{t}\".\n\n¿Querías alguna de estas?"
+        return "❓ No entendí la consulta.\n\n¿Querías alguna de estas?"
+
+    def sugerencias_fallback(self, texto: str = "") -> list[tuple[str, str]]:
+        """Devuelve una lista de tuplas (texto_boton, callback_data) con opciones recomendadas."""
+        return [
+            ("🐄 Inventario", "cmd:inventario"),
+            ("📋 Historial", "cmd:historial"),
+            ("❓ Comandos", "cmd:ayuda"),
+        ]
 
     def _tag_de(self, animal_id) -> str:
         row = self.db.query_one("SELECT tag FROM animales WHERE id_animal = ?", (animal_id,))
