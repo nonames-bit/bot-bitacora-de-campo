@@ -127,7 +127,7 @@ implementado todavía.
 # 1. Crear el archivo de entorno y pegar el token de @BotFather
 cp .env.example .env        # editar TELEGRAM_TOKEN
 
-# 2. Sembrar los usuarios autorizados (editar el user_id del OWNER)
+# 2. Sembrar los usuarios autorizados (editar el user_id del OWNER; luego se pueden agregar trabajadores vía Telegram con /agregar_usuario, ver docs/TELEGRAM_GUIA_USUARIO.md)
 cp src/server/users.example.json src/server/users.json
 
 # 3. Instalar dependencias

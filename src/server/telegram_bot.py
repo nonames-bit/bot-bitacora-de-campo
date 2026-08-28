@@ -309,7 +309,13 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "⚙️ Gestión de Usuarios & Sistema:\n"
             "• /agregar_usuario <user_id> <ROL> [nombre] - Registrar o actualizar usuario\n"
             "• /quitar_usuario <user_id> - Eliminar usuario\n"
-            "• /logs - Ver últimas líneas del registro del bot"
+            "• /logs - Ver últimas líneas del registro del bot\n\n"
+            "🆘 ¿Agregar un trabajador nuevo?\n"
+            "1. Pídele que busque el bot y le mande /start (verá \"No autorizado\")\n"
+            "2. Consigue su user_id: que él busque @userinfobot → /start (Id) o revisa \"grep no autorizado /root/bitacora/bot.log\"\n"
+            "3. Agrégalo: /agregar_usuario 712345678 TRABAJADOR Carlos\n"
+            "4. Verifica: /usuarios | Para quitar: /quitar_usuario 712345678\n"
+            "Roles: TRABAJADOR (solo reporta), ADMIN (ve reportes), OWNER (todo)"
         )
     if rol == "ADMIN":
         return (

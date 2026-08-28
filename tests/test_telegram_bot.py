@@ -176,6 +176,8 @@ def test_formatear_ayuda():
     assert "Propietario / OWNER" in ayuda_owner
     assert "/agregar_usuario" in ayuda_owner
     assert "/logs" in ayuda_owner
+    assert "🆘 ¿Agregar un trabajador nuevo?" in ayuda_owner
+    assert "@userinfobot" in ayuda_owner
     assert "/alertas" in ayuda_owner
     assert "/importar" in ayuda_owner
     assert "/confirmar_importar" in ayuda_owner
@@ -188,6 +190,7 @@ def test_formatear_ayuda():
     assert "/confirmar_importar" in ayuda_admin
     assert "/descartar_backup" in ayuda_admin
     assert "/agregar_usuario" not in ayuda_admin
+    assert "¿Agregar un trabajador nuevo?" not in ayuda_admin
 
     ayuda_trabajador = formatear_ayuda("TRABAJADOR")
     assert "Trabajador / Campo" in ayuda_trabajador

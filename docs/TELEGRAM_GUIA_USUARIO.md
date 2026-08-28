@@ -107,6 +107,34 @@ significa que su número **todavía no está dado de alta** en el sistema.
 
 👉 **Avísele al dueño.** Solo él puede agregarlo para que pueda usar el bot.
 
+### 4.1 Cómo agregar un nuevo trabajador (solo dueño) 👥
+
+Si llega un trabajador nuevo a la finca o cambia de celular, el dueño puede darle acceso en 4 pasos sencillos **directamente desde su Telegram** (sin necesidad de reiniciar el bot ni tocar el servidor):
+
+1. **Pídale que busque el bot y le mande `/start`:**
+   Al trabajador le saldrá el mensaje *"⛔ No autorizado"*. Esto es normal.
+2. **Consiga su ID de Telegram (`user_id`):**
+   - **Opción fácil (desde el celular del trabajador):** Que él busque en Telegram el usuario `@userinfobot`, le dé `/start` y le envíe a usted el número que aparece en **Id** (por ejemplo: `712345678`).
+   - **Opción servidor:** Si tiene acceso por SSH, puede ver el intento en los logs ejecutando `grep "no autorizado" /root/bitacora/bot.log`.
+3. **Agréguelo enviándole este comando al bot:**
+   ```
+   /agregar_usuario 712345678 TRABAJADOR Carlos
+   ```
+   *(Reemplace `712345678` por el ID del trabajador y `Carlos` por su nombre).*
+4. **Verifique que quedó registrado:**
+   - Envíe `/usuarios` al bot para confirmar que aparece en la lista.
+   - Si más adelante la persona se retira de la finca, puede quitarle el acceso con:
+     ```
+     /quitar_usuario 712345678
+     ```
+
+> 💡 **Nota:** El alta es **inmediata**; no requiere reiniciar el bot ni el servidor. Tan pronto mande el comando, el trabajador puede empezar a enviar notas y novedades de campo.
+>
+> **Roles disponibles:**
+> - `TRABAJADOR`: Solo reporta notas de campo y consulta fichas básicas.
+> - `ADMIN`: Ve reportes, potreros, alertas, inventario y exporta/importa datos.
+> - `OWNER`: Dueño con control total (incluyendo agregar/quitar usuarios y ver logs).
+
 ---
 
 ## 5. Consejos para que el bot entienda bien
