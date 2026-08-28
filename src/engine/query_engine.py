@@ -19,6 +19,57 @@ from .reproductive_engine import (
 REPOSO_LISTO_DIAS = 21
 
 
+def formatear_edad_zootecnica(f_nac: date, hoy: date) -> str:
+    """Calcula y formatea la edad zootécnica legible con días totales entre paréntesis.
+
+    Formato:
+    - >= 365 días: X años Y meses (Z días) o X años (Z días) si meses == 0
+    - 30 a 364 días: M meses D días (Z días) o M meses (Z días) si días == 0
+    - < 30 días: D días
+    """
+    dias_totales = (hoy - f_nac).days
+    if dias_totales < 0:
+        return "0 días"
+
+    dias_totales_str = f"{dias_totales:,}".replace(",", ".")
+
+    if dias_totales < 30:
+        return f"{dias_totales} día{'s' if dias_totales != 1 else ''}"
+
+    # Cálculo exacto por calendario
+    años = hoy.year - f_nac.year
+    meses = hoy.month - f_nac.month
+    dias = hoy.day - f_nac.day
+    if dias < 0:
+        meses -= 1
+        año_prev = hoy.year if hoy.month > 1 else hoy.year - 1
+        mes_prev = hoy.month - 1 if hoy.month > 1 else 12
+        import calendar
+        _, num_dias_prev = calendar.monthrange(año_prev, mes_prev)
+        dias += num_dias_prev
+    if meses < 0:
+        años -= 1
+        meses += 12
+
+    if dias_totales >= 365:
+        año_str = f"{años} año{'s' if años != 1 else ''}"
+        if meses > 0:
+            mes_str = f"{meses} mes{'es' if meses != 1 else ''}"
+            texto_edad = f"{año_str} {mes_str}"
+        else:
+            texto_edad = año_str
+        return f"{texto_edad} ({dias_totales_str} días)"
+    else:
+        # 30 a 364 días
+        mes_str = f"{meses} mes{'es' if meses != 1 else ''}"
+        if dias > 0:
+            dia_str = f"{dias} día{'s' if dias != 1 else ''}"
+            texto_edad = f"{mes_str} {dia_str}"
+        else:
+            texto_edad = mes_str
+        return f"{texto_edad} ({dias_totales_str} días)"
+
+
 ROMANO_A_ARABIGO = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
 ARABIGO_A_ROMANO = {v: k for k, v in ROMANO_A_ARABIGO.items()}
 
@@ -339,62 +390,85 @@ class QueryEngine:
 
         edad_dias = (self.hoy - f_nac).days if f_nac else None
 
-        # Categoría etaria / zootécnica
+        # Categoría etaria / zootécnica alineada fielmente a Software Ganadero (SG)
+        # Estados típicos SG:
+        # - Machos: <8m CRÍA MACHO / Ternero, 8-18m LEVANTE / Novillo, 18-30m TORETE / Torete, >30m TORO / Toro
+        # - Hembras con partos:
+        #   - da <= 305d: VACA PARIDA (o VACA PARIDA SERVIDA / SIN PALPAR si tiene servicio)
+        #   - da > 305d: VACA SECA (o VACA ESCOTERA si tiene >1 parto sin servicio)
+        # - Hembras sin partos:
+        #   - <12m: CRÍA HEMBRA / Ternera
+        #   - 12-18m: NOVILLA LEVANTE / Novilla
+        #   - >=18m: NOVILLA VIENTRE / Novilla (o NOVILLA VIENTRE SERVIDA si tiene servicio)
         if es_macho:
             if edad_dias is not None:
-                if edad_dias < 365:
+                if edad_dias < 243:  # < 8 meses
                     tipo_animal = "Ternero"
-                    estado_reprod = "CRÍA / LEVANTE"
-                elif edad_dias < 730:
+                    estado_reprod = "CRÍA MACHO"
+                elif edad_dias < 548:  # 8 a 18 meses
                     tipo_animal = "Novillo"
-                    estado_reprod = "CEBA / LEVANTE"
-                else:
+                    estado_reprod = "LEVANTE"
+                elif edad_dias < 913:  # 18 a 30 meses
+                    tipo_animal = "Torete"
+                    estado_reprod = "TORETE"
+                else:  # > 30 meses
                     tipo_animal = "Toro"
-                    estado_reprod = "MACHO REPRODUCTOR"
+                    estado_reprod = "TORO"
             else:
                 # Edad desconocida: evitar clasificar como Toro reproductor
                 if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
                     tipo_animal = "Ternero"
-                    estado_reprod = "CRÍA / LEVANTE"
+                    estado_reprod = "CRÍA MACHO"
                 else:
                     tipo_animal = "Macho joven"
                     estado_reprod = "LEVANTE / EDAD POR CONFIRMAR"
         else:
-            if partos:
-                tipo_animal = "Vaca"
-            elif edad_dias is not None:
-                if edad_dias < 365:
-                    tipo_animal = "Ternera"
-                elif edad_dias < 730:
-                    tipo_animal = "Novilla"
-                else:
-                    tipo_animal = "Novilla"
-            else:
-                if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
-                    tipo_animal = "Ternera"
-                else:
-                    tipo_animal = "Novilla"
-
-            # Estado reproductivo hembra
             ult_parto = partos[-1] if partos else None
             ult_servicio = servicios[-1] if servicios else None
 
-            if ult_parto and not ult_servicio:
-                estado_reprod = "PARIDA SIN PALPAR"
-            elif ult_parto and ult_servicio:
-                if to_date(ult_servicio["fecha"]) and to_date(ult_parto["fecha"]) and to_date(ult_servicio["fecha"]) >= to_date(ult_parto["fecha"]):
-                    estado_reprod = "PARIDA SERVIDA / SIN PALPAR"
+            if partos:
+                tipo_animal = "Vaca"
+                f_up = to_date(ult_parto["fecha"]) if ult_parto else None
+                da = (self.hoy - f_up).days if f_up else 0
+                f_us = to_date(ult_servicio["fecha"]) if ult_servicio else None
+                serv_post_parto = bool(f_us and f_up and f_us >= f_up)
+
+                if da > 305:
+                    if len(partos) > 1 and not serv_post_parto:
+                        estado_reprod = "VACA ESCOTERA"
+                    elif serv_post_parto:
+                        estado_reprod = "VACA SECA SERVIDA"
+                    else:
+                        estado_reprod = "VACA SECA"
                 else:
-                    estado_reprod = "PARIDA SIN PALPAR"
-            elif ult_servicio:
-                estado_reprod = "SERVIDA / PENDIENTE PALPACIÓN"
-            elif not partos and not servicios:
-                if (edad_dias is not None and edad_dias < 365) or (edad_dias is None and ((animal["madre_id"] and animal["madre_id"] != aid) or p_nac)):
-                    estado_reprod = "CRÍA / LEVANTE"
-                else:
-                    estado_reprod = "NOVILLA / SIN REPORTES"
+                    # da <= 305 días (vaca parida en lactancia activa)
+                    if serv_post_parto:
+                        estado_reprod = "VACA PARIDA SERVIDA / SIN PALPAR"
+                    else:
+                        estado_reprod = "VACA PARIDA SIN PALPAR"
+            elif edad_dias is not None:
+                if edad_dias < 365:  # < 12 meses
+                    tipo_animal = "Ternera"
+                    estado_reprod = "CRÍA HEMBRA"
+                elif edad_dias < 548:  # 12 a 18 meses
+                    tipo_animal = "Novilla"
+                    estado_reprod = "NOVILLA LEVANTE"
+                else:  # >= 18 meses (edad apta para vientre)
+                    tipo_animal = "Novilla"
+                    if ult_servicio:
+                        estado_reprod = "NOVILLA VIENTRE SERVIDA"
+                    else:
+                        estado_reprod = "NOVILLA VIENTRE"
             else:
-                estado_reprod = "VACÍA / SIN SERVICIO"
+                if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
+                    tipo_animal = "Ternera"
+                    estado_reprod = "CRÍA HEMBRA"
+                elif ult_servicio:
+                    tipo_animal = "Novilla"
+                    estado_reprod = "NOVILLA VIENTRE SERVIDA"
+                else:
+                    tipo_animal = "Novilla"
+                    estado_reprod = "NOVILLA VIENTRE"
 
         bloques = []
 
@@ -405,10 +479,15 @@ class QueryEngine:
             f"🐄 <b>{tipo_animal} {tag_str}{nom_txt}</b>",
             f"🏷️ <b>Raza:</b> {raza}",
             f"📍 <b>Potrero:</b> {potrero_nom}",
+        ]
+        if f_nac:
+            edad_str = formatear_edad_zootecnica(f_nac, self.hoy)
+            header.append(f"🎂 <b>Edad:</b> {edad_str}")
+        header.extend([
             f"● <b>Estado:</b> {estado}",
             f"🧬 <b>Reproductivo:</b> {estado_reprod}",
             "───────────────────",
-        ]
+        ])
         bloques.append("\n".join(header))
 
         # Sección Reproducción

@@ -377,7 +377,8 @@ def test_ficha_vaca_parida_y_cria_ternero(db):
     assert "Ternero V008" in resp_v008
     assert "Toro V008" not in resp_v008
     assert "MACHO REPRODUCTOR" not in resp_v008
-    assert "CRÍA / LEVANTE" in resp_v008
+    assert "CRÍA MACHO" in resp_v008
+    assert "Edad:" in resp_v008
     assert "partos: 0 registro(s)" in resp_v008
     assert "Días Abiertos" not in resp_v008
     assert "Último Parto" not in resp_v008
@@ -385,27 +386,27 @@ def test_ficha_vaca_parida_y_cria_ternero(db):
 
 
 def test_ficha_macho_clasificacion_etaria(db):
-    # Ternero (<12 meses), Novillo (12-24 meses), Toro (>=24 meses)
-    db.registrar_animal("T01", sexo="Macho", fecha_nacimiento="2026-03-01")  # ~6 meses -> Ternero
-    db.registrar_animal("N01", sexo="Macho", fecha_nacimiento="2025-01-01")  # ~20 meses -> Novillo
-    db.registrar_animal("TORO1", sexo="Macho", fecha_nacimiento="2023-01-01")  # ~3.5 años -> Toro
+    # Ternero (<8 meses), Novillo (8-18 meses), Torete (18-30 meses), Toro (>=30 meses)
+    db.registrar_animal("T01", sexo="Macho", fecha_nacimiento="2026-03-01")  # ~6 meses -> Ternero / CRÍA MACHO
+    db.registrar_animal("N01", sexo="Macho", fecha_nacimiento="2025-01-01")  # ~20 meses -> Torete / TORETE
+    db.registrar_animal("TORO1", sexo="Macho", fecha_nacimiento="2023-01-01")  # ~3.6 años -> Toro / TORO
 
     qe = QueryEngine(db, hoy=date(2026, 9, 1))
 
     resp_t01 = qe.responder("ficha T01")
     assert "Ternero T01" in resp_t01
-    assert "CRÍA / LEVANTE" in resp_t01
+    assert "CRÍA MACHO" in resp_t01
     assert "partos: 0" in resp_t01
     assert "Días Abiertos" not in resp_t01
 
     resp_n01 = qe.responder("ficha N01")
-    assert "Novillo N01" in resp_n01
-    assert "CEBA / LEVANTE" in resp_n01
+    assert "Torete N01" in resp_n01
+    assert "TORETE" in resp_n01
     assert "partos: 0" in resp_n01
 
     resp_toro = qe.responder("ficha TORO1")
     assert "Toro TORO1" in resp_toro
-    assert "MACHO REPRODUCTOR" in resp_toro
+    assert "TORO" in resp_toro
     assert "partos: 0" in resp_toro
 
 
@@ -439,8 +440,9 @@ def test_ficha_ternero_v009_madre_ja400(db):
     assert "FICHA ZOOTÉCNICA" in resp_v009
     assert "Ternero V009" in resp_v009
     assert "Toro V009" not in resp_v009
-    assert "MACHO REPRODUCTOR" not in resp_v009
-    assert "CRÍA / LEVANTE" in resp_v009
+    assert "TORETE" not in resp_v009
+    assert "CRÍA MACHO" in resp_v009
+    assert "5 meses 26 días (179 días)" in resp_v009
     assert "partos: 0 registro(s)" in resp_v009
     assert "servicios: 0 registro(s)" in resp_v009
     assert "Días Abiertos" not in resp_v009
@@ -466,8 +468,8 @@ def test_ficha_v009_con_parto_autorreferenciado_corrupto(db):
 
     assert "Ternero V009" in resp
     assert "Toro V009" not in resp
-    assert "MACHO REPRODUCTOR" not in resp
-    assert "CRÍA / LEVANTE" in resp
+    assert "TORETE" not in resp
+    assert "CRÍA MACHO" in resp
     assert "partos: 0 registro(s)" in resp
     assert "Días Abiertos" not in resp
     assert "Último Parto" not in resp
@@ -487,7 +489,7 @@ def test_ficha_v009_sin_fecha_nacimiento_infiere_parto_madre(db):
     resp = qe.responder("ficha V009")
 
     assert "Ternero V009" in resp
-    assert "CRÍA / LEVANTE" in resp
+    assert "CRÍA MACHO" in resp
     assert "Madre: JA400" in resp
     assert "Fecha: 2026-03-02" in resp
 
@@ -521,6 +523,89 @@ def test_ficha_macho_sexo_indefinido_infiere_macho_desde_parto(db):
     assert "Vaca CRIA_01" not in resp
     assert "partos: 0 registro(s)" in resp
     assert "Días Abiertos" not in resp
+
+
+def test_ficha_edad_legible_7_anos_3_meses(db):
+    # Vaca con 7 años y 3 meses (nacida el 2019-05-10, consulta el 2026-08-28 -> 2.667 días)
+    db.registrar_animal(
+        "V_ADULTA",
+        nombre="PALOMA",
+        sexo="Hembra",
+        fecha_nacimiento="2019-05-10",
+        estado="ACTIVO",
+    )
+    db.registrar_parto("V_ADULTA", fecha="2026-02-15", sexo_cria="Hembra")
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha V_ADULTA")
+
+    assert "FICHA ZOOTÉCNICA" in resp
+    assert "🎂 <b>Edad:</b> 7 años 3 meses (2.667 días)" in resp
+    assert "VACA PARIDA" in resp
+
+
+def test_ficha_edad_cria_8_meses(db):
+    # Cría macho de 8 meses exactos (nacido el 2025-12-28, hoy 2026-08-28 -> 243 días)
+    db.registrar_animal(
+        "CRIA_8M",
+        sexo="Macho",
+        fecha_nacimiento="2025-12-28",
+        estado="ACTIVO",
+    )
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha CRIA_8M")
+
+    assert "FICHA ZOOTÉCNICA" in resp
+    assert "🎂 <b>Edad:</b> 8 meses (243 días)" in resp
+    assert "Novillo CRIA_8M" in resp or "Ternero CRIA_8M" in resp
+    assert "Toro CRIA_8M" not in resp
+    assert "TORETE" not in resp
+
+
+def test_ficha_edad_menos_30_dias(db):
+    # Ternero recién nacido de 12 días
+    db.registrar_animal(
+        "CRIA_12D",
+        sexo="Macho",
+        fecha_nacimiento="2026-08-16",
+        estado="ACTIVO",
+    )
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("ficha CRIA_12D")
+
+    assert "FICHA ZOOTÉCNICA" in resp
+    assert "🎂 <b>Edad:</b> 12 días" in resp
+    assert "Ternero CRIA_12D" in resp
+    assert "CRÍA MACHO" in resp
+
+
+def test_ficha_estados_zootecnicos_sg(db):
+    # Hembras en diferentes etapas productivas según Software Ganadero
+    # 1. Novilla levante (14 meses)
+    db.registrar_animal("NOV_LEV", sexo="Hembra", fecha_nacimiento="2025-06-28", estado="ACTIVO")
+    # 2. Novilla vientre (>18m, 22 meses)
+    db.registrar_animal("NOV_VIE", sexo="Hembra", fecha_nacimiento="2024-10-28", estado="ACTIVO")
+    # 3. Vaca parida (parto hace 120 días)
+    db.registrar_animal("VAC_PARIDA", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("VAC_PARIDA", fecha="2026-04-30", sexo_cria="Hembra")
+    # 4. Vaca escotera (>1 parto, >305 días sin servicio: parto hace 400 días)
+    db.registrar_animal("VAC_ESCOTERA", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("VAC_ESCOTERA", fecha="2024-01-01", sexo_cria="Hembra")
+    db.registrar_parto("VAC_ESCOTERA", fecha="2025-07-24", sexo_cria="Hembra")
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+
+    resp_nl = qe.responder("ficha NOV_LEV")
+    assert "NOVILLA LEVANTE" in resp_nl
+
+    resp_nv = qe.responder("ficha NOV_VIE")
+    assert "NOVILLA VIENTRE" in resp_nv
+
+    resp_vp = qe.responder("ficha VAC_PARIDA")
+    assert "VACA PARIDA SIN PALPAR" in resp_vp
+
+    resp_ve = qe.responder("ficha VAC_ESCOTERA")
+    assert "VACA ESCOTERA" in resp_ve
 
 
 
