@@ -338,4 +338,31 @@ def test_construir_application_registra_callback_handler():
     assert "InlineKeyboard" in content
 
 
+def test_formatear_animales_sg_brackets_y_filtro_activos(db):
+    hoy = date(2026, 9, 1)
+
+    # Sembrar animales con edades conocidas
+    db.registrar_animal(tag="H01", sexo="Hembra", fecha_nacimiento="2026-01-01", estado="ACTIVO")  # <1
+    db.registrar_animal(tag="H02", sexo="Hembra", fecha_nacimiento="2024-01-01", estado="ACTIVO")  # 2-4
+    db.registrar_animal(tag="M01", sexo="Macho", fecha_nacimiento="2026-02-01", estado="ACTIVO")   # <1
+    db.registrar_animal(tag="M02", sexo="Macho", nombre="TORO PADRON", fecha_nacimiento="2022-01-01", estado="ACTIVO")  # Reproductor
+    db.registrar_animal(tag="H_DESC", sexo="Hembra", estado="DESCARTADO")
+
+    resp = formatear_animales(db, hoy=hoy)
+
+    assert "Resumen General de Inventario (SG)" in resp
+    assert "<pre>" in resp
+    assert "</pre>" in resp
+    assert "Hembras <1 año" in resp
+    assert "Hembras 2-4 años" in resp
+    assert "Machos <1 año" in resp
+    assert "Reproductor" in resp
+    assert "Hembras 2 | Machos 2 | Total 4" in resp
+    assert "Activos: 4" in resp
+    assert "♀ 2" in resp
+    assert "♂ 2" in resp
+    assert "Histórico total: 5" in resp
+    assert "H_DESC" not in resp
+
+
 

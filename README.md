@@ -179,7 +179,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **235 pruebas en verde** (249 en VPS con OCR)
+- **Pruebas:** Pytest — **238 pruebas en verde** (252 en VPS)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -254,7 +254,8 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] Corrección zootécnica de fichas (`_historial` y `database.py`): categorías etarias SG fieles (`CRÍA MACHO <8m`, `LEVANTE 8-18m`, `TORETE 18-30m`, `TORO >30m` / `CRÍA HEMBRA`, `NOVILLA LEVANTE 12-18m`, `NOVILLA VIENTRE ≥18m`, `VACA PARIDA ≤305d` vs `VACA SECA/ESCOTERA >305d`), aislamiento de partos/días abiertos exclusivamente para hembras, bloqueo de partos autorreferenciados (`vaca_id != id_cria`), inferencia de `madre_id`/`sexo_cria` y soporte de tags con `_`.
 - [x] **Ficha con edad humana** (`formatear_edad_zootecnica`): `🎂 Edad: 7 años 3 meses (2.667 días)` / `8 meses (243 días)` / `12 días`, inferida desde `fecha_nacimiento` o `parto madre` (<450d), mostrada en header.
 - [x] **`/status` depurado para GANADERIA-JA 01-JA**: solo `Activos: 338 (GANADERIA-JA 01-JA)` sin `Histórico`, `Potrero + reposo` filtra reposos absurdos `>365d` (JARA 3.232d → `Ninguno`), `Potrero + animales` usa último traslado + `estado='ACTIVO'`, `Actualizado` usa mtime del `data/bitacora.db` (fecha del último backup SG) con fallback a `MAX(partos.fecha)`.
-- [x] Suite de pruebas con pytest: **235 pruebas en verde** (249 en VPS)
+- [x] **Resumen SG inventario por brackets** (replica foto SG 339): tabla `Hembras <1, 1-2, 2-4, 4-8, 8-10, >10` y `Machos <1, 1-2, >2, Reproductor` con `Nro` y `Distrib.%` + `Total 339`, solo `estado='ACTIVO'` (GANADERIA-JA 01-JA), potreros ocupados con `% del total`; igual que `/animales` y `/status`.
+- [x] Suite de pruebas con pytest: **238 pruebas en verde** (252 en VPS)
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
 - [ ] Optimización continua y calibración de campo.

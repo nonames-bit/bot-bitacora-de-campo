@@ -608,6 +608,96 @@ def test_ficha_estados_zootecnicos_sg(db):
     assert "VACA ESCOTERA" in resp_ve
 
 
+def test_resumen_inventario_sg_brackets_completos(db):
+    hoy = date(2026, 9, 1)
+
+    # 1. Hembras en cada uno de los 6 brackets SG
+    db.registrar_animal("H_MENOR_1", sexo="Hembra", fecha_nacimiento="2026-03-01", estado="ACTIVO")   # 184d -> <1
+    db.registrar_animal("H_1_2", sexo="Hembra", fecha_nacimiento="2025-03-01", estado="ACTIVO")       # 549d -> 1-2
+    db.registrar_animal("H_2_4", sexo="Hembra", fecha_nacimiento="2023-09-01", estado="ACTIVO")       # 1096d -> 2-4
+    db.registrar_animal("H_4_8", sexo="Hembra", fecha_nacimiento="2020-09-01", estado="ACTIVO")       # 2191d -> 4-8
+    db.registrar_animal("H_8_10", sexo="Hembra", fecha_nacimiento="2017-09-01", estado="ACTIVO")      # 3287d -> 8-10
+    db.registrar_animal("H_MAYOR_10", sexo="Hembra", fecha_nacimiento="2014-09-01", estado="ACTIVO")  # 4383d -> >10
+
+    # 2. Machos en cada bracket SG
+    db.registrar_animal("M_MENOR_1", sexo="Macho", fecha_nacimiento="2026-04-01", estado="ACTIVO")    # 153d -> <1
+    db.registrar_animal("M_1_2", sexo="Macho", fecha_nacimiento="2025-04-01", estado="ACTIVO")        # 518d -> 1-2
+    db.registrar_animal("M_MAYOR_2", sexo="Macho", fecha_nacimiento="2024-06-23", estado="ACTIVO")    # 800d -> >2
+    db.registrar_animal("M_REP_EDAD", sexo="Macho", fecha_nacimiento="2022-01-01", estado="ACTIVO")   # 1704d (>913d) -> Reproductor
+    db.registrar_animal("M_REP_TORO", sexo="Macho", nombre="TORO BRAHMAN 01", fecha_nacimiento="2025-01-01", estado="ACTIVO")  # flag TORO -> Reproductor
+
+    # 3. Animales históricos (NO deben contarse en inventario activo)
+    db.registrar_animal("H_MUERTO", sexo="Hembra", estado="MUERTO", fecha_nacimiento="2020-01-01")
+    db.registrar_animal("M_VENDIDO", sexo="Macho", estado="VENDIDO", fecha_nacimiento="2022-01-01")
+
+    qe = QueryEngine(db, hoy=hoy)
+
+    # Consulta por lenguaje natural
+    resp = qe.responder("resumen inventario")
+
+    assert "Resumen General de Inventario (SG)" in resp
+    assert "<pre>" in resp
+    assert "</pre>" in resp
+
+    # Verificaciones de brackets hembras
+    assert "Hembras <1 año" in resp and "9.09%" in resp
+    assert "Hembras 1-2 años" in resp
+    assert "Hembras 2-4 años" in resp
+    assert "Hembras 4-8 años" in resp
+    assert "Hembras 8-10 años" in resp
+    assert "Hembras >10 años" in resp
+
+    # Verificaciones de brackets machos
+    assert "Machos <1 año" in resp
+    assert "Machos 1-2 años" in resp
+    assert "Machos >2 años" in resp
+    assert "Reproductor" in resp and "18.18%" in resp
+
+    # Pie de tabla SG y resumen
+    assert "Hembras 6 | Machos 5 | Total 11" in resp
+    assert "Total en finca: 11 animales" in resp
+    assert "H_MUERTO" not in resp
+    assert "M_VENDIDO" not in resp
+
+
+def test_inventario_potreros_ocupados_porcentajes_y_filtro_historico(db):
+    hoy = date(2026, 9, 1)
+
+    db.registrar_potrero(nombre="POTRERO ALTO", codigo="01")
+    db.registrar_potrero(nombre="POTRERO BAJO", codigo="02")
+    db.registrar_potrero(nombre="POTRERO VACIO", codigo="03")
+    # Potrero histórico con reposo excesivo (no debe aparecer)
+    db.registrar_potrero(nombre="JARA", codigo="99", dias_reposo=3232)
+
+    # 15 animales activos en POTRERO ALTO (75.00%)
+    for i in range(1, 16):
+        db.registrar_animal(f"ALTO_{i:02d}", potrero="01", estado="ACTIVO")
+
+    # 5 animales activos en POTRERO BAJO (25.00%)
+    for i in range(1, 6):
+        db.registrar_animal(f"BAJO_{i:02d}", potrero="02", estado="ACTIVO")
+
+    # Animales históricos asignados a potrero (NO deben contarse)
+    db.registrar_animal("HIST_1", potrero="01", estado="MUERTO")
+    db.registrar_animal("HIST_2", potrero="02", estado="VENDIDO")
+
+    qe = QueryEngine(db, hoy=hoy)
+    resp = qe.responder("inventario potreros")
+
+    assert "Inventario por potrero — Ocupados (2)" in resp
+    assert "<pre>" in resp
+    assert "</pre>" in resp
+
+    # Tabla con porcentajes SG-like
+    assert "POTRERO ALTO" in resp and "15" in resp and "75.00%" in resp
+    assert "POTRERO BAJO" in resp and "5" in resp and "25.00%" in resp
+    assert "Total en potreros" in resp and "20" in resp and "100.00%" in resp
+
+    # JARA no debe salir en ocupados
+    assert "JARA" not in resp
+    assert "Vacíos: 1" in resp
+
+
 
 
 

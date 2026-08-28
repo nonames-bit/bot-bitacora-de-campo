@@ -12,7 +12,11 @@ from typing import Optional
 
 from ..bot.bot_interface import Bot
 from ..db.database import Database
-from ..engine.query_engine import QueryEngine
+from ..engine.query_engine import (
+    QueryEngine,
+    calcular_brackets_inventario_sg,
+    generar_resumen_inventario_sg,
+)
 from ..importers.dbf_importer import import_zip
 from ..parsers import nlp_engine as nlu
 from ..parsers.media_handler import (MediaError, extract_image_info,
@@ -85,28 +89,24 @@ def _contar_activos(db: Database) -> int:
     return int(row["n"]) if row else 0
 
 
-def formatear_animales(db: Database) -> str:
+def formatear_animales(db: Database, hoy: Optional[date] = None) -> str:
     """Genera un resumen del inventario de animales activos y del histórico."""
     total = db.count("animales")
     if total == 0:
         return "📊 Inventario de animales: 0 registrados."
 
     activos = _contar_activos(db)
-    filas_sexo = db.query(
-        "SELECT sexo, COUNT(*) as c FROM animales WHERE estado = 'ACTIVO' GROUP BY sexo"
-    )
-    hembras = 0
-    machos = 0
-    for r in filas_sexo:
-        s = (r["sexo"] or "Sin especificar").strip()
-        if s == "Hembra":
-            hembras = int(r["c"])
-        elif s == "Macho":
-            machos = int(r["c"])
+    if activos == 0:
+        return f"📊 Inventario de animales: 0 activos registrados · Histórico total: {_fmt_es_co(total)}"
+
+    tabla_sg = generar_resumen_inventario_sg(db, hoy=hoy)
+    datos = calcular_brackets_inventario_sg(db, hoy=hoy)
+    hembras = datos["total_hembras"]
+    machos = datos["total_machos"]
 
     lineas = [
-        "📊 Inventario de Animales:",
-        f"🐄 Activos: {activos} (♀ {hembras} · ♂ {machos}) · Histórico total: {total}",
+        tabla_sg,
+        f"🐄 Activos: {_fmt_es_co(activos)} (♀ {hembras} · ♂ {machos}) · Histórico total: {_fmt_es_co(total)}",
     ]
     return "\n".join(lineas)
 
@@ -846,7 +846,10 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             msg = formatear_animales(db)
-            await update.message.reply_text(msg)
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(msg)
         except Exception as e:
             logger.error("Error en cmd_animales: %s", e, exc_info=True)
             if update.message:
@@ -1189,7 +1192,10 @@ def construir_application(
                 await query.answer()
                 msg = formatear_animales(db)
                 if query.message:
-                    await query.message.reply_text(msg)
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
 
             elif data == "cmd:historial":
                 await query.answer()

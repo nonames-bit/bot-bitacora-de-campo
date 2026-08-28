@@ -70,6 +70,224 @@ def formatear_edad_zootecnica(f_nac: date, hoy: date) -> str:
         return f"{texto_edad} ({dias_totales_str} días)"
 
 
+def _fmt_es_co(num: int | float) -> str:
+    """Formatea enteros o flotantes con separador de miles '.' (estilo es-CO)."""
+    if isinstance(num, int):
+        return f"{num:,}".replace(",", ".")
+    return f"{num:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def calcular_brackets_inventario_sg(db: Database, hoy: date | None = None) -> dict:
+    """Calcula la distribución de inventario activo por brackets de edad exactos de Software Ganadero (SG).
+
+    Brackets SG:
+    - Hembras:
+      * <1 año: 0-364 días (<365 días)
+      * 1-2 años: 365-729 días (<730 días)
+      * 2-4 años: 730-1459 días (<1460 días)
+      * 4-8 años: 1460-2921 días (<=2921 días)
+      * 8-10 años: 2922-3651 días (<=3651 días)
+      * >10 años: >3651 días (>3651 días)
+    - Machos:
+      * <1 año: 0-364 días (<365 días)
+      * 1-2 años: 365-729 días (<730 días)
+      * >2 años: 730+ días pero no reproductor (730 a 912 días)
+      * Reproductor: machos con flag reproductor (marcado TORO o edad >= 913 días / >30 meses)
+    - Sin clasificar / Sin narr (sexo indefinido o no especificado)
+    """
+    if hoy is None:
+        hoy = date.today()
+
+    total_historico = db.count("animales")
+    animales = db.query(
+        "SELECT id_animal, tag, nombre, sexo, raza, fecha_nacimiento, madre_id, notas "
+        "FROM animales WHERE estado = 'ACTIVO'"
+    )
+    n_total = len(animales)
+
+    # Brackets contadores
+    h_brackets = {
+        "menor_1": 0,
+        "1_2": 0,
+        "2_4": 0,
+        "4_8": 0,
+        "8_10": 0,
+        "mayor_10": 0,
+    }
+    m_brackets = {
+        "menor_1": 0,
+        "1_2": 0,
+        "mayor_2": 0,
+        "reproductor": 0,
+    }
+    sin_narr_count = 0
+    terneros_menor_12m = 0
+
+    for a in animales:
+        aid = a["id_animal"]
+
+        # Resolver fecha de nacimiento (o fallback desde partos de cría / madre)
+        fn = to_date(a["fecha_nacimiento"])
+        if not fn:
+            p = db.query_one(
+                "SELECT fecha FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
+                (aid, aid),
+            )
+            if p and p["fecha"]:
+                fn = to_date(p["fecha"])
+            elif a["madre_id"] and a["madre_id"] != aid:
+                p_m = db.query_one(
+                    "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                    (a["madre_id"],),
+                )
+                if p_m and p_m["fecha"]:
+                    d_m = to_date(p_m["fecha"])
+                    if d_m and (hoy - d_m).days <= 450:
+                        fn = d_m
+
+        edad_dias = max(0, (hoy - fn).days) if fn else None
+        if edad_dias is not None and edad_dias < 365:
+            terneros_menor_12m += 1
+
+        # Resolver sexo
+        s_raw = (a["sexo"] or "").strip().lower()
+        if not s_raw or s_raw in ("i", "indefinido", "indeterminado", "desconocido", "?"):
+            p_cria = db.query_one(
+                "SELECT sexo_cria FROM partos WHERE id_cria = ? AND sexo_cria IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                (aid,),
+            )
+            if p_cria and p_cria["sexo_cria"]:
+                s_raw = p_cria["sexo_cria"].strip().lower()
+
+        es_macho = bool(s_raw.startswith("m") or s_raw in ("macho", "toro", "ternero", "novillo", "buey"))
+        es_hembra = bool(s_raw.startswith("h") or s_raw in ("hembra", "vaca", "novilla", "ternera"))
+
+        if es_hembra:
+            if edad_dias is not None:
+                if edad_dias < 365:
+                    h_brackets["menor_1"] += 1
+                elif edad_dias < 730:
+                    h_brackets["1_2"] += 1
+                elif edad_dias < 1460:
+                    h_brackets["2_4"] += 1
+                elif edad_dias <= 2921:
+                    h_brackets["4_8"] += 1
+                elif edad_dias <= 3651:
+                    h_brackets["8_10"] += 1
+                else:
+                    h_brackets["mayor_10"] += 1
+            else:
+                # Sin fecha de nacimiento conocida: inferir por partos/madre
+                has_parto = db.query_one(
+                    "SELECT 1 FROM partos WHERE vaca_id = ? AND (id_cria IS NULL OR id_cria != ?) LIMIT 1",
+                    (aid, aid),
+                )
+                if has_parto:
+                    h_brackets["4_8"] += 1
+                elif a["madre_id"]:
+                    h_brackets["menor_1"] += 1
+                else:
+                    h_brackets["2_4"] += 1
+
+        elif es_macho:
+            txt_info = f"{a['nombre'] or ''} {a['notas'] or ''} {a['tag'] or ''}".upper()
+            es_reproductor_flag = bool(re.search(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b", txt_info))
+
+            if es_reproductor_flag or (edad_dias is not None and edad_dias >= 913):
+                m_brackets["reproductor"] += 1
+            elif edad_dias is not None:
+                if edad_dias < 365:
+                    m_brackets["menor_1"] += 1
+                elif edad_dias < 730:
+                    m_brackets["1_2"] += 1
+                else:
+                    m_brackets["mayor_2"] += 1
+            else:
+                # Macho con edad desconocida
+                if a["madre_id"]:
+                    m_brackets["menor_1"] += 1
+                else:
+                    m_brackets["mayor_2"] += 1
+
+        else:
+            sin_narr_count += 1
+
+    total_hembras = sum(h_brackets.values())
+    total_machos = sum(m_brackets.values())
+
+    filas_definicion = [
+        ("Hembras <1 año", h_brackets["menor_1"]),
+        ("Hembras 1-2 años", h_brackets["1_2"]),
+        ("Hembras 2-4 años", h_brackets["2_4"]),
+        ("Hembras 4-8 años", h_brackets["4_8"]),
+        ("Hembras 8-10 años", h_brackets["8_10"]),
+        ("Hembras >10 años", h_brackets["mayor_10"]),
+        ("Machos <1 año", m_brackets["menor_1"]),
+        ("Machos 1-2 años", m_brackets["1_2"]),
+        ("Machos >2 años", m_brackets["mayor_2"]),
+        ("Reproductor", m_brackets["reproductor"]),
+    ]
+    if sin_narr_count > 0:
+        filas_definicion.append(("Sin clasificar", sin_narr_count))
+
+    filas = []
+    acum_pct = 0.0
+    for label, count in filas_definicion:
+        pct = (count / n_total * 100.0) if n_total > 0 else 0.0
+        acum_pct += pct
+        if acum_pct > 100.0:
+            acum_pct = 100.0
+        filas.append((label, count, pct, acum_pct))
+
+    return {
+        "total_activos": n_total,
+        "total_historico": total_historico,
+        "total_hembras": total_hembras,
+        "total_machos": total_machos,
+        "total_sin_sexo": sin_narr_count,
+        "terneros_menor_12m": terneros_menor_12m,
+        "h_brackets": h_brackets,
+        "m_brackets": m_brackets,
+        "filas": filas,
+    }
+
+
+def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
+    """Genera la tabla formateada en HTML <pre> del Resumen General de Inventario (SG)."""
+    if hoy is None:
+        hoy = date.today()
+    datos = calcular_brackets_inventario_sg(db, hoy)
+    total_activos = datos["total_activos"]
+    if total_activos == 0:
+        return "📊 Inventario: 0 animales activos en la finca."
+
+    pre_lines = [
+        "Categoría          Nro  Distrib.    Acum",
+    ]
+    for cat, n, pct, acum in datos["filas"]:
+        cat_str = cat.ljust(18)
+        n_str = _fmt_es_co(n).rjust(4)
+        pct_str = f"{pct:6.2f}%"
+        acum_str = f"{acum:6.2f}%"
+        pre_lines.append(f"{cat_str} {n_str} {pct_str} {acum_str}")
+
+    pre_lines.append("─" * 40)
+    pie_partes = [
+        f"Hembras {_fmt_es_co(datos['total_hembras'])}",
+        f"Machos {_fmt_es_co(datos['total_machos'])}",
+    ]
+    if datos["total_sin_sexo"] > 0:
+        pie_partes.append(f"Sin narr {_fmt_es_co(datos['total_sin_sexo'])}")
+    pie_partes.append(f"Total {_fmt_es_co(datos['total_activos'])}")
+    pre_lines.append(" | ".join(pie_partes))
+
+    cuerpo = "\n".join(pre_lines)
+    return (
+        "📊 <b>Resumen General de Inventario (SG)</b>\n"
+        f"<pre>\n{cuerpo}\n</pre>"
+    )
+
+
 ROMANO_A_ARABIGO = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
 ARABIGO_A_ROMANO = {v: k for k, v in ROMANO_A_ARABIGO.items()}
 
@@ -641,35 +859,14 @@ class QueryEngine:
         n_total = int(total["n"]) if total else 0
         if n_total == 0:
             return "📊 Inventario: 0 animales activos en la finca."
-        hembras = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='HEMBRA'")
-        machos = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO' AND UPPER(sexo)='MACHO'")
-        n_hembras = int(hembras["n"]) if hembras else 0
-        n_machos = int(machos["n"]) if machos else 0
-        # Terneros aproximados: <12 meses
-        terneros = 0
-        try:
-            rows = self.db.query("SELECT id_animal, fecha_nacimiento, madre_id FROM animales WHERE estado='ACTIVO'")
-            for r in rows:
-                fn = to_date(r["fecha_nacimiento"])
-                if not fn:
-                    p = self.db.query_one(
-                        "SELECT fecha FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
-                        (r["id_animal"], r["id_animal"]),
-                    )
-                    if p and p["fecha"]:
-                        fn = to_date(p["fecha"])
-                    elif r["madre_id"] and r["madre_id"] != r["id_animal"]:
-                        p_m = self.db.query_one(
-                            "SELECT fecha FROM partos WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1",
-                            (r["madre_id"],),
-                        )
-                        if p_m and p_m["fecha"]:
-                            fn = to_date(p_m["fecha"])
-                if fn and (self.hoy - fn).days < 365:
-                    terneros += 1
-        except Exception:
-            terneros = 0
-        detalle = f"🐄 Total en finca: {n_total} animales"
+
+        tabla_sg = generar_resumen_inventario_sg(self.db, self.hoy)
+        datos = calcular_brackets_inventario_sg(self.db, self.hoy)
+        n_hembras = datos["total_hembras"]
+        n_machos = datos["total_machos"]
+        terneros = datos["terneros_menor_12m"]
+
+        detalle = f"🐄 Total en finca: {_fmt_es_co(n_total)} animales"
         partes = []
         if n_hembras:
             partes.append(f"{n_hembras} vacas")
@@ -679,7 +876,9 @@ class QueryEngine:
             detalle += f" ({', '.join(partes)})"
         if terneros:
             detalle += f" — {terneros} terneros <12m incluidos"
-        return detalle + "."
+        detalle += "."
+
+        return f"{tabla_sg}\n{detalle}"
 
     def _inventario_categoria(self, categoria: str) -> str:
         cat = categoria.lower()
@@ -739,6 +938,9 @@ class QueryEngine:
         # Agrupación por nombre normalizado (case-insensitive, sin duplicados)
         grupos: dict[str, dict] = {}
         for p in potreros:
+            # Descartar potreros históricos/abandonados con reposo excesivo (>365d)
+            if p["dias_reposo"] is not None and p["dias_reposo"] > 365:
+                continue
             raw_nom = (p["nombre"] or p["codigo"] or str(p["id"])).strip()
             norm = normalizar(raw_nom).strip().upper()
             if not norm:
@@ -783,7 +985,7 @@ class QueryEngine:
             return "No hay potreros registrados."
 
         def fmt_num(n: int) -> str:
-            return f"{n:,}".replace(",", ".")
+            return _fmt_es_co(n)
 
         if mostrar_vacios:
             if not vacios:
@@ -804,18 +1006,25 @@ class QueryEngine:
         if not ocupados:
             return f"📍 <b>Inventario por potrero:</b> Todos los potreros ({len(vacios)}) están vacíos."
 
-        max_nom_w = max(len(o["display"]) for o in ocupados)
-        max_num_w = max(len(fmt_num(o["total"])) for o in ocupados)
-        col_w = max(max_nom_w, 16)
-
-        pre_lines = []
-        for o in ocupados:
-            nom = o["display"].ljust(col_w)
-            num = fmt_num(o["total"]).rjust(max_num_w)
-            pre_lines.append(f"{nom}  {num}")
-
         total_animales = sum(o["total"] for o in ocupados)
         total_str = fmt_num(total_animales)
+
+        max_nom_w = max(len(o["display"]) for o in ocupados)
+        col_w = max(max_nom_w, 18)
+
+        pre_lines = [
+            f"{'Potrero'.ljust(col_w)}  {'Nro'.rjust(4)}  {'Distrib.'.rjust(8)}",
+            "─" * (col_w + 16),
+        ]
+        for o in ocupados:
+            nom = o["display"].ljust(col_w)
+            num = fmt_num(o["total"]).rjust(4)
+            pct = (o["total"] / total_animales * 100.0) if total_animales > 0 else 0.0
+            pct_str = f"{pct:6.2f}%"
+            pre_lines.append(f"{nom}  {num}  {pct_str}")
+
+        pre_lines.append("─" * (col_w + 16))
+        pre_lines.append(f"{'Total en potreros'.ljust(col_w)}  {total_str.rjust(4)}  {'100.00%'.rjust(8)}")
 
         lineas = [
             f"📍 <b>Inventario por potrero — Ocupados ({len(ocupados)})</b>",
