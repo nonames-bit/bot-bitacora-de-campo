@@ -134,6 +134,10 @@ class QueryEngine:
             nom_pot = extraer_nombre_potrero(texto)
             if (es_consulta_potrero and nom_pot) or (nom_pot and not tag):
                 return self._animales_en_potrero(nom_pot)
+        # Ficha directa por arete o nombre corto (ej. "N069", "JA26", "patricia", "47")
+        if tag and len(t.split()) <= 2 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto|total|inventario|vacas|toros|terneros|novillas)\b", t):
+            return self._historial(tag)
+
         # Fallback: consulta por nombre de potrero sin la palabra "potrero" (ej. "cuantos hay en olegario 1")
         if re.search(r"\b(?:que\s+vacas?|que\s+animales?|cuantas?|cuantos?|hay|estan?|est[aá]n|listar|mostrar)\b", t):
             potreros = self.db.query("SELECT nombre, codigo FROM potreros")
@@ -142,9 +146,11 @@ class QueryEngine:
                     if not campo:
                         continue
                     for var in _potrero_variantes(normalizar(campo)):
-                        if var and var in t:
+                        # Coincidencia de palabra completa para evitar que código '06' matchee dentro de 'n069'
+                        if var and re.search(rf"\b{re.escape(var)}\b", t):
                             return self._animales_en_potrero(campo)
-        # Si el mensaje es solo el nombre del potrero (ej. "olegario 1" o "olegario 1?" )
+
+        # Si el mensaje es solo el nombre exacto de un potrero (ej. "olegario 1" o "olegario 1?" )
         if len(t.split()) <= 3:
             t_clean = re.sub(r"[?!.,;:¿¡]+$", "", t.strip())
             potreros = self.db.query("SELECT nombre, codigo FROM potreros")
@@ -153,13 +159,13 @@ class QueryEngine:
                     if not campo:
                         continue
                     for var in _potrero_variantes(normalizar(campo)):
-                        if var and (var == t_clean or var in t_clean):
+                        if var and var == t_clean:
                             return self._animales_en_potrero(campo)
         if re.search(r"\bfoto[s]?\b|\bimagen(?:es)?\b", t):
             return self._fotos(tag)
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
             return self._ultimo_parto(tag)
-        if tag and len(t.split()) <= 2 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto)\b", t):
+        if tag and len(t.split()) <= 3 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto)\b", t):
             return self._historial(tag)
         return self._ayuda(texto)
 
