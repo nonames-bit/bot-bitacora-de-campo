@@ -227,6 +227,33 @@ sistema. Usted solo se encarga de **mandar las novedades**; el bot hace el resto
 
 ---
 
+## 7. Sincronización automática por carpeta COPIAS (Backups grandes de 70 MB) 📦⚡
+
+Cuando el backup de Software Ganadero contiene fotos y tablas históricas completas, suele pesar **más de 20 MB** (habitualmente 70 MB o más), por lo que Telegram no permite enviarlo por chat directo.
+
+Para resolver esto, el bot cuenta con un **observador automático (watcher)** que detecta los backups apenas se generan:
+
+### ¿Cómo funciona el flujo automático?
+1. **Generación en Software Ganadero:** Al hacer la copia de seguridad periódica en el PC de la finca o la oficina, el SG genera un archivo `.Zip` con la fecha (ej. `Datos20260828.Zip`) en la carpeta de copias (por defecto `C:\Copias` en Windows o `data/copias/` en el VPS).
+2. **Detección por Fecha / mtime / Hash:** El servicio vigilante detecta el nuevo archivo, valida que se haya terminado de escribir y comprueba que no haya sido importado antes mediante su huella digital MD5 y fecha de modificación.
+3. **Auto-Importación Idempotente:** El sistema procesa internamente las tablas DBF y fotos en SQLite, aplicando deduplicación por llaves zootécnicas sin sobreescribir ni duplicar datos.
+4. **Notificación Instantánea al Dueño:** Al terminar, el bot le envía automáticamente un mensaje al OWNER por Telegram con el reporte consolidado:
+   ```text
+   📦 Software Ganadero — Auto-Import Exitoso
+   📁 Archivo: Datos20260828.Zip (1.4s)
+   📊 Consolidado: 15 nuevos, 480 duplicados
+
+   📋 Detalle por tabla:
+   • animales: 2 nuevos, 310 duplicados
+   • celos: 1 nuevos, 40 duplicados
+   • partos: 3 nuevos, 55 duplicados
+   • pesos: 5 nuevos, 38 duplicados
+   • servicios: 4 nuevos, 37 duplicados
+   ```
+5. **Cero intervención manual:** No necesita escribir comandos ni confirmar por chat; todo queda registrado en `data/copias_import.log`.
+
+---
+
 > 📞 Si algo le parece raro o el bot no le responde, avísele al dueño. Este
 > cuaderno de campo es de todos: mientras mejor anotemos, mejor trabaja la
 > finca. 🌱

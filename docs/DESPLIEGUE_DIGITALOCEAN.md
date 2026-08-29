@@ -371,6 +371,27 @@ crear registros repetidos, y **nunca borra las notas capturadas por el bot**.
 Al terminar verá `✅ Importación completada con éxito.` y la base
 `data/bitacora.db` quedará sincronizada (misma deduplicación que por Telegram).
 
+### Opción C — Auto-Import por Carpeta COPIAS (100% Automático)
+
+Para no tener que entrar por SSH cada vez que genere un backup de 70 MB en Software Ganadero:
+
+1. **En el VPS:** Puede activar el vigilante en segundo plano o agendarlo en `cron`:
+   ```bash
+   # Opción 1: Agendar sondeo en cron cada 5 minutos
+   crontab -e
+   # Agregar la línea:
+   # */5 * * * * /root/bitacora/scripts/vigilar_copias.sh --once >> /root/bitacora/bot.log 2>&1
+
+   # Opción 2: Ejecutar como demonio
+   ./scripts/vigilar_copias.sh
+   ```
+2. **En su PC Windows (donde corre Software Ganadero):**
+   Ejecute el script de sincronización automática en PowerShell:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -CopiasDir "C:\Copias"
+   ```
+   Apenas SG genere una copia en `C:\Copias`, el script la transfiere por `scp`, la importa en el VPS y el bot le notifica por Telegram.
+
 ---
 
 ## ✅ Lista final de verificación

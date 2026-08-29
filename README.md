@@ -179,6 +179,33 @@ Flujo por Telegram (OWNER/ADMIN):
 > instrucciones para subirlo por SSH e importarlo con `scripts/importar_backup.sh`
 > (ver [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)).
 
+### 📂 Sincronización automática por carpeta COPIAS (Backups de 70 MB)
+
+Cuando los backups de Software Ganadero (SG) superan el límite de 20 MB de Telegram (frecuente por la inclusión de fotografías y tablas históricas pesadas de 70+ MB), la sincronización se realiza **100% en segundo plano** mediante observadores automáticos:
+
+1. **Opción VPS (`src/watchers/copias_watcher.py` y `scripts/vigilar_copias.sh`):**
+   - Monitorea la carpeta `COPIAS_DIR` (por defecto `/root/bitacora/data/copias` o `data/copias`).
+   - Usa la biblioteca `watchdog` si está disponible, o realiza sondeos (polling cada 60s o tarea cron cada 5 min).
+   - Detecta archivos `.Zip` ordenados por fecha de modificación (`mtime`), verifica integridad y calcula firma MD5.
+   - Compara con el registro persistente `data/copias/.ultimo_importado` para evitar reprocesar archivos ya conocidos.
+   - Ejecuta `import_zip` de forma idempotente, registra la actividad en `data/copias_import.log` y notifica al `OWNER` por Telegram vía Bot API.
+
+2. **Opción PC Windows SG (`scripts/vigilar_copias_windows.ps1`):**
+   - Monitorea la carpeta local de backups de SG (por defecto `C:\Copias`).
+   - Al detectar un nuevo `.Zip` generado por fecha, lo transfiere automáticamente por `scp` al droplet VPS (`206.189.188.183:/tmp/`).
+   - Dispara la ejecución remota de `bash scripts/importar_backup.sh` vía SSH sin intervención manual.
+
+```bash
+# Iniciar vigilante en VPS (modo demonio continuo o polling):
+./scripts/vigilar_copias.sh
+
+# Ejecutar una sola pasada (ej. para cron cada 5 minutos):
+./scripts/vigilar_copias.sh --once
+
+# En Windows PowerShell (PC con Software Ganadero):
+powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -CopiasDir "C:\Copias"
+```
+
 ---
 
 ## 🛠️ Stack Tecnológico y Skills Integradas
