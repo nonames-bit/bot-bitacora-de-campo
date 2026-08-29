@@ -72,3 +72,27 @@ def test_historial_incluye_fotos(db):
     assert "fotos" in h
     assert len(h["fotos"]) == 1
     assert h["fotos"][0]["ocr_text"] == "TAG: 33 CELO"
+
+
+def test_vincular_fotos_huerfanas_y_busqueda_amplia(db):
+    # Caso real reportado por usuario: foto subida con caption 'N069 curando nuches' pero tag nulo
+    db.registrar_animal("N069", sexo="Hembra", estado="ACTIVO")
+    db.execute(
+        "INSERT INTO fotos (ruta, caption, fecha) VALUES (?, ?, ?)",
+        ("media/foto_6123051140_1787793909.jpg", "N069 curando nuches", "2026-08-27"),
+    )
+
+    # 1. Búsqueda directa por fotos_de debe encontrarla incluso antes de la migración por caption LIKE
+    encontradas_prev = db.fotos_de("N069")
+    assert len(encontradas_prev) >= 1
+    assert "curando nuches" in encontradas_prev[0]["caption"]
+
+    # 2. Auto-vinculación de fotos huérfanas
+    vinculadas = db.vincular_fotos_huerfanas()
+    assert vinculadas >= 1
+
+    # 3. Verificar que ahora tiene tag y animal_id resueltos
+    encontradas_post = db.fotos_de("N069")
+    assert len(encontradas_post) >= 1
+    assert encontradas_post[0]["tag"] is not None
+    assert encontradas_post[0]["animal_id"] is not None

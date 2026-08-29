@@ -1527,20 +1527,26 @@ def construir_application(
 
             tag = context.args[0].strip() if context.args else None
             if tag:
-                filas = db.fotos_de(tag, limit=3)
-                if not filas:
+                filas = db.fotos_de(tag, limit=5)
+                foto_disco = buscar_foto_animal(db, tag, media_dir=media_dir)
+                if not filas and not foto_disco:
                     await update.message.reply_text(f"📷 No hay fotos registradas para el animal {tag}.")
                     return
+
+                enviadas = 0
                 for r in filas:
                     ruta = r["ruta"]
                     fec = r["fecha"] or "sin fecha"
-                    cap = f" ({r['caption']})" if r["caption"] else ""
-                    pie = f"📷 Animal {tag} - {fec}{cap}"
-                    if os.path.exists(ruta):
+                    cap = f" — {r['caption']}" if r["caption"] else ""
+                    pie = f"📷 Animal {tag} [{fec}]{cap}"
+                    if ruta and os.path.exists(ruta):
                         with open(ruta, "rb") as f:
                             await update.message.reply_photo(photo=f, caption=pie)
-                    else:
-                        await update.message.reply_text(f"📷 Registro de foto ({fec}), pero el archivo local no está disponible.")
+                            enviadas += 1
+
+                if foto_disco and os.path.exists(foto_disco) and enviadas == 0:
+                    with open(foto_disco, "rb") as f:
+                        await update.message.reply_photo(photo=f, caption=f"📷 Foto del animal {tag}")
             else:
                 # Mostrar últimas fotos registradas
                 filas = db.ultimas_fotos(limit=5)
@@ -1548,12 +1554,12 @@ def construir_application(
                     await update.message.reply_text("📷 No hay fotos registradas en la bitácora.")
                     return
                 for r in filas:
-                    ruta = r["ruta"]
-                    tag_foto = r["tag"] or "Sin tag"
-                    fec = r["fecha"] or "sin fecha"
-                    cap = f" - {r['caption']}" if r["caption"] else ""
+                    ruta = r.get("ruta")
+                    tag_foto = r.get("tag") or "Sin arete"
+                    fec = r.get("fecha") or "sin fecha"
+                    cap = f" — {r['caption']}" if r.get("caption") else ""
                     pie = f"📷 Tag {tag_foto} [{fec}]{cap}"
-                    if os.path.exists(ruta):
+                    if ruta and os.path.exists(ruta):
                         with open(ruta, "rb") as f:
                             await update.message.reply_photo(photo=f, caption=pie)
                     else:

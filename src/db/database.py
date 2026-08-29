@@ -34,6 +34,7 @@ class Database:
             self.conn.execute("UPDATE animales SET madre_id = NULL WHERE madre_id = id_animal")
             self.conn.execute("UPDATE animales SET padre_id = NULL WHERE padre_id = id_animal")
             self.conn.execute("DELETE FROM partos WHERE vaca_id = id_cria AND vaca_id IS NOT NULL")
+            self.vincular_fotos_huerfanas()
         except Exception:
             pass
         self.conn.commit()
@@ -317,17 +318,54 @@ class Database:
             ocr_text=ocr_text,
         ))
 
+    def vincular_fotos_huerfanas(self) -> int:
+        """Vincula fotos existentes donde tag o animal_id sea NULL si el caption, ocr o ruta tiene un tag reconocible."""
+        from ..parsers import nlp_engine as nlu
+        filas = self.query(
+            "SELECT id, caption, ruta, ocr_text FROM fotos "
+            "WHERE animal_id IS NULL OR tag IS NULL OR UPPER(tag) = 'SIN TAG'"
+        )
+        vinculadas = 0
+        for f in filas:
+            cand_tag = None
+            if f["caption"]:
+                cand_tag = nlu.extraer_tag(f["caption"])
+            if not cand_tag and f["ocr_text"]:
+                cand_tag = nlu.extraer_tag(f["ocr_text"])
+            if not cand_tag and f["ruta"]:
+                cand_tag = nlu.extraer_tag(f["ruta"])
+            if cand_tag:
+                aid = self.resolve_animal(cand_tag, crear=False)
+                self.conn.execute(
+                    "UPDATE fotos SET tag = ?, animal_id = ? WHERE id = ?",
+                    (cand_tag, aid, f["id"]),
+                )
+                vinculadas += 1
+        if vinculadas > 0:
+            self.conn.commit()
+        return vinculadas
+
     def fotos_de(self, animal_tag_or_id, limit: int = 5) -> list[sqlite3.Row]:
         aid = self.resolve_animal(animal_tag_or_id)
         tag_str = str(animal_tag_or_id).strip()
+        tag_like = f"%{tag_str}%"
         if aid is not None:
             return self.query(
-                "SELECT * FROM fotos WHERE animal_id = ? OR tag = ? ORDER BY id DESC LIMIT ?",
-                (aid, tag_str, limit),
+                "SELECT * FROM fotos WHERE animal_id = ? "
+                "   OR UPPER(tag) = UPPER(?) "
+                "   OR UPPER(caption) LIKE UPPER(?) "
+                "   OR UPPER(ocr_text) LIKE UPPER(?) "
+                "   OR UPPER(ruta) LIKE UPPER(?) "
+                "ORDER BY id DESC LIMIT ?",
+                (aid, tag_str, tag_like, tag_like, tag_like, limit),
             )
         return self.query(
-            "SELECT * FROM fotos WHERE tag = ? ORDER BY id DESC LIMIT ?",
-            (tag_str, limit),
+            "SELECT * FROM fotos WHERE UPPER(tag) = UPPER(?) "
+            "   OR UPPER(caption) LIKE UPPER(?) "
+            "   OR UPPER(ocr_text) LIKE UPPER(?) "
+            "   OR UPPER(ruta) LIKE UPPER(?) "
+            "ORDER BY id DESC LIMIT ?",
+            (tag_str, tag_like, tag_like, tag_like, limit),
         )
 
     def ultimas_fotos(self, limit: int = 10) -> list[sqlite3.Row]:
