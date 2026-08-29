@@ -77,6 +77,8 @@ PREFIJOS_TAG = (
     "donde esta", "donde esta la", "donde esta el", "donde anda", "donde anda la", "donde anda el",
     "en que potrero esta", "en que potrero esta la", "en que potrero esta el",
     "secado de", "secado de la", "secado de el", "madre de", "padre de", "quien es",
+    "cuando se movio", "cuando se traslado", "cuando se cambio", "cuando entro", "cuando paso",
+    "traslado de", "traslado de la", "traslado de el", "movimiento de",
 )
 
 # Palabras que no son tags de animal aunque vayan precedidas de "la"/"el".
@@ -86,12 +88,13 @@ PALABRAS_NO_TAG = {
     "vaca", "vacas", "animal", "animales", "ternera", "ternero", "becerro",
     "becerra", "novilla", "novillo", "vaquilla", "vaquillona", "cria",
     "toro", "torete", "crias", "parto", "celo", "servicio",
-    "tratamiento", "pesaje", "traslado", "muerte", "movimiento",
+    "tratamiento", "pesaje", "traslado", "traslados", "muerte", "movimiento", "movimientos",
     "esta", "estan", "donde", "cuando", "cuanto", "quien", "que", "como", "hoy", "ayer",
     "madre", "padre", "mama", "papa", "abuela", "abuelo", "en", "de", "del", "al", "a",
     "el", "la", "los", "las", "un", "una", "unos", "unas", "tiempo", "retiro",
     "pario", "peso", "insemine", "insemino", "inseminada", "inseminaron", "servida", "servio", "sirvio", "sirvieron",
     "murio", "puso", "aplico", "toco", "toca", "cubrio", "monto",
+    "movio", "movieron", "traslado", "trasladaron", "cambio", "cambiaron", "entro", "entraron", "paso", "pasaron",
     "debo", "debe", "deben", "debemos", "tengo", "tiene", "tienen", "tenemos", "hay", "les", "le", "me", "te", "se", "nos",
     "servir", "inseminar", "inseminacion", "inseminaciones", "servicios", "palpacion", "palpaciones",
 }

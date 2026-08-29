@@ -748,6 +748,17 @@ def test_consultas_especificas_nombre_y_tag(db, tmp_path):
     assert encontrada is not None
     assert "ja26.jpg" in encontrada
 
+    # 7. Pregunta de cuándo se movió de potrero
+    db.registrar_traslado(
+        "JA26", fecha="2026-08-20", potrero_origen="P01", potrero_destino="01", lote="2"
+    )
+    resp_trasl = qe.responder("¿cuándo se movió patricia de potrero?")
+    assert "Último traslado de JA26" in resp_trasl
+    assert "OLEGARIO I" in resp_trasl
+    assert "2026-08-20" in resp_trasl
+    assert "Lote 2" in resp_trasl
+
+
 
 
 

@@ -401,6 +401,10 @@ class QueryEngine:
         ):
             return self._ubicacion_animal(tag)
 
+        # 1b. Traslados y movimientos de potrero (ej. "¿cuándo se movió patricia?", "¿cuándo fue el traslado de la 47?")
+        if tag and re.search(r"\b(?:cuando\s+se\s+movi[oó]|cuando\s+se\s+traslad[oó]|cuando\s+se\s+cambi[oó]|cuando\s+fue\s+el\s+traslado|cuando\s+entr[oó]|traslados?|movimientos?)\b", t):
+            return self._ultimo_traslado(tag)
+
         # 2. Partos y maternidad
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
             return self._ultimo_parto(tag)
@@ -561,6 +565,79 @@ class QueryEngine:
                 dias_en_potrero = f" (hace {dias_p} días)"
         detalle_fecha = f" desde el {fecha_ingreso}{dias_en_potrero}" if fecha_ingreso else ""
         return f"🌱 El animal {tag_str}{nombre} se encuentra actualmente en el potrero <b>{potrero_nom}</b>{lote_str}{detalle_fecha}. Estado: {estado}."
+
+    def _ultimo_traslado(self, tag) -> str:
+        if not tag:
+            return "¿De cuál animal desea consultar los traslados? (ej. '¿cuándo se movió patricia?')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No se encontró el animal '{tag}' en los registros."
+        animal = self.db.get_animal(aid)
+        if not animal:
+            return f"No se encontró el animal '{tag}' en los registros."
+
+        tag_str = animal["tag"] or str(tag)
+        nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
+
+        traslados = self.db.query(
+            "SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 5",
+            (aid,),
+        )
+        if not traslados:
+            if animal["potrero_id"]:
+                prow = self.db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (animal["potrero_id"],))
+                pnom = prow["nombre"] or prow["codigo"] if prow else f"Potrero {animal['potrero_id']}"
+                return f"🌱 {tag_str}{nombre} se encuentra asignada al potrero <b>{pnom}</b> (no registra fecha de traslado histórica)."
+            return f"No hay registros de traslados para {tag_str}{nombre}."
+
+        ult = traslados[0]
+        fec = ult["fecha"] or "sin fecha"
+        p_dest_nom = "Desconocido"
+        if ult["potrero_destino"]:
+            prow = self.db.query_one(
+                "SELECT nombre, codigo FROM potreros WHERE id = ? OR codigo = ? OR nombre = ?",
+                (ult["potrero_destino"], ult["potrero_destino"], ult["potrero_destino"]),
+            )
+            if not prow:
+                p_obj = self._buscar_potrero(str(ult["potrero_destino"]))
+                if p_obj:
+                    prow = p_obj
+            if prow:
+                p_dest_nom = prow["nombre"] or prow["codigo"] or str(ult["potrero_destino"])
+            else:
+                p_dest_nom = str(ult["potrero_destino"])
+
+        p_orig_nom = None
+        if ult["potrero_origen"]:
+            prow_o = self.db.query_one(
+                "SELECT nombre, codigo FROM potreros WHERE id = ? OR codigo = ? OR nombre = ?",
+                (ult["potrero_origen"], ult["potrero_origen"], ult["potrero_origen"]),
+            )
+            if not prow_o:
+                p_obj_o = self._buscar_potrero(str(ult["potrero_origen"]))
+                if p_obj_o:
+                    prow_o = p_obj_o
+            if prow_o:
+                p_orig_nom = prow_o["nombre"] or prow_o["codigo"] or str(ult["potrero_origen"])
+            else:
+                p_orig_nom = str(ult["potrero_origen"])
+
+        orig_str = f" desde <b>{p_orig_nom}</b>" if p_orig_nom else ""
+        lote_str = f" (Lote {ult['lote']})" if ult["lote"] else ""
+
+        dias_str = ""
+        if ult["fecha"] and to_date(ult["fecha"]):
+            dias = (self.hoy - to_date(ult["fecha"])).days
+            if dias >= 0:
+                dias_str = f" · Ocupación actual: <b>{dias} días</b>"
+
+        resp = (
+            f"🚚 <b>Último traslado de {tag_str}{nombre}:</b>\n"
+            f"• Fecha: <b>{fec}</b>\n"
+            f"• Movido a: <b>{p_dest_nom}</b>{orig_str}{lote_str}\n"
+            f"• Estado: {animal['estado'] or 'ACTIVO'}{dias_str}"
+        )
+        return resp
 
     def _ultimo_parto(self, tag) -> str:
         if not tag:
@@ -1335,11 +1412,12 @@ class QueryEngine:
         potrero_nom = p_row["nombre"] or p_row["codigo"] or str(pid)
 
         animales = self.db.query(
-            "SELECT id_animal, tag, potrero_id, estado FROM animales "
+            "SELECT id_animal, tag, potrero_id, estado, sexo, fecha_nacimiento, nombre FROM animales "
             "WHERE estado = 'ACTIVO' ORDER BY id_animal"
         )
 
         tags_en_potrero: list[str] = []
+        animales_en_este: list[dict] = []
         for a in animales:
             aid = a["id_animal"]
             ult_traslado = self.db.query_one(
@@ -1354,6 +1432,7 @@ class QueryEngine:
             if p_actual == pid:
                 tag_str = a["tag"] or str(aid)
                 tags_en_potrero.append(tag_str)
+                animales_en_este.append(a)
 
         total = len(tags_en_potrero)
         if total == 0:
@@ -1367,7 +1446,59 @@ class QueryEngine:
             sobrantes = total - 10
             tags_str = f"{', '.join(primeros)} y {sobrantes} más"
 
-        return f"🐄 Potrero '{potrero_nom}': {total} {palabra_animal} ({tags_str})"
+        resumen_base = f"🐄 Potrero '{potrero_nom}': {total} {palabra_animal} ({tags_str})"
+
+        # Conteo por categorías zootécnicas Software Ganadero (SG)
+        conteo_cat: dict[str, int] = {
+            "Crías hembra (<1a)": 0,
+            "Hembras levante (1-2a)": 0,
+            "Novillas vientre (>2a)": 0,
+            "Vacas paridas": 0,
+            "Vacas secas": 0,
+            "Crías macho (<1a)": 0,
+            "Machos levante (1-2a)": 0,
+            "Machos ceba": 0,
+            "Toros reproductores": 0,
+        }
+        for a in animales_en_este:
+            aid = a["id_animal"]
+            sexo = (a["sexo"] or "").strip().lower()
+            fnac = to_date(a["fecha_nacimiento"])
+            edad_d = (self.hoy - fnac).days if fnac else None
+            es_h = bool(sexo.startswith("h") or sexo.startswith("f") or sexo in ("vaca", "novilla", "ternera"))
+
+            if es_h:
+                if edad_d is not None and edad_d < 365:
+                    conteo_cat["Crías hembra (<1a)"] += 1
+                elif edad_d is not None and edad_d < 730:
+                    conteo_cat["Hembras levante (1-2a)"] += 1
+                else:
+                    p_ult = self.db.ultimo_parto(aid)
+                    if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
+                        dp = (self.hoy - to_date(p_ult["fecha"])).days
+                        if dp <= 305:
+                            conteo_cat["Vacas paridas"] += 1
+                        else:
+                            conteo_cat["Vacas secas"] += 1
+                    else:
+                        conteo_cat["Novillas vientre (>2a)"] += 1
+            else:
+                nom_m = (a["nombre"] or "").upper()
+                if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_d is not None and edad_d >= 1095):
+                    conteo_cat["Toros reproductores"] += 1
+                elif edad_d is not None and edad_d < 365:
+                    conteo_cat["Crías macho (<1a)"] += 1
+                elif edad_d is not None and edad_d < 730:
+                    conteo_cat["Machos levante (1-2a)"] += 1
+                else:
+                    conteo_cat["Machos ceba"] += 1
+
+        cats_activas = [f"• {k}: {v}" for k, v in conteo_cat.items() if v > 0]
+        if cats_activas and total > 1:
+            detalle_cat = "\n\n📋 <b>Composición zootécnica:</b>\n" + "\n".join(cats_activas)
+            return f"{resumen_base}{detalle_cat}"
+
+        return resumen_base
 
     def _fotos(self, tag) -> str:
         if not tag:
