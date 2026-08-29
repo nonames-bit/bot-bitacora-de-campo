@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Vigilante automatico para la carpeta de copias de Software Ganadero en Windows.
 .DESCRIPTION
@@ -43,15 +43,40 @@ if (-not (Test-Path -Path $CopiasDir)) {
 
 $EstadoFile = Join-Path $CopiasDir ".ultimo_sincronizado.json"
 $LogFile = Join-Path $CopiasDir "copias_sync.log"
+$SshKey = Join-Path $env:USERPROFILE ".ssh\id_ed25519_bitacora"
+$SshOpts = @("-i", $SshKey, "-o", "StrictHostKeyChecking=accept-new", "-o", "ConnectTimeout=15", "-o", "ServerAliveInterval=10", "-o", "ServerAliveCountMax=3")
+
+# Reintenta una escritura de archivo varias veces: en Windows, el antivirus u OneDrive
+# suelen bloquear momentaneamente un archivo recien creado/modificado (IOException
+# transitoria), y sin reintento la escritura fallaba en silencio dejando el estado
+# de sincronizacion sin persistir (ver docs: bug detectado 2026-08-29).
+function Invoke-EscrituraConReintento {
+    param(
+        [scriptblock]$Accion,
+        [int]$Intentos = 5,
+        [int]$EsperaMs = 400
+    )
+    for ($i = 1; $i -le $Intentos; $i++) {
+        try {
+            & $Accion
+            return $true
+        } catch {
+            if ($i -eq $Intentos) {
+                Write-Host "[ERROR] Escritura fallo tras $Intentos intentos: $_" -ForegroundColor Red
+                return $false
+            }
+            Start-Sleep -Milliseconds $EsperaMs
+        }
+    }
+    return $false
+}
 
 function Write-Log {
     param([string]$Mensaje, [string]$Nivel = "INFO")
     $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     $linea = "[$timestamp] [$Nivel] $Mensaje"
     Write-Host $linea
-    try {
-        Add-Content -Path $LogFile -Value $linea -Encoding UTF8
-    } catch { }
+    Invoke-EscrituraConReintento -Accion { Add-Content -Path $LogFile -Value $linea -Encoding UTF8 } | Out-Null
 }
 
 function Leer-Estado {
@@ -59,7 +84,7 @@ function Leer-Estado {
         try {
             $raw = Get-Content -Path $EstadoFile -Raw -Encoding UTF8
             $obj = ConvertFrom-Json $raw
-            if ($obj.procesados -eq $null) {
+            if ($null -eq $obj.procesados) {
                 $obj | Add-Member -MemberType NoteProperty -Name "procesados" -Value @{} -Force
             }
             return $obj
@@ -70,7 +95,10 @@ function Leer-Estado {
     return [PSCustomObject]@{
         ultimo_archivo = ""
         ultimo_hash = ""
-        procesados = @{}
+        # PSCustomObject vacio, no Hashtable: iterar .PSObject.Properties sobre un
+        # [hashtable] devuelve tambien sus miembros .NET (IsReadOnly, Keys, Count...)
+        # como si fueran archivos procesados, contaminando el JSON guardado.
+        procesados = [PSCustomObject]@{}
     }
 }
 
@@ -78,7 +106,7 @@ function Guardar-Estado {
     param($Nombre, $HashVal, $Length, $LastWriteTime)
     $estado = Leer-Estado
     $props = @{}
-    if ($estado.procesados -ne $null) {
+    if ($null -ne $estado.procesados) {
         $estado.procesados.PSObject.Properties | ForEach-Object {
             $props[$_.Name] = $_.Value
         }
@@ -98,10 +126,10 @@ function Guardar-Estado {
         procesados = $props
     }
 
-    try {
-        $nuevoEstado | ConvertTo-Json -Depth 5 | Set-Content -Path $EstadoFile -Encoding UTF8
-    } catch {
-        Write-Log "Error al guardar estado en $EstadoFile : $_" "ERROR"
+    $json = $nuevoEstado | ConvertTo-Json -Depth 5
+    $ok = Invoke-EscrituraConReintento -Accion { Set-Content -Path $EstadoFile -Value $json -Encoding UTF8 }
+    if (-not $ok) {
+        Write-Log "No se pudo persistir el estado de sincronizacion para $Nombre en $EstadoFile (quedara pendiente de reintento en la proxima corrida)." "ERROR"
     }
 }
 
@@ -127,6 +155,9 @@ function Sincronizar-Copias {
     }
 
     $estado = Leer-Estado
+    $nEnviados = 0
+    $nFallidos = 0
+    $nOmitidos = 0
 
     foreach ($archivo in $archivosZip) {
         $nombre = $archivo.Name
@@ -142,40 +173,50 @@ function Sincronizar-Copias {
 
         # Comprobar si ya fue sincronizado
         $yaSincronizado = $false
-        if ($estado.procesados -ne $null) {
+        if ($null -ne $estado.procesados) {
             $reg = $estado.procesados.$nombre
-            if ($reg -ne $null -and $reg.hash -eq $fileHash) {
+            if ($null -ne $reg -and $reg.hash -eq $fileHash) {
                 $yaSincronizado = $true
             }
         }
 
-        if (-not $yaSincronizado) {
-            Write-Log "Nuevo backup detectado: $nombre ($([math]::Round($archivo.Length/1MB, 2)) MB). Iniciando transferencia..." "INFO"
+        if ($yaSincronizado) {
+            $nOmitidos++
+            continue
+        }
 
-            # 1. Enviar via SCP al VPS
-            $scpTarget = "${VpsUser}@${VpsHost}:${VpsDestDir}/$nombre"
-            Write-Log "Ejecutando SCP a $scpTarget..." "INFO"
-            & scp -i "$env:USERPROFILE\.ssh\id_ed25519_bitacora" -o StrictHostKeyChecking=accept-new "$($archivo.FullName)" "$scpTarget"
+        Write-Log "Nuevo backup detectado: $nombre ($([math]::Round($archivo.Length/1MB, 2)) MB). Iniciando transferencia..." "INFO"
 
-            if ($LASTEXITCODE -ne 0) {
-                Write-Log "Error en la transferencia SCP de $nombre (codigo: $LASTEXITCODE)." "ERROR"
-                continue
-            }
+        # 1. Enviar via SCP al VPS
+        $scpTarget = "${VpsUser}@${VpsHost}:${VpsDestDir}/$nombre"
+        Write-Log "Ejecutando SCP a $scpTarget..." "INFO"
+        & scp @SshOpts "$($archivo.FullName)" "$scpTarget"
 
-            Write-Log "Transferencia SCP completada. Disparando importacion remota en VPS..." "INFO"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Error en la transferencia SCP de $nombre (codigo: $LASTEXITCODE)." "ERROR"
+            $nFallidos++
+            Start-Sleep -Seconds 2
+            continue
+        }
 
-            # 2. Ejecutar script de importacion remota por SSH
-            $sshCmd = "bash ${VpsProjectPath}/scripts/importar_backup.sh ${VpsDestDir}/$nombre"
-            & ssh -i "$env:USERPROFILE\.ssh\id_ed25519_bitacora" -o StrictHostKeyChecking=accept-new "${VpsUser}@${VpsHost}" "$sshCmd"
+        Write-Log "Transferencia SCP completada. Disparando importacion remota en VPS..." "INFO"
 
-            if ($LASTEXITCODE -eq 0) {
-                Write-Log "[OK] Importacion remota completada exitosamente para $nombre." "INFO"
-                Guardar-Estado -Nombre $nombre -HashVal $fileHash -Length $archivo.Length -LastWriteTime $archivo.LastWriteTimeUtc.ToString("o")
-            } else {
-                Write-Log "[WARN] Error al ejecutar importacion remota para $nombre (codigo: $LASTEXITCODE)." "ERROR"
-            }
+        # 2. Ejecutar script de importacion remota por SSH
+        $sshCmd = "bash ${VpsProjectPath}/scripts/importar_backup.sh ${VpsDestDir}/$nombre"
+        & ssh @SshOpts "${VpsUser}@${VpsHost}" "$sshCmd"
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-Log "[OK] Importacion remota completada exitosamente para $nombre." "INFO"
+            Guardar-Estado -Nombre $nombre -HashVal $fileHash -Length $archivo.Length -LastWriteTime $archivo.LastWriteTimeUtc.ToString("o")
+            $nEnviados++
+        } else {
+            Write-Log "[WARN] Error al ejecutar importacion remota para $nombre (codigo: $LASTEXITCODE)." "ERROR"
+            $nFallidos++
+            Start-Sleep -Seconds 2
         }
     }
+
+    Write-Log "Resumen del ciclo: $nEnviados enviados, $nFallidos fallidos, $nOmitidos ya sincronizados (de $($archivosZip.Count) backups en carpeta)." "INFO"
 }
 
 Write-Log ">> Iniciando vigilante de copias SG (Windows -> VPS $VpsHost)" "INFO"
