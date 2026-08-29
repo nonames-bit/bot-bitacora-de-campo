@@ -334,6 +334,237 @@ def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
     )
 
 
+def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -> list[dict]:
+    """Calcula las existencias por potrero desglosadas por las 9 categorías zootécnicas de Software Ganadero (SG)."""
+    hoy = hoy or date.today()
+    potreros = db.query("SELECT * FROM potreros")
+    if not potreros:
+        return []
+
+    potreros_by_id = {p["id"]: p for p in potreros}
+    grupos: dict[str, dict] = {}
+    for p in potreros:
+        if p["dias_reposo"] is not None and p["dias_reposo"] > 365:
+            continue
+        raw_nom = (p["nombre"] or p["codigo"] or str(p["id"])).strip()
+        norm = normalizar(raw_nom).strip().upper()
+        if not norm:
+            norm = f"POTRERO {p['id']}"
+        if norm not in grupos:
+            grupos[norm] = {
+                "display": raw_nom.upper(),
+                "ids": set(),
+                "animales": [],
+                "ch": 0, "hl": 0, "nv": 0, "vp": 0, "vs": 0,
+                "cm": 0, "ml": 0, "mc": 0, "rep": 0,
+                "total": 0,
+                "dias_reposo": p["dias_reposo"],
+                "fecha_ingreso_reciente": None,
+            }
+        grupos[norm]["ids"].add(p["id"])
+
+    animales = db.query(
+        "SELECT id_animal, tag, potrero_id, estado, sexo, fecha_nacimiento, nombre, notas, madre_id FROM animales WHERE estado = 'ACTIVO'"
+    )
+    for a in animales:
+        aid = a["id_animal"]
+        ult = db.query_one(
+            "SELECT potrero_destino, fecha, lote FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1",
+            (aid,),
+        )
+        pid = ult["potrero_destino"] if (ult and ult["potrero_destino"] is not None) else a["potrero_id"]
+        fecha_ingreso = ult["fecha"] if ult else None
+
+        if pid is not None and pid in potreros_by_id:
+            p_row = potreros_by_id[pid]
+            raw_nom = (p_row["nombre"] or p_row["codigo"] or str(pid)).strip()
+            norm = normalizar(raw_nom).strip().upper()
+            if norm not in grupos:
+                grupos[norm] = {
+                    "display": raw_nom.upper(),
+                    "ids": {pid},
+                    "animales": [],
+                    "ch": 0, "hl": 0, "nv": 0, "vp": 0, "vs": 0,
+                    "cm": 0, "ml": 0, "mc": 0, "rep": 0,
+                    "total": 0,
+                    "dias_reposo": None,
+                    "fecha_ingreso_reciente": None,
+                }
+            g = grupos[norm]
+            g["animales"].append(a)
+            g["total"] += 1
+            if fecha_ingreso:
+                if not g["fecha_ingreso_reciente"] or str(fecha_ingreso) > str(g["fecha_ingreso_reciente"]):
+                    g["fecha_ingreso_reciente"] = str(fecha_ingreso)
+
+            # Categorizar según SG (potreros.jpg)
+            sexo = (a["sexo"] or "").strip().lower()
+            fnac = to_date(a["fecha_nacimiento"])
+            edad_d = (hoy - fnac).days if fnac else None
+            es_h = bool(sexo.startswith("h") or sexo.startswith("f") or sexo in ("vaca", "novilla", "ternera"))
+
+            if es_h:
+                if edad_d is not None and edad_d < 365:
+                    g["ch"] += 1
+                elif edad_d is not None and edad_d < 730:
+                    g["hl"] += 1
+                else:
+                    p_ult = db.ultimo_parto(aid)
+                    if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
+                        dp = (hoy - to_date(p_ult["fecha"])).days
+                        if dp <= 305:
+                            g["vp"] += 1
+                        else:
+                            g["vs"] += 1
+                    else:
+                        g["nv"] += 1
+            else:
+                nom_m = f"{a['nombre'] or ''} {a['notas'] or ''} {a['tag'] or ''}".upper()
+                if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_d is not None and edad_d >= 1095):
+                    g["rep"] += 1
+                elif edad_d is not None and edad_d < 365:
+                    g["cm"] += 1
+                elif edad_d is not None and edad_d < 730:
+                    g["ml"] += 1
+                else:
+                    g["mc"] += 1
+
+    ocupados = [g for g in grupos.values() if g["total"] > 0]
+    ocupados.sort(key=lambda x: (-x["total"], x["display"]))
+    return ocupados
+
+
+def formatear_tabla_potreros_sg(filas_potreros: list[dict]) -> str:
+    """Formatea la tabla de inventario por potreros exacta a la de Software Ganadero (potreros.jpg)."""
+    if not filas_potreros:
+        return "📍 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>\n\nNo hay potreros con animales activos actualmente."
+
+    tot_ch = sum(p["ch"] for p in filas_potreros)
+    tot_hl = sum(p["hl"] for p in filas_potreros)
+    tot_nv = sum(p["nv"] for p in filas_potreros)
+    tot_vp = sum(p["vp"] for p in filas_potreros)
+    tot_vs = sum(p["vs"] for p in filas_potreros)
+    tot_cm = sum(p["cm"] for p in filas_potreros)
+    tot_ml = sum(p["ml"] for p in filas_potreros)
+    tot_mc = sum(p["mc"] for p in filas_potreros)
+    tot_rep = sum(p["rep"] for p in filas_potreros)
+    tot_general = sum(p["total"] for p in filas_potreros)
+
+    def v(n: int) -> str:
+        return str(n) if n > 0 else "."
+
+    max_nom = max(len(p["display"]) for p in filas_potreros)
+    col_w = min(max(max_nom, 14), 16)
+
+    header = f"{'Potrero'.ljust(col_w)} CH HL NV VP VS CM ML MC RP  Tot"
+    sep = "─" * len(header)
+    lines = [header, sep]
+
+    for p in filas_potreros:
+        nom = p["display"][:col_w].ljust(col_w)
+        ch = v(p["ch"]).rjust(2)
+        hl = v(p["hl"]).rjust(2)
+        nv = v(p["nv"]).rjust(2)
+        vp = v(p["vp"]).rjust(2)
+        vs = v(p["vs"]).rjust(2)
+        cm = v(p["cm"]).rjust(2)
+        ml = v(p["ml"]).rjust(2)
+        mc = v(p["mc"]).rjust(2)
+        rep = v(p["rep"]).rjust(2)
+        tot = str(p["total"]).rjust(4)
+        lines.append(f"{nom} {ch} {hl} {nv} {vp} {vs} {cm} {ml} {mc} {rep} {tot}")
+
+    lines.append(sep)
+    tot_nom = "Totales...".ljust(col_w)
+    lines.append(
+        f"{tot_nom} {v(tot_ch).rjust(2)} {v(tot_hl).rjust(2)} {v(tot_nv).rjust(2)} {v(tot_vp).rjust(2)} "
+        f"{v(tot_vs).rjust(2)} {v(tot_cm).rjust(2)} {v(tot_ml).rjust(2)} {v(tot_mc).rjust(2)} "
+        f"{v(tot_rep).rjust(2)} {str(tot_general).rjust(4)}"
+    )
+
+    msg = [
+        "🌿 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>",
+        "<pre>",
+        "\n".join(lines),
+        "</pre>",
+        "<i>Leyenda: CH: Cría hembra | HL: Hemb. levante | NV: Nov. vientre | VP: Vaca parida | VS: Vaca seca | CM: Cría macho | ML: Mac. levante | MC: Macho ceba | RP: Reproductor | Tot: Total activos</i>",
+    ]
+    return "\n".join(msg)
+
+
+def formatear_ocupacion_potreros(db: Database, hoy: Optional[date] = None) -> str:
+    """Calcula y formatea los días de ocupación y rotación Voisin para todos los potreros."""
+    hoy = hoy or date.today()
+    potreros = db.query("SELECT * FROM potreros")
+    if not potreros:
+        return "No hay potreros registrados en la bitácora."
+
+    filas_ocupados = calcular_existencias_potreros_sg(db, hoy)
+    nombres_ocupados = {p["display"] for p in filas_ocupados}
+
+    # Potreros ocupados
+    lineas_ocupados = []
+    for p in filas_ocupados:
+        f_ingreso = p.get("fecha_ingreso_reciente")
+        dias_ocup = (hoy - to_date(f_ingreso)).days if f_ingreso and to_date(f_ingreso) else None
+
+        if dias_ocup is not None:
+            if dias_ocup <= 3:
+                estado_v = f"🟢 {dias_ocup}d ocupación (Óptimo Voisin)"
+            elif dias_ocup <= 6:
+                estado_v = f"🟡 {dias_ocup}d ocupación (Rotación recomendada)"
+            else:
+                estado_v = f"🔴 {dias_ocup}d ocupación (⚠️ Sobreocupación)"
+        else:
+            estado_v = "🟢 En pastoreo activo"
+
+        lineas_ocupados.append(
+            f"• <b>{p['display']}:</b> {p['total']} animales · {estado_v}"
+        )
+
+    # Potreros vacíos / en reposo
+    lineas_reposo = []
+    for p in potreros:
+        raw_nom = (p["nombre"] or p["codigo"] or str(p["id"])).strip().upper()
+        if raw_nom in nombres_ocupados:
+            continue
+        d_reposo = p["dias_reposo"]
+        if d_reposo is not None and d_reposo > 365:
+            continue
+
+        if d_reposo is not None:
+            if d_reposo >= 30:
+                est_r = f"🟢 {d_reposo}d reposo (✅ Listo para pastoreo)"
+            else:
+                est_r = f"⏳ {d_reposo}d reposo (recuperando forraje)"
+        else:
+            est_r = "⏳ En reposo"
+        lineas_reposo.append(f"• <b>{raw_nom}:</b> {est_r}")
+
+    salida = [
+        "🌿 <b>Días de Ocupación y Rotación Voisin — Ganadería JA</b>",
+        "",
+        f"📍 <b>Potreros Ocupados ({len(lineas_ocupados)}):</b>",
+    ]
+    if lineas_ocupados:
+        salida.extend(lineas_ocupados)
+    else:
+        salida.append("<i>No hay potreros con ganado actualmente.</i>")
+
+    salida.append("")
+    salida.append(f"🌱 <b>Potreros en Reposo / Recuperación ({len(lineas_reposo)}):</b>")
+    if lineas_reposo:
+        salida.extend(lineas_reposo[:15])
+        if len(lineas_reposo) > 15:
+            salida.append(f"<i>... y {len(lineas_reposo)-15} potreros más en descanso.</i>")
+    else:
+        salida.append("<i>Todos los potreros están actualmente ocupados.</i>")
+
+    salida.append("")
+    salida.append("💡 <i>Regla Voisin: Ocupación máxima 1 a 3 días por potrero para garantizar el rebrote del pasto.</i>")
+    return "\n".join(salida)
+
+
 ROMANO_A_ARABIGO = {"i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
 ARABIGO_A_ROMANO = {v: k for k, v in ROMANO_A_ARABIGO.items()}
 
@@ -444,6 +675,16 @@ class QueryEngine:
         # 7. Pesaje y crecimiento
         if re.search(r"\bpes[oó]\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
+
+        # Ocupación y rotación de potreros (Voisin)
+        if re.search(r"\b(?:ocupaci[oó]n|dias\s+de\s+ocupaci[oó]n|tiempo\s+de\s+ocupaci[oó]n|rotaci[oó]n|rotacion\s+de\s+potreros|rotacion\s+voisin)\b", t):
+            return self._ocupacion_potreros()
+
+        # Existencias por potrero en formato Software Ganadero (SG)
+        if re.search(r"\b(?:existencias?\s+por\s+potreros?|tabla\s+de\s+potreros?|potreros?\s+sg|potreros?\s+software\s+ganadero)\b", t) or (
+            re.search(r"\bpotrero", t) and re.search(r"\b(?:existencias?|sg|categor[ií]as?)\b", t)
+        ):
+            return self._inventario_potreros(formato_sg=True)
 
         # 8. Inventario / conteos (consultas diarias: total ganado, total vacas, novillas, inventario potreros) — incluye typo gaando
         if re.search(r"\b(?:total|totales|inventario|cuantos?|cuantas?|cuanto)\b", t) or re.search(r"\bganad", t) or re.search(r"\bga+ndo\b", t):
@@ -1248,7 +1489,14 @@ class QueryEngine:
             return f"🐄 Total terneros (<12 meses): {count}."
         return self._inventario_general()
 
-    def _inventario_potreros(self, mostrar_vacios: bool = False) -> str:
+    def _ocupacion_potreros(self) -> str:
+        return formatear_ocupacion_potreros(self.db, self.hoy)
+
+    def _inventario_potreros(self, mostrar_vacios: bool = False, formato_sg: bool = False) -> str:
+        if formato_sg:
+            filas_sg = calcular_existencias_potreros_sg(self.db, self.hoy)
+            return formatear_tabla_potreros_sg(filas_sg)
+
         potreros = self.db.query("SELECT * FROM potreros")
         if not potreros:
             return "No hay potreros registrados."

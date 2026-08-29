@@ -203,6 +203,9 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
         for r in filas_alertas
     ]
 
+    from ..engine.query_engine import calcular_existencias_potreros_sg
+    potreros_sg = calcular_existencias_potreros_sg(db, hoy)
+
     return {
         "inventario": {
             "activos": activos,
@@ -213,6 +216,7 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
         "periodo": {"desde": desde_iso, "hasta": hasta_iso},
         "eventos": eventos,
         "alertas": alertas,
+        "potreros_sg": potreros_sg,
     }
 
 
@@ -229,7 +233,14 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import (
+        Image,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
 
     datos = recolectar_datos(db, dias, hoy)
     fecha_hoy = hoy if hoy is not None else date.today()
@@ -251,32 +262,61 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     base = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle(
         "TituloReporte", parent=base["Title"], fontName="Helvetica-Bold",
-        fontSize=16, textColor=colors.HexColor("#333333"), spaceAfter=2,
+        fontSize=15, textColor=colors.HexColor("#222222"), spaceAfter=2,
     )
     estilo_subtitulo = ParagraphStyle(
         "SubtituloReporte", parent=base["Normal"], fontName="Helvetica",
-        fontSize=10, textColor=colors.HexColor("#666666"), spaceAfter=12,
+        fontSize=9, textColor=colors.HexColor("#555555"), spaceAfter=6,
     )
     estilo_seccion = ParagraphStyle(
         "SeccionReporte", parent=base["Heading2"], fontName="Helvetica-Bold",
-        fontSize=13, textColor=colors.HexColor("#333333"),
-        spaceBefore=12, spaceAfter=6,
+        fontSize=12, textColor=colors.HexColor("#222222"),
+        spaceBefore=10, spaceAfter=4,
     )
     estilo_normal = ParagraphStyle(
         "NormalReporte", parent=base["Normal"], fontName="Helvetica",
-        fontSize=10, textColor=colors.HexColor("#333333"),
+        fontSize=9, textColor=colors.HexColor("#333333"),
     )
     estilo_pie = ParagraphStyle(
         "PieReporte", parent=base["Normal"], fontName="Helvetica-Oblique",
-        fontSize=8, textColor=colors.HexColor("#999999"), spaceBefore=16,
+        fontSize=8, textColor=colors.HexColor("#888888"), spaceBefore=14,
     )
 
-    # Encabezado.
-    story = [Paragraph("Reporte de campo — Finca", estilo_titulo)]
-    story.append(Paragraph(
-        f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']} · Generado: {fecha_hoy.isoformat()}",
-        estilo_subtitulo,
-    ))
+    # Buscar logo si existe
+    logo_path = None
+    candidatos_logo = [
+        "docs/GanaderiaJA_Logo.jpg",
+        "media/GanaderiaJA_Logo.jpg",
+        os.path.join(os.path.dirname(__file__), "../../docs/GanaderiaJA_Logo.jpg"),
+    ]
+    for cand in candidatos_logo:
+        if os.path.exists(cand):
+            logo_path = cand
+            break
+
+    # Encabezado con logo
+    if logo_path:
+        img = Image(logo_path, width=20 * mm, height=20 * mm)
+        texto_enc = [
+            Paragraph("GANADERÍA JA", estilo_titulo),
+            Paragraph(f"Bitácora de Campo Zootécnico & Software Ganadero (SG) · Generado: {fecha_hoy.isoformat()}", estilo_subtitulo),
+            Paragraph(f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}", estilo_normal),
+        ]
+        enc_table = Table([[img, texto_enc]], colWidths=[24 * mm, 146 * mm])
+        enc_table.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story = [enc_table]
+    else:
+        story = [Paragraph("Reporte de campo — Ganadería JA", estilo_titulo)]
+        story.append(Paragraph(
+            f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']} · Generado: {fecha_hoy.isoformat()}",
+            estilo_subtitulo,
+        ))
 
     # Inventario.
     inv = datos["inventario"]
@@ -286,6 +326,60 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
         f"Histórico total: {inv['historico_total']}",
         estilo_normal,
     ))
+
+    # Existencias por potrero (Software Ganadero SG)
+    potreros_sg = datos.get("potreros_sg", [])
+    if potreros_sg:
+        story.append(Paragraph("Existencias por potrero (Software Ganadero)", estilo_seccion))
+        tabla_pot_datos = [["Potrero", "CH", "HL", "NV", "VP", "VS", "CM", "ML", "MC", "Rep", "Total"]]
+        for p in potreros_sg:
+            def v(n: int) -> str: return str(n) if n > 0 else "-"
+            tabla_pot_datos.append([
+                p["display"][:18],
+                v(p["ch"]), v(p["hl"]), v(p["nv"]), v(p["vp"]), v(p["vs"]),
+                v(p["cm"]), v(p["ml"]), v(p["mc"]), v(p["rep"]),
+                str(p["total"]),
+            ])
+        tot_ch = sum(p["ch"] for p in potreros_sg)
+        tot_hl = sum(p["hl"] for p in potreros_sg)
+        tot_nv = sum(p["nv"] for p in potreros_sg)
+        tot_vp = sum(p["vp"] for p in potreros_sg)
+        tot_vs = sum(p["vs"] for p in potreros_sg)
+        tot_cm = sum(p["cm"] for p in potreros_sg)
+        tot_ml = sum(p["ml"] for p in potreros_sg)
+        tot_mc = sum(p["mc"] for p in potreros_sg)
+        tot_rep = sum(p["rep"] for p in potreros_sg)
+        tot_gen = sum(p["total"] for p in potreros_sg)
+        def vt(n: int) -> str: return str(n) if n > 0 else "-"
+        tabla_pot_datos.append([
+            "Totales...",
+            vt(tot_ch), vt(tot_hl), vt(tot_nv), vt(tot_vp), vt(tot_vs),
+            vt(tot_cm), vt(tot_ml), vt(tot_mc), vt(tot_rep),
+            str(tot_gen),
+        ])
+
+        tabla_p = Table(
+            tabla_pot_datos,
+            colWidths=[40 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm]
+        )
+        tabla_p.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8e8e8")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#efefef")),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f7f7f7")]),
+            ("LEFTPADDING", (0, 0), (-1, -1), 2),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(tabla_p)
 
     # Tablas por evento.
     for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:

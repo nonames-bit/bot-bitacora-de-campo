@@ -100,3 +100,17 @@ def test_generar_pdf_genera_archivo_real(tmp_path, db):
     assert ruta.stat().st_size > 1024
     with open(ruta, "rb") as f:
         assert f.read(5) == b"%PDF-"
+
+
+def test_recolectar_datos_incluye_potreros_sg(db):
+    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
+    db.registrar_parto("V1", fecha="2026-06-01")
+
+    datos = recolectar_datos(db, 7, hoy=date(2026, 8, 28))
+    assert "potreros_sg" in datos
+    assert len(datos["potreros_sg"]) == 1
+    assert "ORDENO" in datos["potreros_sg"][0]["display"]
+    assert datos["potreros_sg"][0]["vp"] == 1
+    assert datos["potreros_sg"][0]["total"] == 1
+

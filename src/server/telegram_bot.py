@@ -67,7 +67,7 @@ def formatear_historial(db: Database, tag: str, hoy=None) -> str:
 
 
 def formatear_potreros(db: Database, potrero: Optional[str | date] = None, hoy=None) -> str:
-    """Devuelve el estado de los potreros listos, vacíos o los animales en un potrero específico delegando en el motor de consultas."""
+    """Devuelve el estado de los potreros listos, vacíos, existencias SG o días de ocupación delegando en el motor de consultas."""
     if isinstance(potrero, date):
         hoy = potrero
         potrero = None
@@ -76,8 +76,12 @@ def formatear_potreros(db: Database, potrero: Optional[str | date] = None, hoy=N
         p_str = str(potrero).strip()
         if p_str.lower() in ("vacios", "vacio", "vacíos", "vacío"):
             return qe.responder("potreros vacios")
+        if p_str.lower() in ("sg", "existencias", "tabla"):
+            return qe.responder("existencias por potrero")
+        if p_str.lower() in ("ocupacion", "ocupación", "rotacion", "rotación"):
+            return qe.responder("dias de ocupacion")
         if p_str.lower() in ("inventario", "todos", "ocupados"):
-            return qe.responder("inventario potreros")
+            return qe.responder("existencias por potrero")
         if not re.search(r"\bpotrero", p_str, re.IGNORECASE):
             p_str = f"potrero {p_str}"
         return qe.responder(f"animales en {p_str}")
@@ -1106,12 +1110,50 @@ def construir_application(
                 return
             arg_potrero = " ".join(context.args).strip() if context.args else None
             msg = formatear_potreros(db, potrero=arg_potrero)
+            teclado_p = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                    InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
+                ],
+                [
+                    InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                    InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                ],
+            ])
             try:
-                await update.message.reply_text(msg, parse_mode="HTML")
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
             except Exception:
-                await update.message.reply_text(msg)
+                await update.message.reply_text(msg, reply_markup=teclado_p)
         except Exception as e:
             logger.error("Error en cmd_potreros: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_ocupacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            qe = QueryEngine(db)
+            msg = qe.responder("dias de ocupacion")
+            teclado_p = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                    InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                ],
+                [
+                    InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                ],
+            ])
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
+            except Exception:
+                await update.message.reply_text(msg, reply_markup=teclado_p)
+        except Exception as e:
+            logger.error("Error en cmd_ocupacion: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1585,12 +1627,88 @@ def construir_application(
                     if query.message:
                         await query.message.reply_text("⛔ No autorizado.")
                     return
-                msg = formatear_potreros(db)
+                msg = formatear_potreros(db, potrero="sg")
+                teclado_p = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
+                        InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
                     except Exception:
-                        await query.message.reply_text(msg)
+                        await query.message.reply_text(msg, reply_markup=teclado_p)
+
+            elif data == "cmd:potreros_sg":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_potreros(db, potrero="sg")
+                teclado_p = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
+                        InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_p)
+
+            elif data == "cmd:ocupacion":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                qe = QueryEngine(db)
+                msg = qe.responder("dias de ocupacion")
+                teclado_p = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                        InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_p)
+
+            elif data == "cmd:potreros_listos":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_potreros(db)
+                teclado_p = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                        InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_p)
 
             elif data == "cmd:status":
                 await query.answer()
@@ -1745,6 +1863,7 @@ def construir_application(
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal", "buscar"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
+    app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
     app.add_handler(CommandHandler("status", cmd_status))

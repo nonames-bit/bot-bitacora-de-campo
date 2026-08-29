@@ -759,6 +759,78 @@ def test_consultas_especificas_nombre_y_tag(db, tmp_path):
     assert "Lote 2" in resp_trasl
 
 
+def test_existencias_por_potrero_sg(db):
+    from src.engine.query_engine import (
+        calcular_existencias_potreros_sg,
+        formatear_tabla_potreros_sg,
+        QueryEngine,
+    )
+    # Registrar potreros
+    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
+    p2 = db.registrar_potrero("OLEGARIO I", "02")
+
+    # Registrar animales en potrero 1
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
+    db.registrar_parto("V1", fecha="2026-06-01")  # Vaca parida (<305d)
+
+    db.registrar_animal("N1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2023-01-01")  # Novilla vientre (>2a sin parto)
+    db.registrar_animal("T1", sexo="Macho", estado="ACTIVO", potrero=p1, nombre="TORO PADRON", fecha_nacimiento="2021-01-01")  # Reproductor
+
+    # Registrar animales en potrero 2
+    db.registrar_animal("C1", sexo="Hembra", estado="ACTIVO", potrero=p2, fecha_nacimiento="2026-02-01")  # Cría hembra (<1a)
+    db.registrar_animal("CM1", sexo="Macho", estado="ACTIVO", potrero=p2, fecha_nacimiento="2026-03-01")  # Cría macho (<1a)
+
+    filas = calcular_existencias_potreros_sg(db, hoy=date(2026, 8, 28))
+    assert len(filas) == 2
+
+    p1_fila = next(f for f in filas if "ORDENO" in f["display"])
+    assert p1_fila["vp"] == 1
+    assert p1_fila["nv"] == 1
+    assert p1_fila["rep"] == 1
+    assert p1_fila["total"] == 3
+
+    p2_fila = next(f for f in filas if "OLEGARIO" in f["display"])
+    assert p2_fila["ch"] == 1
+    assert p2_fila["cm"] == 1
+    assert p2_fila["total"] == 2
+
+    tabla_str = formatear_tabla_potreros_sg(filas)
+    assert "GANADERIA-JA" in tabla_str
+    assert "ORDENO SANTA" in tabla_str
+    assert "Totales..." in tabla_str
+    assert "5" in tabla_str
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp_query = qe.responder("existencias por potrero")
+    assert "GANADERIA-JA" in resp_query
+    assert "Totales..." in resp_query
+
+
+def test_dias_ocupacion_y_rotacion(db):
+    from src.engine.query_engine import (
+        formatear_ocupacion_potreros,
+        QueryEngine,
+    )
+    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
+    p2 = db.registrar_potrero("BAJO", "02", dias_reposo=35)
+
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_traslado("V1", fecha="2026-08-26", potrero_destino=p1)
+
+    ocup_str = formatear_ocupacion_potreros(db, hoy=date(2026, 8, 28))
+    assert "Días de Ocupación y Rotación" in ocup_str
+    assert "ORDENO SANTA MARTHA" in ocup_str
+    assert "2d ocupación" in ocup_str
+    assert "BAJO" in ocup_str
+    assert "35d reposo" in ocup_str
+    assert "Listo para pastoreo" in ocup_str
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    resp = qe.responder("dias de ocupacion de potreros")
+    assert "Días de Ocupación y Rotación" in resp
+
+
+
 
 
 
