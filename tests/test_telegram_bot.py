@@ -365,4 +365,20 @@ def test_formatear_animales_sg_brackets_y_filtro_activos(db):
     assert "H_DESC" not in resp
 
 
+def test_texto_ejemplo_evento():
+    from src.server.telegram_bot import texto_ejemplo_evento
+    ej_parto = texto_ejemplo_evento("parto")
+    assert "pario la 47" in ej_parto
+
+    ej_celo = texto_ejemplo_evento("celo")
+    assert "AM-PM" in ej_celo
+
+    ej_serv = texto_ejemplo_evento("servicio")
+    assert "pajuela" in ej_serv
+
+    ej_trat = texto_ejemplo_evento("tratamiento")
+    assert "retiro" in ej_trat
+
+
+
 

@@ -1,6 +1,7 @@
 """Motor de consultas: respuestas zootécnicas a preguntas en lenguaje natural."""
 from __future__ import annotations
 
+import os
 import re
 from datetime import date
 
@@ -17,6 +18,51 @@ from .reproductive_engine import (
 )
 
 REPOSO_LISTO_DIAS = 21
+
+
+def buscar_foto_animal(db: Database, tag_or_name: str | int, media_dir: str = "media") -> str | None:
+    """Busca la ruta local de la foto de un animal en la tabla fotos y en el directorio media/."""
+    if not tag_or_name:
+        return None
+    aid = db.resolve_animal(tag_or_name)
+    tags_probar = [str(tag_or_name).strip()]
+    if aid is not None:
+        fotos = db.fotos_de(aid, limit=1)
+        if fotos and fotos[0]["ruta"] and os.path.exists(fotos[0]["ruta"]):
+            return fotos[0]["ruta"]
+        animal = db.get_animal(aid)
+        if animal:
+            if animal["tag"]:
+                tags_probar.append(str(animal["tag"]).strip())
+            if animal["nombre"]:
+                tags_probar.append(str(animal["nombre"]).strip())
+
+    if not os.path.exists(media_dir):
+        return None
+
+    # Probar candidatos en disco
+    for cand in tags_probar:
+        if not cand:
+            continue
+        c_clean = cand.lower().strip()
+        for ext in (".jpg", ".jpeg", ".png"):
+            p = os.path.join(media_dir, c_clean + ext)
+            if os.path.exists(p):
+                return p
+            p_upper = os.path.join(media_dir, cand.upper().strip() + ext)
+            if os.path.exists(p_upper):
+                return p_upper
+        # Si es número puro (ej. 9 o 47), probar variantes prefijadas habituales en SG (a009, v047, n069, ja26)
+        if c_clean.isdigit():
+            for pref in ("a", "n", "v", "ja"):
+                for pad in (3, 2, 0):
+                    padded = pref + (c_clean.zfill(pad) if pad else c_clean)
+                    for ext in (".jpg", ".jpeg"):
+                        p = os.path.join(media_dir, padded + ext)
+                        if os.path.exists(p):
+                            return p
+    return None
+
 
 
 def formatear_edad_zootecnica(f_nac: date, hoy: date) -> str:
@@ -348,6 +394,23 @@ class QueryEngine:
         t = normalizar(texto)
         tag = nlu.extraer_tag(texto)
 
+        # 1. Ubicación y potrero del animal (ej. "¿en qué potrero está patricia?", "¿dónde está la vaca 47?")
+        if (
+            re.search(r"\b(?:donde\s+esta|donde\s+anda|donde\s+se\s+encuentra|en\s+que\s+potrero|ubicacion)\b", t)
+            or (tag and re.search(r"\bpotrero\b", t) and re.search(r"\b(?:esta|anda|se\s+encuentra|quedo)\b", t))
+        ):
+            return self._ubicacion_animal(tag)
+
+        # 2. Partos y maternidad
+        if re.search(r"\bpari[oó]\b|\bparto\b", t):
+            return self._ultimo_parto(tag)
+
+        # 3. Servicios e Inseminación
+        if re.search(r"\b(?:que\s+vacas?|cuales\s+vacas?|que\s+animales?|a\s+que\s+vacas?|hay\s+para\s+inseminar)\b", t) or not tag:
+            if re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b|\btoca.*servicio\b", t):
+                return self._inseminacion_programada()
+        if tag and (re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b", t)):
+            return self._ultimo_servicio(tag)
         if re.search(r"\bpalpacion", t) and re.search(r"\bpendiente", t):
             return self._palpacion_pendiente()
         if re.search(r"\binsemin", t) or (
@@ -355,17 +418,30 @@ class QueryEngine:
             and re.search(r"\bservicio\b|\bia\b", t)
         ):
             return self._inseminacion_programada()
+
+        # 4. Secado y retiros
         if re.search(r"\bsecado\b", t):
             return self._secado(tag)
-        if re.search(r"\bretiro\b", t):
+        if re.search(r"\bretiro\b|\bmedicamento\b|\bremedio\b", t):
+            if tag:
+                return self._retiro_animal(tag)
             return self._en_retiro()
+
+        # 5. Genealogía y familia
+        if tag and re.search(r"\b(?:madre|padre|mama|papa|genealogia|familia|hijos?|hijas?|crias?)\b", t):
+            return self._genealogia(tag)
+
+        # 6. Ficha zootécnica
         if re.search(r"\b(?:historial|ficha|hoja de vida|consulta|info|informacion|datos|buscar|ver)\b", t) and tag:
             return self._historial(tag)
         if re.search(r"\b(?:historial|ficha|consulta)\b", t):
             return self._historial(tag)
-        if re.search(r"\bpes[oó]\b|\bganancia\b|\bkg\b|\bkilos\b", t):
+
+        # 7. Pesaje y crecimiento
+        if re.search(r"\bpes[oó]\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
-        # Inventario / conteos (consultas diarias: total ganado, total vacas, novillas, inventario potreros) — incluye typo gaando
+
+        # 8. Inventario / conteos (consultas diarias: total ganado, total vacas, novillas, inventario potreros) — incluye typo gaando
         if re.search(r"\b(?:total|totales|inventario|cuantos?|cuantas?|cuanto)\b", t) or re.search(r"\bganad", t) or re.search(r"\bga+ndo\b", t):
             # inventario por potrero tiene prioridad si menciona potrero
             if re.search(r"\bpotrero", t):
@@ -439,13 +515,180 @@ class QueryEngine:
         return self._ayuda(texto)
 
     # ------------------------------------------------------------------ #
+    def _ubicacion_animal(self, tag) -> str:
+        if not tag:
+            return "¿De cuál animal desea consultar la ubicación? (ej. '¿en qué potrero está patricia?')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No se encontró el animal '{tag}' en los registros."
+        animal = self.db.get_animal(aid)
+        if not animal:
+            return f"No se encontró el animal '{tag}' en los registros."
+
+        tag_str = animal["tag"] or str(tag)
+        nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
+        estado = animal["estado"] or "ACTIVO"
+
+        potrero_nom = None
+        lote_str = ""
+        fecha_ingreso = None
+
+        if animal["potrero_id"]:
+            prow = self.db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (animal["potrero_id"],))
+            if prow:
+                potrero_nom = prow["nombre"] or prow["codigo"]
+
+        ult_traslado = self.db.query_one(
+            "SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
+        )
+        if ult_traslado:
+            if not potrero_nom and ult_traslado["potrero_destino"]:
+                prow = self.db.query_one("SELECT nombre, codigo FROM potreros WHERE id = ?", (ult_traslado["potrero_destino"],))
+                if prow:
+                    potrero_nom = prow["nombre"] or prow["codigo"]
+            if ult_traslado["lote"]:
+                lote_str = f" (Lote {ult_traslado['lote']})"
+            if ult_traslado["fecha"]:
+                fecha_ingreso = ult_traslado["fecha"]
+
+        if not potrero_nom:
+            return f"El animal {tag_str}{nombre} (Estado: {estado}) no tiene potrero asignado actualmente."
+
+        dias_en_potrero = ""
+        if fecha_ingreso and to_date(fecha_ingreso):
+            dias_p = (self.hoy - to_date(fecha_ingreso)).days
+            if dias_p >= 0:
+                dias_en_potrero = f" (hace {dias_p} días)"
+        detalle_fecha = f" desde el {fecha_ingreso}{dias_en_potrero}" if fecha_ingreso else ""
+        return f"🌱 El animal {tag_str}{nombre} se encuentra actualmente en el potrero <b>{potrero_nom}</b>{lote_str}{detalle_fecha}. Estado: {estado}."
+
     def _ultimo_parto(self, tag) -> str:
         if not tag:
             return "¿De cuál animal desea saber el parto? (ej. '¿cuándo parió la 47?')"
-        parto = self.db.ultimo_parto(tag)
-        if parto is None:
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
             return f"No hay registro de parto para la {tag}."
-        return f"La {tag} parió el {parto['fecha']}."
+        animal = self.db.get_animal(aid)
+        tag_str = animal["tag"] if animal else str(tag)
+        nombre = f" ({animal['nombre']})" if animal and animal["nombre"] else ""
+
+        parto = self.db.ultimo_parto(aid)
+        if parto is None:
+            return f"No hay registro de parto para la {tag_str}{nombre}."
+        fec = parto["fecha"]
+        cria_info = []
+        if parto["sexo_cria"]:
+            cria_info.append(f"Cría {parto['sexo_cria']}")
+        if parto["estado_cria"]:
+            cria_info.append(parto["estado_cria"])
+        if parto["peso_nacimiento"]:
+            cria_info.append(f"{parto['peso_nacimiento']} kg")
+        str_cria = f" ({', '.join(cria_info)})" if cria_info else ""
+        return f"La {tag_str}{nombre} parió el {fec}{str_cria}."
+
+    def _ultimo_servicio(self, tag) -> str:
+        if not tag:
+            return "¿De cuál animal desea consultar el servicio? (ej. '¿cuándo se inseminó la 47?')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No hay servicio registrado para '{tag}'."
+        animal = self.db.get_animal(aid)
+        tag_str = animal["tag"] if animal else str(tag)
+        nombre = f" ({animal['nombre']})" if animal and animal["nombre"] else ""
+
+        serv = self.db.ultimo_servicio(aid)
+        if serv is None:
+            return f"No hay servicio ni inseminación registrada para {tag_str}{nombre}."
+        fec = serv["fecha"]
+        toro_str = f" con toro/pajuela {serv['toro_pajilla']}" if ("toro_pajilla" in serv.keys() and serv["toro_pajilla"]) else ""
+        tipo_str = f" ({serv['tipo_servicio']})" if serv["tipo_servicio"] else ""
+        fep = serv["fep_calculada"] or iso(add_days(serv["fecha"], 283))
+        dias_gest = (self.hoy - to_date(fec)).days if to_date(fec) else 0
+
+        return (
+            f"🐂 {tag_str}{nombre} fue servida el <b>{fec}</b>{toro_str}{tipo_str}.\n"
+            f"• Días de gestación calculados: {dias_gest} días\n"
+            f"• Fecha Estimada de Parto (FEP): <b>{fep}</b>"
+        )
+
+    def _genealogia(self, tag) -> str:
+        if not tag:
+            return "¿De cuál animal desea consultar la genealogía? (ej. '¿quién es la madre de patricia?')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No se encontró el animal '{tag}' en los registros."
+        animal = self.db.get_animal(aid)
+        if not animal:
+            return f"No se encontró el animal '{tag}' en los registros."
+
+        tag_str = animal["tag"] or str(tag)
+        nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
+
+        madre_str = "Desconocida"
+        if animal["madre_id"]:
+            m_row = self.db.get_animal(animal["madre_id"])
+            if m_row:
+                madre_str = m_row["tag"] + (f" ({m_row['nombre']})" if m_row["nombre"] else "")
+
+        padre_str = "Desconocido"
+        if animal["padre_id"]:
+            p_row = self.db.get_animal(animal["padre_id"])
+            if p_row:
+                padre_str = p_row["tag"] + (f" ({p_row['nombre']})" if p_row["nombre"] else "")
+
+        crias = self.db.query(
+            "SELECT a.tag, a.nombre, a.sexo, p.fecha FROM partos p "
+            "LEFT JOIN animales a ON a.id_animal = p.id_cria "
+            "WHERE p.vaca_id = ? AND (p.id_cria IS NULL OR p.id_cria != ?) ORDER BY p.fecha DESC",
+            (aid, aid),
+        )
+        crias_str = f"{len(crias)} partos registrados"
+        if crias:
+            crias_desc = []
+            for c in crias[:3]:
+                c_tag = c["tag"] or "Sin arete"
+                c_fec = f" ({c['fecha']})" if c["fecha"] else ""
+                crias_desc.append(f"{c_tag}{c_fec}")
+            crias_str += f" [{', '.join(crias_desc)}]"
+
+        return (
+            f"🌳 <b>Genealogía de {tag_str}{nombre}</b>\n"
+            f"• Madre: <b>{madre_str}</b>\n"
+            f"• Padre: <b>{padre_str}</b>\n"
+            f"• Crías: {crias_str}"
+        )
+
+    def _retiro_animal(self, tag) -> str:
+        if not tag:
+            return self._en_retiro()
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No se encontró el animal '{tag}'."
+        animal = self.db.get_animal(aid)
+        tag_str = animal["tag"] if animal else str(tag)
+        nombre = f" ({animal['nombre']})" if animal and animal["nombre"] else ""
+
+        tratamientos = self.db.query(
+            "SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT 5", (aid,)
+        )
+        if not tratamientos:
+            return f"✅ {tag_str}{nombre} no tiene tratamientos registrados. Está libre de retiro."
+
+        hoy = self.hoy
+        bloqueos = []
+        for t in tratamientos:
+            for tipo, fin in (
+                ("leche", t["fecha_fin_retiro_leche"]),
+                ("carne", t["fecha_fin_retiro_carne"]),
+            ):
+                if fin and to_date(fin) and to_date(t["fecha"]) <= hoy <= to_date(fin):
+                    dias_rest = (to_date(fin) - hoy).days
+                    prod = t["producto"] or "Fármaco"
+                    bloqueos.append(f"⚠️ Retiro de {tipo} por {prod} hasta el {fin} (faltan {dias_rest} días)")
+
+        if bloqueos:
+            return f"💊 <b>Tratamiento en {tag_str}{nombre}</b>:\n" + "\n".join(bloqueos)
+        return f"✅ {tag_str}{nombre} no tiene retiros activos actualmente. Está libre para consumo/ordeño."
 
     def _palpacion_pendiente(self) -> str:
         hoy = self.hoy

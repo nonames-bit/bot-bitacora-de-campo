@@ -67,18 +67,71 @@ Dígale qué animales entraron o salieron de la finca.
 
 ---
 
-## 3. También puede mandar notas de voz y fotos 🎤📷
+## 3. Pregúntele al Bot con sus Propias Palabras 🗣️🔍
 
-- **Nota de voz:** mantenga presionado el micrófono y cuente la novedad hablando.
-  El bot la guarda. *(La transcripción automática llega en la Fase 3 con Whisper).*
-- **Foto:** saque una foto del arete, del frasco del remedio o del animal y
-  mándela con un texto (ej. `vaca 47` o `pario la 47 ternero macho`). El bot la guarda
-  y la vincula a la base de datos.
+Usted no necesita memorizar comandos difíciles. Puede hacerle preguntas directamente en español cotidiano usando el número de arete (`47`, `JA26`, `A009`) o el **nombre propio** de la vaca (`patricia`):
+
+- **Ubicación actual y potrero:**
+  - *«¿en qué potrero está patricia?»*
+  - *«¿dónde está la vaca 47?»*
+  - *«¿dónde anda el toro 502?»*
+  - ➡️ El bot responde el potrero actual, lote, fecha de entrada y si está activa.
+
+- **Parto puntual y maternidad:**
+  - *«¿cuándo parió patricia?»*
+  - *«¿cuándo fue el parto de la 47?»*
+  - ➡️ El bot responde la fecha exacta, sexo de la cría, estado (vivo/muerto) y peso al nacer.
+
+- **Inseminación y Servicio:**
+  - *«¿cuándo se inseminó patricia?»*
+  - *«¿con qué toro se sirvió la 47?»*
+  - ➡️ El bot responde la fecha, pajuela/toro, días de gestación transcurridos y Fecha Estimada de Parto (FEP).
+
+- **Retiro y Medicamentos:**
+  - *«¿patricia está en retiro?»*
+  - *«¿qué remedio le pusieron a la 105?»*
+  - ➡️ El bot le avisa si tiene retiro activo en leche o carne y cuántos días faltan.
+
+- **Genealogía y Familia:**
+  - *«¿quién es la madre de patricia?»*
+  - *«¿qué crías tiene la 47?»*
+  - ➡️ El bot le muestra la madre, el padre y sus partos registrados.
+
+- **Pesajes y Ganancia:**
+  - *«¿cuánto pesó patricia?»*
+  - *«¿cuál fue la ganancia diaria de la 12?»*
+  - ➡️ El bot le muestra el último peso y los gramos ganados por día (GMD).
+
+---
+
+## 4. Teclado Táctil Interactivo y Fotos Automáticas 🔘📷
+
+### 🔘 Botones de Menú Rápido
+Al enviar `/start` o `/help`, el bot le responderá con un **menú táctil de botones**:
+- `[ 📊 Inventario Hato ]`: conteo rápido de animales por categoría.
+- `[ ⚠️ Alertas ]`: ecografías, palpaciones y secados pendientes.
+- `[ 🌿 Potreros ]`: rotación y potreros listos para pastoreo.
+- `[ 📋 Reporte PDF ]`: genera y descarga el informe zootécnico semanal.
+- `[ 💡 Ejemplos de Notas ]`: abre plantillas listas para copiar y pegar (parto, celo, servicio, remedios, etc.).
+- `[ ⚙️ Estado Servidor ]`: salud del sistema y base de datos.
+
+### 📷 Fotos Automáticas de Animales
+Cuando consulte la ficha de cualquier animal (ej. `/consulta a009`, `/historial patricia` o escribiendo `patricia` o `47`), el bot **buscará automáticamente su foto en la galería del backup** y se la enviará adjunta a la ficha técnica, junto con botones interactivos:
+- `[ ⚖️ Pesajes ]` `[ 🧬 Reproducción ]`
+- `[ 🌱 Potrero ]` `[ 💊 Retiro ]`
+- `[ 📷 Ver Foto ]` `[ 📋 Ficha Completa ]`
+
+---
+
+## 5. También puede mandar notas de voz y fotos 🎤📷
+
+- **Nota de voz:** mantenga presionado el micrófono y cuente la novedad hablando. El bot la transcribe y procesa automáticamente con inteligencia artificial.
+- **Foto:** saque una foto del arete, del frasco del remedio o del animal y mándela con o sin texto. El OCR del bot detecta automáticamente el arete o medicamento y lo registra.
 - **Ver fotos:** escriba `/fotos 47` o `/fotos` para ver las imágenes guardadas.
 
 ---
 
-## 4. Comandos de Consulta y Administración (Dueño y Administrador)
+## 6. Comandos de Consulta y Administración (Dueño y Administrador)
 
 | Comando | Para qué sirve | Ejemplo de uso |
 |---|---|---|

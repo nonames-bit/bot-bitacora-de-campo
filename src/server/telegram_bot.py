@@ -14,6 +14,7 @@ from ..bot.bot_interface import Bot
 from ..db.database import Database
 from ..engine.query_engine import (
     QueryEngine,
+    buscar_foto_animal,
     calcular_brackets_inventario_sg,
     generar_resumen_inventario_sg,
 )
@@ -353,6 +354,60 @@ def formatear_ayuda(rol: Optional[str]) -> str:
     return "⛔ No autorizado."
 
 
+def texto_ejemplo_evento(tipo: str) -> str:
+    """Devuelve la plantilla y explicación de una nota de campo según el tipo."""
+    ejemplos = {
+        "parto": (
+            "🍼 <b>Ejemplo de Parto:</b>\n"
+            "<code>pario la 47 ternero macho vivo 38kg</code>\n\n"
+            "💡 <i>Consejo:</i> Indica siempre la vaca que parió y el sexo de la cría (macho o hembra)."
+        ),
+        "celo": (
+            "🔥 <b>Ejemplo de Celo (Regla AM-PM):</b>\n"
+            "<code>celo en la mañana la 33</code>\n"
+            "<code>celo en la tarde la vaca 12</code>\n\n"
+            "💡 <i>Regla zootécnica:</i> Celo en la mañana se insemina en la tarde; celo en la tarde se insemina en la mañana siguiente."
+        ),
+        "servicio": (
+            "🐂 <b>Ejemplo de Inseminación / Servicio:</b>\n"
+            "<code>insemine la 47 con pajuela toro brahman 502</code>\n"
+            "<code>servicio directo la novilla 15 con toro reproductor</code>\n\n"
+            "💡 <i>Automático:</i> El bot programa ecografía (d35), palpación (d60) y secado (FEP-60d)."
+        ),
+        "tratamiento": (
+            "💉 <b>Ejemplo de Tratamiento / Remedio:</b>\n"
+            "<code>le puse oxitetraciclina 10ml via IM a la 105 retiro 28 dias</code>\n"
+            "<code>le aplique ivermectina 5ml via SC a la 12</code>\n\n"
+            "💡 <i>Alerta:</i> El bot bloqueará el ordeño y venta de carne durante los días de retiro."
+        ),
+        "pesaje": (
+            "⚖️ <b>Ejemplo de Pesaje:</b>\n"
+            "<code>peso 420 kg la vaca 47</code>\n"
+            "<code>pesaje novillo N069 310 kilos</code>\n\n"
+            "💡 <i>Ganancia:</i> El bot calcula la Ganancia Media Diaria (GMD) automáticamente."
+        ),
+        "traslado": (
+            "🚚 <b>Ejemplo de Traslado de Potrero:</b>\n"
+            "<code>pase el lote 2 del potrero bajo al potrero olegario 1</code>\n"
+            "<code>traslade la vaca 47 al potrero norte</code>\n\n"
+            "💡 <i>Voisin:</i> Calcula días de ocupación y descanso de cada pradera."
+        ),
+        "muerte": (
+            "💀 <b>Ejemplo de Muerte / Baja:</b>\n"
+            "<code>se murio el novillo 105 causa mordedura de culebra</code>\n\n"
+            "💡 <i>Inventario:</i> El animal pasa a estado inactivo y se registra la causa."
+        ),
+        "movimiento": (
+            "📥 <b>Ejemplo de Entrada / Salida:</b>\n"
+            "<code>entraron 15 novillas compradas en subasta</code>\n"
+            "<code>salieron 8 toros vendidos para ceba</code>\n\n"
+            "💡 <i>Inventario:</i> Actualiza altas y bajas del hato general."
+        ),
+    }
+    return ejemplos.get(tipo, "Selecciona una categoría para ver su ejemplo de nota de campo.")
+
+
+
 def obtener_ultimos_logs(log_file: str, lineas: int = 20) -> str:
     """Lee y devuelve las últimas líneas del archivo de registro."""
     if not os.path.exists(log_file):
@@ -498,6 +553,79 @@ def construir_application(
             "python-telegram-bot no está instalado. Instálalo con 'pip install python-telegram-bot>=21.0'"
         ) from e
 
+    def crear_teclado_principal(rol: Optional[str]) -> InlineKeyboardMarkup:
+        if rol in ("OWNER", "ADMIN"):
+            keyboard = [
+                [
+                    InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                    InlineKeyboardButton("⚠️ Alertas", callback_data="cmd:alertas"),
+                ],
+                [
+                    InlineKeyboardButton("🌿 Potreros", callback_data="cmd:potreros"),
+                    InlineKeyboardButton("📋 Reporte PDF", callback_data="cmd:reporte"),
+                ],
+                [
+                    InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
+                    InlineKeyboardButton("💡 Ejemplos de Notas", callback_data="cmd:ejemplos"),
+                ],
+                [
+                    InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
+                ],
+            ]
+        else:
+            keyboard = [
+                [
+                    InlineKeyboardButton("📷 Últimas Fotos", callback_data="cmd:fotos"),
+                    InlineKeyboardButton("💡 Ejemplos de Notas", callback_data="cmd:ejemplos"),
+                ],
+                [
+                    InlineKeyboardButton("📋 Guía Rápida", callback_data="cmd:ayuda"),
+                ],
+            ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_ejemplos() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🍼 Parto", callback_data="ejemplo:parto"),
+                InlineKeyboardButton("🔥 Celo AM/PM", callback_data="ejemplo:celo"),
+            ],
+            [
+                InlineKeyboardButton("🐂 Inseminación", callback_data="ejemplo:servicio"),
+                InlineKeyboardButton("💉 Tratamiento", callback_data="ejemplo:tratamiento"),
+            ],
+            [
+                InlineKeyboardButton("⚖️ Pesaje", callback_data="ejemplo:pesaje"),
+                InlineKeyboardButton("🚚 Traslado", callback_data="ejemplo:traslado"),
+            ],
+            [
+                InlineKeyboardButton("💀 Muerte / Baja", callback_data="ejemplo:muerte"),
+                InlineKeyboardButton("📥 Entrada / Salida", callback_data="ejemplo:movimiento"),
+            ],
+            [
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
+        tag_clean = str(tag).strip()
+        keyboard = [
+            [
+                InlineKeyboardButton("⚖️ Pesajes", callback_data=f"pesos:{tag_clean}"),
+                InlineKeyboardButton("🧬 Reproducción", callback_data=f"repro:{tag_clean}"),
+            ],
+            [
+                InlineKeyboardButton("🌱 Potrero", callback_data=f"ubica:{tag_clean}"),
+                InlineKeyboardButton("💊 Retiro", callback_data=f"retiro:{tag_clean}"),
+            ],
+            [
+                InlineKeyboardButton("📷 Ver Foto", callback_data=f"foto:{tag_clean}"),
+                InlineKeyboardButton("📋 Ficha Completa", callback_data=f"ficha:{tag_clean}"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
     async def cmd_start_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -507,7 +635,9 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             rol = auth.rol_de(user_id)
-            await update.message.reply_text(formatear_ayuda(rol))
+            texto_ayuda = formatear_ayuda(rol)
+            teclado = crear_teclado_principal(rol)
+            await update.message.reply_text(texto_ayuda, reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_start_help: %s", e, exc_info=True)
             if update.message:
@@ -544,33 +674,41 @@ def construir_application(
                 await update.message.reply_text(respuesta, reply_markup=reply_markup)
                 return
 
-            if "<pre>" in respuesta or "<b>" in respuesta or "FICHA ZOOTÉCNICA" in respuesta:
+            if "FICHA ZOOTÉCNICA" in respuesta:
+                tag = nlu.extraer_tag(raw_text)
+                if tag:
+                    foto_path = buscar_foto_animal(db, tag, media_dir=media_dir)
+                    teclado = crear_teclado_animal(tag)
+                    if foto_path and os.path.exists(foto_path):
+                        try:
+                            with open(foto_path, "rb") as f:
+                                if len(respuesta) <= 1024:
+                                    await update.message.reply_photo(
+                                        photo=f, caption=respuesta, parse_mode="HTML", reply_markup=teclado
+                                    )
+                                    return
+                                else:
+                                    await update.message.reply_text(respuesta, parse_mode="HTML")
+                                    with open(foto_path, "rb") as f2:
+                                        await update.message.reply_photo(
+                                            photo=f2, caption=f"📷 Foto del animal {tag}", reply_markup=teclado
+                                        )
+                                    return
+                        except Exception as ef:
+                            logger.warning("Error al enviar foto en handle_texto para %s: %s", tag, ef)
+                    try:
+                        await update.message.reply_text(respuesta, parse_mode="HTML", reply_markup=teclado)
+                    except Exception:
+                        await update.message.reply_text(respuesta, reply_markup=teclado)
+                    return
+
+            if "<pre>" in respuesta or "<b>" in respuesta:
                 try:
                     await update.message.reply_text(respuesta, parse_mode="HTML")
                 except Exception:
                     await update.message.reply_text(respuesta)
             else:
                 await update.message.reply_text(respuesta)
-
-            # Botón de fotos si la respuesta es una ficha zootécnica
-            if "FICHA ZOOTÉCNICA" in respuesta:
-                tag = nlu.extraer_tag(raw_text)
-                if tag:
-                    fotos = db.fotos_de(tag)
-                    if fotos:
-                        n_fotos = len(fotos)
-                        btn_k = [
-                            [
-                                InlineKeyboardButton(
-                                    f"📷 Ver foto ({n_fotos})",
-                                    callback_data=f"foto:{tag}",
-                                )
-                            ]
-                        ]
-                        await update.message.reply_text(
-                            f"📷 Este animal tiene {n_fotos} foto(s) disponible(s).",
-                            reply_markup=InlineKeyboardMarkup(btn_k),
-                        )
         except Exception as e:
             logger.error("Error en handle_texto: %s", e, exc_info=True)
             if update.message:
@@ -792,27 +930,31 @@ def construir_application(
                 return
 
             msg = formatear_historial(db, tag)
-            try:
-                await update.message.reply_text(msg, parse_mode="HTML")
-            except Exception:
-                await update.message.reply_text(msg)
+            teclado = crear_teclado_animal(tag)
+            foto_path = buscar_foto_animal(db, tag, media_dir=media_dir)
 
-            # Botón para ver fotos si el animal tiene registros fotográficos
-            fotos = db.fotos_de(tag)
-            if fotos:
-                n_fotos = len(fotos)
-                keyboard = [
-                    [
-                        InlineKeyboardButton(
-                            f"📷 Ver foto ({n_fotos})",
-                            callback_data=f"foto:{tag}",
-                        )
-                    ]
-                ]
-                await update.message.reply_text(
-                    f"📷 Este animal tiene {n_fotos} foto(s) disponible(s).",
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                )
+            if foto_path and os.path.exists(foto_path):
+                try:
+                    with open(foto_path, "rb") as f:
+                        if len(msg) <= 1024:
+                            await update.message.reply_photo(
+                                photo=f, caption=msg, parse_mode="HTML", reply_markup=teclado
+                            )
+                            return
+                        else:
+                            await update.message.reply_text(msg, parse_mode="HTML")
+                            with open(foto_path, "rb") as f2:
+                                await update.message.reply_photo(
+                                    photo=f2, caption=f"📷 Foto del animal {tag}", reply_markup=teclado
+                                )
+                            return
+                except Exception as efoto:
+                    logger.warning("Error al enviar foto para animal %s: %s", tag, efoto)
+
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado)
+            except Exception:
+                await update.message.reply_text(msg, reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_historial: %s", e, exc_info=True)
             if update.message:
@@ -1165,9 +1307,123 @@ def construir_application(
                 return
 
             data = query.data
-            if data.startswith("foto:"):
+            if data == "menu:principal":
+                await query.answer()
+                rol = auth.rol_de(user_id)
+                if query.message:
+                    await query.message.reply_text(
+                        formatear_ayuda(rol), reply_markup=crear_teclado_principal(rol)
+                    )
+
+            elif data == "cmd:ejemplos":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        "💡 <b>Ejemplos de Notas de Campo:</b>\nSelecciona el tipo de evento que deseas ver:",
+                        parse_mode="HTML",
+                        reply_markup=crear_teclado_ejemplos(),
+                    )
+
+            elif data.startswith("ejemplo:"):
+                tipo = data.split("ejemplo:", 1)[1]
+                await query.answer()
+                txt = texto_ejemplo_evento(tipo)
+                btn_volver = [
+                    [
+                        InlineKeyboardButton("⬅️ Volver a Ejemplos", callback_data="cmd:ejemplos"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ]
+                if query.message:
+                    await query.message.reply_text(
+                        txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_volver)
+                    )
+
+            elif data == "cmd:inventario":
+                await query.answer()
+                msg = formatear_animales(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data == "cmd:alertas":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_alertas(db)
+                if query.message:
+                    await query.message.reply_text(msg)
+
+            elif data == "cmd:potreros":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_potreros(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data == "cmd:status":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_status(db, db.path if hasattr(db, "path") else None)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data == "cmd:reporte":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                try:
+                    from ..reports import generar_pdf
+                    os.makedirs(reportes_dir, exist_ok=True)
+                    fecha_hoy = date.today()
+                    ruta = os.path.join(reportes_dir, f"reporte_semanal_{fecha_hoy.isoformat()}.pdf")
+                    generar_pdf(db, 7, ruta, hoy=fecha_hoy)
+                    if os.path.exists(ruta):
+                        with open(ruta, "rb") as f:
+                            contenido = f.read()
+                        if query.message:
+                            await query.message.reply_document(
+                                document=contenido, filename=os.path.basename(ruta)
+                            )
+                except Exception as erep:
+                    logger.error("Error al generar reporte en callback: %s", erep)
+                    if query.message:
+                        await query.message.reply_text(f"❌ Error al generar reporte: {erep}")
+
+            elif data == "cmd:fotos":
+                await query.answer()
+                msg = formatear_fotos(db)
+                if query.message:
+                    await query.message.reply_text(msg)
+
+            elif data.startswith("foto:"):
                 tag = data.split("foto:", 1)[1].strip()
                 await query.answer()
+                foto_path = buscar_foto_animal(db, tag, media_dir=media_dir)
+                if foto_path and os.path.exists(foto_path):
+                    with open(foto_path, "rb") as f:
+                        if query.message:
+                            await query.message.reply_photo(photo=f, caption=f"📷 Foto del animal {tag}")
+                    return
+
                 filas = db.fotos_de(tag, limit=5)
                 if not filas:
                     if query.message:
@@ -1188,9 +1444,51 @@ def construir_application(
                                 f"📷 Foto {tag} [{fec}] (archivo no disponible en servidor)."
                             )
 
-            elif data == "cmd:inventario":
+            elif data.startswith("pesos:"):
+                tag = data.split("pesos:", 1)[1].strip()
                 await query.answer()
-                msg = formatear_animales(db)
+                qe = QueryEngine(db)
+                msg = qe.responder(f"cuanto peso la {tag}")
+                if query.message:
+                    await query.message.reply_text(msg)
+
+            elif data.startswith("repro:"):
+                tag = data.split("repro:", 1)[1].strip()
+                await query.answer()
+                qe = QueryEngine(db)
+                msg = qe.responder(f"servicio de {tag}")
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data.startswith("ubica:"):
+                tag = data.split("ubica:", 1)[1].strip()
+                await query.answer()
+                qe = QueryEngine(db)
+                msg = qe.responder(f"en que potrero esta {tag}")
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data.startswith("retiro:"):
+                tag = data.split("retiro:", 1)[1].strip()
+                await query.answer()
+                qe = QueryEngine(db)
+                msg = qe.responder(f"retiro de {tag}")
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML")
+                    except Exception:
+                        await query.message.reply_text(msg)
+
+            elif data.startswith("ficha:"):
+                tag = data.split("ficha:", 1)[1].strip()
+                await query.answer()
+                msg = formatear_historial(db, tag)
                 if query.message:
                     try:
                         await query.message.reply_text(msg, parse_mode="HTML")
@@ -1208,7 +1506,9 @@ def construir_application(
                 await query.answer()
                 rol = auth.rol_de(user_id)
                 if query.message:
-                    await query.message.reply_text(formatear_ayuda(rol))
+                    await query.message.reply_text(
+                        formatear_ayuda(rol), reply_markup=crear_teclado_principal(rol)
+                    )
 
         except Exception as e:
             logger.error("Error en handle_callback_query: %s", e, exc_info=True)

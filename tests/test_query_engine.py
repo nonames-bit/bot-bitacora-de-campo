@@ -698,6 +698,58 @@ def test_inventario_potreros_ocupados_porcentajes_y_filtro_historico(db):
     assert "Vacíos: 1" in resp
 
 
+def test_consultas_especificas_nombre_y_tag(db, tmp_path):
+    hoy = date(2026, 9, 1)
+    db.registrar_potrero(nombre="OLEGARIO I", codigo="01")
+    db.registrar_animal(tag="JA26", nombre="PATRICIA", sexo="Hembra", estado="ACTIVO", potrero="01")
+    db.registrar_animal(tag="TORO_502", nombre="BRAHMAN 502", sexo="Macho", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA26", fecha="2025-11-12", sexo_cria="Hembra", estado_cria="VIVO", peso_nacimiento=36.0)
+    db.registrar_servicio(vaca_tag="JA26", fecha="2026-06-15", toro_pajilla="TORO_502", tipo_servicio="IA")
+    db.registrar_tratamiento(animal_tag="JA26", fecha="2026-08-30", producto="Oxitetraciclina", dias_retiro_carne=14, fecha_fin_retiro_carne="2026-09-13")
+
+    qe = QueryEngine(db, hoy=hoy)
+
+    # 1. Ubicación de animal por nombre y por tag
+    resp_ubi1 = qe.responder("¿en qué potrero está patricia?")
+    assert "OLEGARIO I" in resp_ubi1
+    assert "JA26" in resp_ubi1
+    assert "PATRICIA" in resp_ubi1
+
+    resp_ubi2 = qe.responder("dónde está la vaca JA26?")
+    assert "OLEGARIO I" in resp_ubi2
+
+    # 2. Parto de animal por nombre propio
+    resp_parto = qe.responder("¿cuándo parió patricia?")
+    assert "2025-11-12" in resp_parto
+    assert "36.0 kg" in resp_parto
+
+    # 3. Servicio de animal
+    resp_serv = qe.responder("¿cuándo se inseminó patricia?")
+    assert "2026-06-15" in resp_serv
+    assert "TORO_502" in resp_serv
+
+    # 4. Retiro de animal individual
+    resp_ret = qe.responder("¿patricia está en retiro?")
+    assert "Oxitetraciclina" in resp_ret
+    assert "2026-09-13" in resp_ret
+
+    # 5. Genealogía de animal
+    resp_gen = qe.responder("¿quién es la madre de patricia?")
+    assert "Genealogía de JA26" in resp_gen
+
+    # 6. Búsqueda de foto de animal
+    from src.engine.query_engine import buscar_foto_animal
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    foto_ja26 = media_dir / "ja26.jpg"
+    foto_ja26.write_bytes(b"dummy_image")
+
+    encontrada = buscar_foto_animal(db, "patricia", media_dir=str(media_dir))
+    assert encontrada is not None
+    assert "ja26.jpg" in encontrada
+
+
+
 
 
 

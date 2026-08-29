@@ -71,9 +71,12 @@ INTENTOS: list[tuple[str, list[str]]] = [
 PREFIJOS_TAG = (
     "la", "el", "vaca", "vacas", "animal", "ternera", "ternero", "becerro",
     "becerra", "novilla", "novillo", "vaquilla", "vaquillona", "cria",
-    "torete", "a la", "a el", "de la", "de el", "consulta", "consultar",
+    "torete", "toro", "a la", "a el", "de la", "de el", "de", "del", "consulta", "consultar",
     "ficha", "historial", "info", "informacion", "arete", "tag", "numero",
-    "nro", "ver", "buscar",
+    "nro", "ver", "buscar", "pario", "pario la", "pario el", "esta", "esta la", "esta el",
+    "donde esta", "donde esta la", "donde esta el", "donde anda", "donde anda la", "donde anda el",
+    "en que potrero esta", "en que potrero esta la", "en que potrero esta el",
+    "secado de", "secado de la", "secado de el", "madre de", "padre de", "quien es",
 )
 
 # Palabras que no son tags de animal aunque vayan precedidas de "la"/"el".
@@ -82,8 +85,15 @@ PALABRAS_NO_TAG = {
     "pradera", "subasta", "finca", "norte", "sur", "bajo", "alto",
     "vaca", "vacas", "animal", "animales", "ternera", "ternero", "becerro",
     "becerra", "novilla", "novillo", "vaquilla", "vaquillona", "cria",
-    "toro", "torete", "cria", "crias", "parto", "celo", "servicio",
+    "toro", "torete", "crias", "parto", "celo", "servicio",
     "tratamiento", "pesaje", "traslado", "muerte", "movimiento",
+    "esta", "estan", "donde", "cuando", "cuanto", "quien", "que", "como", "hoy", "ayer",
+    "madre", "padre", "mama", "papa", "abuela", "abuelo", "en", "de", "del", "al", "a",
+    "el", "la", "los", "las", "un", "una", "unos", "unas", "tiempo", "retiro",
+    "pario", "peso", "insemine", "insemino", "inseminada", "inseminaron", "servida", "servio", "sirvio", "sirvieron",
+    "murio", "puso", "aplico", "toco", "toca", "cubrio", "monto",
+    "debo", "debe", "deben", "debemos", "tengo", "tiene", "tienen", "tenemos", "hay", "les", "le", "me", "te", "se", "nos",
+    "servir", "inseminar", "inseminacion", "inseminaciones", "servicios", "palpacion", "palpaciones",
 }
 
 
@@ -168,6 +178,18 @@ def extraer_tags(texto: str) -> list[str]:
         val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
         if val not in PALABRAS_NO_TAG and val and val not in tags:
             tags.append(val)
+
+    # 4. Fallback para nombres propios o identificadores en preguntas (ej. "patricia esta en retiro?", "donde esta patricia?")
+    if not tags:
+        palabras_filtradas = [
+            re.sub(r"[?!.,;:¿¡]+", "", w).strip()
+            for w in t.split()
+            if re.sub(r"[?!.,;:¿¡]+", "", w).strip() and re.sub(r"[?!.,;:¿¡]+", "", w).strip() not in PALABRAS_NO_TAG
+        ]
+        if len(palabras_filtradas) == 1:
+            cand = palabras_filtradas[0]
+            if len(cand) >= 2 and cand not in tags:
+                tags.append(cand)
 
     return tags
 

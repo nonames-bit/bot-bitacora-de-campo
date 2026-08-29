@@ -179,7 +179,7 @@ Flujo por Telegram (OWNER/ADMIN):
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **238 pruebas en verde** (252 en VPS)
+- **Pruebas:** Pytest — **240 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -245,9 +245,18 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Detección de frascos y fármacos veterinarios (oxitetraciclina, ivermectina, penicilina, dosis `ml/kg`, vías `IM/SC/IV`, lote y tiempos de retiro)
   - [x] Integración en el flujo de Telegram y Bot con concatenación NLU y feedback contextual (`🔍 OCR detectó tag`, `💊 OCR detectó medicamento`)
   - [x] Persistencia de `ocr_text` en SQLite tabla `fotos` con migración idempotente
-- [x] **Integración LLM multi-agente con Gemini (Google AI Studio)**:
-  - [x] Router determinista (regex, sin llamada LLM) que agrupa los 8 eventos zootécnicos en 3 dominios (reproducción, sanidad, manejo) y despacha extractores especializados, sin dependencias pesadas (`src/llm/`).
-  - [x] Arquitectura NLU híbrida: Capa 1 local rápida (regex) + Capa 2 multi-agente Gemini con `responseSchema` (JSON garantizado) para jerga compleja y notas con múltiples eventos zootécnicos.
+- [x] **Fase 3 (Parte 3) — UI Interactiva, Consultas Naturales Específicas y Fotos Automáticas**:
+  - [x] Motor de consultas ampliadas por tag o nombre propio (`patricia`, `JA26`, `47`):
+    - *Ubicación*: `¿en qué potrero está patricia?`, `¿dónde está la vaca 47?` (retorna potrero actual, lote, fecha de ingreso y estado).
+    - *Parto puntual*: `¿cuándo parió patricia?` (retorna fecha exacta, cría, sexo, peso al nacer y días abiertos).
+    - *Servicio / IA*: `¿cuándo se inseminó patricia?` (retorna toro/pajuela, tipo de servicio, días de gestación y FEP).
+    - *Sanidad y Retiro*: `¿patricia está en retiro?` (retorna productos aplicados, vías, fechas de fin y días restantes de carencia).
+    - *Genealogía*: `¿quién es la madre de patricia?`, `¿qué crías tiene?` (retorna madre, padre y lista de partos).
+  - [x] Despliegue automático de fotos de animales: resolución automática en disco `media/` y SQLite de imágenes del backup (`a009.jpg`, `ja26.jpg`, `v047.jpg`, etc.) adjuntando la fotografía directamente con la ficha zootécnica.
+  - [x] Teclados interactivos de Telegram (`InlineKeyboardMarkup`):
+    - Menú interactivo en `/start` y `/help` con botones de acceso rápido (`📊 Inventario`, `⚠️ Alertas`, `🌿 Potreros`, `📋 Reporte PDF`, `📷 Fotos`, `💡 Ejemplos`, `⚙️ Estado`).
+    - Submenú interactivo de ejemplos de notas de campo para trabajadores (Parto, Celo AM/PM, Servicio, Tratamiento, Pesaje, Traslado, etc.).
+    - Botones táctiles contextuales al pie de cada animal (`⚖️ Pesajes`, `🧬 Reproducción`, `🌱 Potrero`, `💊 Retiro`, `📷 Ver Foto`, `📋 Ficha Completa`).
   - [x] Ejecución en paralelo (`ThreadPoolExecutor`) de los extractores cuando una nota toca varios dominios a la vez; agente clasificador LLM como respaldo cuando el router no reconoce ningún dominio.
   - [x] Configuración de variables de entorno `GEMINI_API_KEY` y `GEMINI_MODEL` en `.env`.
 - [x] Documentación y diagramas en `docs/`: arquitectura general, flujo de sincronización SG y matriz de permisos (`docs/ARQUITECTURA_Y_FLUJOS.md`)
