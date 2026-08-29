@@ -1,14 +1,11 @@
-"""Motor de consultas: respuestas zootécnicas a preguntas en lenguaje natural.
+"""Paquete del motor de consultas, dividido por dominio zootécnico.
 
-Implementación dividida por dominio en ``src/engine/query/`` (reproducción,
-sanidad, pasturas, inventario, historial). Este módulo se mantiene como punto
-de importación público estable — no mover ni duplicar lógica aquí.
+Importar siempre desde ``src.engine.query_engine`` (mantiene la API pública
+estable); este paquete es el detalle de implementación interno.
 """
-from __future__ import annotations
-
-from .query import (
+from .engine import QueryEngine
+from .helpers import (
     REPOSO_LISTO_DIAS,
-    QueryEngine,
     buscar_foto_animal,
     calcular_brackets_inventario_sg,
     calcular_existencias_potreros_sg,
