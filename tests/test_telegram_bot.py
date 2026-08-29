@@ -384,13 +384,44 @@ def test_guias_didacticas_trabajador():
     from src.server.telegram_bot import (
         texto_guia_animal,
         texto_guia_audios,
+        texto_guia_chat_hub,
         texto_guia_consultas,
         texto_guia_fotos,
+        texto_guia_preguntas_animal,
+        texto_guia_preguntas_potreros,
+        texto_guia_preguntas_reproduccion,
+        texto_guia_preguntas_sanidad,
+        texto_guia_voz_fotos,
     )
     g_cons = texto_guia_consultas()
     assert "patricia" in g_cons
     assert "potrero" in g_cons
     assert "parto" in g_cons
+
+    g_hub = texto_guia_chat_hub()
+    assert "PREGUNTAR" in g_hub
+    assert "campo" in g_hub
+
+    g_anim = texto_guia_preguntas_animal()
+    assert "Ubicación" in g_anim
+    assert "Partos" in g_anim
+    assert "47" in g_anim
+
+    g_potr = texto_guia_preguntas_potreros()
+    assert "Potreros" in g_potr
+    assert "santa martha" in g_potr
+
+    g_rep = texto_guia_preguntas_reproduccion()
+    assert "abiertas" in g_rep
+    assert "Partos" in g_rep
+
+    g_san = texto_guia_preguntas_sanidad()
+    assert "retiro" in g_san
+    assert "leche" in g_san
+
+    g_vf = texto_guia_voz_fotos()
+    assert "Whisper" in g_vf
+    assert "OCR" in g_vf
 
     g_fotos = texto_guia_fotos()
     assert "Aretes" in g_fotos

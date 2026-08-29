@@ -8,7 +8,8 @@ import re
 import sys
 import time
 import zipfile
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 from typing import Optional
 
 from ..bot.bot_interface import Bot
@@ -66,8 +67,14 @@ from .formatters import (
     texto_ejemplo_evento,
     texto_guia_animal,
     texto_guia_audios,
+    texto_guia_chat_hub,
     texto_guia_consultas,
     texto_guia_fotos,
+    texto_guia_preguntas_animal,
+    texto_guia_preguntas_potreros,
+    texto_guia_preguntas_reproduccion,
+    texto_guia_preguntas_sanidad,
+    texto_guia_voz_fotos,
     texto_menu_principal,
 )
 
@@ -96,6 +103,30 @@ def construir_application(
             "python-telegram-bot no está instalado. Instálalo con 'pip install python-telegram-bot>=21.0'"
         ) from e
 
+    def crear_teclado_guia_chat() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🐮 1. Preguntas sobre un Animal", callback_data="guia:preguntas_animal"),
+            ],
+            [
+                InlineKeyboardButton("🌿 2. Preguntas de Potreros & Voisin", callback_data="guia:preguntas_potreros"),
+            ],
+            [
+                InlineKeyboardButton("🥛 3. Preguntas de Leche & Reproducción", callback_data="guia:preguntas_reprod"),
+            ],
+            [
+                InlineKeyboardButton("💉 4. Preguntas de Medicamentos & Retiro", callback_data="guia:preguntas_sanidad"),
+            ],
+            [
+                InlineKeyboardButton("🎙️ 5. Cómo Dictar por Voz y Fotos", callback_data="guia:voz_fotos"),
+            ],
+            [
+                InlineKeyboardButton("📝 Ejemplos de Notas", callback_data="cmd:ejemplos"),
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
     def crear_teclado_trabajador() -> InlineKeyboardMarkup:
         keyboard = [
             [
@@ -107,12 +138,11 @@ def construir_application(
                 InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
             ],
             [
-                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
-                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
+                InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
             ],
             [
                 InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
-                InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
+                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
             ],
             [
                 InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
@@ -139,22 +169,25 @@ def construir_application(
                 InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             ],
             [
+                InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
                 InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
-                InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
             ],
             [
+                InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
                 InlineKeyboardButton("⚙️ Servidor & Logs", callback_data="cmd:sistema"),
             ],
         ]
         if rol == "OWNER":
-            keyboard[-1].append(InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"))
             keyboard.append([
+                InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
                 InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+            ])
+            keyboard.append([
                 InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
             ])
         else:
-            keyboard[-1].append(InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"))
             keyboard.append([
+                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
                 InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
             ])
         return InlineKeyboardMarkup(keyboard)
@@ -364,7 +397,7 @@ def construir_application(
             rol = auth.rol_de(user_id)
             texto_ayuda = formatear_ayuda(rol)
             teclado = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Abrir Menú", callback_data="menu:principal")]])
-            await update.message.reply_text(texto_ayuda, reply_markup=teclado)
+            await update.message.reply_text(texto_ayuda, parse_mode="HTML", reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_ayuda_completa: %s", e, exc_info=True)
             if update.message:
@@ -667,6 +700,23 @@ def construir_application(
             )
         except Exception as e:
             logger.error("Error en cmd_genetica: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_guia_chat(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = texto_guia_chat_hub()
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_guia_chat()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_guia_chat: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1238,6 +1288,40 @@ def construir_application(
                         reply_markup=InlineKeyboardMarkup(btn),
                     )
 
+            elif data == "guia:chat_hub":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        texto_guia_chat_hub(),
+                        parse_mode="HTML",
+                        reply_markup=crear_teclado_guia_chat(),
+                    )
+
+            elif data in (
+                "guia:preguntas_animal", "guia:preguntas_potreros",
+                "guia:preguntas_reprod", "guia:preguntas_sanidad", "guia:voz_fotos",
+            ):
+                await query.answer()
+                textos_guia_categoria = {
+                    "guia:preguntas_animal": texto_guia_preguntas_animal,
+                    "guia:preguntas_potreros": texto_guia_preguntas_potreros,
+                    "guia:preguntas_reprod": texto_guia_preguntas_reproduccion,
+                    "guia:preguntas_sanidad": texto_guia_preguntas_sanidad,
+                    "guia:voz_fotos": texto_guia_voz_fotos,
+                }
+                btn = [
+                    [
+                        InlineKeyboardButton("⬅️ Volver a Guía de Chat", callback_data="guia:chat_hub"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ]
+                if query.message:
+                    await query.message.reply_text(
+                        textos_guia_categoria[data](),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(btn),
+                    )
+
             elif data == "guia:fotos":
                 await query.answer()
                 btn = [[InlineKeyboardButton("⬅️ Volver al Menú", callback_data="menu:principal")]]
@@ -1437,18 +1521,22 @@ def construir_application(
                     txt = "🔴 <b>Próximos Partos (≤30 días):</b>\n\n✅ No hay partos proyectados para los próximos 30 días."
                     btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
                 else:
-                    lineas = ["🔴 <b>Vacas con Parto Próximo (Próximos 30 días):</b>\n"]
+                    total_p = len(filas)
+                    filas_m = filas[:15]
+                    lineas = [f"🔴 <b>Vacas con Parto Próximo (≤30 días) [{total_p} vaca(s)]:</b>\n"]
                     botones_vacas = []
-                    for r in filas:
+                    for r in filas_m:
                         tag_v = r["tag"] or "S/T"
                         fep = r["fecha_estimada_parto"]
                         dias_faltan = (to_date(fep) - hoy).days if to_date(fep) else 0
                         pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
                         lineas.append(f"• 🐮 <b>{html.escape(str(tag_v))}</b>: FEP {fep} (en {dias_faltan}d){pot}")
                         botones_vacas.append(InlineKeyboardButton(f"🐮 {tag_v}", callback_data=f"ficha:{tag_v}"))
+                    if total_p > 15:
+                        lineas.append(f"\n<i>...y {total_p - 15} vaca(s) más.</i>")
                     txt = "\n".join(lineas)
                     btn_a = []
-                    for i in range(0, len(botones_vacas), 3):
+                    for i in range(0, min(len(botones_vacas), 15), 3):
                         btn_a.append(botones_vacas[i:i+3])
                     btn_a.append([
                         InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
@@ -1477,17 +1565,21 @@ def construir_application(
                     txt = "🟡 <b>Vacas Candidatas para Secado (≥200 DEL):</b>\n\n✅ No hay vacas en lactancia prolongada pendientes de secado."
                     btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
                 else:
-                    lineas = ["🟡 <b>Vacas Candidatas para Secado (≥200 Días de Lactancia):</b>\n"]
+                    total_s = len(filas)
+                    filas_m = filas[:15]
+                    lineas = [f"🟡 <b>Vacas Candidatas para Secado (≥200 Días de Lactancia) [{total_s} vaca(s)]:</b>\n"]
                     botones_vacas = []
-                    for r in filas:
+                    for r in filas_m:
                         tag_v = r["tag"] or "S/T"
                         dias_l = (hoy - to_date(r["ult_parto"])).days if to_date(r["ult_parto"]) else 0
                         pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
                         lineas.append(f"• 🐮 <b>{html.escape(str(tag_v))}</b>: {dias_l} DEL (Parto {r['ult_parto']}){pot}")
                         botones_vacas.append(InlineKeyboardButton(f"🐮 {tag_v}", callback_data=f"ficha:{tag_v}"))
+                    if total_s > 15:
+                        lineas.append(f"\n<i>...y {total_s - 15} vaca(s) más.</i>")
                     txt = "\n".join(lineas)
                     btn_a = []
-                    for i in range(0, len(botones_vacas), 3):
+                    for i in range(0, min(len(botones_vacas), 15), 3):
                         btn_a.append(botones_vacas[i:i+3])
                     btn_a.append([
                         InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
@@ -1515,18 +1607,22 @@ def construir_application(
                     txt = "🟢 <b>Crías en Edad de Destete (≥200 días):</b>\n\n✅ No hay terneros pendientes de destete en este rango."
                     btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
                 else:
-                    lineas = ["🟢 <b>Crías en Edad de Destete (200 - 365 días de edad):</b>\n"]
+                    total_c = len(filas)
+                    filas_m = filas[:15]
+                    lineas = [f"🟢 <b>Crías en Edad de Destete (200 - 365 días) [{total_c} cría(s)]:</b>\n"]
                     botones_crias = []
-                    for r in filas:
+                    for r in filas_m:
                         tag_c = r["tag"] or "S/T"
                         dias_edad = (hoy - to_date(r["fecha_nacimiento"])).days if to_date(r["fecha_nacimiento"]) else 0
                         sexo_txt = "Macho" if str(r["sexo"]).startswith("M") else "Hembra"
                         pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
-                        lineas.append(f"• 🍼 <b>{html.escape(str(tag_c))}</b> ({sexo_txt}): {dias_edad} días (Nac. {r['fecha_nacimiento']}){pot}")
+                        lineas.append(f"• 🍼 <b>{html.escape(str(tag_c))}</b> ({sexo_txt}): {dias_edad}d (Nac. {r['fecha_nacimiento']}){pot}")
                         botones_crias.append(InlineKeyboardButton(f"🐮 {tag_c}", callback_data=f"ficha:{tag_c}"))
+                    if total_c > 15:
+                        lineas.append(f"\n<i>...y {total_c - 15} cría(s) más.</i>")
                     txt = "\n".join(lineas)
                     btn_a = []
-                    for i in range(0, len(botones_crias), 3):
+                    for i in range(0, min(len(botones_crias), 15), 3):
                         btn_a.append(botones_crias[i:i+3])
                     btn_a.append([
                         InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
@@ -1567,15 +1663,19 @@ def construir_application(
                     txt = "⚠️ <b>Alertas de Pérdida de Peso (GMD &lt; 0):</b>\n\n✅ Ningún animal activo registró pérdida de peso en su último pesaje."
                     btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
                 else:
-                    lineas = ["⚠️ <b>Animales con Pérdida de Peso en Último Control:</b>\n"]
+                    total_p = len(perdidas)
+                    perdidas_m = sorted(perdidas, key=lambda x: x[1])[:15]
+                    lineas = [f"⚠️ <b>Pérdida de Peso en Último Control [{total_p} animal(es)]:</b>\n"]
                     botones_p = []
-                    for tag_a, gmd, kg_diff, p_ult, p_pen, pot in sorted(perdidas, key=lambda x: x[1]):
+                    for tag_a, gmd, kg_diff, p_ult, p_pen, pot in perdidas_m:
                         pot_txt = f" · 📍 {pot}" if pot else ""
                         lineas.append(f"• 🐮 <b>{html.escape(str(tag_a))}</b>: <b>{gmd:.0f} g/día</b> ({kg_diff:+.1f} kg: {p_pen:.0f}kg → {p_ult:.0f}kg){pot_txt}")
                         botones_p.append(InlineKeyboardButton(f"🐮 {tag_a}", callback_data=f"animal:pesos:{tag_a}"))
+                    if total_p > 15:
+                        lineas.append(f"\n<i>...y {total_p - 15} animal(es) más.</i>")
                     txt = "\n".join(lineas)
                     btn_a = []
-                    for i in range(0, len(botones_p), 3):
+                    for i in range(0, min(len(botones_p), 15), 3):
                         btn_a.append(botones_p[i:i+3])
                     btn_a.append([
                         InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
@@ -2071,7 +2171,7 @@ def construir_application(
                 btn = [[InlineKeyboardButton("🏠 Volver al Menú", callback_data="menu:principal")]]
                 if query.message:
                     await query.message.reply_text(
-                        formatear_ayuda(rol), reply_markup=InlineKeyboardMarkup(btn)
+                        formatear_ayuda(rol), parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn)
                     )
 
         except Exception as e:
@@ -2084,6 +2184,7 @@ def construir_application(
     # Handlers de comandos
     app.add_handler(CommandHandler(["start", "menu"], cmd_start_menu))
     app.add_handler(CommandHandler(["help", "ayuda", "comandos"], cmd_ayuda_completa))
+    app.add_handler(CommandHandler(["guia", "preguntar", "chat", "preguntas_guia"], cmd_guia_chat))
     app.add_handler(CommandHandler(["buscar", "buscar_animal", "buscador"], cmd_buscar_animal))
     app.add_handler(CommandHandler(["medicamentos", "tratamientos", "farmacia", "retiros", "retiro"], cmd_medicamentos))
     app.add_handler(CommandHandler(["preguntas", "faq", "consultas"], cmd_preguntas_rapidas))

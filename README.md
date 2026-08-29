@@ -347,8 +347,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Distribución racial y cruces del hato (Holstein, Gyr, Cebú, Pardo Suizo, Ayrshire, etc.).
   - [x] **Estructuración Didáctica de Ayuda & Menús**:
     - Menús divididos en 3 bloques claros (Operación en Campo, Zootecnia & Informes SG, Sistema y Administración).
+    - **Centro de Guía de Consultas & Chat** (`/guia`, `/preguntar`): Hub categorizado con ejemplos de preguntas sobre animales, potreros, leche/reproducción, sanidad y dictado por voz/fotos.
     - Guía de ayuda enriquecida con ejemplos de dictado por voz y notas de campo.
-- [x] Suite de pruebas con pytest: **256 pruebas en verde** (100% pasando)
+  - [x] **Manual Integral de Uso y Operación** ([`docs/MANUAL_DE_USO.md`](docs/MANUAL_DE_USO.md)): Guía completa de extremo a extremo para el dueño, administradores y personal de corral.
+- [x] Suite de pruebas con pytest: **271 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua
 - [ ] Calibración de parámetros y retroalimentación de uso en campo.

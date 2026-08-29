@@ -150,12 +150,15 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | Comando | Para qué sirve | Ejemplo de uso |
 |---|---|---|
 | `/menu` o `/start` | Abre el **Menú Táctil de Botones** interactivo y visual. | `/menu`, `/start` |
+| `/guia` o `/preguntar` | **Centro de Guía de Consultas**: Ejemplos de cómo preguntar al chat sobre animales, potreros, leche y sanidad. | `/guia`, `/preguntar` |
 | `/ayuda` o `/help` | Muestra la **Lista Completa de Comandos** y sintaxis. | `/ayuda`, `/comandos` |
 | `/reporte` | Genera y envía el **Reporte en PDF** (semanal por defecto). | `/reporte`, `/reporte diario`, `/reporte 15` |
 | `/exportar` | Descarga el **Backup ZIP** para Software Ganadero. | `/exportar`, `/exportar csv`, `/exportar json` |
 | `/fotos <tag>` | Consulta las fotos guardadas de un animal o las recientes. | `/fotos 47`, `/fotos` |
-| `/alertas` | Muestra las alertas pendientes (ecografías, palpaciones, secado). | `/alertas` |
-| `/historial <tag>` | Ficha completa con todos los eventos de un animal. | `/historial 47` |
+| `/alertas` | Muestra el **semáforo inteligente de alertas** (partos $\le 30$d, secados $\ge 200$ DEL, destetes, pérdidas de peso y retiros). | `/alertas` |
+| `/poblacion`, `/piramide` | **Tablero Poblacional**: Pirámide de edades y brackets demográficos de Software Ganadero. | `/poblacion`, `/piramide` |
+| `/genetica`, `/razas` | **Composición Genética**: Distribución racial y cruces del hato. | `/genetica`, `/razas` |
+| `/historial <tag>` | Ficha interactiva con pestañas táctiles (Pesajes, Partos, Leche, Retiro, Genealogía). | `/historial 47`, `/consulta N069` |
 | `/buscar [tag]` | **Buscador & Fichas de Animales**: Filtros por vacas paridas, inseminadas, toros o crías. | `/buscar`, `/buscar 47` |
 | `/medicamentos`, `/retiros` | **Control Sanitario & Retiros**: Animales en retiro activo de leche/carne y tratamientos. | `/medicamentos`, `/retiros` |
 | `/preguntas`, `/faq` | **Consultas Rápidas de Campo**: Botones táctiles de preguntas frecuentes en 1 toque. | `/preguntas`, `/faq` |
