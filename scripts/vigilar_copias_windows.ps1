@@ -26,7 +26,7 @@
     .\scripts\vigilar_copias_windows.ps1 -CopiasDir "D:\SoftwareGanadero\Copias" -UnaVez
 #>
 param(
-    [string]$CopiasDir = "C:\Copias",
+    [string]$CopiasDir = "C:\Usati\Copias",
     [string]$VpsHost = "206.189.188.183",
     [string]$VpsUser = "root",
     [string]$VpsDestDir = "/tmp",
