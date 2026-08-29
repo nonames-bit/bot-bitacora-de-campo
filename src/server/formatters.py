@@ -62,7 +62,7 @@ def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
         lineas.append("⚠️ <i>Este animal no tiene pesajes registrados en la bitácora.</i>\n")
         lineas.append("💡 <b>Para registrar un pesaje:</b>")
         lineas.append(f"• Escribe: <code>peso 450 kg la {tag_str}</code>")
-        lineas.append(f"• O envía una nota de voz dictando el pesaje.")
+        lineas.append("• O envía una nota de voz dictando el pesaje.")
         return "\n".join(lineas)
 
     ult_p = filas_p[0]
@@ -267,7 +267,7 @@ def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = Non
         f_sec = iso(add_days(to_date(fep_str), -60))
         lineas.append(f"• <b>Fecha de Secado Programada:</b> <b>{f_sec}</b> (60 días antes del parto {fep_str})")
     elif del_dias >= 200:
-        lineas.append(f"• <b>Alerta de Secado:</b> ⚠️ <i>Supera los 200 días de lactancia. Programar secado si la gestación supera los 220 días.</i>")
+        lineas.append("• <b>Alerta de Secado:</b> ⚠️ <i>Supera los 200 días de lactancia. Programar secado si la gestación supera los 220 días.</i>")
 
     lineas.append("\n💡 <i>Tip: Registre pesajes de leche dictando por audio o escribiendo: 'pesaje leche 47 12 litros'.</i>")
     return "\n".join(lineas)
@@ -1090,8 +1090,8 @@ def formatear_estado_servidor(
         "",
         "🧠 <b>INTEGRACIÓN DE MODELOS & APIS:</b>",
         f"• 🤖 <b>NLU / LLM:</b> {gemini_status}",
-        f"• 🎤 <b>Notas de Voz:</b> 🟢 Whisper (transcripción local en español)",
-        f"• 📷 <b>OCR Visión:</b> 🟢 Pytesseract (lectura aretes y medicamentos)",
+        "• 🎤 <b>Notas de Voz:</b> 🟢 Whisper (transcripción local en español)",
+        "• 📷 <b>OCR Visión:</b> 🟢 Pytesseract (lectura aretes y medicamentos)",
     ]
     return "\n".join(salida)
 

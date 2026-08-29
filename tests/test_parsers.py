@@ -1,7 +1,7 @@
 """Pruebas del parser de eventos y del motor NLU."""
 import pytest
 
-from src.parsers.event_parser import EventParser, ParsedEvent
+from src.parsers.event_parser import EventParser
 from src.parsers import nlp_engine as nlu
 
 
@@ -153,7 +153,7 @@ def test_extraer_tag_alfanumerico_y_limpieza_timestamp(parser):
 
 
 def test_transcribe_audio_sidecar(tmp_path):
-    from src.parsers.media_handler import transcribe_audio, MediaError
+    from src.parsers.media_handler import transcribe_audio
     audio = tmp_path / "nota_voz.ogg"
     audio.write_bytes(b"dummy audio")
     sidecar = tmp_path / "nota_voz.ogg.txt"

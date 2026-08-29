@@ -1,7 +1,7 @@
 """Modelos de datos y esquema SQLite de la bitácora de campo zootécnico."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
 # ---------------------------------------------------------------------------

@@ -1,12 +1,10 @@
 """Pruebas para NvidiaClient y fallback híbrido Gemini -> NVIDIA."""
 import json
-import urllib.error
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.parsers.event_parser import EventParser, ParsedEvent
-from src.llm.nvidia_client import NvidiaClient, extract_json_from_text, try_llm_parse
+from src.llm.nvidia_client import NvidiaClient, extract_json_from_text
 from src.llm import try_hybrid_parse
 
 

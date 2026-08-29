@@ -21,7 +21,6 @@ class HistorialQueryMixin:
             return f"No hay registros para la {tag}."
 
         tag_str = animal["tag"] or str(tag)
-        nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
         raza = animal["raza"] or "Sin especificar"
         sexo_raw = animal["sexo"] or ""
         estado = animal["estado"] or "ACTIVO"

@@ -1,25 +1,15 @@
 """Pruebas del módulo de exportación (DBF nativo, CSV, JSON y paquete ZIP)."""
 import io
 import json
-import os
 import zipfile
 from datetime import date
 
-import pytest
 
 from src.exporters import (
     DBFWriter,
     export_all_dbfs,
-    export_causas_dbf,
-    export_celos_dbf,
     export_csv_zip,
-    export_hoja_dbf,
-    export_iamn_dbf,
     export_json_zip,
-    export_partos_dbf,
-    export_pesos_dbf,
-    export_potrero_dbf,
-    export_traslado_dbf,
     export_zip,
     parsear_args_exportar,
 )

@@ -1,8 +1,5 @@
 """Pruebas de registro, consulta y vinculación de fotos de campo."""
-import os
-import pytest
 
-from src.db.database import Database
 from src.engine.query_engine import QueryEngine
 
 

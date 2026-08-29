@@ -536,7 +536,6 @@ def test_paneles_textos_guia():
 def test_construir_application_y_teclado_buscar(db, tmp_path):
     pytest.importorskip("telegram")
     from src.server.auth import Auth
-    from src.server.telegram_bot import construir_application
 
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
     db.registrar_animal("N069", sexo="Hembra", estado="ACTIVO")

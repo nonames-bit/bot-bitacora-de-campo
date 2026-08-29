@@ -5,16 +5,13 @@ import io
 import json
 import os
 import struct
-import time
 import zipfile
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.db.database import Database
 from src.watchers.copias_watcher import (
     CopiasWatcher,
-    calcular_hash_archivo,
     formatear_reporte_copias,
 )
 

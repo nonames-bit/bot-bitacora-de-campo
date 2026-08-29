@@ -1,0 +1,17 @@
+# Configuración mínima de ruff: solo errores reales (E9) y pyflakes (F) —
+# nada de estilo/formato, para no generar ruido en un repo que no usa ruff
+# como formateador. Ver .github/workflows/tests.yml para el paso de CI.
+line-length = 160
+
+[lint]
+select = ["E9", "F"]
+
+[lint.per-file-ignores]
+# telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
+# propósito para mantener estable la API pública (los usan tests y otros
+# módulos), así que los "unused import" de ahí son falsos positivos.
+"src/server/telegram_bot.py" = ["F401"]
+"src/engine/query_engine.py" = ["F401"]
+"src/engine/query/__init__.py" = ["F401"]
+# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto.
+"tests/*" = ["F841"]

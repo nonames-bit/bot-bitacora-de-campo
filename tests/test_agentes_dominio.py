@@ -5,7 +5,6 @@ en vez de parchear urllib, para no reconstruir el envelope HTTP en cada test.
 """
 from unittest.mock import MagicMock
 
-import pytest
 
 from src.llm import manejo, reproduccion, sanidad
 

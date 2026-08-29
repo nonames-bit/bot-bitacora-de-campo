@@ -2,20 +2,10 @@
 import io
 import os
 import zipfile
-import pytest
 
-from src.db.database import Database
 from src.exporters.dbf_exporter import (
     DBFWriter,
     export_all_dbfs,
-    export_hoja_dbf,
-    export_partos_dbf,
-    export_celos_dbf,
-    export_iamn_dbf,
-    export_pesos_dbf,
-    export_potrero_dbf,
-    export_traslado_dbf,
-    export_causas_dbf,
     export_zip,
 )
 from src.importers.dbf_importer import DBFReader

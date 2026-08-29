@@ -1,7 +1,6 @@
 """Pruebas del motor reproductivo (FEP, ecografía, palpación, secado, IEP)."""
 from datetime import date
 
-import pytest
 
 from src.engine.reproductive_engine import (
     ReproductiveEngine, dias_abiertos, fecha_ecografia, fecha_estimada_parto,

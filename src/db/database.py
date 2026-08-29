@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import date
-from typing import Any, Optional
+from typing import Optional
 
-from ..utils import add_days, iso, to_date
+from ..utils import add_days, iso
 from .models import SCHEMA_SQL
 
 

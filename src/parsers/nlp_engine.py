@@ -8,7 +8,6 @@ informal de mayordomos.
 from __future__ import annotations
 
 import re
-from datetime import date
 from typing import Optional
 
 from ..utils import normalizar, parse_fecha

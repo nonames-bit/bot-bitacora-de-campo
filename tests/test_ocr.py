@@ -1,10 +1,7 @@
 """Pruebas unitarias y de integración del módulo OCR (aretes, tags y frascos de medicamentos)."""
-from datetime import date
-import os
 import pytest
 
 from src.bot.bot_interface import Bot
-from src.db.database import Database
 from src.ocr import OCREngine, detect_medicamento, detect_tags
 from src.parsers.media_handler import ImageInfo, MediaError, extract_image_info
 
