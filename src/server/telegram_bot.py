@@ -2102,9 +2102,33 @@ def construir_application(
 
             elif data == "cmd:fotos":
                 await query.answer()
-                msg = formatear_fotos(db)
+                filas = db.ultimas_fotos(limit=5)
+                if not filas:
+                    if query.message:
+                        await query.message.reply_text("📷 No hay fotos registradas en la bitácora.")
+                    return
+
+                msg = formatear_fotos(db, limite=5)
+                teclado_f = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal")]
+                ])
                 if query.message:
-                    await query.message.reply_text(msg)
+                    await query.message.reply_text(msg, reply_markup=teclado_f)
+
+                # Enviar las fotografías disponibles en disco
+                for r in filas:
+                    ruta = r.get("ruta")
+                    tag_foto = r.get("tag") or "Sin arete"
+                    fec = r.get("fecha") or "sin fecha"
+                    cap = f" — {r['caption']}" if r.get("caption") else ""
+                    pie = f"📷 Animal: {tag_foto} [{fec}]{cap}"
+                    if ruta and os.path.exists(ruta):
+                        try:
+                            with open(ruta, "rb") as f:
+                                if query.message:
+                                    await query.message.reply_photo(photo=f, caption=pie)
+                        except Exception as efoto:
+                            logger.error("Error al enviar foto %s: %s", ruta, efoto)
 
             elif data.startswith("foto:"):
                 tag = data.split("foto:", 1)[1].strip()
