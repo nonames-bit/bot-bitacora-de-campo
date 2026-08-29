@@ -319,7 +319,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Base de datos SQLite (ruta, tamaño en MB, total de animales y eventos históricos, fecha de última sincronización).
     - Usuarios autorizados y distribución de roles (OWNER, ADMIN, TRABAJADOR).
     - Estado de IA y APIs integradas (Gemini 2.5 Flash, transcriptor Whisper, OCR Pytesseract).
-- [x] Suite de pruebas con pytest: **247 pruebas en verde** (261 en VPS)
+- [x] **Gestión Integral de Fotografías & Auto-Vinculación**:
+  - [x] Auto-vinculación de fotos históricas huérfanas mediante análisis de `caption`, `ocr_text` y nombre de archivo.
+  - [x] Búsqueda extendida en `fotos_de` por `animal_id`, `tag` exacto/normalizado, mención en comentario, texto OCR y archivos locales.
+  - [x] Envío interactivo de imágenes en Telegram tanto por comando `/fotos <tag>` como por botón de galería `[ 📷 Galería Fotos ]`.
+- [x] Suite de pruebas con pytest: **252 pruebas en verde** (266 en VPS)
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
 - [ ] Optimización continua y calibración de campo.
