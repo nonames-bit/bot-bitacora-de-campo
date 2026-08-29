@@ -88,8 +88,8 @@ def test_formatear_status_memoria_y_archivo(db, tmp_path):
     assert "Norte (35d)" in resp_mem
     assert "Alertas pendientes:" in resp_mem
     assert "en memoria" in resp_mem
-    assert "<pre>" in resp_mem
-    assert "</pre>" in resp_mem
+    assert "<pre>" not in resp_mem
+    assert "<b>Activos:</b>" in resp_mem
     assert "<i>Actualizado:" in resp_mem
 
     # Con archivo físico

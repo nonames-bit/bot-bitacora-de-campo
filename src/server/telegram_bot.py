@@ -856,22 +856,23 @@ def formatear_status(
 
     ts_str = _obtener_fecha_ultimo_backup(db, db_path)
 
-    lineas_pre = [
-        f"Activos: {_fmt_es_co(n_activos)} (GANADERIA-JA 01-JA)",
-        f"Partos últimos 30d:           {_fmt_es_co(n_partos_30d)}",
-        f"Destetes últimos 30d:         {_fmt_es_co(n_destetes_30d)}",
-        f"Potrero + animales:           {pot_mas_animales_str}",
-        f"Potrero + reposo:             {pot_mas_reposo_str}",
-        f"Alertas pendientes:           {_fmt_es_co(n_alertas)}",
-        f"Tamaño DB:                    {size_str}",
-        f"Memoria:                      {mem_str}",
+    lineas = [
+        f"🐄 <b>Activos:</b> {_fmt_es_co(n_activos)} (GANADERIA-JA 01-JA)",
+        "",
+        f"🍼 Partos últimos 30d: <b>{_fmt_es_co(n_partos_30d)}</b>",
+        f"🐮 Destetes últimos 30d: <b>{_fmt_es_co(n_destetes_30d)}</b>",
+        f"🌱 Potrero + animales: <b>{html.escape(pot_mas_animales_str)}</b>",
+        f"🌿 Potrero + reposo: <b>{html.escape(pot_mas_reposo_str)}</b>",
+        f"⚠️ Alertas pendientes: <b>{_fmt_es_co(n_alertas)}</b>",
+        "",
+        f"💾 Tamaño DB: <b>{html.escape(size_str)}</b>",
+        f"🧠 Memoria: <b>{html.escape(mem_str)}</b>",
     ]
-    cuerpo = "\n".join(lineas_pre)
-    cuerpo_escapado = html.escape(cuerpo)
+    cuerpo = "\n".join(lineas)
     return (
-        f"🖥️ <b>Estado del Sistema</b>\n"
-        f"<pre>\n{cuerpo_escapado}\n</pre>\n"
-        f"<i>Actualizado: {ts_str}</i>"
+        f"🖥️ <b>Estado del Sistema</b>\n\n"
+        f"{cuerpo}\n\n"
+        f"<i>Actualizado: {html.escape(ts_str)}</i>"
     )
 
 
