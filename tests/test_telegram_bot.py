@@ -380,5 +380,32 @@ def test_texto_ejemplo_evento():
     assert "retiro" in ej_trat
 
 
+def test_guias_didacticas_trabajador():
+    from src.server.telegram_bot import (
+        texto_guia_animal,
+        texto_guia_audios,
+        texto_guia_consultas,
+        texto_guia_fotos,
+    )
+    g_cons = texto_guia_consultas()
+    assert "patricia" in g_cons
+    assert "potrero" in g_cons
+    assert "parto" in g_cons
+
+    g_fotos = texto_guia_fotos()
+    assert "Aretes" in g_fotos
+    assert "Remedios" in g_fotos or "Medicamentos" in g_fotos
+    assert "retiro" in g_fotos
+
+    g_audios = texto_guia_audios()
+    assert "micrófono" in g_audios
+    assert "transcribe" in g_audios
+
+    g_animal = texto_guia_animal()
+    assert "/consulta" in g_animal
+    assert "fotografía" in g_animal
+
+
+
 
 

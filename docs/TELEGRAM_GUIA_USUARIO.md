@@ -104,19 +104,33 @@ Usted no necesita memorizar comandos difíciles. Puede hacerle preguntas directa
 
 ---
 
-## 4. Teclado Táctil Interactivo y Fotos Automáticas 🔘📷
+## 4. Teclado Táctil Interactivo y Menús Diferenciados 🔘📱
 
-### 🔘 Botones de Menú Rápido
-Al enviar `/start` o `/help`, el bot le responderá con un **menú táctil de botones**:
-- `[ 📊 Inventario Hato ]`: conteo rápido de animales por categoría.
-- `[ ⚠️ Alertas ]`: ecografías, palpaciones y secados pendientes.
-- `[ 🌿 Potreros ]`: rotación y potreros listos para pastoreo.
-- `[ 📋 Reporte PDF ]`: genera y descarga el informe zootécnico semanal.
-- `[ 💡 Ejemplos de Notas ]`: abre plantillas listas para copiar y pegar (parto, celo, servicio, remedios, etc.).
-- `[ ⚙️ Estado Servidor ]`: salud del sistema y base de datos.
+El bot adapta su pantalla y botones de acuerdo a quién lo está usando:
+
+### 🤠 A. Menú de Campo para Trabajadores / Mayordomo
+Diseñado para ser **100% didáctico y visual**. El personal de campo no ve comandos complejos ni reportes administrativos; solo ve botones que le enseñan y facilitan su labor:
+- `[ 📝 Cómo Anotar Reportes ]`: Abre ejemplos listos para copiar de partos, celos, servicios, remedios, pesajes y traslados.
+- `[ 🔍 Cómo Hacer Preguntas ]`: Guía didáctica con ejemplos de preguntas cotidianas (*«¿en qué potrero está patricia?»*, *«¿cuándo parió la 47?»*, etc.).
+- `[ 📷 Fotos Aretes y Remedios ]`: Guía paso a paso de cómo fotografiar aretes y etiquetas de frascos de remedios para que el bot los lea solo.
+- `[ 🐮 Consultar un Animal ]`: Muestra cómo ver la ficha y foto de cualquier vaca escribiendo su número o nombre.
+- `[ 🎤 Cómo Mandar Audios ]`: Consejos para enviar notas de voz claras desde el potrero.
+- `[ 📷 Galería de Fotos ]`: Muestra las últimas fotos registradas en la finca.
+
+### 👑 B. Panel de Control para Dueño (OWNER) y Administradores (ADMIN)
+Tablero de mando integral con acceso inmediato a los reportes y gestión zootécnica:
+- `[ 📊 Inventario Hato ]`: Resumen zootécnico del ganado activo por categorías.
+- `[ ⚠️ Alertas Pendientes ]`: Ecografías, palpaciones y secados programados.
+- `[ 🌿 Potreros Voisin ]`: Estado de rotación y potreros que cumplieron su descanso.
+- `[ 📋 Reporte Semanal PDF ]`: Genera y descarga el informe PDF completo de la semana.
+- `[ 📦 Descargar Backup ZIP ]`: Exporta el paquete ZIP listo para Software Ganadero (SG).
+- `[ 📷 Galería de Fotos ]`: Galería fotográfica general.
+- `[ 👥 Usuarios / Permisos ]` *(Solo OWNER)*: Administra altas y bajas de trabajadores.
+- `[ ⚙️ Estado Servidor ]`: Salud de la base de datos, memoria y registros del sistema.
+- `[ 💡 Modo Guía de Campo ]`: Permite al dueño ver el menú didáctico de los trabajadores.
 
 ### 📷 Fotos Automáticas de Animales
-Cuando consulte la ficha de cualquier animal (ej. `/consulta a009`, `/historial patricia` o escribiendo `patricia` o `47`), el bot **buscará automáticamente su foto en la galería del backup** y se la enviará adjunta a la ficha técnica, junto con botones interactivos:
+Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `/historial patricia` o escribiendo `patricia` o `47`), el bot **busca automáticamente su foto en la galería del backup** y se la envía adjunta a la ficha técnica, junto con botones interactivos:
 - `[ ⚖️ Pesajes ]` `[ 🧬 Reproducción ]`
 - `[ 🌱 Potrero ]` `[ 💊 Retiro ]`
 - `[ 📷 Ver Foto ]` `[ 📋 Ficha Completa ]`

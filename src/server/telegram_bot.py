@@ -407,6 +407,77 @@ def texto_ejemplo_evento(tipo: str) -> str:
     return ejemplos.get(tipo, "Selecciona una categoría para ver su ejemplo de nota de campo.")
 
 
+def texto_guia_consultas() -> str:
+    """Devuelve la guía didáctica de cómo hacerle preguntas al bot en lenguaje natural."""
+    return (
+        "🔍 <b>Cómo hacerle preguntas al Bot:</b>\n\n"
+        "El bot entiende español normal de campo. Escríbale con el <b>número de arete</b> (ej. <code>47</code>, <code>JA26</code>) o el <b>nombre</b> (ej. <code>patricia</code>):\n\n"
+        "🌱 <b>Ubicación actual y potrero:</b>\n"
+        "• <i>«¿en qué potrero está patricia?»</i>\n"
+        "• <i>«¿dónde está la vaca 47?»</i>\n\n"
+        "🍼 <b>Partos y maternidad:</b>\n"
+        "• <i>«¿cuándo parió patricia?»</i>\n"
+        "• <i>«¿cuándo fue el parto de la 47?»</i>\n\n"
+        "🐂 <b>Inseminación y Servicios:</b>\n"
+        "• <i>«¿cuándo se inseminó patricia?»</i>\n"
+        "• <i>«¿con qué toro se sirvió la 47?»</i>\n\n"
+        "💊 <b>Retiros y Remedios aplicados:</b>\n"
+        "• <i>«¿patricia está en retiro?»</i>\n"
+        "• <i>«¿qué medicamento le pusieron a la 105?»</i>\n\n"
+        "⚖️ <b>Pesajes y Ganancia de peso:</b>\n"
+        "• <i>«¿cuánto pesó patricia?»</i>\n"
+        "• <i>«¿cuál fue la ganancia diaria de la 12?»</i>\n\n"
+        "🌳 <b>Genealogía y Crías:</b>\n"
+        "• <i>«¿quién es la madre de patricia?»</i>\n"
+        "• <i>«¿qué crías tiene la 47?»</i>"
+    )
+
+
+def texto_guia_fotos() -> str:
+    """Devuelve la guía didáctica de cómo tomar y enviar fotos de aretes y medicamentos."""
+    return (
+        "📷 <b>Guía de Fotos para el Personal de Campo:</b>\n\n"
+        "El bot cuenta con <b>reconocimiento visual inteligente (OCR e IA)</b>:\n\n"
+        "🏷️ <b>1. Fotos de Aretes / Ganado:</b>\n"
+        "• Tome la foto de frente al arete, limpia y con buena luz.\n"
+        "• El bot leerá el número (ej. <code>N069</code>, <code>JA26</code>, <code>47</code>) y vinculará la foto a la ficha del animal.\n\n"
+        "💊 <b>2. Fotos de Remedios y Medicamentos:</b>\n"
+        "• Enfoque la etiqueta del frasco donde se lea claramente:\n"
+        "  - Nombre o principio activo (ej. <i>Oxitetraciclina</i>, <i>Ivermectina</i>).\n"
+        "  - Dosis (<code>ml/kg</code>) y vía de aplicación (<code>IM</code>, <code>SC</code>).\n"
+        "  - Días de retiro en leche y carne.\n"
+        "• El bot detecta el medicamento automáticamente y le recordará registrar el tratamiento y bloqueo de ordeño/venta."
+    )
+
+
+def texto_guia_audios() -> str:
+    """Devuelve la guía didáctica de cómo enviar notas de voz."""
+    return (
+        "🎤 <b>Cómo Mandar Notas de Voz al Bot:</b>\n\n"
+        "1. Mantenga presionado el botón del <b>micrófono</b> en Telegram.\n"
+        "2. Hable con calma y claridad diciendo la novedad y el animal. Por ejemplo:\n"
+        "   • <i>«Don Julio, le aviso que parió la 47 un ternero macho vivo de 38 kilos»</i>\n"
+        "   • <i>«Inseminé la novilla 15 con pajuela toro brahman 502»</i>\n"
+        "   • <i>«Pasé el lote 2 del potrero bajo al potrero olegario 1»</i>\n"
+        "3. Suelte el botón para enviar.\n"
+        "4. El bot transcribe sus palabras, reconoce el evento zootécnico y lo registra automáticamente en la base de datos."
+    )
+
+
+def texto_guia_animal() -> str:
+    """Devuelve la guía didáctica de cómo consultar fichas de animales."""
+    return (
+        "🐮 <b>Cómo Consultar la Ficha de un Animal:</b>\n\n"
+        "Tiene dos formas muy sencillas:\n\n"
+        "1. <b>Escriba directamente el número o nombre:</b>\n"
+        "   Ejemplos: <code>patricia</code>, <code>47</code>, <code>JA26</code>, <code>a009</code>\n\n"
+        "2. <b>Use el comando de consulta:</b>\n"
+        "   <code>/consulta 47</code> o <code>/historial patricia</code>\n\n"
+        "➡️ El bot le enviará la <b>fotografía del animal</b>, su potrero actual, estado, partos, servicios, pesajes y botones táctiles para consultar detalles."
+    )
+
+
+
 
 def obtener_ultimos_logs(log_file: str, lineas: int = 20) -> str:
     """Lee y devuelve las últimas líneas del archivo de registro."""
@@ -553,36 +624,56 @@ def construir_application(
             "python-telegram-bot no está instalado. Instálalo con 'pip install python-telegram-bot>=21.0'"
         ) from e
 
+    def crear_teclado_trabajador() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
+                InlineKeyboardButton("🔍 Cómo Hacer Preguntas", callback_data="guia:consultas"),
+            ],
+            [
+                InlineKeyboardButton("📷 Fotos Aretes y Remedios", callback_data="guia:fotos"),
+                InlineKeyboardButton("🐮 Consultar un Animal", callback_data="guia:animal"),
+            ],
+            [
+                InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
+                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+            ],
+            [
+                InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
+                InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
+            ],
+            [
+                InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
+                InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
+            ],
+        ]
+        if rol == "OWNER":
+            keyboard.append([
+                InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
+                InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
+            ])
+        else:
+            keyboard.append([
+                InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
+            ])
+        keyboard.append([
+            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+        ])
+        return InlineKeyboardMarkup(keyboard)
+
     def crear_teclado_principal(rol: Optional[str]) -> InlineKeyboardMarkup:
         if rol in ("OWNER", "ADMIN"):
-            keyboard = [
-                [
-                    InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
-                    InlineKeyboardButton("⚠️ Alertas", callback_data="cmd:alertas"),
-                ],
-                [
-                    InlineKeyboardButton("🌿 Potreros", callback_data="cmd:potreros"),
-                    InlineKeyboardButton("📋 Reporte PDF", callback_data="cmd:reporte"),
-                ],
-                [
-                    InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
-                    InlineKeyboardButton("💡 Ejemplos de Notas", callback_data="cmd:ejemplos"),
-                ],
-                [
-                    InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
-                ],
-            ]
-        else:
-            keyboard = [
-                [
-                    InlineKeyboardButton("📷 Últimas Fotos", callback_data="cmd:fotos"),
-                    InlineKeyboardButton("💡 Ejemplos de Notas", callback_data="cmd:ejemplos"),
-                ],
-                [
-                    InlineKeyboardButton("📋 Guía Rápida", callback_data="cmd:ayuda"),
-                ],
-            ]
-        return InlineKeyboardMarkup(keyboard)
+            return crear_teclado_admin(rol)
+        return crear_teclado_trabajador()
 
     def crear_teclado_ejemplos() -> InlineKeyboardMarkup:
         keyboard = [
@@ -1315,6 +1406,55 @@ def construir_application(
                         formatear_ayuda(rol), reply_markup=crear_teclado_principal(rol)
                     )
 
+            elif data == "menu:campo":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        "🤠 <b>Modo Guía de Campo (Personal de Campo):</b>\nSeleccione una opción didáctica de ayuda o consulta:",
+                        parse_mode="HTML",
+                        reply_markup=crear_teclado_trabajador(),
+                    )
+
+            elif data == "guia:consultas":
+                await query.answer()
+                btn = [[InlineKeyboardButton("⬅️ Volver al Menú", callback_data="menu:principal")]]
+                if query.message:
+                    await query.message.reply_text(
+                        texto_guia_consultas(),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(btn),
+                    )
+
+            elif data == "guia:fotos":
+                await query.answer()
+                btn = [[InlineKeyboardButton("⬅️ Volver al Menú", callback_data="menu:principal")]]
+                if query.message:
+                    await query.message.reply_text(
+                        texto_guia_fotos(),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(btn),
+                    )
+
+            elif data == "guia:audios":
+                await query.answer()
+                btn = [[InlineKeyboardButton("⬅️ Volver al Menú", callback_data="menu:principal")]]
+                if query.message:
+                    await query.message.reply_text(
+                        texto_guia_audios(),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(btn),
+                    )
+
+            elif data == "guia:animal":
+                await query.answer()
+                btn = [[InlineKeyboardButton("⬅️ Volver al Menú", callback_data="menu:principal")]]
+                if query.message:
+                    await query.message.reply_text(
+                        texto_guia_animal(),
+                        parse_mode="HTML",
+                        reply_markup=InlineKeyboardMarkup(btn),
+                    )
+
             elif data == "cmd:ejemplos":
                 await query.answer()
                 if query.message:
@@ -1338,6 +1478,42 @@ def construir_application(
                     await query.message.reply_text(
                         txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_volver)
                     )
+
+            elif data == "cmd:exportar":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                try:
+                    from ..exporters import export_zip
+                    os.makedirs("data/exports", exist_ok=True)
+                    fecha_hoy = date.today().isoformat()
+                    ruta_zip = os.path.join("data/exports", f"Backup_SG_{fecha_hoy}.zip")
+                    export_zip(db, ruta_zip)
+                    if os.path.exists(ruta_zip):
+                        with open(ruta_zip, "rb") as f:
+                            contenido = f.read()
+                        if query.message:
+                            await query.message.reply_document(
+                                document=contenido,
+                                filename=os.path.basename(ruta_zip),
+                                caption="📦 Backup exportado en formato ZIP para Software Ganadero (TP/SG).",
+                            )
+                except Exception as eexp:
+                    logger.error("Error al exportar en callback: %s", eexp)
+                    if query.message:
+                        await query.message.reply_text(f"❌ Error al exportar backup: {eexp}")
+
+            elif data == "cmd:usuarios":
+                await query.answer()
+                if not auth.es_owner(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ Solo el propietario (OWNER) puede ver la lista de usuarios.")
+                    return
+                msg = formatear_usuarios(auth)
+                if query.message:
+                    await query.message.reply_text(msg)
 
             elif data == "cmd:inventario":
                 await query.answer()
