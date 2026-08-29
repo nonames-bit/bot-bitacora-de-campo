@@ -447,3 +447,23 @@ journalctl -u bitacora-bot -n 20 --no-pager
 
 Para más detalle del día a día del bot, vea
 [`TELEGRAM_GUIA_USUARIO.md`](./TELEGRAM_GUIA_USUARIO.md).
+
+---
+
+## 9. Bot de pruebas (staging)
+
+Existe un segundo checkout completo en `/root/bitacora-staging`, corriendo como
+el servicio `bitacora-bot-staging`, con su **propio bot de Telegram**
+(`@pruebasgan_bot`) y su **propia base de datos** (copia congelada, no la de
+producción). Sirve para probar cambios de código con datos realistas antes de
+que le lleguen a los trabajadores de verdad.
+
+```bash
+# Desplegar la rama main (o la que se indique) en staging:
+ssh root@206.189.188.183 'bash /root/bitacora-staging/scripts/desplegar_staging.sh'
+ssh root@206.189.188.183 'bash /root/bitacora-staging/scripts/desplegar_staging.sh mi-rama-de-prueba'
+```
+
+El bot de producción (`bitacora-bot`, `/root/bitacora`) nunca se toca al
+desplegar en staging — son procesos, servicios y bases de datos totalmente
+separados.

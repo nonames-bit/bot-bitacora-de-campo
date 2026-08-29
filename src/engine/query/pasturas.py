@@ -329,7 +329,31 @@ class PasturasQueryMixin:
 
         return None
 
-    def _animales_en_potrero(self, nombre_potrero: str) -> str:
+    # Palabras clave de campo -> categoría zootécnica SG, para consultas combinadas
+    # (ej. "vacas paridas en olegario 1"). Se compara contra el texto normalizado.
+    # "terneros"/"ternero" genérico cubre ambos sexos (uso común de campo); las
+    # variantes con "machos" explícito van antes para que el match de frase más
+    # específica gane al iterar el diccionario en orden.
+    CATEGORIAS_FILTRO: dict[str, list[str]] = {
+        "paridas": ["Vacas paridas"],
+        "parida": ["Vacas paridas"],
+        "secas": ["Vacas secas"],
+        "seca": ["Vacas secas"],
+        "novillas": ["Novillas vientre (>2a)"],
+        "novilla": ["Novillas vientre (>2a)"],
+        "toros": ["Toros reproductores"],
+        "toro": ["Toros reproductores"],
+        "reproductores": ["Toros reproductores"],
+        "reproductor": ["Toros reproductores"],
+        "terneras": ["Crías hembra (<1a)"],
+        "ternera": ["Crías hembra (<1a)"],
+        "terneros machos": ["Crías macho (<1a)"],
+        "ternero macho": ["Crías macho (<1a)"],
+        "terneros": ["Crías hembra (<1a)", "Crías macho (<1a)"],
+        "ternero": ["Crías hembra (<1a)", "Crías macho (<1a)"],
+    }
+
+    def _animales_en_potrero(self, nombre_potrero: str, categorias_filtro: list[str] | None = None) -> str:
         p_row = self._buscar_potrero(nombre_potrero)
         if not p_row:
             potreros = self.db.query("SELECT * FROM potreros")
@@ -383,7 +407,7 @@ class PasturasQueryMixin:
 
         resumen_base = f"🐄 Potrero '{potrero_nom}': {total} {palabra_animal} ({tags_str})"
 
-        # Conteo por categorías zootécnicas Software Ganadero (SG)
+        # Conteo y detalle por categorías zootécnicas Software Ganadero (SG)
         conteo_cat: dict[str, int] = {
             "Crías hembra (<1a)": 0,
             "Hembras levante (1-2a)": 0,
@@ -395,38 +419,53 @@ class PasturasQueryMixin:
             "Machos ceba": 0,
             "Toros reproductores": 0,
         }
+        tags_por_categoria: dict[str, list[str]] = {k: [] for k in conteo_cat}
         for a in animales_en_este:
             aid = a["id_animal"]
+            tag_a = a["tag"] or str(aid)
             sexo = (a["sexo"] or "").strip().lower()
             fnac = to_date(a["fecha_nacimiento"])
             edad_d = (self.hoy - fnac).days if fnac else None
             es_h = bool(sexo.startswith("h") or sexo.startswith("f") or sexo in ("vaca", "novilla", "ternera"))
 
+            categoria = None
             if es_h:
                 if edad_d is not None and edad_d < 365:
-                    conteo_cat["Crías hembra (<1a)"] += 1
+                    categoria = "Crías hembra (<1a)"
                 elif edad_d is not None and edad_d < 730:
-                    conteo_cat["Hembras levante (1-2a)"] += 1
+                    categoria = "Hembras levante (1-2a)"
                 else:
                     p_ult = self.db.ultimo_parto(aid)
                     if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
                         dp = (self.hoy - to_date(p_ult["fecha"])).days
-                        if dp <= 305:
-                            conteo_cat["Vacas paridas"] += 1
-                        else:
-                            conteo_cat["Vacas secas"] += 1
+                        categoria = "Vacas paridas" if dp <= 305 else "Vacas secas"
                     else:
-                        conteo_cat["Novillas vientre (>2a)"] += 1
+                        categoria = "Novillas vientre (>2a)"
             else:
                 nom_m = (a["nombre"] or "").upper()
                 if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_d is not None and edad_d >= 1095):
-                    conteo_cat["Toros reproductores"] += 1
+                    categoria = "Toros reproductores"
                 elif edad_d is not None and edad_d < 365:
-                    conteo_cat["Crías macho (<1a)"] += 1
+                    categoria = "Crías macho (<1a)"
                 elif edad_d is not None and edad_d < 730:
-                    conteo_cat["Machos levante (1-2a)"] += 1
+                    categoria = "Machos levante (1-2a)"
                 else:
-                    conteo_cat["Machos ceba"] += 1
+                    categoria = "Machos ceba"
+
+            conteo_cat[categoria] += 1
+            tags_por_categoria[categoria].append(tag_a)
+
+        # Consulta combinada: categoría + potrero (ej. "vacas paridas en olegario 1")
+        if categorias_filtro:
+            tags_filtrados: list[str] = []
+            for cat in categorias_filtro:
+                tags_filtrados.extend(tags_por_categoria.get(cat, []))
+            etiqueta = " / ".join(categorias_filtro)
+            if not tags_filtrados:
+                return f"No hay animales de '{etiqueta}' en el potrero '{potrero_nom}'."
+            n = len(tags_filtrados)
+            palabra = "animal" if n == 1 else "animales"
+            return f"🐄 <b>{etiqueta}</b> en potrero '{potrero_nom}': {n} {palabra} ({', '.join(tags_filtrados)})"
 
         cats_activas = [f"• {k}: {v}" for k, v in conteo_cat.items() if v > 0]
         if cats_activas and total > 1:

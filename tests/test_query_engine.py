@@ -999,6 +999,34 @@ def test_lote_ocupacion(db):
     assert "17 días" in resp
 
 
+def test_consulta_combinada_categoria_y_potrero(db):
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("OLEGARIO I", "01")
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
+    db.registrar_parto("V1", fecha="2026-08-01")
+    db.registrar_animal("V2", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2019-01-01")
+    db.registrar_parto("V2", fecha="2025-01-01")
+    db.registrar_animal("T1", sexo="Macho", estado="ACTIVO", potrero=p1, nombre="TORO PADRON", fecha_nacimiento="2020-01-01")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+
+    resp_paridas = qe.responder("vacas paridas que están en el potrero olegario 1")
+    assert "No entendí" not in resp_paridas
+    assert "V1" in resp_paridas
+    assert "V2" not in resp_paridas
+    assert "T1" not in resp_paridas
+
+    resp_toros = qe.responder("toros en el potrero olegario 1")
+    assert "T1" in resp_toros
+    assert "V1" not in resp_toros
+
+    resp_sin_filtro = qe.responder("animales en el potrero olegario 1")
+    assert "V1" in resp_sin_filtro and "V2" in resp_sin_filtro and "T1" in resp_sin_filtro
+
+    resp_vacio = qe.responder("novillas que están en el potrero olegario 1")
+    assert "No hay animales" in resp_vacio
+
+
 def test_potreros_ocupados_y_sobreocupacion(db):
     from src.engine.query_engine import QueryEngine
     p1 = db.registrar_potrero("VERSALLES", "01")

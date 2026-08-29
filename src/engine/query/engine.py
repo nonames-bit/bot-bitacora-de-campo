@@ -2,10 +2,28 @@
 (reproducción, sanidad, pasturas, inventario, historial) en una sola API pública."""
 from __future__ import annotations
 
+import logging
+import os
 import re
-from datetime import date
+from datetime import date, datetime
 
 from ...db.database import Database
+
+_logger_sin_entender = logging.getLogger("bitacora.consultas_sin_entender")
+
+
+def _registrar_consulta_sin_entender(texto: str) -> None:
+    """Registra en un archivo aparte las preguntas que el bot no entendió, para
+    revisar periódicamente qué frases reales de campo hace falta soportar."""
+    try:
+        ruta = os.environ.get("CONSULTAS_SIN_ENTENDER_LOG", "data/consultas_sin_entender.log")
+        directorio = os.path.dirname(ruta)
+        if directorio and not os.path.exists(directorio):
+            os.makedirs(directorio, exist_ok=True)
+        with open(ruta, "a", encoding="utf-8") as f:
+            f.write(f"{datetime.now().isoformat(timespec='seconds')}\t{texto.strip()}\n")
+    except Exception:
+        _logger_sin_entender.debug("No se pudo registrar consulta sin entender: %s", texto, exc_info=True)
 from ...parsers import nlp_engine as nlu
 from ...utils import normalizar
 from .helpers import _potrero_variantes, extraer_nombre_potrero
@@ -156,6 +174,19 @@ class QueryEngine(
             # fallback para "total ganado" con typo gaando / ga+ndo
             if re.search(r"\bga+ndo\b", t) or re.search(r"\bga+n?ado\b", t):
                 return self._inventario_general()
+        # Consultas combinadas: categoría + potrero en una sola pregunta
+        # (ej. "vacas paridas que están en el potrero olegario 1")
+        if re.search(r"\bpotrero", t):
+            categorias_combo = None
+            for palabra, categorias in self.CATEGORIAS_FILTRO.items():
+                if re.search(rf"\b{re.escape(palabra)}\b", t):
+                    categorias_combo = categorias
+                    break
+            if categorias_combo:
+                nom_pot_combo = extraer_nombre_potrero(texto)
+                if nom_pot_combo:
+                    return self._animales_en_potrero(nom_pot_combo, categorias_filtro=categorias_combo)
+
         if re.search(r"\bpotrero", t) and re.search(r"\bvac[ií]os?\b", t):
             return self._inventario_potreros(mostrar_vacios=True)
         if re.search(r"\bpotrero", t) and re.search(r"\blisto|pastoreo|pastar", t):
@@ -204,6 +235,7 @@ class QueryEngine(
             return self._ultimo_parto(tag)
         if tag and len(t.split()) <= 3 and not re.search(r"\b(?:pari|murio|insemin|celo|peso|retiro|potrero|foto)\b", t):
             return self._historial(tag)
+        _registrar_consulta_sin_entender(texto)
         return self._ayuda(texto)
 
     def _ayuda(self, texto: str = "") -> str:
