@@ -523,6 +523,72 @@ def test_construir_application_y_teclado_buscar(db, tmp_path):
     assert app is not None
 
 
+def test_filtros_busqueda_sql_queries(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2020-01-01")
+    db.registrar_animal("TORO1", sexo="Macho", estado="ACTIVO")
+    db.registrar_animal("CRIA1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2026-08-01")
+    db.registrar_parto("47", "2026-08-20", sexo_cria="Hembra")
+    db.registrar_servicio("47", "2026-08-25", tipo_servicio="IA", toro_pajilla="TORO1")
+    db.registrar_pesaje("47", "2026-08-27", peso_kg=450)
+
+    # 1. Paridas
+    q_paridas = db.query(
+        """
+        SELECT DISTINCT a.tag, a.nombre, p.fecha FROM partos p
+        JOIN animales a ON a.id_animal = p.vaca_id
+        WHERE a.estado = 'ACTIVO' AND a.sexo LIKE 'H%'
+        ORDER BY p.fecha DESC LIMIT 9
+        """
+    )
+    assert len(q_paridas) > 0
+    assert q_paridas[0]["tag"] == "47"
+
+    # 2. Inseminadas
+    q_insem = db.query(
+        """
+        SELECT DISTINCT a.tag, a.nombre, s.fecha FROM servicios s
+        JOIN animales a ON a.id_animal = s.vaca_id
+        WHERE a.estado = 'ACTIVO'
+        ORDER BY s.fecha DESC LIMIT 9
+        """
+    )
+    assert len(q_insem) > 0
+    assert q_insem[0]["tag"] == "47"
+
+    # 3. Toros
+    q_toros = db.query(
+        """
+        SELECT DISTINCT a.tag, a.nombre FROM animales a
+        WHERE a.estado = 'ACTIVO' AND (a.sexo LIKE 'M%' OR a.sexo = 'Macho')
+        ORDER BY a.tag ASC LIMIT 9
+        """
+    )
+    assert len(q_toros) > 0
+    assert q_toros[0]["tag"] == "TORO1"
+
+    # 4. Crías
+    q_crias = db.query(
+        """
+        SELECT DISTINCT a.tag, a.nombre, a.fecha_nacimiento AS fecha FROM animales a
+        WHERE a.estado = 'ACTIVO' AND a.fecha_nacimiento IS NOT NULL
+        ORDER BY a.fecha_nacimiento DESC LIMIT 9
+        """
+    )
+    assert len(q_crias) > 0
+
+    # 5. Pesajes
+    q_pesajes = db.query(
+        """
+        SELECT DISTINCT a.tag, a.nombre, pe.peso_kg, pe.fecha FROM pesajes pe
+        JOIN animales a ON a.id_animal = pe.animal_id
+        WHERE a.estado = 'ACTIVO'
+        ORDER BY pe.fecha DESC LIMIT 9
+        """
+    )
+    assert len(q_pesajes) > 0
+    assert q_pesajes[0]["peso_kg"] == 450
+
+
 
 
 

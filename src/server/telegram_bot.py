@@ -2559,7 +2559,7 @@ def construir_application(
                     filas = db.query(
                         """
                         SELECT DISTINCT a.tag, a.nombre FROM animales a
-                        WHERE a.estado = 'ACTIVO' AND (a.sexo LIKE 'M%' OR a.categoria_sg LIKE '%REPRO%')
+                        WHERE a.estado = 'ACTIVO' AND (a.sexo LIKE 'M%' OR a.sexo = 'Macho')
                         ORDER BY a.tag ASC LIMIT 9
                         """
                     )
@@ -2567,17 +2567,16 @@ def construir_application(
                     titulo = "🍼 <b>Crías y Terneros Recientes:</b>"
                     filas = db.query(
                         """
-                        SELECT DISTINCT a.tag, a.nombre, p.fecha FROM partos p
-                        JOIN animales a ON (a.id_animal = p.id_cria OR a.tag = p.cria_tag)
-                        WHERE a.estado = 'ACTIVO'
-                        ORDER BY p.fecha DESC LIMIT 9
+                        SELECT DISTINCT a.tag, a.nombre, a.fecha_nacimiento AS fecha FROM animales a
+                        WHERE a.estado = 'ACTIVO' AND a.fecha_nacimiento IS NOT NULL
+                        ORDER BY a.fecha_nacimiento DESC LIMIT 9
                         """
                     )
                 elif cat == "pesajes":
                     titulo = "⚖️ <b>Últimos Animales Pesados:</b>"
                     filas = db.query(
                         """
-                        SELECT DISTINCT a.tag, a.nombre, pe.peso, pe.fecha FROM pesajes pe
+                        SELECT DISTINCT a.tag, a.nombre, pe.peso_kg, pe.fecha FROM pesajes pe
                         JOIN animales a ON a.id_animal = pe.animal_id
                         WHERE a.estado = 'ACTIVO'
                         ORDER BY pe.fecha DESC LIMIT 9
