@@ -17,6 +17,7 @@ from ..engine.query_engine import (
     QueryEngine,
     buscar_foto_animal,
     calcular_brackets_inventario_sg,
+    calcular_existencias_potreros_sg,
     generar_resumen_inventario_sg,
 )
 from ..importers.dbf_importer import import_zip
@@ -273,6 +274,234 @@ def formatear_status(
         f"<pre>\n{cuerpo_escapado}\n</pre>\n"
         f"<i>Actualizado: {ts_str}</i>"
     )
+
+
+def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
+    """Genera el Tablero de Control Ejecutivo Zootécnico de la Finca (Hoy / Últimos 7 días / Próximas Alertas)."""
+    if hoy is None:
+        hoy = date.today()
+
+    # 1. Hato activo
+    n_activos = _contar_activos(db)
+    datos_sg = calcular_brackets_inventario_sg(db, hoy=hoy)
+    n_hembras = datos_sg["total_hembras"]
+    n_machos = datos_sg["total_machos"]
+
+    # 2. Novedades últimos 7 días
+    fecha_7d = iso(add_days(hoy, -7))
+    fecha_hoy = iso(hoy)
+
+    # Partos 7d
+    filas_partos = db.query(
+        "SELECT sexo_cria FROM partos WHERE fecha >= ? AND fecha <= ?",
+        (fecha_7d, fecha_hoy),
+    )
+    n_partos_7d = len(filas_partos)
+    h_partos = sum(1 for p in filas_partos if str(p["sexo_cria"]).strip().lower().startswith("h"))
+    m_partos = sum(1 for p in filas_partos if str(p["sexo_cria"]).strip().lower().startswith("m"))
+    partos_det = f" ({h_partos} ♀ / {m_partos} ♂)" if n_partos_7d > 0 else ""
+
+    # Celos 7d
+    r_celos = db.query_one("SELECT COUNT(*) as n FROM celos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_celos_7d = int(r_celos["n"]) if r_celos else 0
+
+    # Servicios 7d
+    r_serv = db.query_one("SELECT COUNT(*) as n FROM servicios WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_serv_7d = int(r_serv["n"]) if r_serv else 0
+
+    # Tratamientos 7d y retiros activos
+    r_trat = db.query_one("SELECT COUNT(*) as n FROM tratamientos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_trat_7d = int(r_trat["n"]) if r_trat else 0
+
+    filas_retiro = db.query(
+        "SELECT DISTINCT animal_id FROM tratamientos "
+        "WHERE (fecha_fin_retiro_leche IS NOT NULL AND fecha_fin_retiro_leche >= ?) "
+        "   OR (fecha_fin_retiro_carne IS NOT NULL AND fecha_fin_retiro_carne >= ?)",
+        (fecha_hoy, fecha_hoy),
+    )
+    n_en_retiro = len(filas_retiro)
+    trat_det = f" ({n_en_retiro} en retiro activo)" if n_en_retiro > 0 else ""
+
+    # Pesajes 7d y GMD
+    filas_pesajes = db.query("SELECT peso_kg, gmd_calculada FROM pesajes WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_pesajes_7d = len(filas_pesajes)
+    gmds = [float(p["gmd_calculada"]) for p in filas_pesajes if p["gmd_calculada"] is not None]
+    gmd_prom_str = f" · GMD prom: {sum(gmds)/len(gmds):.0f} g/d" if gmds else ""
+
+    # Traslados 7d
+    r_trasl = db.query_one("SELECT COUNT(*) as n FROM traslados WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_trasl_7d = int(r_trasl["n"]) if r_trasl else 0
+
+    # Muertes 7d
+    r_muertes = db.query_one("SELECT COUNT(*) as n FROM muertes WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    n_muertes_7d = int(r_muertes["n"]) if r_muertes else 0
+
+    # 3. Alertas próximas 7 días
+    limite_alertas = iso(add_days(hoy, 7))
+    alertas_pendientes = db.query(
+        "SELECT tipo_alerta FROM alertas WHERE estado = 'PENDIENTE' AND fecha_programada <= ?",
+        (limite_alertas,),
+    )
+    cnt_eco = sum(1 for a in alertas_pendientes if "ECO" in str(a["tipo_alerta"]).upper())
+    cnt_palp = sum(1 for a in alertas_pendientes if "PALP" in str(a["tipo_alerta"]).upper())
+    cnt_sec = sum(1 for a in alertas_pendientes if "SEC" in str(a["tipo_alerta"]).upper())
+    tot_alertas_semana = len(alertas_pendientes)
+
+    # 4. Pasturas y Voisin
+    filas_potreros = calcular_existencias_potreros_sg(db, hoy=hoy)
+    n_pot_ocupados = len(filas_potreros)
+
+    from ..utils import to_date
+    sobreocupados = []
+    for p in filas_potreros:
+        f_ingreso = p.get("fecha_ingreso_reciente")
+        dias_ocup = (hoy - to_date(f_ingreso)).days if f_ingreso and to_date(f_ingreso) else None
+        if dias_ocup is not None and dias_ocup > 3:
+            sobreocupados.append(f"{p['display']} ({dias_ocup}d)")
+
+    # Potreros en reposo óptimo
+    nombres_ocup = {p["display"] for p in filas_potreros}
+    todos_pot = db.query("SELECT nombre, codigo, dias_reposo FROM potreros")
+    listos_reposo = []
+    for p in todos_pot:
+        raw_nom = (p["nombre"] or p["codigo"] or "").strip().upper()
+        if raw_nom in nombres_ocup:
+            continue
+        dr = p["dias_reposo"]
+        if dr is not None and 30 <= dr <= 365:
+            listos_reposo.append(raw_nom)
+
+    salida = [
+        "🐮 <b>Tablero de Control Zootécnico — Ganadería JA</b>",
+        "────────────────────────────────────────",
+        f"🐄 <b>HATO ACTIVO:</b> {_fmt_es_co(n_activos)} animales (♀ {n_hembras} · ♂ {n_machos})",
+        "",
+        "📅 <b>NOVEDADES DE LA SEMANA (Últimos 7 días):</b>",
+        f"• 🍼 Partos: <b>{n_partos_7d}</b>{partos_det}",
+        f"• 🔥 Celos observados: <b>{n_celos_7d}</b>",
+        f"• 🐂 Inseminaciones / Servicios: <b>{n_serv_7d}</b>",
+        f"• 💉 Tratamientos médicos: <b>{n_trat_7d}</b>{trat_det}",
+        f"• ⚖️ Pesajes registrados: <b>{n_pesajes_7d}</b>{gmd_prom_str}",
+        f"• 🚚 Traslados de potrero: <b>{n_trasl_7d}</b>",
+        f"• 💀 Bajas / Muertes: <b>{n_muertes_7d}</b>",
+        "",
+        f"⚠️ <b>ALERTAS & TAREAS (Próximos 7 días · Total: {tot_alertas_semana}):</b>",
+        f"• 🔍 Ecografías (día 35): <b>{cnt_eco}</b> pendientes",
+        f"• ✋ Palpaciones (día 60): <b>{cnt_palp}</b> pendientes",
+        f"• 🥛 Secados programados: <b>{cnt_sec}</b> vacas",
+        f"• 💊 Animales en retiro: <b>{n_en_retiro}</b> en carencia",
+        "",
+        "🌿 <b>PASTURAS & ROTACIÓN VOISIN:</b>",
+        f"• 📍 Potreros ocupados: <b>{n_pot_ocupados}</b> en pastoreo",
+        f"• 🌱 Listos para pastoreo: <b>{len(listos_reposo)}</b> con reposo cumplido (≥30d)",
+    ]
+    if sobreocupados:
+        salida.append(f"• ⚠️ Sobreocupación (>3d): <b>{', '.join(sobreocupados[:3])}</b>")
+    else:
+        salida.append("• 🟢 Rotación al día (ningún potrero excede los días de pastoreo)")
+
+    return "\n".join(salida)
+
+
+def formatear_estado_servidor(
+    db: Database, auth: Auth, db_path: Optional[str] = None, hoy: Optional[date] = None
+) -> str:
+    """Genera el Tablero Técnico de Estado del Servidor VPS, Recursos, Base de Datos y APIs."""
+    import platform
+    import shutil
+
+    # 1. Recursos del Servidor
+    os_name = f"{platform.system()} {platform.release()}"
+    if platform.system().lower() == "linux":
+        try:
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if line.startswith("PRETTY_NAME="):
+                        os_name = line.split("=", 1)[1].strip().strip('"')
+                        break
+        except Exception:
+            pass
+
+    # RAM
+    ram_total_mb = 0
+    ram_used_mb = 0
+    ram_pct = 0
+    proc_ram_mb = 0.0
+    try:
+        import psutil
+        vmem = psutil.virtual_memory()
+        ram_total_mb = vmem.total // (1024 * 1024)
+        ram_used_mb = vmem.used // (1024 * 1024)
+        ram_pct = vmem.percent
+        proc = psutil.Process(os.getpid())
+        proc_ram_mb = proc.memory_info().rss / (1024 * 1024)
+    except Exception:
+        pass
+
+    # Disco
+    disk_total_gb = 0.0
+    disk_used_gb = 0.0
+    disk_pct = 0
+    try:
+        d = shutil.disk_usage(".")
+        disk_total_gb = d.total / (1024 ** 3)
+        disk_used_gb = d.used / (1024 ** 3)
+        disk_pct = int((d.used / d.total) * 100) if d.total > 0 else 0
+    except Exception:
+        pass
+
+    # 2. Base de Datos SQLite
+    size_str = "en memoria"
+    if db_path and db_path != ":memory:" and os.path.exists(db_path):
+        bytes_size = os.path.getsize(db_path)
+        mb_size = bytes_size / (1024 * 1024)
+        size_str = f"{mb_size:.2f} MB"
+
+    ts_str = _obtener_fecha_ultimo_backup(db, db_path)
+    total_animales = db.count("animales")
+    total_eventos = (
+        db.count("partos") + db.count("servicios") + db.count("celos") +
+        db.count("tratamientos") + db.count("pesajes") + db.count("traslados") +
+        db.count("muertes")
+    )
+
+    # 3. Usuarios registrados
+    usuarios = auth.listar_usuarios()
+    n_owner = sum(1 for u in usuarios if u.get("rol") == "OWNER")
+    n_admin = sum(1 for u in usuarios if u.get("rol") == "ADMIN")
+    n_trab = sum(1 for u in usuarios if u.get("rol") == "TRABAJADOR")
+
+    # 4. APIs e Inteligencia Artificial
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_status = f"🟢 Activo ({gemini_model})" if gemini_key else "🟡 Modo Local / Sin API Key"
+
+    salida = [
+        "⚙️ <b>Tablero Técnico del Servidor & Sistema</b>",
+        "────────────────────────────────────────",
+        "💻 <b>SERVIDOR VPS (DigitalOcean Droplet):</b>",
+        f"• <b>SO:</b> {os_name}",
+        f"• <b>RAM Servidor:</b> {ram_used_mb} MB / {ram_total_mb} MB ({ram_pct}% en uso)",
+        f"• <b>RAM Bot Bitácora:</b> {proc_ram_mb:.1f} MB",
+        f"• <b>Disco SSD:</b> {disk_used_gb:.1f} GB / {disk_total_gb:.1f} GB ({disk_pct}% usado)",
+        f"• <b>Python:</b> {sys.version.split()[0]} · <b>Servicio:</b> 🟢 bitacora-bot",
+        "",
+        "🗄️ <b>BASE DE DATOS (SQLite):</b>",
+        f"• <b>Archivo:</b> {db_path or 'data/bitacora.db'} ({size_str})",
+        f"• <b>Registros:</b> {_fmt_es_co(total_animales)} animales · {_fmt_es_co(total_eventos)} eventos históricos",
+        f"• <b>Última sincronización / Backup:</b> {ts_str}",
+        "",
+        f"👥 <b>USUARIOS AUTORIZADOS ({len(usuarios)}):</b>",
+        f"• 👑 Dueño (OWNER): <b>{n_owner}</b>",
+        f"• 🛠️ Administradores (ADMIN): <b>{n_admin}</b>",
+        f"• 🤠 Personal de Campo (TRABAJADOR): <b>{n_trab}</b>",
+        "",
+        "🧠 <b>INTEGRACIÓN DE MODELOS & APIS:</b>",
+        f"• 🤖 <b>NLU / LLM:</b> {gemini_status}",
+        f"• 🎤 <b>Notas de Voz:</b> 🟢 Whisper (transcripción local en español)",
+        f"• 📷 <b>OCR Visión:</b> 🟢 Pytesseract (lectura aretes y medicamentos)",
+    ]
+    return "\n".join(salida)
 
 
 def formatear_usuarios(auth: Auth) -> str:
@@ -674,28 +903,31 @@ def construir_application(
         keyboard = [
             [
                 InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
+            ],
+            [
                 InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
-            ],
-            [
                 InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
-                InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
             ],
             [
+                InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
                 InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
+            ],
+            [
+                InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
                 InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             ],
         ]
         if rol == "OWNER":
             keyboard.append([
                 InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
-                InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
+                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
             ])
         else:
             keyboard.append([
-                InlineKeyboardButton("⚙️ Estado Servidor", callback_data="cmd:status"),
+                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
             ])
         keyboard.append([
-            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
             InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
         ])
         return InlineKeyboardMarkup(keyboard)
@@ -1181,10 +1413,58 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            msg = formatear_status(db, db.path if hasattr(db, "path") else None)
-            await update.message.reply_text(msg, parse_mode="HTML")
+            msg = formatear_tablero_finca(db)
+            teclado = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                    InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+                ],
+                [
+                    InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
+                    InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                ],
+                [
+                    InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                ],
+            ])
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado)
+            except Exception:
+                await update.message.reply_text(msg, reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_status: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_sistema(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_estado_servidor(db, auth, db.path if hasattr(db, "path") else None)
+            teclado = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
+                    InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
+                ],
+                [
+                    InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
+                    InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
+                ],
+                [
+                    InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
+                    InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                ],
+            ])
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado)
+            except Exception:
+                await update.message.reply_text(msg, reply_markup=teclado)
+        except Exception as e:
+            logger.error("Error en cmd_sistema: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1714,12 +1994,52 @@ def construir_application(
                     if query.message:
                         await query.message.reply_text("⛔ No autorizado.")
                     return
-                msg = formatear_status(db, db.path if hasattr(db, "path") else None)
+                msg = formatear_tablero_finca(db)
+                teclado_st = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                        InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+                    ],
+                    [
+                        InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
+                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_st)
                     except Exception:
-                        await query.message.reply_text(msg)
+                        await query.message.reply_text(msg, reply_markup=teclado_st)
+
+            elif data == "cmd:sistema":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_estado_servidor(db, auth, db.path if hasattr(db, "path") else None)
+                teclado_sis = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
+                        InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
+                    ],
+                    [
+                        InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
+                        InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
+                    ],
+                    [
+                        InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ],
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_sis)
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_sis)
 
             elif data == "cmd:reporte":
                 await query.answer()
@@ -1864,7 +2184,8 @@ def construir_application(
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
-    app.add_handler(CommandHandler("status", cmd_status))
+    app.add_handler(CommandHandler(["status", "tablero", "finca", "resumen"], cmd_status))
+    app.add_handler(CommandHandler(["sistema", "servidor", "vps"], cmd_sistema))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))
     app.add_handler(CommandHandler("reporte", cmd_reporte))
     app.add_handler(CommandHandler("exportar", cmd_exportar))

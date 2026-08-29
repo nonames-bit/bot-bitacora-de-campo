@@ -423,6 +423,52 @@ def test_texto_menu_principal():
     assert "No autorizado" in menu_anon
 
 
+def test_formatear_tablero_finca(db):
+    from src.server.telegram_bot import formatear_tablero_finca
+    hoy = date(2026, 9, 1)
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("26", sexo="Macho", estado="ACTIVO")
+    db.registrar_parto("47", "2026-08-28", sexo_cria="Hembra")
+    db.registrar_celo("47", "2026-08-29")
+    db.registrar_servicio("47", "2026-08-30", tipo_servicio="IA", toro_pajilla="TORO1")
+    db.registrar_tratamiento("47", "2026-08-29", producto="Oxitetraciclina", dias_retiro_carne=10)
+    db.registrar_pesaje("47", "2026-08-27", peso_kg=450, gmd_calculada=500.0)
+    db.registrar_alerta("47", "ECOGRAFIA", "2026-09-04")
+    db.registrar_potrero(nombre="Potrero 1", dias_reposo=40)
+
+    resp = formatear_tablero_finca(db, hoy=hoy)
+    assert "Tablero de Control Zootécnico" in resp
+    assert "HATO ACTIVO" in resp
+    assert "NOVEDADES DE LA SEMANA" in resp
+    assert "Partos:" in resp
+    assert "Celos observados:" in resp
+    assert "Inseminaciones / Servicios:" in resp
+    assert "Tratamientos médicos:" in resp
+    assert "ALERTAS & TAREAS" in resp
+    assert "PASTURAS & ROTACIÓN VOISIN" in resp
+
+
+def test_formatear_estado_servidor(db, tmp_path):
+    from src.server.telegram_bot import formatear_estado_servidor
+    from src.server.auth import Auth
+
+    users_file = tmp_path / "users.json"
+    auth = Auth(str(users_file))
+    auth.agregar_usuario(111, "Carlos", "OWNER")
+    auth.agregar_usuario(222, "Juan", "TRABAJADOR")
+
+    resp = formatear_estado_servidor(db, auth, ":memory:")
+    assert "Tablero Técnico del Servidor & Sistema" in resp
+    assert "SERVIDOR VPS" in resp
+    assert "BASE DE DATOS" in resp
+    assert "USUARIOS AUTORIZADOS (2)" in resp
+    assert "OWNER" in resp
+    assert "TRABAJADOR" in resp
+    assert "INTEGRACIÓN DE MODELOS & APIS" in resp
+    assert "Whisper" in resp
+    assert "Pytesseract" in resp
+
+
 
 
 
