@@ -310,7 +310,10 @@ class CopiasWatcher:
             )
             try:
                 with urllib.request.urlopen(req, timeout=15) as resp:
-                    if resp.status == 200:
+                    st_code = getattr(resp, "status", None)
+                    if st_code is None and hasattr(resp, "getcode"):
+                        st_code = resp.getcode()
+                    if st_code == 200 or st_code is None:
                         enviados += 1
                         logger.info("Notificación Telegram enviada a user_id=%s", chat_id)
             except Exception as e:

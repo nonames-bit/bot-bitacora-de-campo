@@ -27,9 +27,12 @@ class GeminiClient:
         model: Optional[str] = None,
         timeout: float = 30.0,
     ):
-        raw_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY", "")
+        if api_key is None:
+            raw_key = os.getenv("GEMINI_API_KEY", "")
+        else:
+            raw_key = api_key
         # Deshabilitado si es placeholder o vacía
-        if not raw_key or raw_key in ("pegar_aqui_tu_clave_de_gemini", "") or not raw_key.strip():
+        if raw_key in ("pegar_aqui_tu_clave_de_gemini", "") or not raw_key.strip():
             self.api_key: Optional[str] = None
         else:
             self.api_key = raw_key.strip()
