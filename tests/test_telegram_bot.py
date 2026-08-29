@@ -406,6 +406,24 @@ def test_guias_didacticas_trabajador():
     assert "fotografía" in g_animal
 
 
+def test_texto_menu_principal():
+    from src.server.telegram_bot import texto_menu_principal
+    menu_owner = texto_menu_principal("OWNER")
+    assert "Dueño" in menu_owner
+    assert "Panel de Control" in menu_owner
+
+    menu_admin = texto_menu_principal("ADMIN")
+    assert "Administrador" in menu_admin
+
+    menu_trabajador = texto_menu_principal("TRABAJADOR")
+    assert "Trabajador de Campo" in menu_trabajador
+    assert "cuaderno digital" in menu_trabajador
+
+    menu_anon = texto_menu_principal(None)
+    assert "No autorizado" in menu_anon
+
+
+
 
 
 

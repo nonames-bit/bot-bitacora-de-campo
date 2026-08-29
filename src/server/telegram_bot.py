@@ -349,7 +349,31 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• Envía fotos de aretes o tratamientos\n"
             "• /consulta <tag> o /historial <tag> - Consultar ficha zootécnica de un animal\n"
             "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
-            "• /start o /help - Mostrar esta ayuda"
+            "• /menu - Abrir el menú táctil de botones\n"
+            "• /ayuda - Mostrar esta lista de comandos"
+        )
+    return "⛔ No autorizado."
+
+
+def texto_menu_principal(rol: Optional[str]) -> str:
+    """Devuelve el texto corto y visual para el menú principal con botones (/start o /menu)."""
+    if rol == "OWNER":
+        return (
+            "👑 <b>Panel de Control (Dueño)</b>\n"
+            "Bienvenido a la <i>Bitácora de Campo Ganadero</i>.\n\n"
+            "Selecciona una opción del menú o escribe directamente tu consulta o nota:"
+        )
+    if rol == "ADMIN":
+        return (
+            "🛠️ <b>Panel de Control (Administrador)</b>\n"
+            "Bienvenido a la <i>Bitácora de Campo Ganadero</i>.\n\n"
+            "Selecciona una opción del menú o escribe tu consulta o nota:"
+        )
+    if rol == "TRABAJADOR":
+        return (
+            "🤠 <b>Menú del Trabajador de Campo</b>\n"
+            "¡Bienvenido! Este bot es su cuaderno digital de la finca.\n\n"
+            "Seleccione una opción o envíe su nota de voz, foto o mensaje:"
         )
     return "⛔ No autorizado."
 
@@ -638,6 +662,9 @@ def construir_application(
                 InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
                 InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
             ],
+            [
+                InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
+            ],
         ]
         return InlineKeyboardMarkup(keyboard)
 
@@ -667,6 +694,7 @@ def construir_application(
             ])
         keyboard.append([
             InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+            InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
         ])
         return InlineKeyboardMarkup(keyboard)
 
@@ -717,7 +745,24 @@ def construir_application(
         ]
         return InlineKeyboardMarkup(keyboard)
 
-    async def cmd_start_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    async def cmd_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            rol = auth.rol_de(user_id)
+            texto_menu = texto_menu_principal(rol)
+            teclado = crear_teclado_principal(rol)
+            await update.message.reply_text(texto_menu, parse_mode="HTML", reply_markup=teclado)
+        except Exception as e:
+            logger.error("Error en cmd_start_menu: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_ayuda_completa(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
                 return
@@ -727,10 +772,10 @@ def construir_application(
                 return
             rol = auth.rol_de(user_id)
             texto_ayuda = formatear_ayuda(rol)
-            teclado = crear_teclado_principal(rol)
+            teclado = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Abrir Menú", callback_data="menu:principal")]])
             await update.message.reply_text(texto_ayuda, reply_markup=teclado)
         except Exception as e:
-            logger.error("Error en cmd_start_help: %s", e, exc_info=True)
+            logger.error("Error en cmd_ayuda_completa: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1403,7 +1448,7 @@ def construir_application(
                 rol = auth.rol_de(user_id)
                 if query.message:
                     await query.message.reply_text(
-                        formatear_ayuda(rol), reply_markup=crear_teclado_principal(rol)
+                        texto_menu_principal(rol), parse_mode="HTML", reply_markup=crear_teclado_principal(rol)
                     )
 
             elif data == "menu:campo":
@@ -1681,9 +1726,10 @@ def construir_application(
             elif data == "cmd:ayuda":
                 await query.answer()
                 rol = auth.rol_de(user_id)
+                btn = [[InlineKeyboardButton("🏠 Volver al Menú", callback_data="menu:principal")]]
                 if query.message:
                     await query.message.reply_text(
-                        formatear_ayuda(rol), reply_markup=crear_teclado_principal(rol)
+                        formatear_ayuda(rol), reply_markup=InlineKeyboardMarkup(btn)
                     )
 
         except Exception as e:
@@ -1694,7 +1740,8 @@ def construir_application(
     app = ApplicationBuilder().token(token).build()
 
     # Handlers de comandos
-    app.add_handler(CommandHandler(["start", "help"], cmd_start_help))
+    app.add_handler(CommandHandler(["start", "menu"], cmd_start_menu))
+    app.add_handler(CommandHandler(["help", "ayuda", "comandos"], cmd_ayuda_completa))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal", "buscar"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))

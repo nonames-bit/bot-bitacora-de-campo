@@ -149,6 +149,8 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 
 | Comando | Para qué sirve | Ejemplo de uso |
 |---|---|---|
+| `/menu` o `/start` | Abre el **Menú Táctil de Botones** interactivo y visual. | `/menu`, `/start` |
+| `/ayuda` o `/help` | Muestra la **Lista Completa de Comandos** y sintaxis. | `/ayuda`, `/comandos` |
 | `/reporte` | Genera y envía el **Reporte en PDF** (semanal por defecto). | `/reporte`, `/reporte diario`, `/reporte 15` |
 | `/exportar` | Descarga el **Backup ZIP** para Software Ganadero. | `/exportar`, `/exportar csv`, `/exportar json` |
 | `/fotos <tag>` | Consulta las fotos guardadas de un animal o las recientes. | `/fotos 47`, `/fotos` |
