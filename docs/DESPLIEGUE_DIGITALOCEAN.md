@@ -394,6 +394,29 @@ Para no tener que entrar por SSH cada vez que genere un backup de 70 MB en Softw
 
 ---
 
+## 8. Actualizaciones del Código mediante Git (Deploy Key de Solo Lectura)
+
+El droplet de producción está vinculado al repositorio GitHub oficial utilizando una **Deploy Key de solo lectura** (`vps-206.189.188.183-readonly`).
+
+> 🛡️ **Principio de Menor Privilegio:** El VPS tiene permisos exclusivos para descargar (`git pull`), pero no puede escribir ni modificar ramas en GitHub. Si el servidor sufre un incidente, la seguridad del repositorio central permanece intacta.
+
+### ¿Cómo actualizar el bot en el VPS tras un cambio en GitHub?
+Para traer los últimos cambios y reiniciar el servicio, ejecute en el VPS:
+
+```bash
+cd /root/bitacora
+git pull origin main
+systemctl restart bitacora-bot
+```
+
+Para verificar que el bot arrancó correctamente:
+```bash
+systemctl status bitacora-bot
+journalctl -u bitacora-bot -n 20 --no-pager
+```
+
+---
+
 ## ✅ Lista final de verificación
 
 | Paso | ¿Listo? |
