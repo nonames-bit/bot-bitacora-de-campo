@@ -65,11 +65,15 @@ def test_permisos_por_rol(tmp_path):
     assert auth.puede_consultar(10) is True
     assert auth.puede_administrar(10) is True
     assert auth.puede_gestionar_usuarios(10) is True
+    assert auth.es_owner(10) is True
+    assert auth.es_admin(10) is False
 
     # ADMIN: consultar y administrar, pero no gestionar usuarios
     assert auth.puede_consultar(20) is True
     assert auth.puede_administrar(20) is True
     assert auth.puede_gestionar_usuarios(20) is False
+    assert auth.es_owner(20) is False
+    assert auth.es_admin(20) is True
 
     # TRABAJADOR: solo consultar
     assert auth.puede_consultar(30) is True
