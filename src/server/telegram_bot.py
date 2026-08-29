@@ -1872,13 +1872,48 @@ def construir_application(
 
             elif data == "cmd:usuarios":
                 await query.answer()
-                if not auth.es_owner(user_id):
+                if not auth.puede_gestionar_usuarios(user_id):
                     if query.message:
                         await query.message.reply_text("⛔ Solo el propietario (OWNER) puede ver la lista de usuarios.")
                     return
                 msg = formatear_usuarios(auth)
+                teclado_u = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ])
                 if query.message:
-                    await query.message.reply_text(msg)
+                    await query.message.reply_text(msg, reply_markup=teclado_u)
+
+            elif data == "cmd:logs":
+                await query.answer()
+                if not auth.puede_gestionar_usuarios(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ Solo el propietario (OWNER) puede consultar los logs del sistema.")
+                    return
+                msg = obtener_ultimos_logs(log_file, lineas=25)
+                if len(msg) > 3800:
+                    msg = msg[-3800:]
+                cuerpo_log = html.escape(msg)
+                teclado_l = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("🔄 Refrescar Logs", callback_data="cmd:logs"),
+                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                    ],
+                    [
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            f"📜 <b>Últimos Registros del Sistema (Logs)</b>\n<pre>\n{cuerpo_log}\n</pre>",
+                            parse_mode="HTML",
+                            reply_markup=teclado_l,
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_l)
 
             elif data == "cmd:inventario":
                 await query.answer()

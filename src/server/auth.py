@@ -104,6 +104,14 @@ class Auth:
         logger.warning("Permiso de gestión de usuarios denegado para user_id=%s (rol=%s)", user_id, rol)
         return False
 
+    def es_owner(self, user_id: int) -> bool:
+        """Verifica si el usuario tiene rol OWNER (propietario)."""
+        return self.rol_de(user_id) == "OWNER"
+
+    def es_admin(self, user_id: int) -> bool:
+        """Verifica si el usuario tiene rol ADMIN (administrador)."""
+        return self.rol_de(user_id) == "ADMIN"
+
     def agregar_usuario(self, user_id: int, nombre: str, rol: str) -> None:
         """Agrega o actualiza un usuario y persiste los cambios."""
         try:

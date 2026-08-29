@@ -234,8 +234,8 @@ Cuando el backup de Software Ganadero contiene fotos y tablas históricas comple
 Para resolver esto, el bot cuenta con un **observador automático (watcher)** que detecta los backups apenas se generan:
 
 ### ¿Cómo funciona el flujo automático?
-1. **Generación en Software Ganadero:** Al hacer la copia de seguridad periódica en el PC de la finca o la oficina, el SG genera un archivo `.Zip` con la fecha (ej. `Datos20260828.Zip`) en la carpeta de copias (por defecto `C:\Copias` en Windows o `data/copias/` en el VPS).
-2. **Detección por Fecha / mtime / Hash:** El servicio vigilante detecta el nuevo archivo, valida que se haya terminado de escribir y comprueba que no haya sido importado antes mediante su huella digital MD5 y fecha de modificación.
+1. **Generación en Software Ganadero:** Al hacer la copia de seguridad periódica en el PC de la finca o la oficina, el SG genera un archivo `.Zip` con la fecha (ej. `Datos20260828.Zip`) en la carpeta de copias (`C:\Usati\Copias` en el PC de la finca, configurable vía `COPIAS_DIR`).
+2. **Detección por Fecha / mtime / Hash (cada 60 min):** La Tarea Programada `VigilarCopiasSG` (Windows, `schtasks` cada 60 min) y/o el servicio `copias_watcher` en el VPS revisan la carpeta, validan que el `.Zip` ya esté completo y comprueban por MD5+mtime que no fue importado antes.
 3. **Auto-Importación Idempotente:** El sistema procesa internamente las tablas DBF y fotos en SQLite, aplicando deduplicación por llaves zootécnicas sin sobreescribir ni duplicar datos.
 4. **Notificación Instantánea al Dueño:** Al terminar, el bot le envía automáticamente un mensaje al OWNER por Telegram con el reporte consolidado:
    ```text
