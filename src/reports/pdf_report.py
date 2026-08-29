@@ -9,6 +9,11 @@ import os
 from datetime import date, timedelta
 from typing import Any, Optional
 
+# Paleta institucional GANADERÍA JA (verde pasto oscuro + acento tierra).
+_COLOR_MARCA = "#2F5233"
+_COLOR_MARCA_CLARA = "#E7EFE8"
+_COLOR_MARCA_ZEBRA = "#F3F7F3"
+
 
 # --------------------------------------------------------------------------- #
 # Configuración de tablas de eventos (clave, tabla SQL, columna animal, resumen)
@@ -262,7 +267,7 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     base = getSampleStyleSheet()
     estilo_titulo = ParagraphStyle(
         "TituloReporte", parent=base["Title"], fontName="Helvetica-Bold",
-        fontSize=15, textColor=colors.HexColor("#222222"), spaceAfter=2,
+        fontSize=15, textColor=colors.HexColor(_COLOR_MARCA), spaceAfter=2,
     )
     estilo_subtitulo = ParagraphStyle(
         "SubtituloReporte", parent=base["Normal"], fontName="Helvetica",
@@ -270,7 +275,7 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     )
     estilo_seccion = ParagraphStyle(
         "SeccionReporte", parent=base["Heading2"], fontName="Helvetica-Bold",
-        fontSize=12, textColor=colors.HexColor("#222222"),
+        fontSize=12, textColor=colors.HexColor(_COLOR_MARCA),
         spaceBefore=10, spaceAfter=4,
     )
     estilo_normal = ParagraphStyle(
@@ -363,17 +368,17 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
             colWidths=[40 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm]
         )
         tabla_p.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8e8e8")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
             ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#efefef")),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#D7E5D9")),
             ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("ALIGN", (1, 0), (-1, -1), "CENTER"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor("#f7f7f7")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
             ("LEFTPADDING", (0, 0), (-1, -1), 2),
             ("RIGHTPADDING", (0, 0), (-1, -1), 2),
             ("TOPPADDING", (0, 0), (-1, -1), 2),
@@ -392,14 +397,14 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
             tabla_datos.append([f["fecha"], f["tag"], f["resumen"]])
         tabla = Table(tabla_datos, colWidths=[30 * mm, 24 * mm, 116 * mm])
         tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8e8e8")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f7f7")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
@@ -416,14 +421,14 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
             tabla_datos.append([a["fecha"], a["tag"], a["tipo"]])
         tabla = Table(tabla_datos, colWidths=[30 * mm, 24 * mm, 116 * mm])
         tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e8e8e8")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#333333")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f7f7")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
             ("TOPPADDING", (0, 0), (-1, -1), 3),
