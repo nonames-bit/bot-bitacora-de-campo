@@ -502,6 +502,27 @@ def test_paneles_textos_guia():
     assert "Consultas Rápidas de Campo (1-Toque)" in t_faq
 
 
+def test_construir_application_y_teclado_buscar(db, tmp_path):
+    pytest.importorskip("telegram")
+    from src.server.auth import Auth
+    from src.server.telegram_bot import construir_application
+
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("N069", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("47", date.today().isoformat(), sexo_cria="Macho")
+
+    users_file = tmp_path / "users.json"
+    auth = Auth(str(users_file))
+    auth.agregar_usuario(111, "Dueño", "OWNER")
+
+    app = construir_application(
+        token="123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+        db=db,
+        auth=auth,
+    )
+    assert app is not None
+
+
 
 
 
