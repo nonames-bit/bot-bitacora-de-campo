@@ -1784,10 +1784,10 @@ def construir_application(
                     await update.message.reply_text("📷 No hay fotos registradas en la bitácora.")
                     return
                 for r in filas:
-                    ruta = r.get("ruta")
-                    tag_foto = r.get("tag") or "Sin arete"
-                    fec = r.get("fecha") or "sin fecha"
-                    cap = f" — {r['caption']}" if r.get("caption") else ""
+                    ruta = r["ruta"]
+                    tag_foto = r["tag"] or "Sin arete"
+                    fec = r["fecha"] or "sin fecha"
+                    cap = f" — {r['caption']}" if r["caption"] else ""
                     pie = f"📷 Tag {tag_foto} [{fec}]{cap}"
                     if ruta and os.path.exists(ruta):
                         with open(ruta, "rb") as f:
@@ -2353,10 +2353,10 @@ def construir_application(
 
                 # Enviar las fotografías disponibles en disco
                 for r in filas:
-                    ruta = r.get("ruta")
-                    tag_foto = r.get("tag") or "Sin arete"
-                    fec = r.get("fecha") or "sin fecha"
-                    cap = f" — {r['caption']}" if r.get("caption") else ""
+                    ruta = r["ruta"]
+                    tag_foto = r["tag"] or "Sin arete"
+                    fec = r["fecha"] or "sin fecha"
+                    cap = f" — {r['caption']}" if r["caption"] else ""
                     pie = f"📷 Animal: {tag_foto} [{fec}]{cap}"
                     if ruta and os.path.exists(ruta):
                         try:

@@ -118,3 +118,79 @@ class GeminiClient:
         except Exception as e:
             logger.warning("Excepción inesperada en Gemini: %s", e)
             return None
+
+    def transcribe_audio(self, audio_path: str) -> Optional[str]:
+        """Transcribe un archivo de audio (ogg, mp3, wav, m4a) usando Gemini Multimodal."""
+        if not self.is_available() or not os.path.exists(audio_path) or os.path.getsize(audio_path) < 200:
+            return None
+        import base64
+        ext = os.path.splitext(audio_path)[1].lower().lstrip(".")
+        mime_map = {
+            "ogg": "audio/ogg",
+            "oga": "audio/ogg",
+            "mp3": "audio/mp3",
+            "wav": "audio/wav",
+            "m4a": "audio/mp4",
+            "aac": "audio/aac",
+            "flac": "audio/flac",
+        }
+        mime_type = mime_map.get(ext, "audio/ogg")
+        try:
+            with open(audio_path, "rb") as f:
+                audio_b64 = base64.b64encode(f.read()).decode("utf-8")
+        except Exception as e:
+            logger.warning("No se pudo leer audio %s: %s", audio_path, e)
+            return None
+
+        url = DEFAULT_API_URL.format(model=self.model)
+        prompt = (
+            "Eres un transcriptor experto en notas de campo ganadero y zootécnico en español. "
+            "Transcribe textualmente y con exactitud lo que dice el audio (nombres de animales, números de arete, potreros, kilos, medicamentos). "
+            "Devuelve ÚNICAMENTE el texto transcrito directo, sin comillas ni explicaciones adicionales."
+        )
+        payload = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": audio_b64,
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.0,
+                "maxOutputTokens": 1024,
+            },
+        }
+        req = urllib.request.Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key,
+                "Accept": "application/json",
+                "User-Agent": "BitacoraCampo-Gemini/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = resp.read().decode("utf-8")
+                data = json.loads(body)
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    return None
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if not parts:
+                    return None
+                text = parts[0].get("text", "").strip()
+                return text if text else None
+        except Exception as e:
+            logger.warning("Error en transcripción Gemini Audio: %s", e)
+            return None

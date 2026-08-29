@@ -142,9 +142,20 @@ def transcribe_audio(audio_path: str,
     if res is not None:
         return res
 
+    # Intentar transcripción con Gemini Audio Multimodal (IA en la nube)
+    try:
+        from ..llm.gemini_client import GeminiClient
+        client = GeminiClient()
+        if client.is_available():
+            txt_gemini = client.transcribe_audio(audio_path)
+            if txt_gemini:
+                return AudioTranscript(txt_gemini, origen="gemini-audio")
+    except Exception as eg:
+        logger.debug("Fallo al transcribir con Gemini: %s", eg)
+
     raise MediaError(
-        f"Whisper no está instalado y no hay transcripción acompañante para '{audio_path}'. "
-        f"Instala faster-whisper ('pip install faster-whisper') o proporciona {audio_path}.txt."
+        f"No se pudo transcribir el audio '{audio_path}'. "
+        f"Verifica la API key de Gemini (GEMINI_API_KEY) o instala faster-whisper ('pip install faster-whisper')."
     )
 
 
