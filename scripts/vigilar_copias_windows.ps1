@@ -1,25 +1,25 @@
-<#
+﻿<#
 .SYNOPSIS
-    Vigilante automático para la carpeta de copias de Software Ganadero en Windows.
+    Vigilante automatico para la carpeta de copias de Software Ganadero en Windows.
 .DESCRIPTION
     Monitorea la carpeta local donde Software Ganadero genera los backups (.Zip) por fecha.
-    Al detectar un archivo nuevo o modificado (comparando fecha de modificación, tamaño y hash MD5),
-    lo envía automáticamente vía SCP al servidor VPS (DigitalOcean) y ejecuta el script de importación
-    remota sin intervención manual.
+    Al detectar un archivo nuevo o modificado (comparando fecha de modificacion, tamano y hash MD5),
+    lo envia automaticamente via SCP al servidor VPS (DigitalOcean) y ejecuta el script de importacion
+    remota sin intervencion manual.
 .PARAMETER CopiasDir
     Ruta de la carpeta donde SG exporta las copias (por defecto C:\Copias).
 .PARAMETER VpsHost
-    Dirección IP pública o host del droplet VPS (por defecto 206.189.188.183).
+    Direccion IP publica o host del droplet VPS (por defecto 206.189.188.183).
 .PARAMETER VpsUser
     Usuario SSH para conectarse al VPS (por defecto root).
 .PARAMETER VpsDestDir
     Directorio temporal en el VPS para transferir el Zip (por defecto /tmp).
 .PARAMETER VpsProjectPath
-    Directorio del proyecto bitácora en el VPS (por defecto /root/bitacora).
+    Directorio del proyecto bitacora en el VPS (por defecto /root/bitacora).
 .PARAMETER IntervaloSegundos
     Intervalo de sondeo en segundos para revisar la carpeta (por defecto 60).
 .PARAMETER UnaVez
-    Si se especifica, ejecuta una sola verificación y termina.
+    Si se especifica, ejecuta una sola verificacion y termina.
 .EXAMPLE
     .\scripts\vigilar_copias_windows.ps1
 .EXAMPLE
@@ -38,7 +38,7 @@ param(
 # Asegurar que el directorio de copias existe
 if (-not (Test-Path -Path $CopiasDir)) {
     New-Item -ItemType Directory -Path $CopiasDir -Force | Out-Null
-    Write-Host "📁 Directorio creado: $CopiasDir" -ForegroundColor Cyan
+    Write-Host "[DIR] Directorio creado: $CopiasDir" -ForegroundColor Cyan
 }
 
 $EstadoFile = Join-Path $CopiasDir ".ultimo_sincronizado.json"
@@ -131,9 +131,9 @@ function Sincronizar-Copias {
     foreach ($archivo in $archivosZip) {
         $nombre = $archivo.Name
 
-        # Verificar si el archivo está listo para lectura (no bloqueado por SG)
+        # Verificar si el archivo esta listo para lectura (no bloqueado por SG)
         if (-not (Test-ArchivoListo -Ruta $archivo.FullName)) {
-            Write-Log "El archivo $nombre está en uso o siendo escrito. Se omitirá en este ciclo." "WARN"
+            Write-Log "El archivo $nombre esta en uso o siendo escrito. Se omitira en este ciclo." "WARN"
             continue
         }
 
@@ -152,33 +152,33 @@ function Sincronizar-Copias {
         if (-not $yaSincronizado) {
             Write-Log "Nuevo backup detectado: $nombre ($([math]::Round($archivo.Length/1MB, 2)) MB). Iniciando transferencia..." "INFO"
 
-            # 1. Enviar vía SCP al VPS
+            # 1. Enviar via SCP al VPS
             $scpTarget = "${VpsUser}@${VpsHost}:${VpsDestDir}/$nombre"
             Write-Log "Ejecutando SCP a $scpTarget..." "INFO"
-            & scp -B -o StrictHostKeyChecking=accept-new "$($archivo.FullName)" "$scpTarget"
+            & scp -i "$env:USERPROFILE\.ssh\id_ed25519_bitacora" -o StrictHostKeyChecking=accept-new "$($archivo.FullName)" "$scpTarget"
 
             if ($LASTEXITCODE -ne 0) {
-                Write-Log "Error en la transferencia SCP de $nombre (código: $LASTEXITCODE)." "ERROR"
+                Write-Log "Error en la transferencia SCP de $nombre (codigo: $LASTEXITCODE)." "ERROR"
                 continue
             }
 
-            Write-Log "Transferencia SCP completada. Disparando importación remota en VPS..." "INFO"
+            Write-Log "Transferencia SCP completada. Disparando importacion remota en VPS..." "INFO"
 
-            # 2. Ejecutar script de importación remota por SSH
+            # 2. Ejecutar script de importacion remota por SSH
             $sshCmd = "bash ${VpsProjectPath}/scripts/importar_backup.sh ${VpsDestDir}/$nombre"
-            & ssh -o StrictHostKeyChecking=accept-new "${VpsUser}@${VpsHost}" "$sshCmd"
+            & ssh -i "$env:USERPROFILE\.ssh\id_ed25519_bitacora" -o StrictHostKeyChecking=accept-new "${VpsUser}@${VpsHost}" "$sshCmd"
 
             if ($LASTEXITCODE -eq 0) {
-                Write-Log "✅ Importación remota completada exitosamente para $nombre." "INFO"
+                Write-Log "[OK] Importacion remota completada exitosamente para $nombre." "INFO"
                 Guardar-Estado -Nombre $nombre -HashVal $fileHash -Length $archivo.Length -LastWriteTime $archivo.LastWriteTimeUtc.ToString("o")
             } else {
-                Write-Log "⚠️ Error al ejecutar importación remota para $nombre (código: $LASTEXITCODE)." "ERROR"
+                Write-Log "[WARN] Error al ejecutar importacion remota para $nombre (codigo: $LASTEXITCODE)." "ERROR"
             }
         }
     }
 }
 
-Write-Log "🚀 Iniciando vigilante de copias SG (Windows -> VPS $VpsHost)" "INFO"
+Write-Log ">> Iniciando vigilante de copias SG (Windows -> VPS $VpsHost)" "INFO"
 Write-Log "Carpeta vigilada: $CopiasDir | Intervalo: ${IntervaloSegundos}s" "INFO"
 
 if ($UnaVez) {
@@ -190,7 +190,7 @@ while ($true) {
     try {
         Sincronizar-Copias
     } catch {
-        Write-Log "Excepción durante la sincronización: $_" "ERROR"
+        Write-Log "Excepcion durante la sincronizacion: $_" "ERROR"
     }
     Start-Sleep -Seconds $IntervaloSegundos
 }

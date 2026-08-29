@@ -323,7 +323,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Auto-vinculación de fotos históricas huérfanas mediante análisis de `caption`, `ocr_text` y nombre de archivo.
   - [x] Búsqueda extendida en `fotos_de` por `animal_id`, `tag` exacto/normalizado, mención en comentario, texto OCR y archivos locales.
   - [x] Envío interactivo de imágenes en Telegram tanto por comando `/fotos <tag>` como por botón de galería `[ 📷 Galería Fotos ]`.
-- [x] Suite de pruebas con pytest: **252 pruebas en verde** (266 en VPS)
+- [x] **Paneles Táctiles Interactivos de Búsqueda Rápida, Medicamentos y Preguntas**:
+  - [x] **Buscador Táctil Didáctico** (`[ 🔍 Buscar Animal / Ficha ]` o `/buscar`): botones dinámicos con los animales de actividad más reciente y filtros por categorías (`[ 🥛 Vacas Paridas ]`, `[ 🤰 Inseminadas ]`, `[ 🐂 Toros ]`, `[ 🍼 Crías ]`, `[ ⚖️ Pesajes ]`), con apertura de ficha y fotografía en 1 toque.
+  - [x] **Panel Sanitario de Medicamentos & Retiros** (`[ 💊 Medicamentos & Retiro ]`, `/medicamentos`, `/retiros`): monitoreo en tiempo real de animales en retiro de leche y carne según días de carencia, lista de últimos tratamientos aplicados y accesos directos.
+  - [x] **Consultas Rápidas de Campo en 1-Toque** (`[ ❓ Preguntas Rápidas ]`, `/preguntas`, `/faq`): respuestas instantáneas a preguntas recurrentes sobre ordeño/retiro, potreros listos y días abiertos.
+- [x] Suite de pruebas con pytest: **255 pruebas en verde** (270 en VPS)
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
 - [ ] Optimización continua y calibración de campo.
