@@ -156,6 +156,9 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | `/fotos <tag>` | Consulta las fotos guardadas de un animal o las recientes. | `/fotos 47`, `/fotos` |
 | `/alertas` | Muestra las alertas pendientes (ecografías, palpaciones, secado). | `/alertas` |
 | `/historial <tag>` | Ficha completa con todos los eventos de un animal. | `/historial 47` |
+| `/buscar [tag]` | **Buscador & Fichas de Animales**: Filtros por vacas paridas, inseminadas, toros o crías. | `/buscar`, `/buscar 47` |
+| `/medicamentos`, `/retiros` | **Control Sanitario & Retiros**: Animales en retiro activo de leche/carne y tratamientos. | `/medicamentos`, `/retiros` |
+| `/preguntas`, `/faq` | **Consultas Rápidas de Campo**: Botones táctiles de preguntas frecuentes en 1 toque. | `/preguntas`, `/faq` |
 | `/potreros` | Muestra la **matriz de existencias por potrero de Software Ganadero** o potreros listos. | `/potreros`, `/potreros sg` |
 | `/ocupacion` o `/rotacion` | Muestra los **días de ocupación y rotación Voisin** de potreros ocupados y en reposo. | `/ocupacion`, `/rotacion` |
 | `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |

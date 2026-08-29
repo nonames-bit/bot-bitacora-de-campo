@@ -855,6 +855,91 @@ def parsear_args_reporte(args) -> Optional[tuple[int, str]]:
     return (dias, f"{dias}d")
 
 
+def formatear_panel_medicamentos(db: Database) -> str:
+    """Genera el panel zootécnico y sanitario de medicamentos, tratamientos y retiros."""
+    hoy_iso = date.today().isoformat()
+
+    # 1. Animales en retiro activo
+    en_retiro = db.query(
+        """
+        SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nombre
+        FROM tratamientos t
+        LEFT JOIN animales a ON a.id_animal = t.animal_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE (t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+           OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?)
+        ORDER BY t.fecha DESC
+        """,
+        (hoy_iso, hoy_iso),
+    )
+
+    # 2. Últimos tratamientos (general)
+    ultimos = db.query(
+        """
+        SELECT t.*, a.tag, a.nombre
+        FROM tratamientos t
+        LEFT JOIN animales a ON a.id_animal = t.animal_id
+        ORDER BY t.fecha DESC, t.id DESC LIMIT 8
+        """
+    )
+
+    lineas = [
+        "💊 <b>Control Sanitario, Medicamentos & Retiros</b>",
+        "────────────────────────────────────────",
+    ]
+
+    if en_retiro:
+        lineas.append(f"🚨 <b>ANIMALES EN RETIRO ACTIVO ({len(en_retiro)}):</b>")
+        for r in en_retiro:
+            tag_nom = r["tag"] or (f"#{r['animal_id']}" if r["animal_id"] else "Animal")
+            if r["nombre"]:
+                tag_nom += f" ({r['nombre']})"
+            pot = f" · 📍 {r['potrero_nombre']}" if r["potrero_nombre"] else ""
+            med = r["producto"] or "Tratamiento"
+            ret_leche = f"🥛 Fin leche: {r['fecha_fin_retiro_leche']}" if r["fecha_fin_retiro_leche"] and r["fecha_fin_retiro_leche"] >= hoy_iso else ""
+            ret_carne = f"🥩 Fin carne: {r['fecha_fin_retiro_carne']}" if r["fecha_fin_retiro_carne"] and r["fecha_fin_retiro_carne"] >= hoy_iso else ""
+            ret_txt = " · ".join(x for x in (ret_leche, ret_carne) if x)
+            lineas.append(f"• 🐮 <b>{html.escape(str(tag_nom))}</b>{pot}\n  💉 {html.escape(str(med))} | ⛔ {ret_txt}")
+        lineas.append("")
+    else:
+        lineas.append("✅ <b>No hay animales en retiro de leche ni carne actualmente.</b>\n")
+
+    if ultimos:
+        lineas.append("📋 <b>ÚLTIMOS TRATAMIENTOS REGISTRADOS:</b>")
+        for u in ultimos[:5]:
+            tag_u = u["tag"] or (f"#{u['animal_id']}" if u["animal_id"] else "S/T")
+            fec = u["fecha"] or "S/F"
+            med = u["producto"] or "Fármaco"
+            dos = f" ({u['dosis']})" if u["dosis"] else ""
+            diag = f" · {u['diagnostico']}" if u["diagnostico"] else ""
+            lineas.append(f"• [{fec}] 🐮 <b>{html.escape(str(tag_u))}</b>: {html.escape(str(med))}{dos}{html.escape(diag)}")
+        lineas.append("")
+
+    lineas.append(
+        "💡 <i>Tip de Campo: Envíe una foto del frasco del medicamento o una nota de voz como 'le apliqué 20ml de oxitetraciclina a la 47' y el bot calculará el retiro automáticamente.</i>"
+    )
+    return "\n".join(lineas)
+
+
+def formatear_panel_buscar_animal_texto() -> str:
+    return (
+        "🔍 <b>Buscador de Animales & Fichas Zootécnicas</b>\n"
+        "────────────────────────────────────────\n"
+        "Puede consultar cualquier animal de dos formas:\n\n"
+        "1. <b>Escribiendo directamente en el chat</b> su número o nombre:\n"
+        "   👉 Ejemplos: <code>47</code>, <code>N069</code>, <code>JA26</code>, <code>patricia</code>\n\n"
+        "2. <b>Seleccionando una categoría rápida</b> con los botones de abajo:"
+    )
+
+
+def formatear_panel_preguntas_rapidas_texto() -> str:
+    return (
+        "❓ <b>Consultas Rápidas de Campo (1-Toque)</b>\n"
+        "────────────────────────────────────────\n"
+        "Seleccione una pregunta para obtener la respuesta zootécnica al instante:"
+    )
+
+
 # ---------------------------------------------------------------------- #
 # Construcción del Bot de Telegram (SDK python-telegram-bot)
 # ---------------------------------------------------------------------- #
@@ -882,16 +967,20 @@ def construir_application(
     def crear_teclado_trabajador() -> InlineKeyboardMarkup:
         keyboard = [
             [
+                InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
+                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
+            ],
+            [
+                InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
+                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
+            ],
+            [
                 InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
-                InlineKeyboardButton("🔍 Cómo Hacer Preguntas", callback_data="guia:consultas"),
+                InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
             ],
             [
                 InlineKeyboardButton("📷 Fotos Aretes y Remedios", callback_data="guia:fotos"),
-                InlineKeyboardButton("🐮 Consultar un Animal", callback_data="guia:animal"),
-            ],
-            [
-                InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
-                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
+                InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
             ],
             [
                 InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
@@ -902,12 +991,20 @@ def construir_application(
     def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
         keyboard = [
             [
-                InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
+                InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
                 InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
             ],
             [
-                InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+                InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
                 InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
+            ],
+            [
+                InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
+                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
+            ],
+            [
+                InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+                InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             ],
             [
                 InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
@@ -915,21 +1012,94 @@ def construir_application(
             ],
             [
                 InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
-                InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             ],
         ]
         if rol == "OWNER":
+            keyboard[-1].append(InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"))
             keyboard.append([
-                InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
                 InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+                InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
             ])
         else:
+            keyboard[-1].append(InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"))
             keyboard.append([
-                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+                InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
             ])
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_medicamentos() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🚨 Animales en Retiro Activo", callback_data="cmd:retiros_activos"),
+            ],
+            [
+                InlineKeyboardButton("💉 Últimos Tratamientos", callback_data="cmd:ultimos_tratamientos"),
+                InlineKeyboardButton("📷 Fotos Medicamentos", callback_data="guia:fotos"),
+            ],
+            [
+                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_buscar_animal() -> InlineKeyboardMarkup:
+        ultimos_recientes = db.query(
+            """
+            SELECT DISTINCT a.tag FROM animales a
+            JOIN eventos e ON e.animal_id = a.id_animal
+            WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
+            ORDER BY e.fecha DESC LIMIT 4
+            """
+        )
+        keyboard = [
+            [
+                InlineKeyboardButton("🥛 Vacas Paridas", callback_data="filtro:paridas"),
+                InlineKeyboardButton("🤰 Inseminadas / Gestantes", callback_data="filtro:inseminadas"),
+            ],
+            [
+                InlineKeyboardButton("🐂 Toros / Reproductores", callback_data="filtro:toros"),
+                InlineKeyboardButton("🍼 Crías Recientes", callback_data="filtro:crias"),
+            ],
+            [
+                InlineKeyboardButton("💊 En Retiro Médico", callback_data="cmd:retiros_activos"),
+                InlineKeyboardButton("⚖️ Últimos Pesajes", callback_data="filtro:pesajes"),
+            ],
+        ]
+        if ultimos_recientes:
+            botones_recientes = [
+                InlineKeyboardButton(f"🐮 {r['tag']}", callback_data=f"ficha:{r['tag']}")
+                for r in ultimos_recientes
+            ]
+            keyboard.append(botones_recientes)
+
         keyboard.append([
-            InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ])
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_preguntas_rapidas() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🥛 ¿Quién está en retiro de leche?", callback_data="faq:retiro_leche"),
+            ],
+            [
+                InlineKeyboardButton("🌿 ¿Qué potreros tienen >30d reposo?", callback_data="faq:potreros_listos"),
+            ],
+            [
+                InlineKeyboardButton("⚠️ ¿Qué vacas tienen >90d abiertas?", callback_data="faq:dias_abiertos"),
+            ],
+            [
+                InlineKeyboardButton("🍼 ¿Qué partos hubo en los últimos 30 días?", callback_data="faq:partos_mes"),
+            ],
+            [
+                InlineKeyboardButton("⚖️ ¿Últimos pesajes y ganancias?", callback_data="faq:pesajes"),
+            ],
+            [
+                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
         return InlineKeyboardMarkup(keyboard)
 
     def crear_teclado_principal(rol: Optional[str]) -> InlineKeyboardMarkup:
@@ -1465,6 +1635,51 @@ def construir_application(
                 await update.message.reply_text(msg, reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_sistema: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_medicamentos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_panel_medicamentos(db)
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_medicamentos())
+        except Exception as e:
+            logger.error("Error en cmd_medicamentos: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_buscar_animal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_panel_buscar_animal_texto()
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal())
+        except Exception as e:
+            logger.error("Error en cmd_buscar_animal: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_preguntas_rapidas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_panel_preguntas_rapidas_texto()
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_preguntas_rapidas())
+        except Exception as e:
+            logger.error("Error en cmd_preguntas_rapidas: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -2224,6 +2439,184 @@ def construir_application(
                         "📋 Para consultar la ficha de un animal, escribe:\n/historial <tag> (ej. /historial 47) o directamente el número de arete."
                     )
 
+            elif data == "cmd:buscar_animal":
+                await query.answer()
+                msg = formatear_panel_buscar_animal_texto()
+                if query.message:
+                    await query.message.reply_text(
+                        msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal()
+                    )
+
+            elif data == "cmd:medicamentos":
+                await query.answer()
+                msg = formatear_panel_medicamentos(db)
+                if query.message:
+                    await query.message.reply_text(
+                        msg, parse_mode="HTML", reply_markup=crear_teclado_medicamentos()
+                    )
+
+            elif data == "cmd:preguntas_rapidas":
+                await query.answer()
+                msg = formatear_panel_preguntas_rapidas_texto()
+                if query.message:
+                    await query.message.reply_text(
+                        msg, parse_mode="HTML", reply_markup=crear_teclado_preguntas_rapidas()
+                    )
+
+            elif data == "cmd:retiros_activos":
+                await query.answer()
+                qe = QueryEngine(db)
+                msg = qe.responder("quien esta en retiro")
+                teclado_ret = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("💉 Ver Medicamentos", callback_data="cmd:medicamentos"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ])
+                if query.message:
+                    await query.message.reply_text(msg, reply_markup=teclado_ret)
+
+            elif data == "cmd:ultimos_tratamientos":
+                await query.answer()
+                ultimos = db.query(
+                    """
+                    SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nombre
+                    FROM tratamientos t
+                    LEFT JOIN animales a ON a.id_animal = t.animal_id
+                    LEFT JOIN potreros p ON p.id = a.potrero_id
+                    ORDER BY t.fecha DESC, t.id DESC LIMIT 10
+                    """
+                )
+                if not ultimos:
+                    txt = "💉 No hay tratamientos médicos registrados recientemente en la bitácora."
+                    btn_t = [[InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal")]]
+                else:
+                    lineas = ["💉 <b>Últimos Tratamientos Médicos Registrados:</b>\n"]
+                    botones_trat = []
+                    for u in ultimos:
+                        tag_u = u["tag"] or (f"#{u['animal_id']}" if u["animal_id"] else "S/T")
+                        fec = u["fecha"] or "S/F"
+                        med = u["producto"] or "Tratamiento"
+                        dos = f" ({u['dosis']})" if u["dosis"] else ""
+                        pot = f" · 📍 {u['potrero_nombre']}" if u["potrero_nombre"] else ""
+                        lineas.append(f"• [{fec}] 🐮 <b>{html.escape(str(tag_u))}</b>: {html.escape(str(med))}{dos}{pot}")
+                        if u["tag"] and len(botones_trat) < 6:
+                            botones_trat.append(InlineKeyboardButton(f"🐮 {u['tag']}", callback_data=f"ficha:{u['tag']}"))
+                    txt = "\n".join(lineas)
+                    btn_t = []
+                    if botones_trat:
+                        for i in range(0, len(botones_trat), 3):
+                            btn_t.append(botones_trat[i:i+3])
+                    btn_t.append([
+                        InlineKeyboardButton("💊 Panel Medicamentos", callback_data="cmd:medicamentos"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_t))
+
+            elif data.startswith("filtro:"):
+                cat = data.split("filtro:", 1)[1].strip()
+                await query.answer()
+                filas = []
+                titulo = ""
+                if cat == "paridas":
+                    titulo = "🥛 <b>Vacas Paridas Recientes (Lactancia):</b>"
+                    filas = db.query(
+                        """
+                        SELECT DISTINCT a.tag, a.nombre, p.fecha FROM partos p
+                        JOIN animales a ON a.id_animal = p.vaca_id
+                        WHERE a.estado = 'ACTIVO' AND a.sexo LIKE 'H%'
+                        ORDER BY p.fecha DESC LIMIT 9
+                        """
+                    )
+                elif cat == "inseminadas":
+                    titulo = "🤰 <b>Vacas Inseminadas / Servidas:</b>"
+                    filas = db.query(
+                        """
+                        SELECT DISTINCT a.tag, a.nombre, s.fecha FROM servicios s
+                        JOIN animales a ON a.id_animal = s.vaca_id
+                        WHERE a.estado = 'ACTIVO'
+                        ORDER BY s.fecha DESC LIMIT 9
+                        """
+                    )
+                elif cat == "toros":
+                    titulo = "🐂 <b>Toros / Reproductores Activos:</b>"
+                    filas = db.query(
+                        """
+                        SELECT DISTINCT a.tag, a.nombre FROM animales a
+                        WHERE a.estado = 'ACTIVO' AND (a.sexo LIKE 'M%' OR a.categoria_sg LIKE '%REPRO%')
+                        ORDER BY a.tag ASC LIMIT 9
+                        """
+                    )
+                elif cat == "crias":
+                    titulo = "🍼 <b>Crías y Terneros Recientes:</b>"
+                    filas = db.query(
+                        """
+                        SELECT DISTINCT a.tag, a.nombre, p.fecha FROM partos p
+                        JOIN animales a ON (a.id_animal = p.id_cria OR a.tag = p.cria_tag)
+                        WHERE a.estado = 'ACTIVO'
+                        ORDER BY p.fecha DESC LIMIT 9
+                        """
+                    )
+                elif cat == "pesajes":
+                    titulo = "⚖️ <b>Últimos Animales Pesados:</b>"
+                    filas = db.query(
+                        """
+                        SELECT DISTINCT a.tag, a.nombre, pe.peso, pe.fecha FROM pesajes pe
+                        JOIN animales a ON a.id_animal = pe.animal_id
+                        WHERE a.estado = 'ACTIVO'
+                        ORDER BY pe.fecha DESC LIMIT 9
+                        """
+                    )
+
+                if not filas:
+                    txt = f"{titulo}\n\nNo se encontraron animales activos registrados en esta categoría."
+                    btn_f = [[InlineKeyboardButton("🔍 Buscar Otro Grupo", callback_data="cmd:buscar_animal")]]
+                else:
+                    txt = f"{titulo}\n\nToque cualquier animal para abrir su ficha y fotografía:"
+                    botones = [
+                        InlineKeyboardButton(f"🐮 {r['tag']}", callback_data=f"ficha:{r['tag']}")
+                        for r in filas if r["tag"]
+                    ]
+                    btn_f = []
+                    for i in range(0, len(botones), 3):
+                        btn_f.append(botones[i:i+3])
+                    btn_f.append([
+                        InlineKeyboardButton("🔍 Buscar Otro Grupo", callback_data="cmd:buscar_animal"),
+                        InlineKeyboardButton("🏠 Menú", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_f))
+
+            elif data.startswith("faq:"):
+                tema = data.split("faq:", 1)[1].strip()
+                await query.answer()
+                qe = QueryEngine(db)
+                if tema == "retiro_leche":
+                    msg = qe.responder("quien esta en retiro de leche")
+                elif tema == "potreros_listos":
+                    msg = qe.responder("que potreros estan listos")
+                elif tema == "dias_abiertos":
+                    msg = qe.responder("vacas abiertas mas de 90 dias")
+                elif tema == "partos_mes":
+                    msg = qe.responder("partos del mes")
+                elif tema == "pesajes":
+                    msg = qe.responder("ultimos pesajes")
+                else:
+                    msg = "Consulta no reconocida."
+
+                teclado_faq = InlineKeyboardMarkup([
+                    [
+                        InlineKeyboardButton("❓ Más Preguntas", callback_data="cmd:preguntas_rapidas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]
+                ])
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_faq)
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=teclado_faq)
+
             elif data == "cmd:ayuda":
                 await query.answer()
                 rol = auth.rol_de(user_id)
@@ -2243,8 +2636,11 @@ def construir_application(
     # Handlers de comandos
     app.add_handler(CommandHandler(["start", "menu"], cmd_start_menu))
     app.add_handler(CommandHandler(["help", "ayuda", "comandos"], cmd_ayuda_completa))
+    app.add_handler(CommandHandler(["buscar", "buscar_animal", "buscador"], cmd_buscar_animal))
+    app.add_handler(CommandHandler(["medicamentos", "tratamientos", "farmacia", "retiros", "retiro"], cmd_medicamentos))
+    app.add_handler(CommandHandler(["preguntas", "faq", "consultas"], cmd_preguntas_rapidas))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
-    app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal", "buscar"], cmd_historial))
+    app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
     app.add_handler(CommandHandler("animales", cmd_animales))

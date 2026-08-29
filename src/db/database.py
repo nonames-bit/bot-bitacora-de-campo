@@ -5,7 +5,7 @@ import sqlite3
 from datetime import date
 from typing import Any, Optional
 
-from ..utils import iso, to_date
+from ..utils import add_days, iso, to_date
 from .models import SCHEMA_SQL
 
 
@@ -262,12 +262,20 @@ class Database:
                               fecha_fin_retiro_leche=None, fecha_fin_retiro_carne=None,
                               diagnostico=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
+        f_dosis = iso(fecha) or date.today().isoformat()
+        fin_leche = iso(fecha_fin_retiro_leche)
+        if not fin_leche and dias_retiro_leche and int(dias_retiro_leche) > 0:
+            fin_leche = iso(add_days(f_dosis, int(dias_retiro_leche)))
+        fin_carne = iso(fecha_fin_retiro_carne)
+        if not fin_carne and dias_retiro_carne and int(dias_retiro_carne) > 0:
+            fin_carne = iso(add_days(f_dosis, int(dias_retiro_carne)))
+
         return self.insert("tratamientos", dict(
-            animal_id=animal_id, fecha=iso(fecha), producto=producto,
+            animal_id=animal_id, fecha=f_dosis, producto=producto,
             principio_activo=principio_activo, dosis=dosis, via=via,
             dias_retiro_leche=dias_retiro_leche, dias_retiro_carne=dias_retiro_carne,
-            fecha_fin_retiro_leche=iso(fecha_fin_retiro_leche),
-            fecha_fin_retiro_carne=iso(fecha_fin_retiro_carne),
+            fecha_fin_retiro_leche=fin_leche,
+            fecha_fin_retiro_carne=fin_carne,
             diagnostico=diagnostico,
         ))
 

@@ -469,6 +469,39 @@ def test_formatear_estado_servidor(db, tmp_path):
     assert "Pytesseract" in resp
 
 
+def test_formatear_panel_medicamentos(db):
+    from src.server.telegram_bot import formatear_panel_medicamentos
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_tratamiento(
+        "47",
+        date.today().isoformat(),
+        producto="Oxitetraciclina",
+        dosis="20ml",
+        dias_retiro_leche=5,
+        dias_retiro_carne=28,
+        diagnostico="Mastitis",
+    )
+    resp = formatear_panel_medicamentos(db)
+    assert "Control Sanitario, Medicamentos & Retiros" in resp
+    assert "ANIMALES EN RETIRO ACTIVO" in resp
+    assert "47" in resp
+    assert "Oxitetraciclina" in resp
+    assert "Fin leche:" in resp
+
+
+def test_paneles_textos_guia():
+    from src.server.telegram_bot import (
+        formatear_panel_buscar_animal_texto,
+        formatear_panel_preguntas_rapidas_texto,
+    )
+    t_buscar = formatear_panel_buscar_animal_texto()
+    assert "Buscador de Animales & Fichas Zootécnicas" in t_buscar
+    assert "patricia" in t_buscar
+
+    t_faq = formatear_panel_preguntas_rapidas_texto()
+    assert "Consultas Rápidas de Campo (1-Toque)" in t_faq
+
+
 
 
 
