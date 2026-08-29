@@ -159,7 +159,8 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | `/potreros` | Muestra la **matriz de existencias por potrero de Software Ganadero** o potreros listos. | `/potreros`, `/potreros sg` |
 | `/ocupacion` o `/rotacion` | Muestra los **días de ocupación y rotación Voisin** de potreros ocupados y en reposo. | `/ocupacion`, `/rotacion` |
 | `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |
-| `/status` | Estado de la base de datos, total de eventos y peso del archivo. | `/status` |
+| `/status`, `/tablero`, `/finca` | **Tablero Zootécnico Ejecutivo**: Novedades de la semana, alertas próximas y pasturas. | `/status`, `/tablero`, `/finca` |
+| `/sistema`, `/servidor`, `/vps` | **Tablero Técnico del Servidor**: Recursos VPS, RAM, disco SSD, SQLite y estado de APIs. | `/sistema`, `/servidor` |
 | `/importar` | Muestra la guía para subir un backup `.zip` de Software Ganadero. | `/importar` |
 | `/confirmar_importar` | Procesa el archivo `.zip` subido sin duplicar registros. | `/confirmar_importar` |
 | `/descartar_backup` | Elimina el backup pendiente sin procesar. | `/descartar_backup` |

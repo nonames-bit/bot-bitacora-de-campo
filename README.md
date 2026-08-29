@@ -281,9 +281,18 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Cálculo de días de pastoreo activo y semáforo de pradera (1-3d óptimo, 4-6d rotación, ≥7d sobreocupación).
   - Estado de descanso de potreros en reposo con punto óptimo de recuperación forrajera (≥30 días).
   - Comando `/ocupacion` / `/rotacion` y consultas de tiempo de ocupación.
-- [x] **Logo institucional Ganadería JA**:
-  - Incorporación del emblema `docs/GanaderiaJA_Logo.jpg` en los reportes en PDF (`/reporte`).
-- [x] Suite de pruebas con pytest: **245 pruebas en verde** (259 en VPS)
+- [x] **Doble Tablero de Control Inteligente (Finca vs Sistema)**:
+  - **Tablero Zootécnico de la Finca** (`/status`, `/finca`, `/tablero`, `/resumen` o botón `[ 🐮 Tablero de la Finca ]`):
+    - Hato activo desglosado por sexo y categorías.
+    - Novedades de la semana (últimos 7 días): partos (conteo por sexo), celos, inseminaciones, tratamientos médicos (y retiros activos), pesajes con GMD promedio, traslados y muertes.
+    - Alertas zootécnicas próximas (7 días): ecografías (día 35), palpaciones (día 60), secados y retiros activos de leche/carne.
+    - Pasturas y Voisin: potreros en pastoreo, listos para rotar (≥30d de reposo) y alertas de sobreocupación (>3d).
+  - **Tablero Técnico del Servidor & Sistema** (`/sistema`, `/servidor`, `/vps` o botón `[ ⚙️ Servidor & Sistema ]`):
+    - Métricas de infraestructura VPS (SO, RAM servidor, RAM proceso bot, espacio en disco SSD, versión Python, servicio systemd).
+    - Base de datos SQLite (ruta, tamaño en MB, total de animales y eventos históricos, fecha de última sincronización).
+    - Usuarios autorizados y distribución de roles (OWNER, ADMIN, TRABAJADOR).
+    - Estado de IA y APIs integradas (Gemini 2.5 Flash, transcriptor Whisper, OCR Pytesseract).
+- [x] Suite de pruebas con pytest: **247 pruebas en verde** (261 en VPS)
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
 - [ ] Optimización continua y calibración de campo.
