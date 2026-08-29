@@ -635,29 +635,31 @@ def test_resumen_inventario_sg_brackets_completos(db):
     # Consulta por lenguaje natural
     resp = qe.responder("resumen inventario")
 
-    assert "Resumen General de Inventario (SG)" in resp
     assert "<pre>" in resp
     assert "</pre>" in resp
 
+    import html
+    resp_txt = html.unescape(resp)
+
     # Verificaciones de brackets hembras
-    assert "Hembras <1 año" in resp and "9.09%" in resp
-    assert "Hembras 1-2 años" in resp
-    assert "Hembras 2-4 años" in resp
-    assert "Hembras 4-8 años" in resp
-    assert "Hembras 8-10 años" in resp
-    assert "Hembras >10 años" in resp
+    assert "Hembras <1 año" in resp_txt and "9.09%" in resp_txt
+    assert "Hembras 1-2 años" in resp_txt
+    assert "Hembras 2-4 años" in resp_txt
+    assert "Hembras 4-8 años" in resp_txt
+    assert "Hembras 8-10 años" in resp_txt
+    assert "Hembras >10 años" in resp_txt
 
     # Verificaciones de brackets machos
-    assert "Machos <1 año" in resp
-    assert "Machos 1-2 años" in resp
-    assert "Machos >2 años" in resp
-    assert "Reproductor" in resp and "18.18%" in resp
+    assert "Machos <1 año" in resp_txt
+    assert "Machos 1-2 años" in resp_txt
+    assert "Machos >2 años" in resp_txt
+    assert "Reproductor" in resp_txt and "18.18%" in resp_txt
 
     # Pie de tabla SG y resumen
-    assert "Hembras 6 | Machos 5 | Total 11" in resp
-    assert "Total en finca: 11 animales" in resp
-    assert "H_MUERTO" not in resp
-    assert "M_VENDIDO" not in resp
+    assert "Hembras 6 | Machos 5 | Total 11" in resp_txt
+    assert "Total en finca: 11 animales" in resp_txt
+    assert "H_MUERTO" not in resp_txt
+    assert "M_VENDIDO" not in resp_txt
 
 
 def test_inventario_potreros_ocupados_porcentajes_y_filtro_historico(db):

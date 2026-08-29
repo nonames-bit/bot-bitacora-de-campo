@@ -1,6 +1,7 @@
 """Motor de consultas: respuestas zootécnicas a preguntas en lenguaje natural."""
 from __future__ import annotations
 
+import html
 import os
 import re
 from datetime import date
@@ -308,7 +309,7 @@ def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
         return "📊 Inventario: 0 animales activos en la finca."
 
     pre_lines = [
-        "Categoría          Nro  Distrib.    Acum",
+        f"{'Categoría'.ljust(18)} {'Nro'.rjust(4)} {'Distrib.'.rjust(8)} {'Acum'.rjust(8)}",
     ]
     for cat, n, pct, acum in datos["filas"]:
         cat_str = cat.ljust(18)
@@ -317,20 +318,21 @@ def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
         acum_str = f"{acum:6.2f}%"
         pre_lines.append(f"{cat_str} {n_str} {pct_str} {acum_str}")
 
-    pre_lines.append("─" * 40)
+    pre_lines.append("─" * 42)
     pie_partes = [
         f"Hembras {_fmt_es_co(datos['total_hembras'])}",
         f"Machos {_fmt_es_co(datos['total_machos'])}",
     ]
     if datos["total_sin_sexo"] > 0:
-        pie_partes.append(f"Sin narr {_fmt_es_co(datos['total_sin_sexo'])}")
+        pie_partes.append(f"Sin clasificar {_fmt_es_co(datos['total_sin_sexo'])}")
     pie_partes.append(f"Total {_fmt_es_co(datos['total_activos'])}")
     pre_lines.append(" | ".join(pie_partes))
 
     cuerpo = "\n".join(pre_lines)
+    cuerpo_escapado = html.escape(cuerpo)
     return (
         "📊 <b>Resumen General de Inventario (SG)</b>\n"
-        f"<pre>\n{cuerpo}\n</pre>"
+        f"<pre>\n{cuerpo_escapado}\n</pre>"
     )
 
 
@@ -482,11 +484,10 @@ def formatear_tabla_potreros_sg(filas_potreros: list[dict]) -> str:
         f"{v(tot_rep).rjust(2)} {str(tot_general).rjust(4)}"
     )
 
+    cuerpo_escapado = html.escape("\n".join(lines))
     msg = [
         "🌿 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>",
-        "<pre>",
-        "\n".join(lines),
-        "</pre>",
+        f"<pre>\n{cuerpo_escapado}\n</pre>",
         "<i>Leyenda: CH: Cría hembra | HL: Hemb. levante | NV: Nov. vientre | VP: Vaca parida | VS: Vaca seca | CM: Cría macho | ML: Mac. levante | MC: Macho ceba | RP: Reproductor | Tot: Total activos</i>",
     ]
     return "\n".join(msg)
@@ -1596,9 +1597,7 @@ class QueryEngine:
 
         lineas = [
             f"📍 <b>Inventario por potrero — Ocupados ({len(ocupados)})</b>",
-            "<pre>",
-            "\n".join(pre_lines),
-            "</pre>",
+            f"<pre>\n{html.escape(chr(10).join(pre_lines))}\n</pre>",
             f"Vacíos: {len(vacios)} (ver con /potreros vacios) · Total en potreros: {total_str}",
         ]
         return "\n".join(lineas)

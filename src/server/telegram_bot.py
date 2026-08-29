@@ -1,6 +1,7 @@
 """Bot de Telegram multiusuario con control de acceso basado en roles (RBAC)."""
 from __future__ import annotations
 
+import html
 import logging
 import os
 import re
@@ -95,14 +96,10 @@ def _contar_activos(db: Database) -> int:
 
 
 def formatear_animales(db: Database, hoy: Optional[date] = None) -> str:
-    """Genera un resumen del inventario de animales activos y del histórico."""
-    total = db.count("animales")
-    if total == 0:
-        return "📊 Inventario de animales: 0 registrados."
-
+    """Genera un resumen del inventario de animales activos."""
     activos = _contar_activos(db)
     if activos == 0:
-        return f"📊 Inventario de animales: 0 activos registrados · Histórico total: {_fmt_es_co(total)}"
+        return "📊 Inventario de animales: 0 registrados."
 
     tabla_sg = generar_resumen_inventario_sg(db, hoy=hoy)
     datos = calcular_brackets_inventario_sg(db, hoy=hoy)
@@ -111,7 +108,7 @@ def formatear_animales(db: Database, hoy: Optional[date] = None) -> str:
 
     lineas = [
         tabla_sg,
-        f"🐄 Activos: {_fmt_es_co(activos)} (♀ {hembras} · ♂ {machos}) · Histórico total: {_fmt_es_co(total)}",
+        f"🐄 Activos: {_fmt_es_co(activos)} (♀ {hembras} · ♂ {machos})",
     ]
     return "\n".join(lineas)
 
@@ -270,9 +267,10 @@ def formatear_status(
         f"Memoria:                      {mem_str}",
     ]
     cuerpo = "\n".join(lineas_pre)
+    cuerpo_escapado = html.escape(cuerpo)
     return (
         f"🖥️ <b>Estado del Sistema</b>\n"
-        f"<pre>\n{cuerpo}\n</pre>\n"
+        f"<pre>\n{cuerpo_escapado}\n</pre>\n"
         f"<i>Actualizado: {ts_str}</i>"
     )
 

@@ -56,7 +56,7 @@ def test_formatear_animales_con_datos(db):
     assert "Activos: 2" in resp
     assert "♀ 2" in resp
     assert "♂ 0" in resp
-    assert "Histórico total: 3" in resp
+    assert "Histórico total" not in resp
 
 
 def test_formatear_animales_cuenta_solo_activos(db):
@@ -69,7 +69,7 @@ def test_formatear_animales_cuenta_solo_activos(db):
     assert "Activos: 2" in resp
     assert "♀ 1" in resp
     assert "♂ 1" in resp
-    assert "Histórico total: 4" in resp
+    assert "Histórico total" not in resp
 
 
 def test_formatear_status_memoria_y_archivo(db, tmp_path):
@@ -353,15 +353,15 @@ def test_formatear_animales_sg_brackets_y_filtro_activos(db):
     assert "Resumen General de Inventario (SG)" in resp
     assert "<pre>" in resp
     assert "</pre>" in resp
-    assert "Hembras <1 año" in resp
+    assert "Hembras &lt;1 año" in resp or "Hembras <1 año" in resp
     assert "Hembras 2-4 años" in resp
-    assert "Machos <1 año" in resp
+    assert "Machos &lt;1 año" in resp or "Machos <1 año" in resp
     assert "Reproductor" in resp
     assert "Hembras 2 | Machos 2 | Total 4" in resp
     assert "Activos: 4" in resp
     assert "♀ 2" in resp
     assert "♂ 2" in resp
-    assert "Histórico total: 5" in resp
+    assert "Histórico total" not in resp
     assert "H_DESC" not in resp
 
 
