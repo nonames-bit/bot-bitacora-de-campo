@@ -156,7 +156,8 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | `/fotos <tag>` | Consulta las fotos guardadas de un animal o las recientes. | `/fotos 47`, `/fotos` |
 | `/alertas` | Muestra las alertas pendientes (ecografías, palpaciones, secado). | `/alertas` |
 | `/historial <tag>` | Ficha completa con todos los eventos de un animal. | `/historial 47` |
-| `/potreros` | Muestra qué potreros cumplieron su tiempo de reposo Voisin. | `/potreros` |
+| `/potreros` | Muestra la **matriz de existencias por potrero de Software Ganadero** o potreros listos. | `/potreros`, `/potreros sg` |
+| `/ocupacion` o `/rotacion` | Muestra los **días de ocupación y rotación Voisin** de potreros ocupados y en reposo. | `/ocupacion`, `/rotacion` |
 | `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |
 | `/status` | Estado de la base de datos, total de eventos y peso del archivo. | `/status` |
 | `/importar` | Muestra la guía para subir un backup `.zip` de Software Ganadero. | `/importar` |

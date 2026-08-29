@@ -81,14 +81,16 @@ implementado todavía.
 
 | Comando / Acción | 👑 OWNER | 🛠️ ADMIN | 📋 TRABAJADOR |
 |------------------|:--------:|:---------:|:--------------:|
-| `/start`, `/help` | ✅ | ✅ | ✅ |
+| `/menu` / `/start` (Panel táctil limpio) | ✅ | ✅ | ✅ |
+| `/ayuda` / `/help` / `/comandos` | ✅ | ✅ | ✅ |
 | Texto libre (8 eventos) | ✅ | ✅ | ✅ |
 | Nota de voz (Whisper) | ✅ | ✅ | ✅ |
-| Foto | ✅ | ✅ | ✅ |
+| Foto (OCR arete y medicamentos) | ✅ | ✅ | ✅ |
 | `/historial <tag>` / `/consulta <tag>` | ✅ | ✅ | ✅ |
 | `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
+| `/potreros` / `/potreros sg` | ✅ | ✅ | — |
+| `/ocupacion` / `/rotacion` (Voisin) | ✅ | ✅ | — |
 | `/alertas` | ✅ | ✅ | — |
-| `/potreros` / `/potreros <nombre>` | ✅ | ✅ | — |
 | `/animales` | ✅ | ✅ | — |
 | `/status` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
@@ -104,15 +106,19 @@ implementado todavía.
 
 ### Comandos principales
 
-- **Todos los roles:** `/start` y `/help` (ayuda adaptada al rol), **texto libre**
+- **Todos los roles:** `/menu` y `/start` (tablero visual corto y táctil diferenciado por rol), `/ayuda` (listado exhaustivo de comandos), **texto libre**
   con los 8 eventos zootécnicos, **nota de voz** (transcripción automática con Whisper
   y ejecución del evento o consulta), `/consulta <tag>` / `/historial <tag>` (ficha zootécnica
-  completa del animal), **foto** (con detección de tag y eventos
-  en el pie de foto; se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
+  completa del animal con entrega automática de su fotografía), **foto** (con detección OCR de tag y medicamento en frasco;
+  se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
   consultar imágenes de los animales.
-- **OWNER y ADMIN:** `/alertas`, `/historial <tag>`, `/potreros`, `/animales`,
-  `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF),
+- **OWNER y ADMIN:** `/potreros` y `/potreros sg` (matriz exacta de existencias por potrero de Software Ganadero),
+  `/ocupacion` / `/rotacion` (días de pastoreo y descanso Voisin con semáforo), `/alertas`,
+  `/animales`, `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF institucional con logo `GANADERÍA JA`),
   `/exportar` (genera y envía el archivo ZIP con las 8 tablas DBF para Software Ganadero),
+  `/importar` (guía de importación), enviar el `.zip` del backup directamente como
+  documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
+  `/descartar_backup` (elimina el backup pendiente sin procesar).
   `/importar` (guía de importación), enviar el `.zip` del backup directamente como
   documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
   `/descartar_backup` (elimina el backup pendiente sin procesar).
@@ -264,7 +270,20 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] **Ficha con edad humana** (`formatear_edad_zootecnica`): `🎂 Edad: 7 años 3 meses (2.667 días)` / `8 meses (243 días)` / `12 días`, inferida desde `fecha_nacimiento` o `parto madre` (<450d), mostrada en header.
 - [x] **`/status` depurado para GANADERIA-JA 01-JA**: solo `Activos: 338 (GANADERIA-JA 01-JA)` sin `Histórico`, `Potrero + reposo` filtra reposos absurdos `>365d` (JARA 3.232d → `Ninguno`), `Potrero + animales` usa último traslado + `estado='ACTIVO'`, `Actualizado` usa mtime del `data/bitacora.db` (fecha del último backup SG) con fallback a `MAX(partos.fecha)`.
 - [x] **Resumen SG inventario por brackets** (replica foto SG 339): tabla `Hembras <1, 1-2, 2-4, 4-8, 8-10, >10` y `Machos <1, 1-2, >2, Reproductor` con `Nro` y `Distrib.%` + `Total 339`, solo `estado='ACTIVO'` (GANADERIA-JA 01-JA), potreros ocupados con `% del total`; igual que `/animales` y `/status`.
-- [x] Suite de pruebas con pytest: **238 pruebas en verde** (252 en VPS)
+- [x] **Menús diferenciados y UX interactiva optimizada**:
+  - Panel corto y táctil para `/start` y `/menu` (`crear_teclado_trabajador` y `crear_teclado_admin`).
+  - Menú de campo 100% didáctico para trabajadores (`[ 📝 Cómo Anotar Reportes ]`, `[ 🔍 Cómo Hacer Preguntas ]`, `[ 📷 Fotos Aretes y Remedios ]`, `[ 🐮 Consultar un Animal ]`, `[ 🎤 Cómo Mandar Audios ]`).
+  - Listado completo de comandos reservado para `/ayuda` y `/help`.
+- [x] **Existencias por potrero fieles a Software Ganadero (SG)**:
+  - Matriz zootécnica de 9 columnas (`CH`, `HL`, `NV`, `VP`, `VS`, `CM`, `ML`, `MC`, `RP`, `Tot`) réplica de `potreros.jpg`.
+  - Integrada en el motor de consultas (`_inventario_potreros_sg`), comandos de Telegram y reportes en PDF.
+- [x] **Días de ocupación y rotación Voisin**:
+  - Cálculo de días de pastoreo activo y semáforo de pradera (1-3d óptimo, 4-6d rotación, ≥7d sobreocupación).
+  - Estado de descanso de potreros en reposo con punto óptimo de recuperación forrajera (≥30 días).
+  - Comando `/ocupacion` / `/rotacion` y consultas de tiempo de ocupación.
+- [x] **Logo institucional Ganadería JA**:
+  - Incorporación del emblema `docs/GanaderiaJA_Logo.jpg` en los reportes en PDF (`/reporte`).
+- [x] Suite de pruebas con pytest: **245 pruebas en verde** (259 en VPS)
 
 ### ⏳ En Progreso / Planificado para la Próxima Sesión
 - [ ] Optimización continua y calibración de campo.
