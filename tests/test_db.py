@@ -162,3 +162,19 @@ def test_resolver_animal_tags_flexibles(db):
     assert db.resolve_animal("n069") == aid
 
 
+def test_marcar_historicos_sg(db):
+    p_viejo = db.registrar_potrero(codigo="01", nombre="LECHERAS")
+    p_nuevo = db.registrar_potrero(codigo="A01", nombre="ORDENO SANTA MARTHA")
+
+    db.registrar_animal("VIEJO1", potrero="01", estado="ACTIVO")
+    db.registrar_animal("NUEVO1", potrero="A01", estado="ACTIVO")
+
+    db.marcar_historicos_sg()
+
+    h_viejo = db.query_one("SELECT estado FROM animales WHERE tag='VIEJO1'")
+    h_nuevo = db.query_one("SELECT estado FROM animales WHERE tag='NUEVO1'")
+
+    assert h_viejo["estado"] == "HISTORICO"
+    assert h_nuevo["estado"] == "ACTIVO"
+
+

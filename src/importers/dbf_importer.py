@@ -44,9 +44,17 @@ TIPO_A_ESTADO = {
 }
 
 
-def _estado_desde_tipo(tipo) -> str:
+def _estado_desde_tipo(tipo, codpot=None) -> str:
     """Deriva el estado del animal desde el campo TIPO de SG (strip + upper)."""
-    return TIPO_A_ESTADO.get((tipo or "").strip().upper(), "ACTIVO")
+    estado = TIPO_A_ESTADO.get((tipo or "").strip().upper(), "ACTIVO")
+    if estado == "ACTIVO" and codpot:
+        cod_s = str(codpot).strip()
+        # En Software Ganadero histórico, los potreros numéricos 01..23 corresponden
+        # a lotes cerrados del histórico 2008-2018. Los potreros activos del hato
+        # presente usan nomenclatura con letra (A01..A04, B01..B02, C01..C14).
+        if cod_s.isdigit() and int(cod_s) <= 23:
+            return "HISTORICO"
+    return estado
 
 
 def _dbf_fecha(raw: str) -> Optional[str]:
@@ -246,14 +254,15 @@ def import_animales(db: Database, records, causas: dict) -> dict:
         else:
             duplicados_animales += 1
 
+        codpot = (r.get("CODPOT") or "").strip() or None
         db.registrar_animal(
             tag=tag,
             nombre=(r.get("NOMANI") or "").strip() or None,
             sexo=sexo,
             raza=(r.get("TIPORAZA") or "").strip() or None,
             fecha_nacimiento=r.get("FECNACE"),
-            potrero=(r.get("CODPOT") or "").strip() or None,
-            estado=_estado_desde_tipo(r.get("TIPO")),
+            potrero=codpot,
+            estado=_estado_desde_tipo(r.get("TIPO"), codpot=codpot),
             notas=(r.get("OBS") or "").strip() or None,
         )
         tags.append((tag, r))

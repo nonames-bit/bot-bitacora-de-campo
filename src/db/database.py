@@ -35,6 +35,7 @@ class Database:
             self.conn.execute("UPDATE animales SET padre_id = NULL WHERE padre_id = id_animal")
             self.conn.execute("DELETE FROM partos WHERE vaca_id = id_cria AND vaca_id IS NOT NULL")
             self.vincular_fotos_huerfanas()
+            self.marcar_historicos_sg()
         except Exception:
             pass
         self.conn.commit()
@@ -483,3 +484,19 @@ class Database:
         ancestros_h = self._ancestros(ha, 3)
         ancestros_t = self._ancestros(ta, 3)
         return bool(ancestros_h & ancestros_t) or ta in ancestros_h or ha in ancestros_t
+
+    def marcar_historicos_sg(self) -> int:
+        """Marca como HISTORICO los animales asignados a potreros numéricos viejos (01-23) de SG."""
+        cur = self.conn.execute(
+            """
+            UPDATE animales
+            SET estado = 'HISTORICO'
+            WHERE estado = 'ACTIVO'
+              AND potrero_id IN (
+                  SELECT id FROM potreros
+                  WHERE codigo GLOB '[0-9][0-9]' OR codigo GLOB '[0-9]'
+              )
+            """
+        )
+        self.conn.commit()
+        return cur.rowcount
