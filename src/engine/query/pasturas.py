@@ -138,6 +138,33 @@ class PasturasQueryMixin:
         )
         return resp
 
+    def _lote_ocupacion(self, lote: str) -> str:
+        """Animales cuyo último traslado los asignó al lote indicado, y días desde ese traslado."""
+        filas = self.db.query(
+            """
+            SELECT t.animal_id, t.fecha, t.lote, a.tag
+            FROM traslados t
+            JOIN animales a ON a.id_animal = t.animal_id
+            WHERE a.estado = 'ACTIVO'
+            ORDER BY t.fecha ASC, t.id ASC
+            """
+        )
+        ultimos: dict[int, dict] = {}
+        for f in filas:
+            ultimos[f["animal_id"]] = f  # ordenado ascendente: el último gana
+
+        lote_norm = normalizar(lote)
+        del_grupo = [f for f in ultimos.values() if f["lote"] and normalizar(f["lote"]) == lote_norm]
+        if not del_grupo:
+            return f"No hay animales asignados actualmente al lote '{lote}'."
+
+        fechas = [to_date(f["fecha"]) for f in del_grupo if to_date(f["fecha"])]
+        fecha_reciente = max(fechas) if fechas else None
+        dias_str = f"{(self.hoy - fecha_reciente).days} días" if fecha_reciente else "fecha desconocida"
+        tags = [f["tag"] for f in del_grupo]
+        tags_str = ", ".join(tags[:10]) + (f" y {len(tags) - 10} más" if len(tags) > 10 else "")
+        return f"🌱 <b>Lote {lote}:</b> {len(tags)} animal(es) ({tags_str}) · {dias_str} de pastoreo."
+
     def _potreros_listos(self) -> str:
         potreros = self.db.query("SELECT * FROM potreros")
         listos = []

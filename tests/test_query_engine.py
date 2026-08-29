@@ -832,8 +832,187 @@ def test_dias_ocupacion_y_rotacion(db):
     assert "Días de Ocupación y Rotación" in resp
 
 
+# --------------------------------------------------------------------- #
+# Consultas de lista ampliadas (días abiertos, partos por periodo, crías
+# por sexo, próximas a parir, secado/lactancia larga, tratamientos)
+# --------------------------------------------------------------------- #
+
+def test_dias_abiertos_mayor(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-01-01")
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="48", fecha="2026-08-20")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué vacas tienen más de 90 días abiertas?")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "48" not in resp
+
+    resp_sin = qe.responder("vacas con más de 300 días abiertos")
+    assert "No hay vacas" in resp_sin
 
 
+def test_partos_periodo(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-08-25", sexo_cria="Macho")
+    db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="12", fecha="2026-07-20", sexo_cria="Hembra")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué partos hubo este mes?")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "12" not in resp
+
+    resp2 = qe.responder("partos de los últimos 45 días")
+    assert "47" in resp2
+    assert "12" in resp2
+
+
+def test_crias_por_sexo(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-08-01", sexo_cria="Macho")
+    db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="12", fecha="2026-08-05", sexo_cria="Macho")
+    db.registrar_animal("15", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="15", fecha="2026-08-10", sexo_cria="Hembra")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuántos terneros machos han nacido")
+    assert "No entendí" not in resp
+    assert "2" in resp
+
+
+def test_vacas_proximas_parir(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="47", fecha="2025-12-01", fep_calculada="2026-09-10")
+    db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="12", fecha="2025-06-01", fep_calculada="2027-06-10")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué vacas están próximas a parir?")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "12" not in resp
+
+
+def test_vacas_lactancia_larga(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-01-01")
+    db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="12", fecha="2026-08-20")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("vacas que debo secar este mes")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "12" not in resp
+
+    resp2 = qe.responder("vacas con más de 200 días de lactancia")
+    assert "47" in resp2
+
+
+def test_cuantos_partos_tiene_nombre(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", nombre="patricia", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-01-01")
+    db.registrar_parto(vaca_tag="47", fecha="2024-01-01")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuántos partos tiene patricia")
+    assert "No entendí" not in resp
+    assert "2 partos" in resp
+
+
+def test_con_que_toro_se_sirvio(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("A029", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="A029", fecha="2026-08-01", toro_pajilla="TORO 502")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿con qué toro se sirvió la A029?")
+    assert "No entendí" not in resp
+    assert "TORO 502" in resp
+
+
+def test_tratamientos_animal_y_ultimos(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_tratamiento(animal_tag="47", fecha="2026-08-01", producto="Ivermectina", dosis="10ml", via="SC")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuándo le aplicaron ivermectina a la 47")
+    assert "No entendí" not in resp
+    assert "Ivermectina" in resp
+    assert "2026-08-01" in resp
+
+    resp2 = qe.responder("últimos tratamientos aplicados")
+    assert "No entendí" not in resp2
+    assert "47" in resp2
+    assert "Ivermectina" in resp2
+
+
+def test_se_puede_ordenar_hoy_usa_retiro(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_tratamiento(
+        animal_tag="47", fecha="2026-08-28", producto="Oxitetraciclina",
+        dias_retiro_leche=5, fecha_fin_retiro_leche="2026-09-05",
+    )
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿la vaca 47 se puede ordeñar hoy?")
+    assert "No entendí" not in resp
+    assert "Retiro de leche" in resp
+
+
+def test_pesaje_palabra_completa(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("A060", sexo="Macho", estado="ACTIVO")
+    db.registrar_pesaje("A060", fecha="2026-08-01", peso_kg=180.0)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("último pesaje del novillo A060")
+    assert "No entendí" not in resp
+    assert "180" in resp
+
+
+def test_lote_ocupacion(db):
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("BAJO", "01")
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO")
+    db.registrar_traslado("V1", fecha="2026-08-15", lote="1", potrero_destino=p1)
+    db.registrar_animal("V2", sexo="Hembra", estado="ACTIVO")
+    db.registrar_traslado("V2", fecha="2026-08-20", lote="2", potrero_destino=p1)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("días de pastoreo del lote 1")
+    assert "No entendí" not in resp
+    assert "V1" in resp
+    assert "V2" not in resp
+    assert "17 días" in resp
+
+
+def test_potreros_ocupados_y_sobreocupacion(db):
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("VERSALLES", "01")
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_traslado("V1", fecha="2026-08-20", potrero_destino=p1)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué potreros están ocupados hoy?")
+    assert "No entendí" not in resp
+    assert "VERSALLES" in resp
+
+    resp2 = qe.responder("qué potreros tienen sobreocupación")
+    assert "VERSALLES" in resp2
+    assert "Sobreocupación" in resp2
 
 
 

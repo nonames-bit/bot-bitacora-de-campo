@@ -46,7 +46,34 @@ class QueryEngine(
         if tag and re.search(r"\b(?:cuando\s+se\s+movi[oó]|cuando\s+se\s+traslad[oó]|cuando\s+se\s+cambi[oó]|cuando\s+fue\s+el\s+traslado|cuando\s+entr[oó]|traslados?|movimientos?)\b", t):
             return self._ultimo_traslado(tag)
 
+        # 1c. Consultas de lista de reproducción (varios animales a la vez, no un tag puntual)
+        if re.search(r"\bdias?\s+abiert[oa]s?\b", t):
+            m = re.search(r"(\d+)\s*dias?\s+abiert[oa]s?", t) or re.search(r"mas\s+de\s+(\d+)", t)
+            umbral = int(m.group(1)) if m else 90
+            return self._dias_abiertos_mayor(umbral)
+        if re.search(r"\bpartos?\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
+            if re.search(r"\besta\s+semana\b", t):
+                dias_periodo = 7
+            else:
+                m = re.search(r"ultimos?\s+(\d+)\s+dias", t)
+                dias_periodo = int(m.group(1)) if m else 30
+            return self._partos_periodo(dias_periodo)
+        if re.search(r"\btern|\bcrias?\b", t) and re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t) and re.search(r"\bcuant[oa]s?\b|\bnaci", t):
+            sexo = "macho" if re.search(r"\bmacho", t) else "hembra"
+            return self._crias_por_sexo(sexo)
+        if re.search(r"\bproxim[ao]s?\s+a?\s*parir\b|\bvan\s+a\s+parir\b", t):
+            return self._vacas_proximas_parir()
+        if re.search(r"\bsecar\b", t) or (re.search(r"\blactancia\b", t) and re.search(r"\bdias\b", t)):
+            return self._vacas_lactancia_larga()
+
         # 2. Partos y maternidad
+        if re.search(r"\bcuant[oa]s?\s+partos\b", t):
+            # nlu.extraer_tag no reconoce nombres propios tras "tiene" (solo tras "de");
+            # se extrae aquí el candidato de forma local sin tocar el extractor compartido.
+            m = re.search(r"\bcuant[oa]s?\s+partos\s+tiene\s+(?:la\s+|el\s+)?([a-z0-9]+)", t)
+            tag_partos = tag or (m.group(1) if m else None)
+            if tag_partos:
+                return self._genealogia(tag_partos)
         if re.search(r"\bpari[oó]\b|\bparto\b", t):
             return self._ultimo_parto(tag)
 
@@ -54,7 +81,7 @@ class QueryEngine(
         if re.search(r"\b(?:que\s+vacas?|cuales\s+vacas?|que\s+animales?|a\s+que\s+vacas?|hay\s+para\s+inseminar)\b", t) or not tag:
             if re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b|\btoca.*servicio\b", t):
                 return self._inseminacion_programada()
-        if tag and (re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b", t)):
+        if tag and (re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b|\bsirvio\b|\bque\s+toro\b", t)):
             return self._ultimo_servicio(tag)
         if re.search(r"\bpalpacion", t) and re.search(r"\bpendiente", t):
             return self._palpacion_pendiente()
@@ -67,7 +94,12 @@ class QueryEngine(
         # 4. Secado y retiros
         if re.search(r"\bsecado\b", t):
             return self._secado(tag)
-        if re.search(r"\bretiro\b|\bmedicamento\b|\bremedio\b", t):
+        # 4a. Historial de tratamientos aplicados (distinto del estado de retiro activo)
+        if tag and re.search(r"\btratamientos?\b|\bmedicamentos?\b|\baplic|\bpuso\b|\bpusieron\b", t) and re.search(r"\bcuand[oa]\b|\bultim[oa]s?\b|\bque\b", t):
+            return self._tratamientos_animal(tag)
+        if not tag and re.search(r"\btratamientos?\b", t) and re.search(r"\bultim[oa]s?\b|\baplicados?\b", t):
+            return self._ultimos_tratamientos()
+        if re.search(r"\bretiro\b|\bmedicamento\b|\bremedio\b|\bordena", t):
             if tag:
                 return self._retiro_animal(tag)
             return self._en_retiro()
@@ -83,11 +115,16 @@ class QueryEngine(
             return self._historial(tag)
 
         # 7. Pesaje y crecimiento
-        if re.search(r"\bpes[oó]\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
+        if re.search(r"\bpes[oó]\b|\bpesaje\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
 
+        # Ocupación por lote (ej. "días de pastoreo del lote 1")
+        if re.search(r"\blote\s+([a-z0-9]+)", t) and re.search(r"\bdias\b|\bpastoreo\b|\bocupaci[oó]n\b|\bdonde\b", t):
+            m = re.search(r"\blote\s+([a-z0-9]+)", t)
+            return self._lote_ocupacion(m.group(1))
+
         # Ocupación y rotación de potreros (Voisin)
-        if re.search(r"\b(?:ocupaci[oó]n|dias\s+de\s+ocupaci[oó]n|tiempo\s+de\s+ocupaci[oó]n|rotaci[oó]n|rotacion\s+de\s+potreros|rotacion\s+voisin)\b", t):
+        if re.search(r"\b(?:ocupaci[oó]n|dias\s+de\s+ocupaci[oó]n|tiempo\s+de\s+ocupaci[oó]n|rotaci[oó]n|rotacion\s+de\s+potreros|rotacion\s+voisin|sobreocupaci[oó]n)\b", t) or re.search(r"\bpotreros?\s+(?:estan\s+)?ocupados?\b", t):
             return self._ocupacion_potreros()
 
         # Existencias por potrero en formato Software Ganadero (SG)

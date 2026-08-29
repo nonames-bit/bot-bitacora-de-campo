@@ -56,3 +56,46 @@ class SanidadQueryMixin:
         if not bloqueados:
             return "No hay animales en tiempo de retiro."
         return "Animales en tiempo de retiro: " + "; ".join(bloqueados) + "."
+
+    def _tratamientos_animal(self, tag, limite: int = 5) -> str:
+        """Historial de tratamientos aplicados a un animal (fecha, producto, dosis, vía)."""
+        if not tag:
+            return "¿De cuál animal desea el historial de tratamientos? (ej. 'cuándo le aplicaron ivermectina a la 12')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No se encontró el animal '{tag}'."
+        animal = self.db.get_animal(aid)
+        tag_str = animal["tag"] if animal else str(tag)
+        nombre = f" ({animal['nombre']})" if animal and animal["nombre"] else ""
+
+        tratamientos = self.db.query(
+            "SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT ?",
+            (aid, limite),
+        )
+        if not tratamientos:
+            return f"{tag_str}{nombre} no tiene tratamientos registrados."
+
+        lineas = [f"💊 <b>Tratamientos de {tag_str}{nombre}:</b>"]
+        for t in tratamientos:
+            prod = t["producto"] or "Fármaco"
+            dosis = f" {t['dosis']}" if t["dosis"] else ""
+            via = f" ({t['via']})" if t["via"] else ""
+            lineas.append(f"• {t['fecha']} — {prod}{dosis}{via}")
+        return "\n".join(lineas)
+
+    def _ultimos_tratamientos(self, limite: int = 10) -> str:
+        """Últimos tratamientos aplicados en la finca, sin filtrar por animal."""
+        tratamientos = self.db.query(
+            "SELECT t.*, a.tag, a.nombre FROM tratamientos t "
+            "JOIN animales a ON a.id_animal = t.animal_id "
+            "ORDER BY t.fecha DESC LIMIT ?",
+            (limite,),
+        )
+        if not tratamientos:
+            return "No hay tratamientos registrados en la bitácora."
+        lineas = [f"💊 <b>Últimos {len(tratamientos)} tratamientos aplicados:</b>"]
+        for t in tratamientos:
+            nom = f" ({t['nombre']})" if t["nombre"] else ""
+            prod = t["producto"] or "Fármaco"
+            lineas.append(f"• {t['fecha']} — {t['tag']}{nom}: {prod}")
+        return "\n".join(lineas)
