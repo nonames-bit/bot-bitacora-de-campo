@@ -327,10 +327,31 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] **Buscador Táctil Didáctico** (`[ 🔍 Buscar Animal / Ficha ]` o `/buscar`): botones dinámicos con los animales de actividad más reciente y filtros por categorías (`[ 🥛 Vacas Paridas ]`, `[ 🤰 Inseminadas ]`, `[ 🐂 Toros ]`, `[ 🍼 Crías ]`, `[ ⚖️ Pesajes ]`), con apertura de ficha y fotografía en 1 toque.
   - [x] **Panel Sanitario de Medicamentos & Retiros** (`[ 💊 Medicamentos & Retiro ]`, `/medicamentos`, `/retiros`): monitoreo en tiempo real de animales en retiro de leche y carne según días de carencia, lista de últimos tratamientos aplicados y accesos directos.
   - [x] **Consultas Rápidas de Campo en 1-Toque** (`[ ❓ Preguntas Rápidas ]`, `/preguntas`, `/faq`): respuestas instantáneas a preguntas recurrentes sobre ordeño/retiro, potreros listos y días abiertos.
-- [x] Suite de pruebas con pytest: **255 pruebas en verde** (270 en VPS)
+- [x] **Rediseño Zootécnico Integral inspirado en GANADERO SG App**:
+  - [x] **Fichas de Animales Interactivas con Pestañas Táctiles**:
+    - `[ ⚖️ Pesajes & GMD ]`: Historial ponderal completo, Ganancia Media Diaria (GMD en g/día) y Ganancia de Vida (g/d/vida).
+    - `[ 🍼 Partos & Crías ]`: Perfil reproductivo para hembras (partos, servicios, celos AM/PM, días abiertos, IEP, FEP) y toros (hijos nacidos, servicios).
+    - `[ 🥛 Control Leche ]`: Estado de lactancia (en ordeño vs seca), DEL actuales, proyección de secado ($FEP - 60d$) y alertas a $\ge 200$ DEL.
+    - `[ 💉 Sanidad & Retiro ]`: Semáforo con conteo regresivo de retiro de leche y carne + historial clínico de fármacos, dosis y vías.
+    - `[ 🌳 Genealogía (3G) ]`: Árbol genealógico en 3 generaciones (padre, abuelos paternos, madre, abuelos maternos) y lista de crías descendientes.
+    - `[ 📷 Ver Foto ]` y `[ 📋 Ficha Resumen ]`: Visualización rápida con navegación táctil fluida.
+  - [x] **Centro de Alertas Semafórico de Campo** (`/alertas`):
+    - 🔴 *Partos próximos* ($\le 30$ días) con fecha y conteo regresivo.
+    - 🟡 *Vacas candidatas para secado* ($\ge 200$ DEL o $FEP \le 60$ días).
+    - 🟢 *Crías en edad de destete* ($\ge 200$ días de edad).
+    - ⚠️ *Pérdidas de peso en último control* (GMD $< 0$ g/día).
+    - ⛔ *Retiros sanitarios activos* (bloqueo preventivo de leche y carne).
+  - [x] **Tablero Poblacional & Pirámide de Edades SG** (`/poblacion`, `/piramide`):
+    - Brackets etarios exactos de Software Ganadero para hembras y machos, edad promedio del hato e indicadores zootécnicos.
+  - [x] **Composición Genética y Razas** (`/genetica`):
+    - Distribución racial y cruces del hato (Holstein, Gyr, Cebú, Pardo Suizo, Ayrshire, etc.).
+  - [x] **Estructuración Didáctica de Ayuda & Menús**:
+    - Menús divididos en 3 bloques claros (Operación en Campo, Zootecnia & Informes SG, Sistema y Administración).
+    - Guía de ayuda enriquecida con ejemplos de dictado por voz y notas de campo.
+- [x] Suite de pruebas con pytest: **256 pruebas en verde** (100% pasando)
 
-### ⏳ En Progreso / Planificado para la Próxima Sesión
-- [ ] Optimización continua y calibración de campo.
+### ⏳ En Progreso / Calibración Continua
+- [ ] Calibración de parámetros y retroalimentación de uso en campo.
 
 ### 📋 Hoja de Ruta Pendiente
 - [ ] Mejoras continuas en modelos de visión especializada.

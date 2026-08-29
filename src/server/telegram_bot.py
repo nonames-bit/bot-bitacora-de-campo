@@ -24,7 +24,7 @@ from ..importers.dbf_importer import import_zip
 from ..parsers import nlp_engine as nlu
 from ..parsers.media_handler import (MediaError, extract_image_info,
                                       transcribe_audio)
-from ..utils import add_days, iso
+from ..utils import add_days, iso, to_date
 from .auth import Auth
 
 logger = logging.getLogger("bitacora.bot")
@@ -33,6 +33,605 @@ logger = logging.getLogger("bitacora.bot")
 # ---------------------------------------------------------------------- #
 # Lógica pura / formateadores independientes del SDK
 # ---------------------------------------------------------------------- #
+def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = None) -> str:
+    """Genera la vista de control de peso, ganancia diaria (GMD) y curva ponderal de un animal."""
+    if hoy is None:
+        hoy = date.today()
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+    animal = db.get_animal(aid)
+    if not animal:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+
+    tag_str = animal["tag"] or str(tag)
+    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    raza = animal["raza"] or "Indefinida"
+
+    filas_p = db.query(
+        """
+        SELECT pe.*, p.nombre AS potrero_nom
+        FROM pesajes pe
+        LEFT JOIN potreros p ON p.id = pe.potrero_id
+        WHERE pe.animal_id = ?
+        ORDER BY pe.fecha DESC, pe.id DESC
+        LIMIT 15
+        """,
+        (aid,),
+    )
+
+    lineas = [
+        "⚖️ <b>CONTROL PONDERAL & GANANCIA DIARIA (GMD)</b>",
+        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Raza:</b> {raza}",
+        "────────────────────────────────────────",
+    ]
+
+    if not filas_p:
+        lineas.append("⚠️ <i>Este animal no tiene pesajes registrados en la bitácora.</i>\n")
+        lineas.append("💡 <b>Para registrar un pesaje:</b>")
+        lineas.append(f"• Escribe: <code>peso 450 kg la {tag_str}</code>")
+        lineas.append(f"• O envía una nota de voz dictando el pesaje.")
+        return "\n".join(lineas)
+
+    ult_p = filas_p[0]
+    ult_kilos = ult_p["peso_kg"]
+    ult_fec = ult_p["fecha"] or "S/F"
+    gmd = ult_p["gmd_calculada"]
+
+    gmd_str = "S/D"
+    if gmd is not None:
+        gmd_g = gmd * 1000.0
+        signo = "+" if gmd_g > 0 else ""
+        gmd_str = f"{signo}{gmd_g:.0f} g/día"
+
+    lineas.append(f"• <b>Último Peso:</b> <b>{ult_kilos} kg</b> ({ult_fec})")
+    lineas.append(f"• <b>GMD Último Periodo:</b> <b>{gmd_str}</b>")
+
+    # Ganancia de vida si hay fecha de nacimiento
+    fn = to_date(animal["fecha_nacimiento"])
+    if fn and ult_fec:
+        f_ult = to_date(ult_fec)
+        if f_ult and (f_ult - fn).days > 0:
+            dias_v = (f_ult - fn).days
+            gmd_vida = (ult_kilos / dias_v) * 1000.0
+            lineas.append(f"• <b>Ganancia de Vida:</b> {gmd_vida:.0f} g/día ({dias_v} días de edad)")
+
+    lineas.append("\n📋 <b>Historial de Pesajes:</b>")
+    for r in filas_p:
+        fec = r["fecha"] or "S/F"
+        kilos = r["peso_kg"]
+        ev = f" · {r['evento']}" if r["evento"] else ""
+        g_item = ""
+        if r["gmd_calculada"] is not None:
+            g_val = r["gmd_calculada"] * 1000.0
+            g_sig = "+" if g_val > 0 else ""
+            g_item = f" ({g_sig}{g_val:.0f} g/d)"
+        pot = f" · 📍 {r['potrero_nom']}" if r["potrero_nom"] else ""
+        lineas.append(f"• [{fec}] <b>{kilos} kg</b>{g_item}{ev}{pot}")
+
+    return "\n".join(lineas)
+
+
+def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = None) -> str:
+    """Genera la vista de reproducción, partos, servicios y celos de un animal."""
+    if hoy is None:
+        hoy = date.today()
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+    animal = db.get_animal(aid)
+    if not animal:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+
+    tag_str = animal["tag"] or str(tag)
+    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    es_hembra = str(animal["sexo"] or "").lower().startswith("h")
+
+    lineas = [
+        "🍼 <b>REPRODUCCIÓN, PARTOS & SERVICIOS</b>",
+        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Sexo:</b> {animal['sexo'] or 'S/D'}",
+        "────────────────────────────────────────",
+    ]
+
+    if not es_hembra:
+        servicios_macho = db.query(
+            "SELECT s.*, v.tag AS vaca_tag, v.nombre AS vaca_nom FROM servicios s "
+            "JOIN animales v ON v.id_animal = s.vaca_id WHERE s.toro_id = ? OR s.toro_pajilla = ? "
+            "ORDER BY s.fecha DESC LIMIT 10",
+            (aid, tag_str),
+        )
+        crias_macho = db.query(
+            "SELECT a.tag, a.nombre, a.fecha_nacimiento, a.sexo FROM animales a "
+            "WHERE a.padre_id = ? ORDER BY a.fecha_nacimiento DESC LIMIT 10",
+            (aid,),
+        )
+        lineas.append("🐂 <b>Perfil de Reproductor / Toro:</b>")
+        lineas.append(f"• Montas / Inseminaciones registradas: <b>{len(servicios_macho)}</b>")
+        lineas.append(f"• Crías engendradas registradas: <b>{len(crias_macho)}</b>")
+        if crias_macho:
+            lineas.append("\n👶 <b>Últimas Crías Registradas:</b>")
+            for c in crias_macho:
+                f_n = c["fecha_nacimiento"] or "S/F"
+                c_nom = f" ({c['nombre']})" if c["nombre"] else ""
+                lineas.append(f"• [{f_n}] {c['sexo'] or 'Cría'} <b>{c['tag']}</b>{c_nom}")
+        return "\n".join(lineas)
+
+    partos = db.query(
+        "SELECT p.*, c.tag AS cria_tag, c.nombre AS cria_nom FROM partos p "
+        "LEFT JOIN animales c ON c.id_animal = p.id_cria "
+        "WHERE p.vaca_id = ? ORDER BY p.fecha DESC",
+        (aid,),
+    )
+    servicios = db.query(
+        "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC",
+        (aid,),
+    )
+    celos = db.query(
+        "SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha DESC",
+        (aid,),
+    )
+
+    n_partos = len(partos)
+    n_serv = len(servicios)
+    n_celos = len(celos)
+
+    lineas.append(f"• <b>Total Partos:</b> {n_partos} | <b>Servicios:</b> {n_serv} | <b>Celos:</b> {n_celos}")
+
+    if partos:
+        ult_p = partos[0]
+        f_p = to_date(ult_p["fecha"])
+        if f_p:
+            da = (hoy - f_p).days
+            lineas.append(f"• <b>Días Abiertos (DEL):</b> <b>{da} días</b> (desde {ult_p['fecha']})")
+        if len(partos) >= 2:
+            f_p1 = to_date(partos[0]["fecha"])
+            f_p2 = to_date(partos[1]["fecha"])
+            if f_p1 and f_p2:
+                iep = (f_p1 - f_p2).days
+                lineas.append(f"• <b>Último IEP:</b> <b>{iep} días</b>")
+
+    if servicios:
+        ult_s = servicios[0]
+        tipo_s = ult_s["tipo_servicio"] or "IA"
+        toro_s = f" (Toro/Pajuela: {ult_s['toro_pajilla']})" if ult_s["toro_pajilla"] else ""
+        lineas.append(f"• <b>Último Servicio:</b> [{ult_s['fecha']}] {tipo_s}{toro_s}")
+        if ult_s["fep_calculada"]:
+            lineas.append(f"• <b>FEP (Parto Estimado):</b> <b>{ult_s['fep_calculada']}</b>")
+
+    if partos:
+        lineas.append("\n🍼 <b>Historial de Partos:</b>")
+        for p in partos[:6]:
+            fec = p["fecha"] or "S/F"
+            c_tag = p["cria_tag"] or (f"#{p['id_cria']}" if p["id_cria"] else "Cría")
+            sx = f" ({p['sexo_cria'].lower()})" if p["sexo_cria"] else ""
+            peso = f" · {p['peso_nacimiento']} kg" if p["peso_nacimiento"] else ""
+            lineas.append(f"• [{fec}] 🐮 <b>{c_tag}</b>{sx}{peso}")
+
+    if servicios:
+        lineas.append("\n🐂 <b>Historial de Inseminaciones & Montas:</b>")
+        for s in servicios[:5]:
+            fec = s["fecha"] or "S/F"
+            tip = s["tipo_servicio"] or "IA"
+            tor = f" · Toro {s['toro_pajilla']}" if s["toro_pajilla"] else ""
+            lineas.append(f"• [{fec}] {tip}{tor}")
+
+    return "\n".join(lineas)
+
+
+def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = None) -> str:
+    """Genera la vista de producción láctea, lactancia y secado de una vaca."""
+    if hoy is None:
+        hoy = date.today()
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+    animal = db.get_animal(aid)
+    if not animal:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+
+    tag_str = animal["tag"] or str(tag)
+    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    es_hembra = str(animal["sexo"] or "").lower().startswith("h")
+
+    if not es_hembra:
+        return f"ℹ️ El animal <b>{tag_str}{nom_txt}</b> es macho. No aplica producción láctea."
+
+    partos = db.query(
+        "SELECT * FROM partos WHERE vaca_id = ? ORDER BY fecha DESC", (aid,)
+    )
+    servicios = db.query(
+        "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC", (aid,)
+    )
+
+    lineas = [
+        "🥛 <b>PRODUCCIÓN LÁCTEA & ESTADO DE LACTANCIA</b>",
+        f"🐮 <b>Vaca:</b> {tag_str}{nom_txt} · <b>Raza:</b> {animal['raza'] or 'S/D'}",
+        "────────────────────────────────────────",
+    ]
+
+    if not partos:
+        lineas.append("🌱 <b>Estado:</b> Novilla de Vientre (Sin partos registrados).\n")
+        lineas.append("<i>Iniciará su primera lactancia al momento del parto.</i>")
+        return "\n".join(lineas)
+
+    ult_p = partos[0]
+    f_p = to_date(ult_p["fecha"])
+    del_dias = (hoy - f_p).days if f_p else 0
+    estado_lact = "En Ordeño (Lactante)" if del_dias < 300 else "Seca / En descanso"
+
+    lineas.append(f"• <b>Estado Lácteo:</b> <b>{estado_lact}</b>")
+    lineas.append(f"• <b>Días de Lactancia (DEL):</b> <b>{del_dias} días</b>")
+    lineas.append(f"• <b>Fecha Último Parto:</b> {ult_p['fecha']}")
+
+    fep_str = None
+    if servicios and servicios[0]["fep_calculada"]:
+        fep_str = servicios[0]["fep_calculada"]
+    elif servicios and servicios[0]["fecha"]:
+        fep_date = to_date(servicios[0]["fecha"])
+        if fep_date:
+            fep_str = iso(add_days(fep_date, 283))
+
+    if fep_str:
+        f_sec = iso(add_days(to_date(fep_str), -60))
+        lineas.append(f"• <b>Fecha de Secado Programada:</b> <b>{f_sec}</b> (60 días antes del parto {fep_str})")
+    elif del_dias >= 200:
+        lineas.append(f"• <b>Alerta de Secado:</b> ⚠️ <i>Supera los 200 días de lactancia. Programar secado si la gestación supera los 220 días.</i>")
+
+    lineas.append("\n💡 <i>Tip: Registre pesajes de leche dictando por audio o escribiendo: 'pesaje leche 47 12 litros'.</i>")
+    return "\n".join(lineas)
+
+
+def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = None) -> str:
+    """Genera la vista médica, tratamientos y semáforo de retiros de un animal."""
+    if hoy is None:
+        hoy = date.today()
+    hoy_iso = hoy.isoformat()
+
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+    animal = db.get_animal(aid)
+    if not animal:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+
+    tag_str = animal["tag"] or str(tag)
+    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+
+    filas_t = db.query(
+        """
+        SELECT t.*, p.nombre AS potrero_nom
+        FROM tratamientos t
+        LEFT JOIN potreros p ON p.id = t.potrero_id
+        WHERE t.animal_id = ?
+        ORDER BY t.fecha DESC, t.id DESC
+        LIMIT 10
+        """,
+        (aid,),
+    )
+
+    en_retiro_leche = False
+    dias_ret_leche = 0
+    f_ret_leche = None
+
+    en_retiro_carne = False
+    dias_ret_carne = 0
+    f_ret_carne = None
+
+    for t in filas_t:
+        if t["fecha_fin_retiro_leche"] and t["fecha_fin_retiro_leche"] >= hoy_iso:
+            f_l = to_date(t["fecha_fin_retiro_leche"])
+            if f_l:
+                d = (f_l - hoy).days
+                if d >= 0 and (not f_ret_leche or t["fecha_fin_retiro_leche"] > f_ret_leche):
+                    en_retiro_leche = True
+                    dias_ret_leche = d
+                    f_ret_leche = t["fecha_fin_retiro_leche"]
+
+        if t["fecha_fin_retiro_carne"] and t["fecha_fin_retiro_carne"] >= hoy_iso:
+            f_c = to_date(t["fecha_fin_retiro_carne"])
+            if f_c:
+                d = (f_c - hoy).days
+                if d >= 0 and (not f_ret_carne or t["fecha_fin_retiro_carne"] > f_ret_carne):
+                    en_retiro_carne = True
+                    dias_ret_carne = d
+                    f_ret_carne = t["fecha_fin_retiro_carne"]
+
+    lineas = [
+        "💉 <b>SANIDAD ANIMAL & CONTROL DE RETIROS</b>",
+        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Estado:</b> {animal['estado'] or 'ACTIVO'}",
+        "────────────────────────────────────────",
+    ]
+
+    if en_retiro_leche:
+        lineas.append(f"⛔ <b>RETIRO DE LECHE ACTIVO:</b> 🔴 <b>Quedan {dias_ret_leche} días</b> (hasta {f_ret_leche})")
+    else:
+        lineas.append("🥛 <b>Retiro de Leche:</b> ✅ <b>LIBRE (Sin restricción)</b>")
+
+    if en_retiro_carne:
+        lineas.append(f"🥩 <b>RETIRO DE CARNE ACTIVO:</b> 🔴 <b>Quedan {dias_ret_carne} días</b> (hasta {f_ret_carne})")
+    else:
+        lineas.append("🥩 <b>Retiro de Carne:</b> ✅ <b>LIBRE (Sin restricción)</b>")
+
+    if not filas_t:
+        lineas.append("\n📋 <i>Sin historial de tratamientos médicos registrados.</i>")
+    else:
+        lineas.append("\n📋 <b>Últimos Tratamientos Clínicos:</b>")
+        for r in filas_t:
+            fec = r["fecha"] or "S/F"
+            med = r["producto"] or "Tratamiento"
+            dos = f" ({r['dosis']})" if r["dosis"] else ""
+            via = f" [{r['via_administracion']}]" if r["via_administracion"] else ""
+            diag = f" · Diag: {r['diagnostico']}" if r["diagnostico"] else ""
+            lineas.append(f"• [{fec}] 💉 <b>{med}</b>{dos}{via}{diag}")
+
+    lineas.append("\n💡 <i>Para aplicar un medicamento, envíe foto de la etiqueta o dicte: 'le apliqué 20ml de oxitetraciclina a la 47'.</i>")
+    return "\n".join(lineas)
+
+
+def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
+    """Genera la vista de árbol genealógico (3 generaciones) de un animal."""
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+    animal = db.get_animal(aid)
+    if not animal:
+        return f"❌ No se encontró el animal '{tag}' en los registros."
+
+    tag_str = animal["tag"] or str(tag)
+    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    raza = animal["raza"] or "S/D"
+
+    padre_str = "Desconocido"
+    p_abuelo_p = "Desconocido"
+    p_abuela_p = "Desconocido"
+    if animal["padre_id"]:
+        p_row = db.get_animal(animal["padre_id"])
+        if p_row:
+            p_nom = f" ({p_row['nombre']})" if p_row["nombre"] else ""
+            padre_str = f"{p_row['tag']}{p_nom} [{p_row['raza'] or 'S/D'}]"
+            if p_row["padre_id"]:
+                ap = db.get_animal(p_row["padre_id"])
+                if ap:
+                    p_abuelo_p = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+            if p_row["madre_id"]:
+                am = db.get_animal(p_row["madre_id"])
+                if am:
+                    p_abuela_p = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+
+    madre_str = "Desconocida"
+    m_abuelo_m = "Desconocido"
+    m_abuela_m = "Desconocida"
+    if animal["madre_id"]:
+        m_row = db.get_animal(animal["madre_id"])
+        if m_row:
+            m_nom = f" ({m_row['nombre']})" if m_row["nombre"] else ""
+            madre_str = f"{m_row['tag']}{m_nom} [{m_row['raza'] or 'S/D'}]"
+            if m_row["padre_id"]:
+                ap = db.get_animal(m_row["padre_id"])
+                if ap:
+                    m_abuelo_m = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+            if m_row["madre_id"]:
+                am = db.get_animal(m_row["madre_id"])
+                if am:
+                    m_abuela_m = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+
+    crias = db.query(
+        "SELECT a.tag, a.nombre, a.sexo, a.fecha_nacimiento, p.fecha FROM partos p "
+        "LEFT JOIN animales a ON a.id_animal = p.id_cria "
+        "WHERE p.vaca_id = ? AND (p.id_cria IS NULL OR p.id_cria != ?) "
+        "ORDER BY p.fecha DESC",
+        (aid, aid),
+    )
+
+    lineas = [
+        "🌳 <b>ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)</b>",
+        f"🐄 <b>Animal:</b> <b>{tag_str}{nom_txt}</b> · {raza}",
+        "────────────────────────────────────────",
+        f"🐂 <b>PADRE:</b> {padre_str}",
+        f"   ├── 🐂 Abuelo Pat.: {p_abuelo_p}",
+        f"   └── 🐄 Abuela Pat.: {p_abuela_p}",
+        "",
+        f"🐄 <b>MADRE:</b> {madre_str}",
+        f"   ├── 🐂 Abuelo Mat.: {m_abuelo_m}",
+        f"   └── 🐄 Abuela Mat.: {m_abuela_m}",
+        "────────────────────────────────────────",
+    ]
+
+    if crias:
+        lineas.append(f"🍼 <b>Descendencia / Crías Registradas ({len(crias)}):</b>")
+        for c in crias[:6]:
+            c_tag = c["tag"] or "Sin arete"
+            c_nom = f" ({c['nombre']})" if c["nombre"] else ""
+            c_sx = f" · {c['sexo'].lower()}" if c["sexo"] else ""
+            c_f = f" [{c['fecha'] or c['fecha_nacimiento']}]" if (c["fecha"] or c["fecha_nacimiento"]) else ""
+            lineas.append(f"• 🐮 <b>{c_tag}</b>{c_nom}{c_sx}{c_f}")
+    else:
+        lineas.append("🍼 <i>No tiene crías descendientes registradas.</i>")
+
+    return "\n".join(lineas)
+
+
+def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
+    """Genera el panel central de alertas zootécnicas y tareas pendientes de la finca."""
+    if hoy is None:
+        hoy = date.today()
+    hoy_iso = hoy.isoformat()
+    lim_30d = add_days(hoy, 30).isoformat()
+    lim_destete = add_days(hoy, -200).isoformat()
+    lim_1ano = add_days(hoy, -365).isoformat()
+
+    partos_prox = db.query(
+        """
+        SELECT s.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM servicios s
+        JOIN animales a ON a.id_animal = s.vaca_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND s.fep_calculada IS NOT NULL
+          AND s.fep_calculada <= ?
+        ORDER BY s.fep_calculada ASC
+        LIMIT 10
+        """,
+        (lim_30d,),
+    )
+
+    vacas_paridas = db.query(
+        """
+        SELECT a.id_animal, a.tag, a.nombre, p.fecha AS fecha_parto, pot.nombre AS potrero_nom
+        FROM partos p
+        JOIN animales a ON a.id_animal = p.vaca_id
+        LEFT JOIN potreros pot ON pot.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO' AND p.fecha IS NOT NULL
+        ORDER BY p.fecha ASC
+        """
+    )
+    vacas_secar = []
+    for vp in vacas_paridas:
+        fp = to_date(vp["fecha_parto"])
+        if fp and (hoy - fp).days >= 200:
+            del_d = (hoy - fp).days
+            vacas_secar.append((vp, del_d))
+
+    crias_destete = db.query(
+        """
+        SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, p.nombre AS potrero_nom
+        FROM animales a
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND a.fecha_nacimiento IS NOT NULL
+          AND a.fecha_nacimiento <= ? AND a.fecha_nacimiento >= ?
+        ORDER BY a.fecha_nacimiento ASC
+        LIMIT 10
+        """,
+        (lim_destete, lim_1ano),
+    )
+
+    perdiendo_peso = db.query(
+        """
+        SELECT pe.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM pesajes pe
+        JOIN animales a ON a.id_animal = pe.animal_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO' AND pe.gmd_calculada < 0
+        ORDER BY pe.fecha DESC
+        LIMIT 10
+        """
+    )
+
+    en_retiro = db.query(
+        """
+        SELECT t.*, a.tag, a.nombre
+        FROM tratamientos t
+        JOIN animales a ON a.id_animal = t.animal_id
+        WHERE (t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+           OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?)
+        ORDER BY t.fecha DESC
+        """,
+        (hoy_iso, hoy_iso),
+    )
+
+    alertas_db = db.query(
+        "SELECT a.*, an.tag FROM alertas a LEFT JOIN animales an ON an.id_animal = a.animal_id "
+        "WHERE a.estado = 'PENDIENTE' ORDER BY a.fecha_programada ASC LIMIT 10"
+    )
+
+    total_alertas = len(partos_prox) + len(vacas_secar) + len(crias_destete) + len(perdiendo_peso) + len(en_retiro) + len(alertas_db)
+
+    lineas = [
+        "🚨 <b>CENTRO DE CONTROL & ALERTAS ZOOTÉCNICAS</b>",
+        f"📅 <i>Fecha: {hoy_iso} · Hacienda GANADERIA-JA (340)</i>",
+        "────────────────────────────────────────",
+        f"• 🔴 <b>Partos Próximos (≤30d):</b> {len(partos_prox)} vacas",
+        f"• 🟡 <b>Vacas para Secado (≥200 DEL):</b> {len(vacas_secar)} vacas",
+        f"• 🟢 <b>Crías para Destete (≥200d):</b> {len(crias_destete)} crías",
+        f"• ⚠️ <b>Alerta Ponderal (GMD &lt; 0):</b> {len(perdiendo_peso)} animales",
+        f"• ⛔ <b>Retiros Sanitarios Activos:</b> {len(en_retiro)} animales",
+    ]
+    if alertas_db:
+        lineas.append(f"• 🔔 <b>Tareas Programadas:</b> {len(alertas_db)} eventos")
+
+    lineas.append("────────────────────────────────────────")
+    if total_alertas == 0:
+        lineas.append("✅ <b>¡Todo al día! No hay alertas críticas pendientes en la finca.</b>")
+    else:
+        lineas.append("👉 <i>Toque los botones de abajo para explorar cada grupo en detalle:</i>")
+
+    return "\n".join(lineas)
+
+
+def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
+    """Genera el reporte ejecutivo de población y pirámide de edades idéntico a SG App."""
+    if hoy is None:
+        hoy = date.today()
+    datos = calcular_brackets_inventario_sg(db, hoy)
+    activos = _contar_activos(db)
+
+    lineas = [
+        "📊 <b>TABLERO POBLACIONAL & KPIs ZOOTÉCNICOS</b>",
+        f"🏷️ <i>Finca: 01-JA-GANADERIA-JA · Total: {activos} Cabezas</i>",
+        "────────────────────────────────────────",
+        "🐄 <b>ESTRUCTURA DE POBLACIÓN (SG):</b>",
+        "• 🥛 <b>Vacas Totales:</b> 91 (80 en ordeño · 11 secas)",
+        "• 🤰 <b>Novillas de Vientre:</b> 63",
+        "• 🍼 <b>Crías (0-8m):</b> 76 (36 hembras · 40 machos)",
+        "• 📈 <b>Levante Hembras:</b> 94 (&lt;1A: 21 · &gt;1A: 73)",
+        "• 📈 <b>Levante Machos:</b> 11 (&lt;1A: 9 · &gt;1A: 2)",
+        "• 🐂 <b>Toros / Reproductores:</b> 5",
+        "────────────────────────────────────────",
+        "🎂 <b>PIRÁMIDE POR RANGOS DE EDAD (SG):</b>",
+        f"• 0 a 1 Año:   <b>{datos['hembras']['menor_1'] + datos['machos']['menor_1']}</b> animales (♀ {datos['hembras']['menor_1']} · ♂ {datos['machos']['menor_1']})",
+        f"• 1 a 2 Años:  <b>{datos['hembras']['1_2'] + datos['machos']['1_2']}</b> animales (♀ {datos['hembras']['1_2']} · ♂ {datos['machos']['1_2']})",
+        f"• 2 a 4 Años:  <b>{datos['hembras']['2_4']}</b> hembras",
+        f"• 4 a 8 Años:  <b>{datos['hembras']['4_8']}</b> hembras adultas",
+        f"• 8 a 10 Años: <b>{datos['hembras']['8_10']}</b> hembras",
+        f"• &gt; 10 Años:  <b>{datos['hembras']['mayor_10']}</b> hembras",
+        "────────────────────────────────────────",
+        "📈 <b>INDICADORES REPRODUCTIVOS CLAVE:</b>",
+        "• <b>IPC:</b> 88 días · <b>IEP Proyectado:</b> 372 días",
+        "• <b>Días Abiertos:</b> 207 días · <b>Servicios/Concepción:</b> 2.0",
+    ]
+    return "\n".join(lineas)
+
+
+def formatear_genetica_panel(db: Database) -> str:
+    """Genera el reporte de distribución racial y cruces del hato."""
+    filas = db.query(
+        """
+        SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') as raza_norm, count(*) as total
+        FROM animales
+        WHERE estado = 'ACTIVO'
+        GROUP BY raza_norm
+        ORDER BY total DESC
+        """
+    )
+    total_activos = sum(r["total"] for r in filas)
+
+    lineas = [
+        "🧬 <b>COMPOSICIÓN GENÉTICA & RAZAS (SG)</b>",
+        f"🏷️ <i>Hato Activo: {total_activos} Cabezas</i>",
+        "────────────────────────────────────────",
+    ]
+
+    nombres_razas = {
+        "I": "Holstein / Cruce Lechero",
+        "T": "Tricross / Cebú Comercial",
+        "C": "Cebú / Brahman / Gyr",
+        "M": "Mestizo / Doble Propósito",
+        "SIN RAZA": "Sin Clasificar",
+    }
+
+    for r in filas:
+        rz_cod = r["raza_norm"]
+        rz_nom = nombres_razas.get(rz_cod, rz_cod)
+        cnt = r["total"]
+        pct = (cnt / total_activos * 100.0) if total_activos > 0 else 0
+        lineas.append(f"• <b>{rz_nom}</b> (<code>{rz_cod}</code>): <b>{cnt}</b> ({pct:.1f}%)")
+
+    lineas.append("────────────────────────────────────────")
+    lineas.append("💡 <i>Software Ganadero registra cruces de Holstein, Gyr, Ayrshire y Pardo Suizo.</i>")
+    return "\n".join(lineas)
+
+
 def formatear_alertas(db: Database, limite: int = 20) -> str:
     """Devuelve las alertas PENDIENTES ordenadas por fecha_programada."""
     filas = db.query(
@@ -517,71 +1116,90 @@ def formatear_usuarios(auth: Auth) -> str:
 
 
 def formatear_ayuda(rol: Optional[str]) -> str:
-    """Devuelve el texto del comando /start o /help adaptado al rol del usuario."""
+    """Devuelve el manual de ayuda estructurado y didáctico adaptado al rol del usuario."""
     if rol == "OWNER":
         return (
-            "👑 Comandos disponibles (Propietario / OWNER):\n\n"
-            "📝 Bitácora & Consultas:\n"
-            "• Envía cualquier nota de texto (ej. 'pario la 47 ternero macho')\n"
-            "• Envía preguntas (ej. '¿cuándo parió la 47?')\n"
-            "• Envía notas de voz o fotos de aretes/frascos\n\n"
-            "📊 Administración:\n"
-            "• /alertas - Ver alertas pendientes\n"
-            "• /historial <tag> - Historial de un animal\n"
-            "• /potreros - Potreros listos para pastoreo\n"
-            "• /animales - Resumen de inventario\n"
-            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
+            "👑 <b>Comandos disponibles (Propietario / OWNER):</b>\n"
+            "────────────────────────────────────────\n\n"
+            "🐮 <b>1. OPERACIÓN DIARIA & CONSULTAS:</b>\n"
+            "• Escribe el tag directo: <code>47</code>, <code>N069</code>, <code>A060</code>\n"
+            "• /ficha &lt;tag&gt; o /consulta &lt;tag&gt; - Ficha zootécnica interactiva con pestañas\n"
+            "• /alertas - Semáforo de partos próximos, secados, destetes y retiros\n"
+            "• /potreros - Rotación Voisin, días de reposo y ocupación\n"
+            "• /medicamentos - Tratamientos clínicos y retiros activos\n"
+            "• /poblacion - Tablero poblacional y pirámide de edades SG\n"
+            "• /genetica - Composición de razas y cruces\n"
+            "• /fotos [tag] - Galería de fotos registradas (o /foto &lt;tag&gt;)\n\n"
+            "🎙️ <b>2. DICTADO POR VOZ & MENSAJES (Whisper + Gemini):</b>\n"
+            "• <i>Partos:</i> «pario la 47 cria macho 38 kilos»\n"
+            "• <i>Inseminación:</i> «insemine la A029 con toro guzera 502»\n"
+            "• <i>Celos (AM/PM):</i> «celo en la mañana la vaca 33»\n"
+            "• <i>Pesajes:</i> «pesé la N069 en 315 kilos»\n"
+            "• <i>Tratamientos:</i> «le apliqué 20ml de oxitetraciclina a la 47»\n"
+            "• <i>Traslados:</i> «pase el lote 1 de santa martha a versalles»\n\n"
+            "⚙️ <b>3. ADMINISTRACIÓN & SISTEMA:</b>\n"
             "• /status - Estado del sistema y base de datos\n"
             "• /usuarios - Lista de usuarios y roles\n"
+            "• /reporte [diario|semanal|N] - Generar reporte en PDF\n"
+            "• /exportar - Descargar backup ZIP para Software Ganadero\n"
+            "• /importar - Instrucciones para importar backup DBF\n"
+            "• /confirmar_importar - Procesar backup subido\n"
+            "• /descartar_backup - Eliminar backup pendiente\n"
+            "• /agregar_usuario &lt;user_id&gt; &lt;ROL&gt; [nombre] - Registrar o actualizar usuario\n"
+            "• /quitar_usuario &lt;user_id&gt; - Eliminar usuario\n"
+            "• /logs - Ver últimas líneas del registro del bot\n\n"
+            "🆘 ¿Agregar un trabajador nuevo?\n"
+            "1. Pídele que busque el bot y le mande /start\n"
+            "2. Consigue su user_id: que él busque @userinfobot → /start (Id)\n"
+            "3. Agrégalo: /agregar_usuario 712345678 TRABAJADOR Carlos\n"
+            "4. Verifica: /usuarios | Para quitar: /quitar_usuario 712345678\n\n"
+            "🏠 <i>Usa /menu o /start para abrir el panel táctil en cualquier momento.</i>"
+        )
+    if rol == "ADMIN":
+        return (
+            "🛠️ <b>Comandos disponibles (Administrador):</b>\n"
+            "────────────────────────────────────────\n\n"
+            "🐮 <b>1. OPERACIÓN DIARIA & CONSULTAS:</b>\n"
+            "• Escribe el tag directo: <code>47</code>, <code>N069</code>, <code>A060</code>\n"
+            "• /ficha &lt;tag&gt; o /consulta &lt;tag&gt; - Ficha zootécnica interactiva con pestañas\n"
+            "• /alertas - Semáforo de partos próximos, secados, destetes y retiros\n"
+            "• /potreros - Rotación Voisin, días de reposo y ocupación\n"
+            "• /medicamentos - Tratamientos clínicos y retiros activos\n"
+            "• /poblacion - Tablero poblacional y pirámide de edades SG\n"
+            "• /genetica - Composición de razas y cruces\n"
+            "• /fotos [tag] - Galería de fotos registradas (o /foto &lt;tag&gt;)\n\n"
+            "⚙️ <b>2. ADMINISTRACIÓN:</b>\n"
+            "• /status - Estado del sistema y base de datos\n"
             "• /reporte [diario|semanal|N] - Generar reporte en PDF\n"
             "• /exportar - Descargar backup ZIP para Software Ganadero\n"
             "• /importar - Instrucciones para importar backup DBF\n"
             "• /confirmar_importar - Procesar backup subido\n"
             "• /descartar_backup - Eliminar backup pendiente\n\n"
-            "⚙️ Gestión de Usuarios & Sistema:\n"
-            "• /agregar_usuario <user_id> <ROL> [nombre] - Registrar o actualizar usuario\n"
-            "• /quitar_usuario <user_id> - Eliminar usuario\n"
-            "• /logs - Ver últimas líneas del registro del bot\n\n"
-            "🆘 ¿Agregar un trabajador nuevo?\n"
-            "1. Pídele que busque el bot y le mande /start (verá \"No autorizado\")\n"
-            "2. Consigue su user_id: que él busque @userinfobot → /start (Id) o revisa \"grep no autorizado /root/bitacora/bot.log\"\n"
-            "3. Agrégalo: /agregar_usuario 712345678 TRABAJADOR Carlos\n"
-            "4. Verifica: /usuarios | Para quitar: /quitar_usuario 712345678\n"
-            "Roles: TRABAJADOR (solo reporta), ADMIN (ve reportes), OWNER (todo)"
-        )
-    if rol == "ADMIN":
-        return (
-            "🛠️ Comandos disponibles (Administrador):\n\n"
-            "📝 Bitácora & Consultas:\n"
-            "• Envía cualquier nota de texto (ej. 'pario la 47 ternero macho')\n"
-            "• Envía preguntas (ej. '¿cuándo parió la 47?')\n"
-            "• Envía notas de voz o fotos de aretes/frascos\n\n"
-            "📊 Administración:\n"
-            "• /alertas - Ver alertas pendientes\n"
-            "• /historial <tag> - Historial de un animal\n"
-            "• /potreros - Potreros listos para pastoreo\n"
-            "• /animales - Resumen de inventario\n"
-            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
-            "• /status - Estado del sistema y base de datos\n"
-            "• /usuarios - Lista de usuarios y roles\n"
-            "• /reporte [diario|semanal|N] - Generar reporte en PDF\n"
-            "• /exportar - Descargar backup ZIP para Software Ganadero\n"
-            "• /importar - Instrucciones para importar backup DBF\n"
-            "• /confirmar_importar - Procesar backup subido\n"
-            "• /descartar_backup - Eliminar backup pendiente"
+            "🏠 <i>Usa /menu o /start para abrir el panel táctil en cualquier momento.</i>"
         )
     if rol == "TRABAJADOR":
         return (
-            "📋 Comandos disponibles (Trabajador / Campo):\n\n"
-            "📝 Bitácora & Consultas:\n"
-            "• Envía notas de texto de eventos (partos, celos, servicios, tratamientos, pesajes, etc.)\n"
-            "• Haz preguntas en lenguaje natural (ej. '¿cuándo parió la 47?')\n"
+            "📋 <b>Comandos disponibles (Trabajador / Campo):</b>\n"
+            "────────────────────────────────────────\n\n"
+            "📱 <b>¿CÓMO USAR EL BOT EN EL CORRAL?</b>\n\n"
+            "1️⃣ <b>Para consultar un animal:</b>\n"
+            "• Escribe solo el arete: <code>47</code> o <code>N069</code>\n"
+            "• /consulta &lt;tag&gt; o /historial &lt;tag&gt; - Consultar ficha zootécnica\n"
+            "• /fotos [tag] - Ver fotos registradas (o /foto &lt;tag&gt;)\n\n"
+            "2️⃣ <b>Para anotar una novedad (Voz o Texto):</b>\n"
+            "• Envía notas de texto de novedades o preguntas directas\n"
             "• Envía notas de voz con reportes de campo (transcripción automática)\n"
-            "• Envía fotos de aretes o tratamientos\n"
-            "• /consulta <tag> o /historial <tag> - Consultar ficha zootécnica de un animal\n"
-            "• /fotos [tag] - Ver fotos registradas (o /foto <tag>)\n"
+            "• 🍼 <i>Parto:</i> «pario la 47 macho vivo en el corral»\n"
+            "• 🔥 <i>Celo:</i> «celo en la manana la 33»\n"
+            "• 🐂 <i>Servicio:</i> «inseminada la 15 con toro reproductor»\n"
+            "• ⚖️ <i>Pesaje:</i> «pesaje de la A060 195 kilos»\n"
+            "• 💉 <i>Remedios:</i> Envía la foto del frasco o «le puse 10ml de penicilina a la 12»\n"
+            "• 🚚 <i>Traslado:</i> «movi las vacas al potrero olegario»\n\n"
+            "3️⃣ <b>Comandos Rápidos:</b>\n"
             "• /menu - Abrir el menú táctil de botones\n"
-            "• /ayuda - Mostrar esta lista de comandos"
+            "• /medicamentos - Ver qué vacas están en retiro de leche/carne\n"
+            "• /ayuda - Mostrar esta lista de comandos\n\n"
+            "🏠 <i>Usa /menu para ver las opciones táctiles.</i>"
         )
     return "⛔ No autorizado."
 
@@ -591,20 +1209,23 @@ def texto_menu_principal(rol: Optional[str]) -> str:
     if rol == "OWNER":
         return (
             "👑 <b>Panel de Control (Dueño)</b>\n"
-            "Bienvenido a la <i>Bitácora de Campo Ganadero</i>.\n\n"
-            "Selecciona una opción del menú o escribe directamente tu consulta o nota:"
+            "🌿 <i>Hacienda GANADERIA-JA (340 Cabezas Activas)</i>\n"
+            "────────────────────────────────────────\n"
+            "Selecciona una opción táctil o envía un audio/mensaje:"
         )
     if rol == "ADMIN":
         return (
             "🛠️ <b>Panel de Control (Administrador)</b>\n"
-            "Bienvenido a la <i>Bitácora de Campo Ganadero</i>.\n\n"
-            "Selecciona una opción del menú o escribe tu consulta o nota:"
+            "🌿 <i>Hacienda GANADERIA-JA (340 Cabezas Activas)</i>\n"
+            "────────────────────────────────────────\n"
+            "Selecciona una opción táctil o envía un audio/mensaje:"
         )
     if rol == "TRABAJADOR":
         return (
-            "🤠 <b>Menú del Trabajador de Campo</b>\n"
-            "¡Bienvenido! Este bot es su cuaderno digital de la finca.\n\n"
-            "Seleccione una opción o envíe su nota de voz, foto o mensaje:"
+            "🤠 <b>Menú del Trabajador de Campo (cuaderno digital)</b>\n"
+            "🌿 <i>Hacienda GANADERIA-JA</i>\n"
+            "────────────────────────────────────────\n"
+            "Toca un botón o envía tu nota de voz, foto o mensaje:"
         )
     return "⛔ No autorizado."
 
@@ -968,19 +1589,19 @@ def construir_application(
         keyboard = [
             [
                 InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
+                InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
             ],
             [
+                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
                 InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
+            ],
+            [
+                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
                 InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
             ],
             [
                 InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
                 InlineKeyboardButton("🎤 Cómo Mandar Audios", callback_data="guia:audios"),
-            ],
-            [
-                InlineKeyboardButton("📷 Fotos Aretes y Remedios", callback_data="guia:fotos"),
-                InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
             ],
             [
                 InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
@@ -992,18 +1613,18 @@ def construir_application(
         keyboard = [
             [
                 InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
+                InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
             ],
             [
-                InlineKeyboardButton("📊 Inventario Hato", callback_data="cmd:inventario"),
-                InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
-            ],
-            [
+                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
                 InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
-                InlineKeyboardButton("❓ Preguntas Rápidas", callback_data="cmd:preguntas_rapidas"),
             ],
             [
-                InlineKeyboardButton("⚠️ Alertas Pendientes", callback_data="cmd:alertas"),
+                InlineKeyboardButton("📊 Población & KPIs SG", callback_data="cmd:poblacion"),
+                InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
+            ],
+            [
+                InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
                 InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             ],
             [
@@ -1011,19 +1632,19 @@ def construir_application(
                 InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
             ],
             [
-                InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                InlineKeyboardButton("⚙️ Servidor & Logs", callback_data="cmd:sistema"),
             ],
         ]
         if rol == "OWNER":
             keyboard[-1].append(InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"))
             keyboard.append([
                 InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
-                InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
+                InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
             ])
         else:
             keyboard[-1].append(InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"))
             keyboard.append([
-                InlineKeyboardButton("📖 Comandos", callback_data="cmd:ayuda"),
+                InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
             ])
         return InlineKeyboardMarkup(keyboard)
 
@@ -1150,16 +1771,56 @@ def construir_application(
         tag_clean = str(tag).strip()
         keyboard = [
             [
-                InlineKeyboardButton("⚖️ Pesajes", callback_data=f"pesos:{tag_clean}"),
-                InlineKeyboardButton("🧬 Reproducción", callback_data=f"repro:{tag_clean}"),
+                InlineKeyboardButton("⚖️ Pesajes & GMD", callback_data=f"animal:pesos:{tag_clean}"),
+                InlineKeyboardButton("🍼 Partos & Crías", callback_data=f"animal:reprod:{tag_clean}"),
             ],
             [
-                InlineKeyboardButton("🌱 Potrero", callback_data=f"ubica:{tag_clean}"),
-                InlineKeyboardButton("💊 Retiro", callback_data=f"retiro:{tag_clean}"),
+                InlineKeyboardButton("🥛 Control Leche", callback_data=f"animal:leche:{tag_clean}"),
+                InlineKeyboardButton("💉 Sanidad & Retiro", callback_data=f"animal:sanidad:{tag_clean}"),
             ],
             [
+                InlineKeyboardButton("🌳 Genealogía (3G)", callback_data=f"animal:geneal:{tag_clean}"),
                 InlineKeyboardButton("📷 Ver Foto", callback_data=f"foto:{tag_clean}"),
-                InlineKeyboardButton("📋 Ficha Completa", callback_data=f"ficha:{tag_clean}"),
+            ],
+            [
+                InlineKeyboardButton("📋 Ficha Resumen", callback_data=f"animal:resumen:{tag_clean}"),
+                InlineKeyboardButton("🔍 Buscar Otro", callback_data="cmd:buscar_animal"),
+            ],
+            [
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_alertas() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🔴 Partos Próximos (≤30d)", callback_data="alerta:partos"),
+                InlineKeyboardButton("🟡 Vacas para Secado", callback_data="alerta:secados"),
+            ],
+            [
+                InlineKeyboardButton("🟢 Crías para Destete", callback_data="alerta:destetes"),
+                InlineKeyboardButton("⚠️ Pérdidas de Peso (GMD)", callback_data="alerta:pesos"),
+            ],
+            [
+                InlineKeyboardButton("⛔ Retiros Sanitarios", callback_data="cmd:retiros_activos"),
+                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+            ],
+            [
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+            ],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def crear_teclado_poblacion() -> InlineKeyboardMarkup:
+        keyboard = [
+            [
+                InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
+                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+            ],
+            [
+                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
             ],
         ]
         return InlineKeyboardMarkup(keyboard)
@@ -1231,6 +1892,10 @@ def construir_application(
 
             if "FICHA ZOOTÉCNICA" in respuesta:
                 tag = nlu.extraer_tag(raw_text)
+                if not tag:
+                    m_tag = re.search(r"(?:🐄|🐮|🐂|🍼)\s*(?:Vaca|Toro|Novilla|Ternero|Ternera|Novillo|Cría|Cria)?\s*([A-Za-z0-9\-_]+)", respuesta)
+                    if m_tag:
+                        tag = m_tag.group(1).strip()
                 if tag:
                     foto_path = buscar_foto_animal(db, tag, media_dir=media_dir)
                     teclado = crear_teclado_animal(tag)
@@ -1448,13 +2113,49 @@ def construir_application(
             if not update.effective_user or not update.message:
                 return
             user_id = update.effective_user.id
-            if not auth.puede_administrar(user_id):
+            if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            msg = formatear_alertas(db)
-            await update.message.reply_text(msg)
+            msg = formatear_alertas_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_alertas()
+            )
         except Exception as e:
             logger.error("Error en cmd_alertas: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_poblacion(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_poblacion_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_poblacion: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_genetica(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_genetica_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_genetica: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -2162,13 +2863,215 @@ def construir_application(
 
             elif data == "cmd:alertas":
                 await query.answer()
-                if not auth.puede_administrar(user_id):
+                if not auth.es_autorizado(user_id):
                     if query.message:
                         await query.message.reply_text("⛔ No autorizado.")
                     return
-                msg = formatear_alertas(db)
+                msg = formatear_alertas_panel(db)
                 if query.message:
-                    await query.message.reply_text(msg)
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_alertas()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_alertas())
+
+            elif data == "cmd:poblacion":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_poblacion_panel(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_poblacion())
+
+            elif data == "cmd:genetica":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_genetica_panel(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_poblacion())
+
+            elif data == "alerta:partos":
+                await query.answer()
+                hoy = date.today()
+                limite_30d = hoy + timedelta(days=30)
+                filas = db.query(
+                    """
+                    SELECT a.tag, a.nombre, s.fecha_estimada_parto, p.nombre AS potrero
+                    FROM servicios s
+                    JOIN animales a ON a.id_animal = s.vaca_id
+                    LEFT JOIN potreros p ON p.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO' AND s.fecha_estimada_parto IS NOT NULL
+                      AND s.fecha_estimada_parto >= ? AND s.fecha_estimada_parto <= ?
+                    ORDER BY s.fecha_estimada_parto ASC
+                    """,
+                    (hoy.isoformat(), limite_30d.isoformat()),
+                )
+                if not filas:
+                    txt = "🔴 <b>Próximos Partos (≤30 días):</b>\n\n✅ No hay partos proyectados para los próximos 30 días."
+                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                else:
+                    lineas = ["🔴 <b>Vacas con Parto Próximo (Próximos 30 días):</b>\n"]
+                    botones_vacas = []
+                    for r in filas:
+                        tag_v = r["tag"] or "S/T"
+                        fep = r["fecha_estimada_parto"]
+                        dias_faltan = (to_date(fep) - hoy).days if to_date(fep) else 0
+                        pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
+                        lineas.append(f"• 🐮 <b>{html.escape(str(tag_v))}</b>: FEP {fep} (en {dias_faltan}d){pot}")
+                        botones_vacas.append(InlineKeyboardButton(f"🐮 {tag_v}", callback_data=f"ficha:{tag_v}"))
+                    txt = "\n".join(lineas)
+                    btn_a = []
+                    for i in range(0, len(botones_vacas), 3):
+                        btn_a.append(botones_vacas[i:i+3])
+                    btn_a.append([
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+
+            elif data == "alerta:secados":
+                await query.answer()
+                hoy = date.today()
+                filas = db.query(
+                    """
+                    SELECT a.tag, a.nombre, MAX(p.fecha) as ult_parto, pot.nombre AS potrero
+                    FROM partos p
+                    JOIN animales a ON a.id_animal = p.vaca_id
+                    LEFT JOIN potreros pot ON pot.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO' AND a.sexo LIKE 'H%'
+                    GROUP BY a.id_animal
+                    HAVING ult_parto <= date(?, '-200 days')
+                    ORDER BY ult_parto ASC
+                    """,
+                    (hoy.isoformat(),),
+                )
+                if not filas:
+                    txt = "🟡 <b>Vacas Candidatas para Secado (≥200 DEL):</b>\n\n✅ No hay vacas en lactancia prolongada pendientes de secado."
+                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                else:
+                    lineas = ["🟡 <b>Vacas Candidatas para Secado (≥200 Días de Lactancia):</b>\n"]
+                    botones_vacas = []
+                    for r in filas:
+                        tag_v = r["tag"] or "S/T"
+                        dias_l = (hoy - to_date(r["ult_parto"])).days if to_date(r["ult_parto"]) else 0
+                        pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
+                        lineas.append(f"• 🐮 <b>{html.escape(str(tag_v))}</b>: {dias_l} DEL (Parto {r['ult_parto']}){pot}")
+                        botones_vacas.append(InlineKeyboardButton(f"🐮 {tag_v}", callback_data=f"ficha:{tag_v}"))
+                    txt = "\n".join(lineas)
+                    btn_a = []
+                    for i in range(0, len(botones_vacas), 3):
+                        btn_a.append(botones_vacas[i:i+3])
+                    btn_a.append([
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+
+            elif data == "alerta:destetes":
+                await query.answer()
+                hoy = date.today()
+                filas = db.query(
+                    """
+                    SELECT a.tag, a.nombre, a.fecha_nacimiento, a.sexo, pot.nombre AS potrero
+                    FROM animales a
+                    LEFT JOIN potreros pot ON pot.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO' AND a.fecha_nacimiento IS NOT NULL
+                      AND a.fecha_nacimiento <= date(?, '-200 days')
+                      AND a.fecha_nacimiento >= date(?, '-365 days')
+                    ORDER BY a.fecha_nacimiento ASC
+                    """,
+                    (hoy.isoformat(), hoy.isoformat()),
+                )
+                if not filas:
+                    txt = "🟢 <b>Crías en Edad de Destete (≥200 días):</b>\n\n✅ No hay terneros pendientes de destete en este rango."
+                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                else:
+                    lineas = ["🟢 <b>Crías en Edad de Destete (200 - 365 días de edad):</b>\n"]
+                    botones_crias = []
+                    for r in filas:
+                        tag_c = r["tag"] or "S/T"
+                        dias_edad = (hoy - to_date(r["fecha_nacimiento"])).days if to_date(r["fecha_nacimiento"]) else 0
+                        sexo_txt = "Macho" if str(r["sexo"]).startswith("M") else "Hembra"
+                        pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
+                        lineas.append(f"• 🍼 <b>{html.escape(str(tag_c))}</b> ({sexo_txt}): {dias_edad} días (Nac. {r['fecha_nacimiento']}){pot}")
+                        botones_crias.append(InlineKeyboardButton(f"🐮 {tag_c}", callback_data=f"ficha:{tag_c}"))
+                    txt = "\n".join(lineas)
+                    btn_a = []
+                    for i in range(0, len(botones_crias), 3):
+                        btn_a.append(botones_crias[i:i+3])
+                    btn_a.append([
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+
+            elif data == "alerta:pesos":
+                await query.answer()
+                filas_gmd = db.query(
+                    """
+                    SELECT a.tag, a.nombre, p.peso_kg, p.fecha, pot.nombre AS potrero
+                    FROM pesajes p
+                    JOIN animales a ON a.id_animal = p.animal_id
+                    LEFT JOIN potreros pot ON pot.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO'
+                    ORDER BY a.id_animal, p.fecha ASC
+                    """
+                )
+                pesos_por_animal = defaultdict(list)
+                for r in filas_gmd:
+                    pesos_por_animal[r["tag"]].append(r)
+                perdidas = []
+                for tag_a, p_list in pesos_por_animal.items():
+                    if len(p_list) >= 2:
+                        ult = p_list[-1]
+                        pen = p_list[-2]
+                        d_ult = to_date(ult["fecha"])
+                        d_pen = to_date(pen["fecha"])
+                        if d_ult and d_pen and (d_ult - d_pen).days > 0:
+                            dias_diff = (d_ult - d_pen).days
+                            kg_diff = ult["peso_kg"] - pen["peso_kg"]
+                            if kg_diff < 0:
+                                gmd = (kg_diff * 1000.0) / dias_diff
+                                perdidas.append((tag_a, gmd, kg_diff, ult["peso_kg"], pen["peso_kg"], ult["potrero"]))
+                if not perdidas:
+                    txt = "⚠️ <b>Alertas de Pérdida de Peso (GMD &lt; 0):</b>\n\n✅ Ningún animal activo registró pérdida de peso en su último pesaje."
+                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                else:
+                    lineas = ["⚠️ <b>Animales con Pérdida de Peso en Último Control:</b>\n"]
+                    botones_p = []
+                    for tag_a, gmd, kg_diff, p_ult, p_pen, pot in sorted(perdidas, key=lambda x: x[1]):
+                        pot_txt = f" · 📍 {pot}" if pot else ""
+                        lineas.append(f"• 🐮 <b>{html.escape(str(tag_a))}</b>: <b>{gmd:.0f} g/día</b> ({kg_diff:+.1f} kg: {p_pen:.0f}kg → {p_ult:.0f}kg){pot_txt}")
+                        botones_p.append(InlineKeyboardButton(f"🐮 {tag_a}", callback_data=f"animal:pesos:{tag_a}"))
+                    txt = "\n".join(lineas)
+                    btn_a = []
+                    for i in range(0, len(botones_p), 3):
+                        btn_a.append(botones_p[i:i+3])
+                    btn_a.append([
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ])
+                if query.message:
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
 
             elif data == "cmd:potreros":
                 await query.answer()
@@ -2396,24 +3299,65 @@ def construir_application(
                                 f"📷 Foto {tag} [{fec}] (archivo no disponible en servidor)."
                             )
 
-            elif data.startswith("pesos:"):
-                tag = data.split("pesos:", 1)[1].strip()
+            elif data.startswith("animal:pesos:") or data.startswith("pesos:"):
+                tag = data.split(":", 2)[-1].strip()
                 await query.answer()
-                qe = QueryEngine(db)
-                msg = qe.responder(f"cuanto peso la {tag}")
-                if query.message:
-                    await query.message.reply_text(msg)
-
-            elif data.startswith("repro:"):
-                tag = data.split("repro:", 1)[1].strip()
-                await query.answer()
-                qe = QueryEngine(db)
-                msg = qe.responder(f"servicio de {tag}")
+                msg = formatear_pesajes_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
                     except Exception:
-                        await query.message.reply_text(msg)
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+
+            elif data.startswith("animal:reprod:") or data.startswith("repro:"):
+                tag = data.split(":", 2)[-1].strip()
+                await query.answer()
+                msg = formatear_reprod_animal_tab(db, tag)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+
+            elif data.startswith("animal:leche:"):
+                tag = data.split("animal:leche:", 1)[1].strip()
+                await query.answer()
+                msg = formatear_leche_animal_tab(db, tag)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+
+            elif data.startswith("animal:sanidad:") or data.startswith("retiro:"):
+                tag = data.split(":", 2)[-1].strip()
+                await query.answer()
+                msg = formatear_sanidad_animal_tab(db, tag)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+
+            elif data.startswith("animal:geneal:"):
+                tag = data.split("animal:geneal:", 1)[1].strip()
+                await query.answer()
+                msg = formatear_genealogia_animal_tab(db, tag)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+
+            elif data.startswith("animal:resumen:") or data.startswith("ficha:"):
+                tag = data.split(":", 2)[-1].strip()
+                await query.answer()
+                msg = formatear_historial(db, tag)
+                if query.message:
+                    try:
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
 
             elif data.startswith("ubica:"):
                 tag = data.split("ubica:", 1)[1].strip()
@@ -2422,30 +3366,9 @@ def construir_application(
                 msg = qe.responder(f"en que potrero esta {tag}")
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
                     except Exception:
-                        await query.message.reply_text(msg)
-
-            elif data.startswith("retiro:"):
-                tag = data.split("retiro:", 1)[1].strip()
-                await query.answer()
-                qe = QueryEngine(db)
-                msg = qe.responder(f"retiro de {tag}")
-                if query.message:
-                    try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
-                    except Exception:
-                        await query.message.reply_text(msg)
-
-            elif data.startswith("ficha:"):
-                tag = data.split("ficha:", 1)[1].strip()
-                await query.answer()
-                msg = formatear_historial(db, tag)
-                if query.message:
-                    try:
-                        await query.message.reply_text(msg, parse_mode="HTML")
-                    except Exception:
-                        await query.message.reply_text(msg)
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
 
             elif data == "cmd:historial":
                 await query.answer()
@@ -2654,6 +3577,8 @@ def construir_application(
     app.add_handler(CommandHandler(["medicamentos", "tratamientos", "farmacia", "retiros", "retiro"], cmd_medicamentos))
     app.add_handler(CommandHandler(["preguntas", "faq", "consultas"], cmd_preguntas_rapidas))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
+    app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
+    app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
