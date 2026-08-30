@@ -234,10 +234,14 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     Usa tipografías base (Helvetica) y texto plano sin emojis. Crea el
     directorio padre de ``ruta_salida`` si no existe.
     """
+    import shutil
+    import tempfile
+
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
+    from reportlab.lib.utils import ImageReader
     from reportlab.platypus import (
         Image,
         Paragraph,
@@ -246,6 +250,19 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
         Table,
         TableStyle,
     )
+
+    from ..engine.charts import (
+        generar_grafico_categorias,
+        generar_grafico_evolucion_rebano,
+        graficos_disponibles,
+    )
+
+    def _imagen_ajustada(ruta: str, ancho_mm: float) -> Image:
+        """Flowable Image escalada a ``ancho_mm`` preservando la proporción
+        real del PNG (evita estirar/achatar los gráficos de matplotlib)."""
+        iw, ih = ImageReader(ruta).getSize()
+        alto_mm = ancho_mm * (ih / iw)
+        return Image(ruta, width=ancho_mm * mm, height=alto_mm * mm)
 
     datos = recolectar_datos(db, dias, hoy)
     fecha_hoy = hoy if hoy is not None else date.today()
@@ -386,6 +403,32 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
         ]))
         story.append(tabla_p)
 
+    # Gráficos (opcionales: si matplotlib no está disponible en el servidor,
+    # el reporte se genera igual, solo sin esta sección).
+    tmp_charts_dir = None
+    if graficos_disponibles():
+        tmp_charts_dir = tempfile.mkdtemp(prefix="bitacora_reporte_charts_")
+        graficos_embebidos = []
+        try:
+            ruta_cat = generar_grafico_categorias(db, output_dir=tmp_charts_dir, hoy=fecha_hoy)
+            if ruta_cat:
+                graficos_embebidos.append(("Distribución del Hato", ruta_cat, 82))
+        except Exception:
+            pass
+        try:
+            ruta_evo = generar_grafico_evolucion_rebano(db, meses=6, output_dir=tmp_charts_dir, hoy=fecha_hoy)
+            if ruta_evo:
+                graficos_embebidos.append(("Evolución del Rebaño (6 meses)", ruta_evo, 170))
+        except Exception:
+            pass
+
+        if graficos_embebidos:
+            story.append(Paragraph("Gráficos", estilo_seccion))
+            for titulo_g, ruta_g, ancho_g in graficos_embebidos:
+                story.append(Paragraph(titulo_g, estilo_normal))
+                story.append(_imagen_ajustada(ruta_g, ancho_g))
+                story.append(Spacer(1, 6))
+
     # Tablas por evento.
     for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
         filas = datos["eventos"].get(clave)
@@ -446,4 +489,6 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     ))
 
     doc.build(story)
+    if tmp_charts_dir:
+        shutil.rmtree(tmp_charts_dir, ignore_errors=True)
     return ruta_salida

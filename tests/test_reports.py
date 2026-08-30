@@ -102,6 +102,31 @@ def test_generar_pdf_genera_archivo_real(tmp_path, db):
         assert f.read(5) == b"%PDF-"
 
 
+def test_generar_pdf_incluye_graficos_embebidos(tmp_path, db):
+    from src.engine.charts import graficos_disponibles
+    if not graficos_disponibles():
+        import pytest
+        pytest.skip("matplotlib no está instalado en este entorno")
+
+    db.registrar_potrero("Norte")
+    for i, tag in enumerate(["V1", "V2", "V3"]):
+        db.registrar_animal(tag, sexo="Hembra" if i % 2 == 0 else "Macho",
+                            estado="ACTIVO", potrero="Norte", fecha_nacimiento="2024-01-01")
+    db.registrar_parto("V1", fecha="2026-08-24", sexo_cria="Macho", peso_nacimiento=35.0)
+
+    ruta = tmp_path / "reporte_con_graficos.pdf"
+    generar_pdf(db, 7, str(ruta), hoy=date(2026, 8, 26))
+
+    import pypdf
+    r = pypdf.PdfReader(str(ruta))
+    total_imagenes = sum(len(list(p.images)) for p in r.pages)
+    # Al menos el logo (si existe) + 1 gráfico; con datos de categorías
+    # poblado, debe haber por lo menos una imagen PNG de matplotlib.
+    nombres = [img.name for p in r.pages for img in p.images]
+    assert any(n.endswith(".png") for n in nombres), f"no se embebió ningún gráfico: {nombres}"
+    assert total_imagenes >= 1
+
+
 def test_recolectar_datos_incluye_potreros_sg(db):
     p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
     db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
