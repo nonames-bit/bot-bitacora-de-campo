@@ -1197,6 +1197,16 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "2. Consigue su user_id: que él busque @userinfobot → /start (Id)\n"
             "3. Agrégalo: /agregar_usuario 712345678 TRABAJADOR Carlos\n"
             "4. Verifica: /usuarios | Para quitar: /quitar_usuario 712345678\n\n"
+            "🆘 ¿Un trabajador o el ADMIN registró algo por error (ej. una muerte, "
+            "parto o pesaje que no era)?\n"
+            "1. /ultimos — busca la línea del registro equivocado\n"
+            "2. Copia y envía el comando /deshacer que te muestra en esa línea\n"
+            "3. Revisa lo que dice que va a borrar y confirma con /confirmar_deshacer\n"
+            "   (o /cancelar_deshacer si te arrepientes)\n"
+            "Si el problema es grande (muchos registros dañados, no solo uno), eso ya "
+            "no es para el chat: pide que restauren el respaldo automático de anoche "
+            "desde el VPS (scripts/restaurar_backup.sh) — esa es la otra red de "
+            "seguridad, separada del respaldo de Software Ganadero.\n\n"
             "🏠 <i>Toca /menu o /start para abrir el panel táctil interactivo.</i>"
         )
     if rol == "ADMIN":

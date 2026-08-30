@@ -182,6 +182,10 @@ def test_formatear_ayuda():
     assert "/importar" in ayuda_owner
     assert "/confirmar_importar" in ayuda_owner
     assert "/descartar_backup" in ayuda_owner
+    assert "/deshacer" in ayuda_owner
+    assert "/confirmar_deshacer" in ayuda_owner
+    assert "/ultimos" in ayuda_owner
+    assert "restaurar_backup.sh" in ayuda_owner
 
     ayuda_admin = formatear_ayuda("ADMIN")
     assert "Administrador" in ayuda_admin
