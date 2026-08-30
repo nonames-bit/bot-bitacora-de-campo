@@ -270,7 +270,18 @@ def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = Non
     elif del_dias >= 200:
         lineas.append("• <b>Alerta de Secado:</b> ⚠️ <i>Supera los 200 días de lactancia. Programar secado si la gestación supera los 220 días.</i>")
 
-    lineas.append("\n💡 <i>Tip: Registre pesajes de leche dictando por audio o escribiendo: 'pesaje leche 47 12 litros'.</i>")
+    controles = db.historial_leche(aid)
+    if controles:
+        ultimos = controles[-5:][::-1]
+        lineas.append(f"\n🥛 <b>Últimos controles de leche ({len(controles)} total):</b>")
+        for c in ultimos:
+            litros_str = f"{c['litros']} L" if c["litros"] is not None else "S/D"
+            lineas.append(f"  • {c['fecha']}: {litros_str}")
+    else:
+        lineas.append(
+            "\n💡 <i>Sin controles de leche registrados todavía. Registre uno dictando o "
+            "escribiendo, ej.: 'la 47 dio 12 litros de leche'.</i>"
+        )
     return "\n".join(lineas)
 
 
@@ -1182,6 +1193,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/genetica</code> — Composición racial y cruces del hato\n"
             "• <code>/fotos [tag]</code> — Galería fotográfica del ganado\n"
             "• <code>/grafico [tag]</code> — Curva de crecimiento (peso vs edad)\n"
+            "• <code>/grafico_leche [tag]</code> — Curva de lactancia (litros vs días en leche)\n"
             "• <code>/graficos</code> — Panel de gráficos generales de la finca\n\n"
             "🎙️ <b>2. Registro por Voz o Texto (Whisper + IA):</b>\n"
             "• 🍼 <i>Partos:</i> «pario la 47 ternero macho 38 kilos»\n"
@@ -1238,6 +1250,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/genetica</code> — Composición racial y cruces del hato\n"
             "• <code>/fotos [tag]</code> — Galería fotográfica del ganado\n"
             "• <code>/grafico [tag]</code> — Curva de crecimiento (peso vs edad)\n"
+            "• <code>/grafico_leche [tag]</code> — Curva de lactancia (litros vs días en leche)\n"
             "• <code>/graficos</code> — Panel de gráficos generales de la finca\n\n"
             "⚙️ <b>2. Informes y Sincronización:</b>\n"
             "• <code>/status</code> — Tablero zootécnico ejecutivo de la finca\n"
@@ -1261,6 +1274,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/ficha [tag]</code> o <code>/consulta [tag]</code> — Ver historial, partos y potrero\n"
             "• <code>/fotos [tag]</code> — Ver galería o fotos del animal\n"
             "• <code>/grafico [tag]</code> — Curva de crecimiento (peso vs edad)\n"
+            "• <code>/grafico_leche [tag]</code> — Curva de lactancia (litros vs días en leche)\n"
             "• <code>/graficos</code> — Panel de gráficos generales de la finca\n\n"
             "2️⃣ <b>Anotar una novedad (Voz con transcripción automática o Texto):</b>\n"
             "• Envía notas de texto de novedades o preguntas directas\n"
@@ -1361,6 +1375,12 @@ def texto_ejemplo_evento(tipo: str) -> str:
             "<code>la 12 tiene condición corporal 3</code>\n\n"
             "💡 <i>Uso:</i> Se guarda por fecha, igual que un pesaje; sirve para ver la tendencia nutricional del animal."
         ),
+        "leche": (
+            "🥛 <b>Ejemplo de Control de Leche:</b>\n"
+            "<code>la 47 dio 12 litros de leche</code>\n"
+            "<code>ordeñé 8.5 litros a la 12</code>\n\n"
+            "💡 <i>Uso:</i> No hace falta a diario — con un control semanal ya se puede armar la curva de lactancia."
+        ),
     }
     return ejemplos.get(tipo, "Selecciona una categoría para ver su ejemplo de nota de campo.")
 
@@ -1430,7 +1450,8 @@ def texto_guia_preguntas_animal() -> str:
         "• <i>«¿cuánto pesó la N069?»</i>\n"
         "• <i>«último pesaje del novillo A060»</i>\n"
         "• <i>«ganancia diaria de la 47»</i>\n"
-        "• <i>«condición corporal de la 47»</i>\n\n"
+        "• <i>«condición corporal de la 47»</i>\n"
+        "• <i>«litros de leche de la 47»</i>\n\n"
         "🌳 <b>Genealogía & Crías:</b>\n"
         "• <i>«¿quién es la madre de patricia?»</i>\n"
         "• <i>«quién es el padre de la 47»</i>\n"

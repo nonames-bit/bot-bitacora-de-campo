@@ -51,6 +51,10 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\btraslad", r"\bpotrero\b.*\bpotrero\b", r"\bmov[ií] el lote\b",
         r"\bcambie el lote\b", r"\brot[óo] el\b",
     ]),
+    ("leche", [
+        r"\blitros?\s+de\s+leche\b", r"\bleche\b.*\blitros?\b", r"\blitros?\b.*\bleche\b",
+        r"\bordeñ[eoó]", r"\bproducci[oó]n\s+de\s+leche\b", r"\bcontrol\s+lechero\b",
+    ]),
     ("pesaje", [
         r"\bpesaje\b", r"\bpes[oó]\b", r"\bpeso\s+\d",
         r"\d+\s*(?:kg|kilos|kilogramos)\b", r"\bkilogramos\b", r"\bkilos\b",
@@ -258,6 +262,19 @@ def extraer_peso(texto: str) -> Optional[float]:
     if m:
         return _f(m.group(1))
     m = re.search(r"\bpeso\s+(\d+(?:[.,]\d+)?)\b", t)
+    if m:
+        return _f(m.group(1))
+    return None
+
+
+def extraer_litros_leche(texto: str) -> Optional[float]:
+    """Extrae los litros de leche producidos (ej. '12 litros', '8.5 lts de
+    leche', 'ordeñó 10 litros')."""
+    t = normalizar(texto)
+    m = re.search(r"\b(\d+(?:[.,]\d+)?)\s*(?:litros?|lts?)\b", t)
+    if m:
+        return _f(m.group(1))
+    m = re.search(r"\blitros?\s+(?:de\s+leche\s+)?(\d+(?:[.,]\d+)?)\b", t)
     if m:
         return _f(m.group(1))
     return None

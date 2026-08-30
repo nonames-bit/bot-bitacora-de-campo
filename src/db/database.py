@@ -19,6 +19,7 @@ class Database:
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
         "traslados", "pesajes", "movimientos", "condicion_corporal",
+        "produccion_leche",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -418,6 +419,39 @@ class Database:
             "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
         )
 
+    def registrar_leche(self, animal_tag, fecha=None, litros=None,
+                        notas=None, registrado_por=None) -> int:
+        animal_id = self.resolve_animal(animal_tag, crear=True, sexo="Hembra")
+        f = iso(fecha)
+        # Mismo animal + misma fecha + mismos litros: nota reenviada, no dos
+        # controles de leche reales idénticos el mismo día (el control es
+        # semanal, no diario, así que esto casi nunca choca con un dato real).
+        existente = self._id_si_ya_existe("produccion_leche", {
+            "animal_id": animal_id, "fecha": f, "litros": litros,
+        })
+        if existente:
+            return existente
+        return self.insert("produccion_leche", dict(
+            animal_id=animal_id, fecha=f, litros=litros, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+    def ultima_leche(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        if aid is None:
+            return None
+        return self.query_one(
+            "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
+        )
+
+    def historial_leche(self, animal_tag_or_id) -> list[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        if aid is None:
+            return []
+        return self.query(
+            "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha", (aid,)
+        )
+
     def registrar_alerta(self, animal_tag, tipo_alerta, fecha_programada=None,
                          estado="PENDIENTE", descripcion=None) -> int:
         animal_id = self.resolve_animal(animal_tag) if animal_tag else None
@@ -640,6 +674,11 @@ class Database:
                        ('Condición corporal' || CASE WHEN cc.valor IS NOT NULL THEN ' ' || cc.valor ELSE '' END),
                        cc.creado_en, cc.registrado_por
                 FROM condicion_corporal cc LEFT JOIN animales a ON a.id_animal = cc.animal_id
+                UNION ALL
+                SELECT 'produccion_leche', pl.id, a.tag, pl.fecha,
+                       ('Leche' || CASE WHEN pl.litros IS NOT NULL THEN ' ' || pl.litros || 'L' ELSE '' END),
+                       pl.creado_en, pl.registrado_por
+                FROM produccion_leche pl LEFT JOIN animales a ON a.id_animal = pl.animal_id
             )
             ORDER BY creado_en IS NULL, creado_en DESC, id DESC
             LIMIT ?
@@ -668,6 +707,7 @@ class Database:
             "pesajes": lambda f: f"Pesaje de {tag}" + (f" — {f['peso_kg']}kg" if f["peso_kg"] is not None else ""),
             "movimientos": lambda f: f"Movimiento de {tag} ({f['tipo_movimiento'] or '?'})",
             "condicion_corporal": lambda f: f"Condición corporal de {tag}" + (f" — {f['valor']}" if f["valor"] is not None else ""),
+            "produccion_leche": lambda f: f"Producción de leche de {tag}" + (f" — {f['litros']}L" if f["litros"] is not None else ""),
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,
@@ -722,6 +762,9 @@ class Database:
             "movimientos": self.query("SELECT * FROM movimientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "condicion_corporal": self.query(
                 "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha", (aid,)
+            ),
+            "produccion_leche": self.query(
+                "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha", (aid,)
             ),
             "fotos": self.query("SELECT * FROM fotos WHERE animal_id = ? OR tag = ? ORDER BY fecha", (aid, tag)),
         }

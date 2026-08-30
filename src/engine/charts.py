@@ -199,6 +199,110 @@ def _promedio_peso_hato_por_edad(db, sexo: str, excluir_id: int, bucket_dias: in
     return sorted((b, sum(vals) / len(vals)) for b, vals in buckets.items())
 
 
+def _promedio_leche_hato_por_del(db, excluir_id: int, bucket_dias: int = 15) -> list[tuple[int, float]]:
+    """Promedio de litros/día por bucket de días en leche (DEL, agrupado de
+    a 15 días) entre los demás animales activos, usando el último parto de
+    cada uno para calcular el DEL de cada control. Referencia visual, mismo
+    criterio que _promedio_peso_hato_por_edad."""
+    filas = db.query(
+        """
+        SELECT pl.animal_id AS animal_id, pl.fecha AS fecha_control, pl.litros AS litros
+        FROM produccion_leche pl
+        JOIN animales a ON a.id_animal = pl.animal_id
+        WHERE a.estado = 'ACTIVO' AND a.id_animal != ? AND pl.litros IS NOT NULL
+        """,
+        (excluir_id,),
+    )
+    if not filas:
+        return []
+    partos_cache: dict = {}
+    buckets: dict[int, list[float]] = {}
+    for f in filas:
+        aid = f["animal_id"]
+        if aid not in partos_cache:
+            partos_cache[aid] = db.ultimo_parto(aid)
+        parto = partos_cache[aid]
+        if not parto or not parto["fecha"]:
+            continue
+        f_parto = to_date(parto["fecha"])
+        f_control = to_date(f["fecha_control"])
+        if not f_parto or not f_control:
+            continue
+        del_dias = (f_control - f_parto).days
+        if del_dias < 0:
+            continue
+        bucket = (del_dias // bucket_dias) * bucket_dias
+        buckets.setdefault(bucket, []).append(float(f["litros"]))
+    if len(buckets) < 2:
+        return []
+    return sorted((b, sum(vals) / len(vals)) for b, vals in buckets.items())
+
+
+def generar_grafico_lactancia(db, tag, output_dir: str = "data/reportes",
+                              hoy: Optional[date] = None) -> Optional[str]:
+    """Curva de lactancia individual (litros/día vs días en leche) sobre la
+    curva promedio del hato, mismo estilo que generar_grafico_peso. Muestra
+    de un vistazo el pico, la persistencia y si la vaca está cayendo antes
+    de tiempo comparada con sus compañeras.
+
+    Requiere al menos 2 controles de leche del animal y conocer la fecha de
+    su último parto (para calcular días en leche); devuelve None si no hay
+    suficientes datos todavía."""
+    if not _MATPLOTLIB_OK:
+        return None
+    aid = db.resolve_animal(tag)
+    if aid is None:
+        return None
+    animal = db.get_animal(aid)
+    if animal is None:
+        return None
+
+    controles = db.historial_leche(aid)
+    ultimo_parto = db.ultimo_parto(aid)
+    if ultimo_parto is None or not ultimo_parto["fecha"]:
+        return None
+    f_parto = to_date(ultimo_parto["fecha"])
+    if not f_parto:
+        return None
+
+    xs: list[int] = []
+    ys: list[float] = []
+    for c in controles:
+        if c["litros"] is None:
+            continue
+        f_c = to_date(c["fecha"])
+        if not f_c:
+            continue
+        dias_leche = (f_c - f_parto).days
+        if dias_leche < 0:
+            continue  # control de una lactancia anterior, no de esta
+        xs.append(dias_leche)
+        ys.append(float(c["litros"]))
+
+    if len(xs) < 2:
+        return None
+
+    fig, ax = plt.subplots(figsize=(7, 4.2), dpi=130)
+    ax.plot(xs, ys, marker="o", color=_COLOR_LINEA, linewidth=2.2, markersize=6, label="Litros/día (individual)")
+
+    prom = _promedio_leche_hato_por_del(db, aid)
+    if prom:
+        xs_prom, ys_prom = zip(*prom)
+        ax.plot(xs_prom, ys_prom, color=_COLOR_PROMEDIO, linewidth=1.6, linestyle="--",
+                label="Promedio del hato")
+
+    ax.set_xlabel("Días en leche (DEL)")
+    ax.set_ylabel("Litros/día")
+    tag_str = animal["tag"] or str(tag)
+    nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
+    ax.set_title(f"Curva de Lactancia — {tag_str}{nombre}")
+    _estilo_ejes(ax)
+    ax.legend(loc="upper right", fontsize=8)
+
+    fecha_hoy = (hoy or date.today()).isoformat()
+    return _guardar(fig, output_dir, f"grafico_lactancia_{tag_str}_{fecha_hoy}.png")
+
+
 # --------------------------------------------------------------------- #
 # Panel general de la finca
 # --------------------------------------------------------------------- #

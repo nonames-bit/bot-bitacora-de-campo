@@ -364,6 +364,44 @@ def test_condicion_corporal_aparece_en_historial(db):
 
 
 # ---------------------------------------------------------------------------
+# Producción de leche (control semanal)
+# ---------------------------------------------------------------------------
+def test_registrar_leche_y_consultar_ultima(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-08-01", litros=10.0)
+    db.registrar_leche("47", fecha="2026-08-08", litros=12.5, registrado_por=99)
+
+    ultima = db.ultima_leche("47")
+    assert ultima["litros"] == 12.5
+    assert ultima["fecha"] == "2026-08-08"
+    assert ultima["registrado_por"] == 99
+
+
+def test_registrar_leche_es_idempotente(db):
+    id1 = db.registrar_leche("47", fecha="2026-08-08", litros=12.5)
+    id2 = db.registrar_leche("47", fecha="2026-08-08", litros=12.5)
+    assert id1 == id2
+    id3 = db.registrar_leche("47", fecha="2026-08-08", litros=13.0)
+    assert id3 != id1
+
+
+def test_leche_aparece_en_historial(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-08-08", litros=12.5)
+    hist = db.historial("47")
+    assert len(hist["produccion_leche"]) == 1
+    assert hist["produccion_leche"][0]["litros"] == 12.5
+
+
+def test_historial_leche_devuelve_ordenado_por_fecha(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-08-15", litros=11.0)
+    db.registrar_leche("47", fecha="2026-08-01", litros=10.0)
+    controles = db.historial_leche("47")
+    assert [c["fecha"] for c in controles] == ["2026-08-01", "2026-08-15"]
+
+
+# ---------------------------------------------------------------------------
 # Registro de importaciones de Software Ganadero (¿está usando el backup de
 # hoy?)
 # ---------------------------------------------------------------------------

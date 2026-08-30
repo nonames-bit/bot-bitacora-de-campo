@@ -242,6 +242,7 @@ def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("📈 Gráfico de Peso", callback_data=f"animal:grafico:{tag_clean}"),
+            InlineKeyboardButton("📉 Curva de Lactancia", callback_data=f"animal:grafico_leche:{tag_clean}"),
         ],
         [
             InlineKeyboardButton("📋 Ficha Resumen", callback_data=f"animal:resumen:{tag_clean}"),

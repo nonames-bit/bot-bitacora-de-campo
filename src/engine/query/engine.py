@@ -257,6 +257,10 @@ class QueryEngine(
         if re.search(r"\b(?:historial|ficha|consulta)\b", t):
             return self._historial(tag)
 
+        # 6b. Producción de leche
+        if re.search(r"\blitros?\b|\bleche\b|\bordeñ[eoó]|\bcontrol\s+lechero\b", t):
+            return self._leche(tag)
+
         # 7. Pesaje y crecimiento
         if re.search(r"\bpes[oó]\b|\bpesaje\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)

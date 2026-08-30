@@ -15,6 +15,7 @@ from src.engine.charts import (
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
     generar_grafico_iep_boxplot_completo,
+    generar_grafico_lactancia,
     generar_grafico_ocupacion_potreros,
     generar_grafico_peso,
     generar_grafico_peso_destete_por_raza,
@@ -312,3 +313,50 @@ def test_generar_grafico_dias_abiertos_km_pocos_datos_devuelve_none(db, tmp_path
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
     db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
     assert generar_grafico_dias_abiertos_km(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+# ---------------------------------------------------------------------------
+# Curva de lactancia individual (litros/día vs días en leche)
+# ---------------------------------------------------------------------------
+def test_generar_grafico_lactancia(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    db.registrar_leche("47", fecha="2026-06-08", litros=10.0)
+    db.registrar_leche("47", fecha="2026-06-15", litros=12.0)
+    ruta = generar_grafico_lactancia(db, "47", output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_lactancia_con_promedio_del_hato(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    db.registrar_leche("47", fecha="2026-06-08", litros=10.0)
+    db.registrar_leche("47", fecha="2026-06-15", litros=12.0)
+    for i in range(3):
+        tag = f"V{i}"
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO")
+        db.registrar_parto(vaca_tag=tag, fecha="2026-05-01")
+        db.registrar_leche(tag, fecha="2026-05-08", litros=9.0 + i)
+        db.registrar_leche(tag, fecha="2026-05-15", litros=11.0 + i)
+    ruta = generar_grafico_lactancia(db, "47", output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_lactancia_menos_de_dos_controles_devuelve_none(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    db.registrar_leche("47", fecha="2026-06-08", litros=10.0)
+    assert generar_grafico_lactancia(db, "47", output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+def test_generar_grafico_lactancia_sin_parto_devuelve_none(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-06-08", litros=10.0)
+    db.registrar_leche("47", fecha="2026-06-15", litros=12.0)
+    assert generar_grafico_lactancia(db, "47", output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+def test_generar_grafico_lactancia_animal_inexistente_devuelve_none(db, tmp_path):
+    assert generar_grafico_lactancia(db, "no-existe-999", output_dir=str(tmp_path)) is None

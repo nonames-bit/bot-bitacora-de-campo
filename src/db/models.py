@@ -127,6 +127,14 @@ CREATE TABLE IF NOT EXISTS condicion_corporal (
     notas TEXT
 );
 
+CREATE TABLE IF NOT EXISTS produccion_leche (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER,
+    fecha TEXT,
+    litros REAL,
+    notas TEXT
+);
+
 CREATE TABLE IF NOT EXISTS alertas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER,
@@ -162,7 +170,7 @@ CREATE TABLE IF NOT EXISTS import_sg_historial (
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
-    "alertas", "fotos", "import_sg_historial",
+    "produccion_leche", "alertas", "fotos", "import_sg_historial",
 ]
 
 

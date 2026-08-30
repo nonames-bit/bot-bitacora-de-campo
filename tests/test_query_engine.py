@@ -1005,6 +1005,22 @@ def test_condicion_corporal_consulta(db):
     assert "No hay" in resp_sin_datos
 
 
+def test_leche_consulta(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-08-01", litros=10.0)
+    db.registrar_leche("47", fecha="2026-08-08", litros=12.5)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("litros de leche de la 47")
+    assert "No entendí" not in resp
+    assert "12.5" in resp
+    assert "2026-08-08" in resp
+
+    resp_sin_datos = qe.responder("litros de leche de la 99")
+    assert "No hay" in resp_sin_datos
+
+
 def test_cuantos_partos_tiene_nombre(db):
     from src.engine.query_engine import QueryEngine
     db.registrar_animal("47", nombre="patricia", sexo="Hembra", estado="ACTIVO")

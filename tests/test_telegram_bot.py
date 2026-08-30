@@ -735,6 +735,31 @@ def test_comando_grafico_registrado():
     assert 'animal:grafico:' in content
 
 
+def test_comando_grafico_leche_registrado():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler(["grafico_leche", "curva_lactancia"], cmd_grafico_leche)' in content
+    assert 'animal:grafico_leche:' in content
+
+
+def test_formatear_leche_animal_tab_muestra_controles(db):
+    from src.server.telegram_bot import formatear_leche_animal_tab
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    db.registrar_leche("47", fecha="2026-06-08", litros=10.0)
+    resp = formatear_leche_animal_tab(db, "47", hoy=date(2026, 8, 30))
+    assert "10.0" in resp
+    assert "2026-06-08" in resp
+
+
+def test_formatear_leche_animal_tab_sin_controles_da_tip(db):
+    from src.server.telegram_bot import formatear_leche_animal_tab
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    resp = formatear_leche_animal_tab(db, "47", hoy=date(2026, 8, 30))
+    assert "Sin controles de leche" in resp
+
+
 def test_comando_graficos_panel_registrado():
     import pathlib
     content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")

@@ -152,6 +152,11 @@ class Bot:
                 animal_tag=ev.animal_tag, fecha=ev.fecha, valor=d.get("valor"),
                 registrado_por=user_id,
             )
+        elif ev.tipo == "leche":
+            self.db.registrar_leche(
+                animal_tag=ev.animal_tag, fecha=ev.fecha, litros=d.get("litros"),
+                registrado_por=user_id,
+            )
         elif ev.tipo == "traslado":
             self.db.registrar_traslado(
                 animal_tag=ev.animal_tag, fecha=ev.fecha, lote=d.get("lote"),
@@ -238,6 +243,8 @@ class Bot:
             return f"Registrado pesaje de la {tag}: {d.get('peso_kg')} kg."
         if ev.tipo == "condicion_corporal":
             return f"Registrada condición corporal de la {tag}: {d.get('valor')}."
+        if ev.tipo == "leche":
+            return f"Registrada producción de leche de la {tag}: {d.get('litros')} litros."
         if ev.tipo == "traslado":
             return f"Registrado traslado (lote {d.get('lote') or '?'})."
         if ev.tipo == "movimiento":

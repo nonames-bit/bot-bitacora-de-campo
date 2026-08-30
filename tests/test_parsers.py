@@ -242,6 +242,36 @@ def test_parse_condicion_corporal_sin_valor_es_consulta(parser):
     assert ev.tipo == "consulta"
 
 
+# ---------------------------------------------------------------------------
+# Producción de leche: mismo patrón que condición corporal (calca pesaje,
+# pero sin número extraíble es una PREGUNTA, no un registro).
+@pytest.mark.parametrize("texto, esperado", [
+    ("la 47 dio 12 litros de leche", "12"),
+    ("ordeñé 8.5 litros a la 12", "8.5"),
+    ("12 litros de leche de la 47", "12"),
+])
+def test_extraer_litros_leche(texto, esperado):
+    assert nlu.extraer_litros_leche(texto) == float(esperado)
+
+
+def test_clasificar_leche():
+    assert nlu.clasificar("la 47 dio 12 litros de leche") == "leche"
+
+
+def test_parse_leche(parser):
+    ev = parser.parse("la 47 dio 12 litros de leche")
+    assert ev.tipo == "leche"
+    assert ev.animal_tag == "47"
+    assert ev.datos["litros"] == 12.0
+
+
+def test_parse_leche_sin_valor_es_consulta(parser):
+    # Regresión (mismo tipo que condición corporal): "cuánta leche dio la 47"
+    # sin número extraíble es una pregunta, no un registro con litros=None.
+    ev = parser.parse("cuánta leche dio la 47")
+    assert ev.tipo == "consulta"
+
+
 def test_transcribe_audio_sin_transcripcion_error(tmp_path):
     from src.parsers.media_handler import transcribe_audio, MediaError
     import pytest

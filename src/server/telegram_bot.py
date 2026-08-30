@@ -22,6 +22,7 @@ from ..engine.charts import (
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
     generar_grafico_iep_boxplot_completo,
+    generar_grafico_lactancia,
     generar_grafico_ocupacion_potreros,
     generar_grafico_peso,
     generar_grafico_peso_destete_por_raza,
@@ -992,6 +993,40 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error al generar el gráfico: {e}")
 
+    async def cmd_grafico_leche(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            tag = context.args[0].strip() if context.args else (nlu.extraer_tag(update.message.text or "") or None)
+            if not tag:
+                await update.message.reply_text("Uso: /grafico_leche <tag> (ej. /grafico_leche N069)")
+                return
+            if not graficos_disponibles():
+                await update.message.reply_text(
+                    "📉 Los gráficos no están disponibles en este servidor (falta matplotlib)."
+                )
+                return
+            ruta_grafico = generar_grafico_lactancia(db, tag, output_dir=reportes_dir)
+            if ruta_grafico and os.path.exists(ruta_grafico):
+                with open(ruta_grafico, "rb") as f:
+                    await update.message.reply_photo(
+                        photo=f, caption=f"📉 Curva de lactancia — {tag}",
+                        reply_markup=crear_teclado_animal(tag),
+                    )
+            else:
+                await update.message.reply_text(
+                    f"📉 No hay suficientes controles de leche registrados para {tag} "
+                    "(se necesitan al menos 2, y conocer su fecha de último parto)."
+                )
+        except Exception as e:
+            logger.error("Error en cmd_grafico_leche: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error al generar el gráfico: {e}")
+
     async def cmd_graficos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -1930,6 +1965,30 @@ def construir_application(
                                 "(se necesitan al menos 2)."
                             )
 
+            elif data.startswith("animal:grafico_leche:"):
+                tag = data.split("animal:grafico_leche:", 1)[1].strip()
+                await query.answer()
+                if not graficos_disponibles():
+                    if query.message:
+                        await query.message.reply_text(
+                            "📉 Los gráficos no están disponibles en este servidor (falta matplotlib)."
+                        )
+                else:
+                    ruta_grafico = generar_grafico_lactancia(db, tag, output_dir=reportes_dir)
+                    if ruta_grafico and os.path.exists(ruta_grafico):
+                        with open(ruta_grafico, "rb") as f:
+                            if query.message:
+                                await query.message.reply_photo(
+                                    photo=f, caption=f"📉 Curva de lactancia — {tag}",
+                                    reply_markup=crear_teclado_animal(tag),
+                                )
+                    else:
+                        if query.message:
+                            await query.message.reply_text(
+                                f"📉 No hay suficientes controles de leche registrados para {tag} "
+                                "(se necesitan al menos 2, y conocer su fecha de último parto)."
+                            )
+
             elif data.startswith("panel_grafico:"):
                 tipo = data.split("panel_grafico:", 1)[1].strip()
                 await query.answer()
@@ -2220,6 +2279,7 @@ def construir_application(
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
     app.add_handler(CommandHandler(["grafico", "grafica", "curva"], cmd_grafico))
+    app.add_handler(CommandHandler(["grafico_leche", "curva_lactancia"], cmd_grafico_leche))
     app.add_handler(CommandHandler(["graficos", "graficas", "panel_graficos"], cmd_graficos))
     app.add_handler(CommandHandler(["status", "tablero", "finca", "resumen"], cmd_status))
     app.add_handler(CommandHandler(["sistema", "servidor", "vps"], cmd_sistema))

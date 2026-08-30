@@ -36,6 +36,26 @@ class InventarioQueryMixin:
             return f"No hay condición corporal registrada para la {tag}."
         return f"La {tag} tiene condición corporal <b>{registro['valor']}</b> (registrada el {registro['fecha']})."
 
+    def _leche(self, tag) -> str:
+        if not tag:
+            return "¿De cuál vaca desea la producción de leche? (ej. 'litros de leche de la 47')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No hay registro de producción de leche para la {tag}."
+        registros = self.db.query(
+            "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha DESC LIMIT 2", (aid,)
+        )
+        if not registros:
+            return f"No hay producción de leche registrada para la {tag}."
+        ultimo = registros[0]
+        texto = f"La {tag} produjo <b>{ultimo['litros']} litros</b> de leche el {ultimo['fecha']}"
+        if len(registros) >= 2 and registros[1]["litros"] is not None and ultimo["litros"] is not None:
+            anterior = registros[1]
+            diff = ultimo["litros"] - anterior["litros"]
+            signo = "+" if diff >= 0 else ""
+            texto += f" ({signo}{diff:.1f}L vs el control anterior del {anterior['fecha']})"
+        return texto + "."
+
     def _animales_perdiendo_peso(self) -> str:
         """Animales activos cuyos dos últimos pesajes muestran ganancia diaria
         negativa (están perdiendo peso): señal de un problema sanitario o
