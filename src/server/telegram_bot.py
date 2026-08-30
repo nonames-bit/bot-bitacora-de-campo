@@ -17,6 +17,7 @@ from ..db.database import Database
 from ..engine.charts import (
     generar_grafico_aforo_potreros,
     generar_grafico_categorias,
+    generar_grafico_dias_abiertos_km,
     generar_grafico_evolucion_rebano,
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
@@ -26,6 +27,7 @@ from ..engine.charts import (
     generar_grafico_peso_destete_por_raza,
     generar_grafico_prenadas_vacias_potrero,
     generar_grafico_rendimiento_padre,
+    generar_grafico_waterfall_inventario,
     graficos_disponibles,
 )
 from ..engine.query_engine import (
@@ -100,6 +102,7 @@ from .formatters import (
 # ---------------------------------------------------------------------- #
 GRAFICOS_PANEL = {
     "evolucion": (generar_grafico_evolucion_rebano, "📈 Evolución del Rebaño (últimos 12 meses)"),
+    "waterfall": (generar_grafico_waterfall_inventario, "🌊 Waterfall de Inventario Mensual"),
     "categorias": (generar_grafico_categorias, "🥧 Distribución del Hato por Categorías"),
     "gmd": (generar_grafico_gmd_hato, "⚖️ Ganancia Media Diaria del Hato"),
     "iep": (generar_grafico_iep_boxplot, "📦 Intervalo Entre Partos (IEP, últimos 2 años)"),
@@ -109,6 +112,7 @@ GRAFICOS_PANEL = {
     "aforo": (generar_grafico_aforo_potreros, "🌱 Aforo de Forraje por Potrero"),
     "ocupacion": (generar_grafico_ocupacion_potreros, "🔄 Ocupación de Potreros (Voisin)"),
     "prenadas": (generar_grafico_prenadas_vacias_potrero, "🤰 Preñadas vs Vacías por Potrero (estimado)"),
+    "dias_abiertos_km": (generar_grafico_dias_abiertos_km, "📉 Días Abiertos (curva de Kaplan-Meier)"),
 }
 
 

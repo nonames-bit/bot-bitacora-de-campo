@@ -259,6 +259,9 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton("📈 Evolución del Rebaño", callback_data="panel_grafico:evolucion"),
+            InlineKeyboardButton("🌊 Waterfall de Inventario", callback_data="panel_grafico:waterfall"),
+        ],
+        [
             InlineKeyboardButton("🥧 Categorías del Hato", callback_data="panel_grafico:categorias"),
         ],
         [
@@ -278,6 +281,9 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🤰 Preñadas vs Vacías por Potrero", callback_data="panel_grafico:prenadas"),
+        ],
+        [
+            InlineKeyboardButton("📉 Días Abiertos (Kaplan-Meier)", callback_data="panel_grafico:dias_abiertos_km"),
         ],
         [
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),

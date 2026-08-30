@@ -27,6 +27,21 @@ try:
     matplotlib.use("Agg")  # backend sin pantalla: obligatorio en servidor/VPS
     import matplotlib.pyplot as plt
     _MATPLOTLIB_OK = True
+    # Estilo tipográfico consistente en todos los gráficos del bot (una sola
+    # vez al importar el módulo) -- letras más limpias y legibles que el
+    # default de matplotlib, y consistentes entre sí sin repetir configuración
+    # en cada función.
+    plt.rcParams.update({
+        "font.family": "DejaVu Sans",
+        "font.size": 10.5,
+        "axes.titlesize": 13,
+        "axes.titleweight": "bold",
+        "axes.labelsize": 10.5,
+        "figure.facecolor": "white",
+        "axes.facecolor": "white",
+        "legend.frameon": True,
+        "legend.framealpha": 0.9,
+    })
 except Exception:
     _MATPLOTLIB_OK = False
 
@@ -38,6 +53,9 @@ _PALETA = [
 ]
 _COLOR_LINEA = "#2e7d32"
 _COLOR_PROMEDIO = "#9e9e9e"
+# Verde institucional de Ganadería JA (el mismo de los reportes PDF), usado
+# como acento de marca en títulos y notas al pie de cada gráfico.
+_COLOR_MARCA = "#2F5233"
 _MESES_ES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
@@ -51,12 +69,20 @@ def _estilo_ejes(ax) -> None:
     ax.grid(True, alpha=0.3, linewidth=0.6)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
+    ax.spines["left"].set_color("#666666")
+    ax.spines["bottom"].set_color("#666666")
     ax.set_axisbelow(True)
+    if ax.get_title():
+        ax.set_title(ax.get_title(), color=_COLOR_MARCA, fontweight="bold")
 
 
 def _guardar(fig, output_dir: str, nombre_archivo: str) -> str:
     os.makedirs(output_dir, exist_ok=True)
     ruta = os.path.join(output_dir, nombre_archivo)
+    # Marca de agua sutil, igual en todos los gráficos (identidad visual
+    # Ganadería JA, consistente con el reporte PDF).
+    fig.text(0.99, 0.01, "Ganadería JA", ha="right", va="bottom",
+              fontsize=7.5, color="#aaaaaa", style="italic")
     fig.tight_layout()
     # bbox_inches="tight" evita que títulos/leyendas largos (ej. la nota de
     # intervalos excluidos del IEP) queden cortados en el borde del canvas.
@@ -176,22 +202,12 @@ def _promedio_peso_hato_por_edad(db, sexo: str, excluir_id: int, bucket_dias: in
 # --------------------------------------------------------------------- #
 # Panel general de la finca
 # --------------------------------------------------------------------- #
-def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "data/reportes",
-                                     hoy: Optional[date] = None) -> Optional[str]:
-    """Evolución mensual del hato: barras de nacimientos/muertes/compras/
-    ventas y una línea de inventario estimado (eje secundario), igual al
-    estilo del reporte "Tendencias de la población" de Software Ganadero.
-
-    El inventario es una ESTIMACIÓN: parte del total de animales activos
-    hoy y retrocede mes a mes restando/sumando los movimientos registrados
-    en el bot. Si un animal fue importado sin su evento de nacimiento o
-    compra en el bot, el nivel de meses muy anteriores puede no cuadrar
-    exactamente con lo que había en Software Ganadero ese día.
-    """
-    if not _MATPLOTLIB_OK:
-        return None
-    hoy = hoy or date.today()
-
+def _movimientos_mensuales(db, meses: int, hoy: date):
+    """Nacimientos/muertes/compras/ventas por mes de los últimos `meses`
+    meses, más el inventario estimado al final de cada mes (retrocediendo
+    desde el total activo de hoy). Compartido por generar_grafico_evolucion_rebano
+    y generar_grafico_waterfall_inventario para no duplicar la lógica.
+    Devuelve None si no hay ningún movimiento en la ventana."""
     periodos = []
     y, m = hoy.year, hoy.month
     for _ in range(meses):
@@ -236,7 +252,31 @@ def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "dat
         delta_sig = nacimientos[i + 1] + compras[i + 1] - muertes_m[i + 1] - ventas[i + 1]
         niveles[i] = niveles[i + 1] - delta_sig
 
-    x = range(len(periodos))
+    return etiquetas, nacimientos, muertes_m, compras, ventas, niveles
+
+
+def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "data/reportes",
+                                     hoy: Optional[date] = None) -> Optional[str]:
+    """Evolución mensual del hato: barras de nacimientos/muertes/compras/
+    ventas y una línea de inventario estimado (eje secundario), igual al
+    estilo del reporte "Tendencias de la población" de Software Ganadero.
+
+    El inventario es una ESTIMACIÓN: parte del total de animales activos
+    hoy y retrocede mes a mes restando/sumando los movimientos registrados
+    en el bot. Si un animal fue importado sin su evento de nacimiento o
+    compra en el bot, el nivel de meses muy anteriores puede no cuadrar
+    exactamente con lo que había en Software Ganadero ese día.
+    """
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    datos = _movimientos_mensuales(db, meses, hoy)
+    if datos is None:
+        return None
+    etiquetas, nacimientos, muertes_m, compras, ventas, niveles = datos
+
+    x = range(len(etiquetas))
     fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
     ancho = 0.2
     ax.bar([i - 1.5 * ancho for i in x], nacimientos, ancho, label="Nacimientos", color=_PALETA[2])
@@ -655,3 +695,154 @@ def generar_grafico_prenadas_vacias_potrero(db, output_dir: str = "data/reportes
     ax.legend(loc="lower right", fontsize=8)
 
     return _guardar(fig, output_dir, f"grafico_prenadas_potrero_{hoy.isoformat()}.png")
+
+
+def generar_grafico_waterfall_inventario(db, meses: int = 12, output_dir: str = "data/reportes",
+                                         hoy: Optional[date] = None) -> Optional[str]:
+    """Waterfall (cascada) del inventario mensual: una barra de inicio, un
+    escalón por mes (verde si el neto del mes fue positivo, rojo si fue
+    negativo) y una barra final, para ver de un vistazo cómo se llegó del
+    inventario de hace `meses` meses al de hoy sin tener que leer una tabla.
+
+    Usa el mismo inventario ESTIMADO que generar_grafico_evolucion_rebano
+    (ver su docstring para la limitación de animales importados sin evento
+    de nacimiento/compra propio en el bot)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    datos = _movimientos_mensuales(db, meses, hoy)
+    if datos is None:
+        return None
+    etiquetas, nacimientos, muertes_m, compras, ventas, niveles = datos
+
+    deltas = [nacimientos[i] + compras[i] - muertes_m[i] - ventas[i] for i in range(len(etiquetas))]
+    inicio = niveles[0] - deltas[0]
+    niveles_completos = [inicio] + list(niveles)  # longitud = len(etiquetas) + 1
+
+    categorias = ["Inicio"] + etiquetas + ["Actual"]
+    n = len(categorias)
+
+    color_inicio_fin = "#607D8B"
+    color_sube = "#00C853"
+    color_baja = "#EF5350"
+
+    fig, ax = plt.subplots(figsize=(max(9, 0.9 * n), 5.5), dpi=130)
+
+    # Barras de inicio y final: representan el total (van desde 0), no un cambio.
+    ax.bar(0, inicio, color=color_inicio_fin, width=0.6)
+    ax.text(0, inicio, f" {int(round(inicio))}", ha="center", va="bottom", fontsize=8)
+    ax.bar(n - 1, niveles_completos[-1], color=color_inicio_fin, width=0.6)
+    ax.text(n - 1, niveles_completos[-1], f" {int(round(niveles_completos[-1]))}", ha="center", va="bottom", fontsize=8)
+
+    # Escalones mensuales: barras flotantes entre el nivel anterior y el nuevo.
+    for i, d in enumerate(deltas):
+        base = min(niveles_completos[i], niveles_completos[i + 1])
+        alto = abs(d)
+        color = color_sube if d >= 0 else color_baja
+        ax.bar(i + 1, alto, bottom=base, color=color, width=0.6)
+        signo = "+" if d > 0 else ""
+        ax.text(i + 1, max(niveles_completos[i], niveles_completos[i + 1]),
+                f" {signo}{d}", ha="center", va="bottom", fontsize=8)
+
+    # Líneas conectoras punteadas entre el borde de cada barra y la siguiente.
+    for k in range(len(niveles_completos)):
+        ax.plot([k + 0.3, k + 1 - 0.3], [niveles_completos[k], niveles_completos[k]],
+                color="#bbbbbb", linewidth=1, linestyle=":")
+
+    ax.set_xticks(range(n))
+    ax.set_xticklabels(categorias, fontsize=8)
+    ax.set_ylabel("Inventario estimado (total activos)")
+    ax.set_title("Waterfall de Inventario Mensual")
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_waterfall_inventario_{hoy.isoformat()}.png")
+
+
+def _kaplan_meier(observaciones: list) -> tuple:
+    """Estimador de Kaplan-Meier clásico. ``observaciones`` es una lista de
+    (tiempo_dias, evento) donde evento=True significa que el evento
+    (siguiente servicio) ocurrió en ese tiempo, y evento=False significa
+    censurado (todavía sin servicio a la fecha de corte -- no es que "no
+    haya pasado nada", es que no se sabe todavía). Devuelve
+    (tiempos, supervivencia) para graficar como función escalonada."""
+    datos = sorted(observaciones, key=lambda x: x[0])
+    tiempos = [0]
+    supervivencia = [1.0]
+    s = 1.0
+    en_riesgo = len(datos)
+    i = 0
+    while i < len(datos):
+        t = datos[i][0]
+        eventos_en_t = 0
+        n_en_t = 0
+        while i < len(datos) and datos[i][0] == t:
+            if datos[i][1]:
+                eventos_en_t += 1
+            n_en_t += 1
+            i += 1
+        if eventos_en_t > 0 and en_riesgo > 0:
+            s *= (1 - eventos_en_t / en_riesgo)
+            tiempos.append(t)
+            supervivencia.append(s)
+        en_riesgo -= n_en_t
+    return tiempos, supervivencia
+
+
+def generar_grafico_dias_abiertos_km(db, output_dir: str = "data/reportes",
+                                     hoy: Optional[date] = None) -> Optional[str]:
+    """Curva de Kaplan-Meier de días abiertos: eje X = días desde el parto,
+    eje Y = % de vacas que seguían sin un servicio posterior a esa altura.
+    A diferencia de un promedio simple de días abiertos (que excluye a las
+    vacas que todavía no han sido servidas), esto SÍ las incluye como
+    "censuradas" -- por eso no da un número artificialmente bueno.
+
+    "Servicio posterior" es la señal disponible más cercana a "dejó de
+    estar vacía" -- el bot no tiene todavía un evento propio de confirmación
+    de preñez (palpación/ecografía), igual que en el resto de las consultas
+    de reproducción de este bot."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    partos = db.query(
+        "SELECT vaca_id, fecha FROM partos WHERE vaca_id IS NOT NULL AND fecha IS NOT NULL "
+        "AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY vaca_id, fecha"
+    )
+    observaciones = []
+    for p in partos:
+        f_parto = to_date(p["fecha"])
+        if not f_parto:
+            continue
+        siguiente_servicio = db.query_one(
+            "SELECT fecha FROM servicios WHERE vaca_id = ? AND fecha >= ? "
+            "ORDER BY fecha ASC LIMIT 1", (p["vaca_id"], p["fecha"]),
+        )
+        if siguiente_servicio and siguiente_servicio["fecha"]:
+            f_serv = to_date(siguiente_servicio["fecha"])
+            if f_serv and (f_serv - f_parto).days >= 0:
+                observaciones.append(((f_serv - f_parto).days, True))
+                continue
+        dias_censura = (hoy - f_parto).days
+        if dias_censura >= 0:
+            observaciones.append((dias_censura, False))
+
+    if len(observaciones) < 5:
+        return None
+
+    tiempos, supervivencia = _kaplan_meier(observaciones)
+    porcentajes = [s * 100 for s in supervivencia]
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
+    ax.step(tiempos, porcentajes, where="post", color=_PALETA[3], linewidth=2.3)
+    ax.fill_between(tiempos, porcentajes, step="post", color=_PALETA[3], alpha=0.12)
+    ax.axhline(50, color="#9e9e9e", linewidth=1, linestyle=":")
+    ax.set_xlabel("Días posparto")
+    ax.set_ylabel("% de vacas aún sin servicio posterior")
+    ax.set_ylim(0, 105)
+    ax.set_title("Días Abiertos — Curva de Kaplan-Meier")
+    _estilo_ejes(ax)
+    ax.text(0.98, 0.95, f"n = {len(observaciones)} intervalo(s) posparto",
+            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666666")
+
+    return _guardar(fig, output_dir, f"grafico_dias_abiertos_km_{hoy.isoformat()}.png")

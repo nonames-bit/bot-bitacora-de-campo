@@ -7,8 +7,10 @@ import pytest
 
 from src.engine.charts import (
     _calcular_ieps,
+    _kaplan_meier,
     generar_grafico_aforo_potreros,
     generar_grafico_categorias,
+    generar_grafico_dias_abiertos_km,
     generar_grafico_evolucion_rebano,
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
@@ -18,6 +20,7 @@ from src.engine.charts import (
     generar_grafico_peso_destete_por_raza,
     generar_grafico_prenadas_vacias_potrero,
     generar_grafico_rendimiento_padre,
+    generar_grafico_waterfall_inventario,
     graficos_disponibles,
 )
 
@@ -252,3 +255,60 @@ def test_generar_grafico_prenadas_vacias_potrero_sin_hembras_adultas_devuelve_no
     p1 = db.registrar_potrero("Norte")
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2026-06-01")  # cría
     assert generar_grafico_prenadas_vacias_potrero(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+# ---------------------------------------------------------------------------
+# Waterfall de inventario mensual
+# ---------------------------------------------------------------------------
+def test_generar_grafico_waterfall_inventario(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-03-01", sexo_cria="Macho")
+    db.registrar_animal("48", sexo="Macho", estado="ACTIVO")
+    db.registrar_muerte("48", fecha="2026-06-01")
+    ruta = generar_grafico_waterfall_inventario(db, meses=8, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_waterfall_inventario_sin_datos_devuelve_none(db, tmp_path):
+    assert generar_grafico_waterfall_inventario(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+# ---------------------------------------------------------------------------
+# Días abiertos: curva de Kaplan-Meier
+# ---------------------------------------------------------------------------
+def test_kaplan_meier_todo_eventos_llega_a_cero():
+    # 4 vacas, todas servidas (evento) en distintos tiempos: la supervivencia
+    # debe llegar exactamente a 0 al final (todas "salieron" de abiertas).
+    obs = [(30, True), (60, True), (90, True), (120, True)]
+    tiempos, supervivencia = _kaplan_meier(obs)
+    assert tiempos[0] == 0 and supervivencia[0] == 1.0
+    assert supervivencia[-1] == pytest.approx(0.0, abs=1e-9)
+    assert tiempos == sorted(tiempos)
+    assert all(0.0 <= s <= 1.0 for s in supervivencia)
+
+
+def test_kaplan_meier_con_censura_no_llega_a_cero():
+    # Una vaca censurada (todavía abierta) nunca "sale" del riesgo como
+    # evento, así que la supervivencia no debe caer a 0 solo por ella.
+    obs = [(30, True), (60, True), (200, False)]
+    _tiempos, supervivencia = _kaplan_meier(obs)
+    assert supervivencia[-1] > 0.0
+
+
+def test_generar_grafico_dias_abiertos_km(db, tmp_path):
+    for i in range(6):
+        tag = f"V{i}"
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO")
+        db.registrar_parto(vaca_tag=tag, fecha=f"2026-0{(i % 6) + 1}-01")
+        if i % 2 == 0:
+            db.registrar_servicio(vaca_tag=tag, fecha=f"2026-0{(i % 6) + 1}-20")
+    ruta = generar_grafico_dias_abiertos_km(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_dias_abiertos_km_pocos_datos_devuelve_none(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01")
+    assert generar_grafico_dias_abiertos_km(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None

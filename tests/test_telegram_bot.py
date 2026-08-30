@@ -742,8 +742,8 @@ def test_comando_graficos_panel_registrado():
     assert 'panel_grafico:' in content
     from src.server.telegram_bot import GRAFICOS_PANEL
     for tipo in (
-        "evolucion", "categorias", "gmd", "iep", "iep_completo",
-        "destete_raza", "padre", "aforo", "ocupacion", "prenadas",
+        "evolucion", "waterfall", "categorias", "gmd", "iep", "iep_completo",
+        "destete_raza", "padre", "aforo", "ocupacion", "prenadas", "dias_abiertos_km",
     ):
         assert tipo in GRAFICOS_PANEL
 
