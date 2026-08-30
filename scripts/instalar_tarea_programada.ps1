@@ -59,7 +59,9 @@ if ($tareaExistente) {
     Write-Host "[INFO] Ya existe una tarea '$NombreTarea'. Se va a reemplazar con la nueva configuracion." -ForegroundColor Yellow
 }
 
-$argumentos = "-NoProfile -ExecutionPolicy Bypass -File `"$rutaScript`" -CopiasDir `"$CopiasDir`" -UnaVez"
+# -WindowStyle Hidden evita que se abra una ventana de consola visible cada
+# vez que corre (cada N minutos); sigue ejecutandose igual de fondo.
+$argumentos = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$rutaScript`" -CopiasDir `"$CopiasDir`" -UnaVez"
 $accion = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argumentos -WorkingDirectory (Split-Path $rutaScript -Parent)
 
 # Dispara ya mismo y se repite cada N minutos. [TimeSpan]::MaxValue NO sirve
