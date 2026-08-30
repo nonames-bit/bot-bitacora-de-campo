@@ -180,8 +180,12 @@ def extraer_tags(texto: str) -> list[str]:
             if val not in tags:
                 tags.append(val)
 
-    # 2. Búsqueda de identificadores alfanuméricos con letras y dígitos (ej. n069, a301, h12, n-069, cria_01)
-    for m in re.finditer(r"\b([a-z]{1,3}[-_]?[a-z0-9_]{0,9}\d{1,6})\b", t):
+    # 2. Búsqueda de identificadores alfanuméricos con letras y dígitos (ej. n069,
+    # a301, h12, n-069, cria_01). El sufijo final "(?:[-_]\d{1,4})?" cubre la
+    # convención de numerar crías como "arete_madre-n" (ej. JA26-6, N065-1):
+    # sin él, la parte "-6"/"-1" se perdía y el tag quedaba truncado al de la
+    # madre, haciendo que "consulta JA26-6" abriera la ficha de la madre.
+    for m in re.finditer(r"\b([a-z]{1,3}[-_]?[a-z0-9_]{0,9}\d{1,6}(?:[-_]\d{1,4})?)\b", t):
         val = m.group(1).strip("-_")
         val = re.sub(r"\d{1,2}:\d{2}.*", "", val, flags=re.IGNORECASE)
         if val not in PALABRAS_NO_TAG and val and val not in tags:

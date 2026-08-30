@@ -152,6 +152,20 @@ def test_extraer_tag_alfanumerico_y_limpieza_timestamp(parser):
     assert ev_directo.tipo == "consulta"
 
 
+# Regresión real: al consultar "JA26-6" (arete de una cría numerada como
+# "madre-n", convención habitual de la finca) el bot abría la ficha de la
+# MADRE (JA26) porque el regex de extraer_tags no incluía el guion antes del
+# sufijo numérico y truncaba "ja26-6" a "ja26".
+@pytest.mark.parametrize("texto, esperado", [
+    ("JA26-6", "ja26-6"),
+    ("consulta JA26-6", "ja26-6"),
+    ("N065-1", "n065-1"),
+    ("ficha de la JA26-6", "ja26-6"),
+])
+def test_extraer_tag_con_sufijo_de_cria_numerada(texto, esperado):
+    assert nlu.extraer_tag(texto) == esperado
+
+
 def test_transcribe_audio_sidecar(tmp_path):
     from src.parsers.media_handler import transcribe_audio
     audio = tmp_path / "nota_voz.ogg"

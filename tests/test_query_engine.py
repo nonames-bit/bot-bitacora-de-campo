@@ -51,6 +51,19 @@ def test_historial(qe):
     assert "Días Abiertos" in resp
 
 
+def test_historial_cria_numerada_como_madre_guion_n_no_abre_ficha_madre(db):
+    # Regresión real: convención de la finca de numerar crías como
+    # "arete_madre-n" (ej. JA26-6). Antes del fix, "consulta ja26-6" abría
+    # la ficha de la MADRE (JA26) porque extraer_tag truncaba el tag.
+    db.registrar_animal("JA26", nombre="PATRICIA", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA26", id_cria_tag="JA26-6", fecha="2026-08-27", sexo_cria="Macho")
+    qe = QueryEngine(db, hoy=HOY)
+
+    resp = qe.responder("ja26-6")
+    assert "PATRICIA" not in resp
+    assert "JA26-6" in resp or "ja26-6" in resp.lower()
+
+
 def test_pesaje_y_ganancia(qe):
     resp = qe.responder("¿cuánto pesó la 12 y cuál fue su ganancia diaria?")
     assert "420" in resp
