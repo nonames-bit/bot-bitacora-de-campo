@@ -731,7 +731,10 @@ def test_comando_graficos_panel_registrado():
     assert 'CommandHandler(["graficos", "graficas", "panel_graficos"], cmd_graficos)' in content
     assert 'panel_grafico:' in content
     from src.server.telegram_bot import GRAFICOS_PANEL
-    for tipo in ("evolucion", "categorias", "gmd", "iep", "destete_raza", "padre", "aforo", "ocupacion", "prenadas"):
+    for tipo in (
+        "evolucion", "categorias", "gmd", "iep", "iep_completo",
+        "destete_raza", "padre", "aforo", "ocupacion", "prenadas",
+    ):
         assert tipo in GRAFICOS_PANEL
 
 

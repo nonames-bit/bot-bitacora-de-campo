@@ -58,7 +58,9 @@ def _guardar(fig, output_dir: str, nombre_archivo: str) -> str:
     os.makedirs(output_dir, exist_ok=True)
     ruta = os.path.join(output_dir, nombre_archivo)
     fig.tight_layout()
-    fig.savefig(ruta, facecolor="white")
+    # bbox_inches="tight" evita que títulos/leyendas largos (ej. la nota de
+    # intervalos excluidos del IEP) queden cortados en el borde del canvas.
+    fig.savefig(ruta, facecolor="white", bbox_inches="tight")
     plt.close(fig)
     return ruta
 
@@ -359,13 +361,8 @@ def generar_grafico_gmd_hato(db, output_dir: str = "data/reportes",
     return _guardar(fig, output_dir, f"grafico_gmd_hato_{hoy.isoformat()}.png")
 
 
-def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
-                                hoy: Optional[date] = None) -> Optional[str]:
-    """Boxplot del intervalo entre partos (IEP, en días) de todas las vacas
-    con 2 o más partos, para detectar vacas atípicas (outliers)."""
-    if not _MATPLOTLIB_OK:
-        return None
-    hoy = hoy or date.today()
+def _calcular_ieps(db) -> list[int]:
+    """Intervalos (en días) entre partos consecutivos de cada vaca."""
     vacas = db.query(
         "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL AND (id_cria IS NULL OR id_cria != vaca_id)"
     )
@@ -380,6 +377,35 @@ def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
             dias = (fechas[i] - fechas[i - 1]).days
             if dias > 0:
                 ieps.append(dias)
+    return ieps
+
+
+def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
+                                hoy: Optional[date] = None,
+                                umbral_max_dias: Optional[int] = 730) -> Optional[str]:
+    """Boxplot del intervalo entre partos (IEP, en días) de todas las vacas
+    con 2 o más partos, para detectar vacas atípicas (outliers).
+
+    Por defecto excluye intervalos mayores a ``umbral_max_dias`` (2 años):
+    en la práctica, un hato con historial importado de años atrás y con
+    huecos de registro (no se cargó todo parto real en el sistema) produce
+    intervalos "fantasma" de varios años entre dos partos reales de la
+    misma vaca que en realidad tuvo partos intermedios sin registrar. Un
+    intervalo real de más de 2 años sin que la vaca haya sido descartada es
+    prácticamente imposible en manejo normal, así que es mucho más probable
+    que sea un hueco de datos que un caso real. Pase
+    ``umbral_max_dias=None`` para ver el histórico completo sin filtrar
+    (útil para auditar esos huecos)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    ieps_todos = _calcular_ieps(db)
+    if umbral_max_dias is not None:
+        ieps = [d for d in ieps_todos if d <= umbral_max_dias]
+        n_excluidos = len(ieps_todos) - len(ieps)
+    else:
+        ieps = ieps_todos
+        n_excluidos = 0
 
     if len(ieps) < 3:
         return None
@@ -394,11 +420,22 @@ def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
     ax.set_ylabel("Intervalo entre partos (días)")
     ax.set_xticks([1])
     ax.set_xticklabels([f"{len(ieps)} intervalo(s) registrado(s)"])
-    ax.set_title("Intervalo Entre Partos (IEP) — detección de vacas atípicas")
+    titulo = "Intervalo Entre Partos (IEP) — detección de vacas atípicas"
+    if n_excluidos > 0:
+        titulo += f"\n({n_excluidos} intervalo(s) >{umbral_max_dias}d excluido(s): probable hueco de registro, no dato real)"
+    ax.set_title(titulo, fontsize=11)
     _estilo_ejes(ax)
     ax.legend(loc="upper right", fontsize=8)
 
     return _guardar(fig, output_dir, f"grafico_iep_{hoy.isoformat()}.png")
+
+
+def generar_grafico_iep_boxplot_completo(db, output_dir: str = "data/reportes",
+                                         hoy: Optional[date] = None) -> Optional[str]:
+    """Versión del boxplot de IEP sin filtrar outliers (histórico completo),
+    para cuando se quiere auditar los huecos de registro en vez de
+    esconderlos."""
+    return generar_grafico_iep_boxplot(db, output_dir=output_dir, hoy=hoy, umbral_max_dias=None)
 
 
 def generar_grafico_peso_destete_por_raza(db, output_dir: str = "data/reportes",

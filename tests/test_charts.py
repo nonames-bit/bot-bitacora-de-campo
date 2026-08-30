@@ -6,11 +6,13 @@ from datetime import date
 import pytest
 
 from src.engine.charts import (
+    _calcular_ieps,
     generar_grafico_aforo_potreros,
     generar_grafico_categorias,
     generar_grafico_evolucion_rebano,
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
+    generar_grafico_iep_boxplot_completo,
     generar_grafico_ocupacion_potreros,
     generar_grafico_peso,
     generar_grafico_peso_destete_por_raza,
@@ -126,6 +128,56 @@ def test_generar_grafico_iep_boxplot_sin_suficientes_intervalos_devuelve_none(db
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
     db.registrar_parto(vaca_tag="47", fecha="2025-01-01")  # un solo parto, sin intervalo
     assert generar_grafico_iep_boxplot(db, output_dir=str(tmp_path)) is None
+
+
+def _sembrar_ieps_con_hueco_de_registro(db):
+    """3 vacas con intervalo normal (~370-390 días) + 1 vaca con un hueco de
+    registro real: se importó del Software Ganadero un historial con años sin
+    cargar partos intermedios, así que entre dos partos reales de la misma
+    vaca queda un intervalo "fantasma" de varios años. Reproduce el reporte
+    real del usuario (boxplot con outliers de miles de días)."""
+    for i, tag in enumerate(["47", "48", "49"]):
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO")
+        db.registrar_parto(vaca_tag=tag, fecha=f"2024-0{i + 1}-01")
+        db.registrar_parto(vaca_tag=tag, fecha=f"2025-0{i + 1}-10")
+    db.registrar_animal("HUECO", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="HUECO", fecha="2017-01-01")
+    db.registrar_parto(vaca_tag="HUECO", fecha="2025-06-01")  # ~3070 días de hueco, no un IEP real
+
+
+def test_calcular_ieps_incluye_todos_los_intervalos_sin_filtrar(db):
+    _sembrar_ieps_con_hueco_de_registro(db)
+    ieps = _calcular_ieps(db)
+    assert len(ieps) == 4
+    assert max(ieps) > 3000
+
+
+def test_generar_grafico_iep_boxplot_excluye_huecos_de_registro_por_defecto(db, tmp_path):
+    # Regresión real: el usuario reportó que el boxplot de IEP salía
+    # dominado por outliers de miles de días porque no se llevaban
+    # registros completos años atrás y se retomó este año. Por defecto,
+    # intervalos de más de 2 años (730 días) se excluyen del boxplot por
+    # ser casi con certeza huecos de registro, no vacas realmente atípicas.
+    _sembrar_ieps_con_hueco_de_registro(db)
+    ruta = generar_grafico_iep_boxplot(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_iep_boxplot_umbral_none_no_filtra(db, tmp_path):
+    _sembrar_ieps_con_hueco_de_registro(db)
+    ruta = generar_grafico_iep_boxplot(
+        db, output_dir=str(tmp_path), hoy=date(2026, 8, 30), umbral_max_dias=None
+    )
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_iep_boxplot_completo_equivale_a_umbral_none(db, tmp_path):
+    _sembrar_ieps_con_hueco_de_registro(db)
+    ruta = generar_grafico_iep_boxplot_completo(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
 
 
 def test_generar_grafico_peso_destete_por_raza(db, tmp_path):

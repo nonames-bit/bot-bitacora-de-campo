@@ -266,6 +266,9 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📦 Intervalo Entre Partos", callback_data="panel_grafico:iep"),
         ],
         [
+            InlineKeyboardButton("📦 IEP Histórico Completo", callback_data="panel_grafico:iep_completo"),
+        ],
+        [
             InlineKeyboardButton("🐄 Destete por Raza", callback_data="panel_grafico:destete_raza"),
             InlineKeyboardButton("🐂 Rendimiento por Padre", callback_data="panel_grafico:padre"),
         ],
