@@ -14,7 +14,19 @@ from typing import Optional
 
 from ..bot.bot_interface import Bot
 from ..db.database import Database
-from ..engine.charts import generar_grafico_peso, graficos_disponibles
+from ..engine.charts import (
+    generar_grafico_aforo_potreros,
+    generar_grafico_categorias,
+    generar_grafico_evolucion_rebano,
+    generar_grafico_gmd_hato,
+    generar_grafico_iep_boxplot,
+    generar_grafico_ocupacion_potreros,
+    generar_grafico_peso,
+    generar_grafico_peso_destete_por_raza,
+    generar_grafico_prenadas_vacias_potrero,
+    generar_grafico_rendimiento_padre,
+    graficos_disponibles,
+)
 from ..engine.query_engine import (
     QueryEngine,
     buscar_foto_animal,
@@ -83,6 +95,22 @@ from .formatters import (
 
 
 # ---------------------------------------------------------------------- #
+# Gráficos generales de la finca (menú /graficos): tipo -> (generador, título)
+# ---------------------------------------------------------------------- #
+GRAFICOS_PANEL = {
+    "evolucion": (generar_grafico_evolucion_rebano, "📈 Evolución del Rebaño (últimos 12 meses)"),
+    "categorias": (generar_grafico_categorias, "🥧 Distribución del Hato por Categorías"),
+    "gmd": (generar_grafico_gmd_hato, "⚖️ Ganancia Media Diaria del Hato"),
+    "iep": (generar_grafico_iep_boxplot, "📦 Intervalo Entre Partos (IEP)"),
+    "destete_raza": (generar_grafico_peso_destete_por_raza, "🐄 Peso al Destete por Raza"),
+    "padre": (generar_grafico_rendimiento_padre, "🐂 Rendimiento por Padre/Reproductor"),
+    "aforo": (generar_grafico_aforo_potreros, "🌱 Aforo de Forraje por Potrero"),
+    "ocupacion": (generar_grafico_ocupacion_potreros, "🔄 Ocupación de Potreros (Voisin)"),
+    "prenadas": (generar_grafico_prenadas_vacias_potrero, "🤰 Preñadas vs Vacías por Potrero (estimado)"),
+}
+
+
+# ---------------------------------------------------------------------- #
 # Construcción del Bot de Telegram (SDK python-telegram-bot)
 # ---------------------------------------------------------------------- #
 def construir_application(
@@ -112,6 +140,7 @@ def construir_application(
         crear_teclado_animal,
         crear_teclado_buscar_animal,
         crear_teclado_ejemplos,
+        crear_teclado_graficos,
         crear_teclado_guia_chat,
         crear_teclado_medicamentos,
         crear_teclado_poblacion,
@@ -957,6 +986,23 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error al generar el gráfico: {e}")
 
+    async def cmd_graficos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            await update.message.reply_text(
+                "📊 <b>Gráficos de la Finca</b>\n\nElige un gráfico:",
+                parse_mode="HTML", reply_markup=crear_teclado_graficos(),
+            )
+        except Exception as e:
+            logger.error("Error en cmd_graficos: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
     async def cmd_exportar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -1746,6 +1792,14 @@ def construir_application(
                     if query.message:
                         await query.message.reply_text(f"❌ Error al generar reporte: {erep}")
 
+            elif data == "cmd:graficos":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        "📊 <b>Gráficos de la Finca</b>\n\nElige un gráfico:",
+                        parse_mode="HTML", reply_markup=crear_teclado_graficos(),
+                    )
+
             elif data == "cmd:fotos":
                 await query.answer()
                 filas = db.ultimas_fotos(limit=5)
@@ -1868,6 +1922,33 @@ def construir_application(
                             await query.message.reply_text(
                                 f"📈 No hay suficientes pesajes registrados para graficar a {tag} "
                                 "(se necesitan al menos 2)."
+                            )
+
+            elif data.startswith("panel_grafico:"):
+                tipo = data.split("panel_grafico:", 1)[1].strip()
+                await query.answer()
+                entrada = GRAFICOS_PANEL.get(tipo)
+                if not entrada:
+                    if query.message:
+                        await query.message.reply_text("⚠️ Tipo de gráfico no reconocido.")
+                elif not graficos_disponibles():
+                    if query.message:
+                        await query.message.reply_text(
+                            "📈 Los gráficos no están disponibles en este servidor (falta matplotlib)."
+                        )
+                else:
+                    generador, titulo = entrada
+                    ruta_grafico = generador(db, output_dir=reportes_dir)
+                    if ruta_grafico and os.path.exists(ruta_grafico):
+                        with open(ruta_grafico, "rb") as f:
+                            if query.message:
+                                await query.message.reply_photo(
+                                    photo=f, caption=titulo, reply_markup=crear_teclado_graficos(),
+                                )
+                    else:
+                        if query.message:
+                            await query.message.reply_text(
+                                f"{titulo}\n\n⚠️ No hay suficientes datos registrados todavía para este gráfico."
                             )
 
             elif data.startswith("animal:geneal:"):
@@ -2133,6 +2214,7 @@ def construir_application(
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
     app.add_handler(CommandHandler(["grafico", "grafica", "curva"], cmd_grafico))
+    app.add_handler(CommandHandler(["graficos", "graficas", "panel_graficos"], cmd_graficos))
     app.add_handler(CommandHandler(["status", "tablero", "finca", "resumen"], cmd_status))
     app.add_handler(CommandHandler(["sistema", "servidor", "vps"], cmd_sistema))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))

@@ -1,10 +1,17 @@
-"""Generación de gráficos (matplotlib) para la ficha del animal.
+"""Generación de gráficos (matplotlib) para la ficha del animal y paneles
+generales de la finca.
 
 Opcional por diseño: si matplotlib no está instalado en el entorno, las
 funciones devuelven ``None`` en vez de fallar, para que el resto del bot
 (consultas de texto, registro de eventos, etc.) siga funcionando sin esta
 dependencia. El llamador (telegram_bot.py) debe manejar el ``None`` mostrando
 un mensaje de "gráfico no disponible" en vez de un error.
+
+Varias de estas funciones son ESTIMACIONES a partir de los datos que el bot
+sí captura (servicios + partos), no diagnósticos veterinarios reales (no
+existe todavía un evento de "palpación/confirmación de preñez" ni de "costo
+de tratamiento"). Se etiquetan explícitamente como "(estimado)" en el
+gráfico para no hacerlas pasar por datos que no son.
 """
 from __future__ import annotations
 
@@ -13,6 +20,7 @@ from datetime import date
 from typing import Optional
 
 from ..utils import to_date
+from .query.helpers import calcular_existencias_potreros_sg
 
 try:
     import matplotlib
@@ -22,8 +30,15 @@ try:
 except Exception:
     _MATPLOTLIB_OK = False
 
+# Paleta viva, inspirada en la app móvil de Software Ganadero (colores
+# saturados y distinguibles entre sí incluso con 8-9 categorías).
+_PALETA = [
+    "#2196F3", "#3F51B5", "#00C853", "#FF7043", "#78909C",
+    "#E040FB", "#26C6DA", "#EF5350", "#FFC107", "#66BB6A",
+]
 _COLOR_LINEA = "#2e7d32"
 _COLOR_PROMEDIO = "#9e9e9e"
+_MESES_ES = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
 
 def graficos_disponibles() -> bool:
@@ -31,6 +46,26 @@ def graficos_disponibles() -> bool:
     return _MATPLOTLIB_OK
 
 
+def _estilo_ejes(ax) -> None:
+    """Aplica un estilo limpio consistente a todos los gráficos del bot."""
+    ax.grid(True, alpha=0.3, linewidth=0.6)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.set_axisbelow(True)
+
+
+def _guardar(fig, output_dir: str, nombre_archivo: str) -> str:
+    os.makedirs(output_dir, exist_ok=True)
+    ruta = os.path.join(output_dir, nombre_archivo)
+    fig.tight_layout()
+    fig.savefig(ruta, facecolor="white")
+    plt.close(fig)
+    return ruta
+
+
+# --------------------------------------------------------------------- #
+# Ficha de un animal
+# --------------------------------------------------------------------- #
 def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
                          hoy: Optional[date] = None) -> Optional[str]:
     """Genera un PNG con la curva de crecimiento (peso_kg) del animal.
@@ -73,7 +108,18 @@ def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
 
     fig, ax = plt.subplots(figsize=(7, 4.2), dpi=130)
     eje_x = xs if usar_edad else fechas
-    ax.plot(eje_x, ys, marker="o", color=_COLOR_LINEA, linewidth=2, label="Peso registrado")
+    ax.plot(eje_x, ys, marker="o", color=_COLOR_LINEA, linewidth=2.2, markersize=6, label="Peso del animal")
+
+    # Comparación contra el promedio del hato (mismo sexo, edad similar):
+    # solo si hay fecha de nacimiento (eje de edad) y suficientes animales
+    # de referencia en la finca.
+    if usar_edad and animal["sexo"]:
+        prom = _promedio_peso_hato_por_edad(db, animal["sexo"], aid)
+        if prom:
+            xs_prom, ys_prom = zip(*prom)
+            ax.plot(xs_prom, ys_prom, color=_COLOR_PROMEDIO, linewidth=1.6, linestyle="--",
+                   label="Promedio del hato (mismo sexo)")
+
     if usar_edad:
         ax.set_xlabel("Edad (días)")
     else:
@@ -84,13 +130,491 @@ def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
     tag_str = animal["tag"] or str(tag)
     nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
     ax.set_title(f"Curva de crecimiento — {tag_str}{nombre}")
-    ax.grid(True, alpha=0.3)
+    _estilo_ejes(ax)
     ax.legend(loc="upper left", fontsize=8)
-    fig.tight_layout()
 
-    os.makedirs(output_dir, exist_ok=True)
     fecha_hoy = (hoy or date.today()).isoformat()
-    ruta = os.path.join(output_dir, f"grafico_peso_{tag_str}_{fecha_hoy}.png")
-    fig.savefig(ruta)
-    plt.close(fig)
-    return ruta
+    return _guardar(fig, output_dir, f"grafico_peso_{tag_str}_{fecha_hoy}.png")
+
+
+def _promedio_peso_hato_por_edad(db, sexo: str, excluir_id: int, bucket_dias: int = 30) -> list[tuple[int, float]]:
+    """Promedio de peso por bucket de edad (días, agrupado de a 30) entre
+    los demás animales activos del mismo sexo con fecha de nacimiento
+    conocida. Sirve de referencia visual, no es un cálculo estadístico
+    formal (sin ajuste por raza, época, etc.)."""
+    sexo_prefijo = (sexo or "").strip().lower()[:1]
+    if not sexo_prefijo:
+        return []
+    filas = db.query(
+        """
+        SELECT p.fecha AS fecha_pesaje, p.peso_kg AS peso_kg, a.fecha_nacimiento AS fnac
+        FROM pesajes p
+        JOIN animales a ON a.id_animal = p.animal_id
+        WHERE a.estado = 'ACTIVO' AND a.id_animal != ? AND p.peso_kg IS NOT NULL
+          AND a.fecha_nacimiento IS NOT NULL AND LOWER(SUBSTR(a.sexo, 1, 1)) = ?
+        """,
+        (excluir_id, sexo_prefijo),
+    )
+    buckets: dict[int, list[float]] = {}
+    for f in filas:
+        fnac = to_date(f["fnac"])
+        fp = to_date(f["fecha_pesaje"])
+        if not fnac or not fp:
+            continue
+        edad = (fp - fnac).days
+        if edad < 0:
+            continue
+        bucket = (edad // bucket_dias) * bucket_dias
+        buckets.setdefault(bucket, []).append(float(f["peso_kg"]))
+    if len(buckets) < 2:
+        return []
+    return sorted((b, sum(vals) / len(vals)) for b, vals in buckets.items())
+
+
+# --------------------------------------------------------------------- #
+# Panel general de la finca
+# --------------------------------------------------------------------- #
+def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "data/reportes",
+                                     hoy: Optional[date] = None) -> Optional[str]:
+    """Evolución mensual del hato: barras de nacimientos/muertes/compras/
+    ventas y una línea de inventario estimado (eje secundario), igual al
+    estilo del reporte "Tendencias de la población" de Software Ganadero.
+
+    El inventario es una ESTIMACIÓN: parte del total de animales activos
+    hoy y retrocede mes a mes restando/sumando los movimientos registrados
+    en el bot. Si un animal fue importado sin su evento de nacimiento o
+    compra en el bot, el nivel de meses muy anteriores puede no cuadrar
+    exactamente con lo que había en Software Ganadero ese día.
+    """
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    periodos = []
+    y, m = hoy.year, hoy.month
+    for _ in range(meses):
+        periodos.append((y, m))
+        m -= 1
+        if m == 0:
+            m, y = 12, y - 1
+    periodos.reverse()
+
+    nacimientos, muertes_m, compras, ventas, etiquetas = [], [], [], [], []
+    for (yy, mm) in periodos:
+        desde = date(yy, mm, 1).isoformat()
+        hasta = (date(yy + 1, 1, 1) if mm == 12 else date(yy, mm + 1, 1)).isoformat()
+        n_nac = db.query_one(
+            "SELECT COUNT(*) AS n FROM partos WHERE fecha >= ? AND fecha < ? "
+            "AND (id_cria IS NULL OR id_cria != vaca_id)", (desde, hasta),
+        )["n"]
+        n_mue = db.query_one(
+            "SELECT COUNT(*) AS n FROM muertes WHERE fecha >= ? AND fecha < ?", (desde, hasta)
+        )["n"]
+        n_compra = db.query_one(
+            "SELECT COUNT(*) AS n FROM movimientos WHERE fecha >= ? AND fecha < ? "
+            "AND UPPER(tipo_movimiento) IN ('COMPRA', 'ENTRADA')", (desde, hasta),
+        )["n"]
+        n_venta = db.query_one(
+            "SELECT COUNT(*) AS n FROM movimientos WHERE fecha >= ? AND fecha < ? "
+            "AND UPPER(tipo_movimiento) IN ('VENTA', 'SALIDA')", (desde, hasta),
+        )["n"]
+        nacimientos.append(n_nac)
+        muertes_m.append(n_mue)
+        compras.append(n_compra)
+        ventas.append(n_venta)
+        etiquetas.append(f"{_MESES_ES[mm]}\n{yy}")
+
+    if sum(nacimientos) + sum(muertes_m) + sum(compras) + sum(ventas) == 0:
+        return None
+
+    activos_hoy = db.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado='ACTIVO'")["n"]
+    niveles = [0] * len(periodos)
+    niveles[-1] = activos_hoy
+    for i in range(len(periodos) - 2, -1, -1):
+        delta_sig = nacimientos[i + 1] + compras[i + 1] - muertes_m[i + 1] - ventas[i + 1]
+        niveles[i] = niveles[i + 1] - delta_sig
+
+    x = range(len(periodos))
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
+    ancho = 0.2
+    ax.bar([i - 1.5 * ancho for i in x], nacimientos, ancho, label="Nacimientos", color=_PALETA[2])
+    ax.bar([i - 0.5 * ancho for i in x], compras, ancho, label="Compras/Entradas", color=_PALETA[0])
+    ax.bar([i + 0.5 * ancho for i in x], ventas, ancho, label="Ventas/Salidas", color=_PALETA[3])
+    ax.bar([i + 1.5 * ancho for i in x], muertes_m, ancho, label="Muertes", color=_PALETA[7])
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(etiquetas, fontsize=8)
+    ax.set_ylabel("Animales por mes")
+    _estilo_ejes(ax)
+
+    ax2 = ax.twinx()
+    ax2.plot(list(x), niveles, color="#b71c1c", linewidth=2.2, marker="o", markersize=4,
+             label="Inventario estimado")
+    ax2.set_ylabel("Inventario estimado (total activos)")
+    ax2.spines["top"].set_visible(False)
+
+    lineas1, etiquetas1 = ax.get_legend_handles_labels()
+    lineas2, etiquetas2 = ax2.get_legend_handles_labels()
+    ax.legend(lineas1 + lineas2, etiquetas1 + etiquetas2, loc="upper left", fontsize=8, ncol=2)
+    ax.set_title("Evolución del rebaño — Ganadería JA")
+
+    return _guardar(fig, output_dir, f"grafico_evolucion_rebano_{hoy.isoformat()}.png")
+
+
+def generar_grafico_categorias(db, output_dir: str = "data/reportes",
+                               hoy: Optional[date] = None) -> Optional[str]:
+    """Torta de distribución del hato activo por las categorías de Software
+    Ganadero (cría hembra/macho, levante, novilla vientre, vaca parida/seca,
+    ceba, reproductor), sumando todos los potreros más los animales sin
+    potrero asignado."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    grupos = calcular_existencias_potreros_sg(db, hoy)
+    if not grupos:
+        return None
+
+    totales = {"ch": 0, "hl": 0, "nv": 0, "vp": 0, "vs": 0, "cm": 0, "ml": 0, "mc": 0, "rep": 0}
+    for g in grupos:
+        for k in totales:
+            totales[k] += g.get(k, 0)
+
+    total_activos = db.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado='ACTIVO'")["n"]
+    residual = total_activos - sum(totales.values())
+
+    etiquetas_map = {
+        "vp": "Vacas Paridas", "vs": "Vacas Secas", "nv": "Novillas Vientre",
+        "hl": "Hembras Levante", "ch": "Crías Hembra", "cm": "Crías Macho",
+        "ml": "Machos Levante", "mc": "Machos Ceba", "rep": "Reproductores",
+    }
+    etiquetas, valores = [], []
+    for k, v in totales.items():
+        if v > 0:
+            etiquetas.append(etiquetas_map[k])
+            valores.append(v)
+    if residual > 0:
+        etiquetas.append("Sin potrero asignado")
+        valores.append(residual)
+    if not valores:
+        return None
+
+    fig, ax = plt.subplots(figsize=(7, 6), dpi=130)
+    ax.pie(
+        valores, labels=None, autopct=lambda p: f"{p:.0f}%" if p >= 4 else "",
+        colors=_PALETA[: len(valores)], startangle=90,
+        wedgeprops={"linewidth": 1.5, "edgecolor": "white"}, textprops={"fontsize": 9},
+    )
+    ax.legend(etiquetas, loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=9)
+    ax.set_title(f"Distribución del hato — {total_activos} animales activos")
+    ax.axis("equal")
+
+    return _guardar(fig, output_dir, f"grafico_categorias_{hoy.isoformat()}.png")
+
+
+def generar_grafico_gmd_hato(db, output_dir: str = "data/reportes",
+                             hoy: Optional[date] = None) -> Optional[str]:
+    """Dispersión de la Ganancia Media Diaria (GMD) de todos los animales
+    activos con al menos 2 pesajes, contra su edad al último pesaje."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    animales = db.query(
+        "SELECT id_animal, tag, sexo, fecha_nacimiento FROM animales WHERE estado='ACTIVO'"
+    )
+    xs_h, ys_h, xs_m, ys_m = [], [], [], []
+    for a in animales:
+        pesajes = db.query(
+            "SELECT fecha, peso_kg FROM pesajes WHERE animal_id = ? AND peso_kg IS NOT NULL "
+            "ORDER BY fecha DESC LIMIT 2", (a["id_animal"],),
+        )
+        if len(pesajes) < 2:
+            continue
+        ultimo, anterior = pesajes[0], pesajes[1]
+        f1, f2 = to_date(anterior["fecha"]), to_date(ultimo["fecha"])
+        fnac = to_date(a["fecha_nacimiento"])
+        if not f1 or not f2 or (f2 - f1).days <= 0 or not fnac:
+            continue
+        gmd = (float(ultimo["peso_kg"]) - float(anterior["peso_kg"])) / (f2 - f1).days
+        edad = (f2 - fnac).days
+        sexo = (a["sexo"] or "").strip().lower()
+        if sexo.startswith("h"):
+            xs_h.append(edad); ys_h.append(gmd)
+        elif sexo.startswith("m"):
+            xs_m.append(edad); ys_m.append(gmd)
+
+    if len(xs_h) + len(xs_m) < 2:
+        return None
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
+    if xs_h:
+        ax.scatter(xs_h, ys_h, color=_PALETA[0], label="Hembras", alpha=0.75, s=45)
+    if xs_m:
+        ax.scatter(xs_m, ys_m, color=_PALETA[3], label="Machos", alpha=0.75, s=45)
+    ax.axhline(0, color="#616161", linewidth=1, linestyle=":")
+    ax.set_xlabel("Edad al último pesaje (días)")
+    ax.set_ylabel("GMD (kg/día)")
+    ax.set_title("Ganancia Media Diaria del hato")
+    _estilo_ejes(ax)
+    ax.legend(loc="upper right", fontsize=9)
+
+    return _guardar(fig, output_dir, f"grafico_gmd_hato_{hoy.isoformat()}.png")
+
+
+def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
+                                hoy: Optional[date] = None) -> Optional[str]:
+    """Boxplot del intervalo entre partos (IEP, en días) de todas las vacas
+    con 2 o más partos, para detectar vacas atípicas (outliers)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    vacas = db.query(
+        "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL AND (id_cria IS NULL OR id_cria != vaca_id)"
+    )
+    ieps: list[int] = []
+    for v in vacas:
+        partos = db.query(
+            "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL "
+            "AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY fecha", (v["vaca_id"],),
+        )
+        fechas = [to_date(p["fecha"]) for p in partos if to_date(p["fecha"])]
+        for i in range(1, len(fechas)):
+            dias = (fechas[i] - fechas[i - 1]).days
+            if dias > 0:
+                ieps.append(dias)
+
+    if len(ieps) < 3:
+        return None
+
+    fig, ax = plt.subplots(figsize=(6, 5), dpi=130)
+    caja = ax.boxplot(ieps, patch_artist=True, widths=0.4,
+                      flierprops={"marker": "o", "markerfacecolor": _PALETA[3], "markersize": 6})
+    for patch in caja["boxes"]:
+        patch.set_facecolor(_PALETA[0])
+        patch.set_alpha(0.6)
+    ax.axhline(365, color=_PALETA[2], linewidth=1.4, linestyle="--", label="Meta: 365 días (1 parto/año)")
+    ax.set_ylabel("Intervalo entre partos (días)")
+    ax.set_xticks([1])
+    ax.set_xticklabels([f"{len(ieps)} intervalo(s) registrado(s)"])
+    ax.set_title("Intervalo Entre Partos (IEP) — detección de vacas atípicas")
+    _estilo_ejes(ax)
+    ax.legend(loc="upper right", fontsize=8)
+
+    return _guardar(fig, output_dir, f"grafico_iep_{hoy.isoformat()}.png")
+
+
+def generar_grafico_peso_destete_por_raza(db, output_dir: str = "data/reportes",
+                                          hoy: Optional[date] = None) -> Optional[str]:
+    """Barras del peso promedio al destete (pesajes.evento='DESTETE'),
+    agrupado por raza del animal."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    filas = db.query(
+        "SELECT a.raza AS raza, p.peso_kg AS peso_kg FROM pesajes p "
+        "JOIN animales a ON a.id_animal = p.animal_id "
+        "WHERE UPPER(p.evento) = 'DESTETE' AND p.peso_kg IS NOT NULL AND a.raza IS NOT NULL"
+    )
+    por_raza: dict[str, list[float]] = {}
+    for f in filas:
+        raza = (f["raza"] or "").strip() or "Sin raza"
+        por_raza.setdefault(raza, []).append(float(f["peso_kg"]))
+    if not por_raza:
+        return None
+
+    razas = sorted(por_raza, key=lambda r: -sum(por_raza[r]) / len(por_raza[r]))
+    promedios = [sum(por_raza[r]) / len(por_raza[r]) for r in razas]
+    conteos = [len(por_raza[r]) for r in razas]
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
+    barras = ax.bar(razas, promedios, color=_PALETA[: len(razas)])
+    for barra, n in zip(barras, conteos):
+        ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" n={n}",
+               ha="center", va="bottom", fontsize=8, rotation=0)
+    ax.set_ylabel("Peso promedio al destete (kg)")
+    ax.set_title("Peso al Destete por Raza")
+    ax.tick_params(axis="x", rotation=20, labelsize=9)
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_destete_raza_{hoy.isoformat()}.png")
+
+
+def generar_grafico_rendimiento_padre(db, output_dir: str = "data/reportes",
+                                      hoy: Optional[date] = None) -> Optional[str]:
+    """Barras del peso promedio al nacer de las crías, agrupado por padre
+    (solo padres registrados como animal local vía genealogía -- no cubre
+    pajuelas de IA sin un animal correspondiente en el sistema)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    filas = db.query(
+        """
+        SELECT padre.tag AS padre_tag, padre.nombre AS padre_nombre, p.peso_nacimiento AS peso
+        FROM partos p
+        JOIN animales cria ON cria.id_animal = p.id_cria
+        JOIN animales padre ON padre.id_animal = cria.padre_id
+        WHERE p.peso_nacimiento IS NOT NULL AND cria.padre_id IS NOT NULL
+        """
+    )
+    por_padre: dict[str, list[float]] = {}
+    for f in filas:
+        etiqueta = f["padre_tag"] or "?"
+        if f["padre_nombre"]:
+            etiqueta += f" ({f['padre_nombre']})"
+        por_padre.setdefault(etiqueta, []).append(float(f["peso"]))
+    # Solo padres con al menos 2 crías pesadas (evitar comparar con n=1)
+    por_padre = {k: v for k, v in por_padre.items() if len(v) >= 2}
+    if not por_padre:
+        return None
+
+    padres = sorted(por_padre, key=lambda k: -sum(por_padre[k]) / len(por_padre[k]))
+    promedios = [sum(por_padre[k]) / len(por_padre[k]) for k in padres]
+    conteos = [len(por_padre[k]) for k in padres]
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
+    barras = ax.barh(padres, promedios, color=_PALETA[: len(padres)])
+    for barra, n in zip(barras, conteos):
+        ax.text(barra.get_width(), barra.get_y() + barra.get_height() / 2, f" n={n}",
+               ha="left", va="center", fontsize=8)
+    ax.set_xlabel("Peso promedio al nacer de sus crías (kg)")
+    ax.set_title("Rendimiento por Padre/Reproductor")
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_rendimiento_padre_{hoy.isoformat()}.png")
+
+
+def generar_grafico_aforo_potreros(db, output_dir: str = "data/reportes",
+                                   hoy: Optional[date] = None) -> Optional[str]:
+    """Barras del aforo (kg/m²) registrado por potrero, coloreado por tipo
+    de pasto. Es una foto del último aforo cargado por potrero, no una
+    serie histórica (el bot no guarda un historial de aforos repetidos)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    potreros = db.query(
+        "SELECT nombre, codigo, tipo_pasto, aforo_kg_m2 FROM potreros "
+        "WHERE aforo_kg_m2 IS NOT NULL ORDER BY aforo_kg_m2 DESC"
+    )
+    if not potreros:
+        return None
+
+    nombres = [(p["nombre"] or p["codigo"] or "?") for p in potreros]
+    valores = [float(p["aforo_kg_m2"]) for p in potreros]
+    pastos = [(p["tipo_pasto"] or "Sin dato") for p in potreros]
+    pastos_unicos = sorted(set(pastos))
+    color_de_pasto = {p: _PALETA[i % len(_PALETA)] for i, p in enumerate(pastos_unicos)}
+    colores = [color_de_pasto[p] for p in pastos]
+
+    fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
+    ax.bar(nombres, valores, color=colores)
+    ax.set_ylabel("Aforo (kg/m²)")
+    ax.set_title("Aforo de Forraje por Potrero")
+    ax.tick_params(axis="x", rotation=30, labelsize=8)
+    _estilo_ejes(ax)
+
+    parches = [plt.Rectangle((0, 0), 1, 1, color=color_de_pasto[p]) for p in pastos_unicos]
+    ax.legend(parches, pastos_unicos, loc="upper right", fontsize=8, title="Tipo de pasto")
+
+    return _guardar(fig, output_dir, f"grafico_aforo_potreros_{hoy.isoformat()}.png")
+
+
+def generar_grafico_ocupacion_potreros(db, output_dir: str = "data/reportes",
+                                       hoy: Optional[date] = None) -> Optional[str]:
+    """Barras horizontales de días de ocupación actual por potrero
+    (semáforo Voisin: verde ≤3d, amarillo ≤6d, rojo >6d)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    grupos = calcular_existencias_potreros_sg(db, hoy)
+    if not grupos:
+        return None
+
+    nombres, dias_ocup, colores = [], [], []
+    for g in grupos:
+        f_ingreso = g.get("fecha_ingreso_reciente")
+        d = (hoy - to_date(f_ingreso)).days if f_ingreso and to_date(f_ingreso) else None
+        if d is None:
+            continue
+        nombres.append(g["display"])
+        dias_ocup.append(d)
+        colores.append("#2e7d32" if d <= 3 else ("#f9a825" if d <= 6 else "#c62828"))
+
+    if not nombres:
+        return None
+
+    orden = sorted(range(len(nombres)), key=lambda i: -dias_ocup[i])
+    nombres = [nombres[i] for i in orden]
+    dias_ocup = [dias_ocup[i] for i in orden]
+    colores = [colores[i] for i in orden]
+
+    fig, ax = plt.subplots(figsize=(7, max(3.5, 0.4 * len(nombres))), dpi=130)
+    ax.barh(nombres, dias_ocup, color=colores)
+    ax.axvline(3, color="#616161", linewidth=1, linestyle=":")
+    ax.set_xlabel("Días de ocupación actual")
+    ax.set_title("Ocupación de Potreros (Rotación Voisin)")
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_ocupacion_potreros_{hoy.isoformat()}.png")
+
+
+def _hembra_prenada_estimado(db, aid: int) -> bool:
+    """Estimación: True si el último servicio de la hembra no tiene un
+    parto registrado después de esa fecha (no hay diagnóstico de preñez
+    real en el sistema -- ver nota del módulo)."""
+    ult = db.ultimo_servicio(aid)
+    if ult is None or not ult["fecha"]:
+        return False
+    parto = db.query_one(
+        "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1", (aid, ult["fecha"])
+    )
+    return parto is None
+
+
+def generar_grafico_prenadas_vacias_potrero(db, output_dir: str = "data/reportes",
+                                            hoy: Optional[date] = None) -> Optional[str]:
+    """Barras apiladas por potrero: hembras en edad reproductiva (≥1 año)
+    preñadas (estimado) vs vacías, más el total de animales del potrero
+    como referencia. "Preñada" aquí es una ESTIMACIÓN por servicio sin
+    parto posterior -- el bot no registra diagnóstico de preñez (palpación/
+    ecografía) como evento propio todavía."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    grupos = calcular_existencias_potreros_sg(db, hoy)
+    if not grupos:
+        return None
+
+    nombres, totales, prenadas, vacias = [], [], [], []
+    for g in grupos:
+        n_prenadas = 0
+        n_vacias = 0
+        for a in g.get("animales", []):
+            sexo = (a["sexo"] or "").strip().lower()
+            if not sexo.startswith("h"):
+                continue
+            fnac = to_date(a["fecha_nacimiento"])
+            if fnac and (hoy - fnac).days < 365:
+                continue  # cría, no aplica
+            if _hembra_prenada_estimado(db, a["id_animal"]):
+                n_prenadas += 1
+            else:
+                n_vacias += 1
+        if n_prenadas + n_vacias == 0:
+            continue
+        nombres.append(g["display"])
+        totales.append(g["total"])
+        prenadas.append(n_prenadas)
+        vacias.append(n_vacias)
+
+    if not nombres:
+        return None
+
+    fig, ax = plt.subplots(figsize=(8, max(3.5, 0.5 * len(nombres))), dpi=130)
+    ax.barh(nombres, prenadas, color=_PALETA[2], label="Preñadas (estimado)")
+    ax.barh(nombres, vacias, left=prenadas, color=_PALETA[0], label="Vacías")
+    for i, tot in enumerate(totales):
+        ax.text(prenadas[i] + vacias[i], i, f"  potrero: {tot} animales en total", va="center", fontsize=8)
+    ax.set_xlabel("Hembras en edad reproductiva")
+    ax.set_title("Preñadas vs Vacías por Potrero (estimado)")
+    _estilo_ejes(ax)
+    ax.legend(loc="lower right", fontsize=8)
+
+    return _guardar(fig, output_dir, f"grafico_prenadas_potrero_{hoy.isoformat()}.png")

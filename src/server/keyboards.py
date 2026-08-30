@@ -80,6 +80,9 @@ def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
+            InlineKeyboardButton("📊 Gráficos de la Finca", callback_data="cmd:graficos"),
+        ],
+        [
             InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
             InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
         ],
@@ -249,6 +252,36 @@ def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+def crear_teclado_graficos() -> InlineKeyboardMarkup:
+    """Menú de gráficos generales de la finca (distinto de los gráficos por
+    animal, que viven en crear_teclado_animal)."""
+    keyboard = [
+        [
+            InlineKeyboardButton("📈 Evolución del Rebaño", callback_data="panel_grafico:evolucion"),
+            InlineKeyboardButton("🥧 Categorías del Hato", callback_data="panel_grafico:categorias"),
+        ],
+        [
+            InlineKeyboardButton("⚖️ GMD del Hato", callback_data="panel_grafico:gmd"),
+            InlineKeyboardButton("📦 Intervalo Entre Partos", callback_data="panel_grafico:iep"),
+        ],
+        [
+            InlineKeyboardButton("🐄 Destete por Raza", callback_data="panel_grafico:destete_raza"),
+            InlineKeyboardButton("🐂 Rendimiento por Padre", callback_data="panel_grafico:padre"),
+        ],
+        [
+            InlineKeyboardButton("🌱 Aforo por Potrero", callback_data="panel_grafico:aforo"),
+            InlineKeyboardButton("🔄 Ocupación de Potreros", callback_data="panel_grafico:ocupacion"),
+        ],
+        [
+            InlineKeyboardButton("🤰 Preñadas vs Vacías por Potrero", callback_data="panel_grafico:prenadas"),
+        ],
+        [
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 
 def crear_teclado_alertas() -> InlineKeyboardMarkup:
     keyboard = [

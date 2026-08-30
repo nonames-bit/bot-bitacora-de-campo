@@ -725,6 +725,16 @@ def test_comando_grafico_registrado():
     assert 'animal:grafico:' in content
 
 
+def test_comando_graficos_panel_registrado():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler(["graficos", "graficas", "panel_graficos"], cmd_graficos)' in content
+    assert 'panel_grafico:' in content
+    from src.server.telegram_bot import GRAFICOS_PANEL
+    for tipo in ("evolucion", "categorias", "gmd", "iep", "destete_raza", "padre", "aforo", "ocupacion", "prenadas"):
+        assert tipo in GRAFICOS_PANEL
+
+
 def test_existencias_potreros_nota_animales_sin_potrero(db):
     """Un animal ACTIVO sin potrero resoluble debe explicarse en la tabla, no
     desaparecer en silencio haciendo que el total no cuadre con el general."""
