@@ -186,6 +186,7 @@ def test_formatear_ayuda():
     assert "/confirmar_deshacer" in ayuda_owner
     assert "/ultimos" in ayuda_owner
     assert "restaurar_backup.sh" in ayuda_owner
+    assert "/grafico" in ayuda_owner
 
     ayuda_admin = formatear_ayuda("ADMIN")
     assert "Administrador" in ayuda_admin
@@ -715,6 +716,13 @@ def test_comandos_deshacer_registrados():
     assert 'CommandHandler("deshacer", cmd_deshacer)' in content
     assert 'CommandHandler("confirmar_deshacer", cmd_confirmar_deshacer)' in content
     assert 'CommandHandler("cancelar_deshacer", cmd_cancelar_deshacer)' in content
+
+
+def test_comando_grafico_registrado():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler(["grafico", "grafica", "curva"], cmd_grafico)' in content
+    assert 'animal:grafico:' in content
 
 
 def test_existencias_potreros_nota_animales_sin_potrero(db):

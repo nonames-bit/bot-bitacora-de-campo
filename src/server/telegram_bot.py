@@ -14,6 +14,7 @@ from typing import Optional
 
 from ..bot.bot_interface import Bot
 from ..db.database import Database
+from ..engine.charts import generar_grafico_peso, graficos_disponibles
 from ..engine.query_engine import (
     QueryEngine,
     buscar_foto_animal,
@@ -923,6 +924,39 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error al consultar fotos: {e}")
 
+    async def cmd_grafico(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            tag = context.args[0].strip() if context.args else (nlu.extraer_tag(update.message.text or "") or None)
+            if not tag:
+                await update.message.reply_text("Uso: /grafico <tag> (ej. /grafico N069)")
+                return
+            if not graficos_disponibles():
+                await update.message.reply_text(
+                    "📈 Los gráficos no están disponibles en este servidor (falta matplotlib)."
+                )
+                return
+            ruta_grafico = generar_grafico_peso(db, tag, output_dir=reportes_dir)
+            if ruta_grafico and os.path.exists(ruta_grafico):
+                with open(ruta_grafico, "rb") as f:
+                    await update.message.reply_photo(
+                        photo=f, caption=f"📈 Curva de crecimiento — {tag}",
+                        reply_markup=crear_teclado_animal(tag),
+                    )
+            else:
+                await update.message.reply_text(
+                    f"📈 No hay suficientes pesajes registrados para graficar a {tag} (se necesitan al menos 2)."
+                )
+        except Exception as e:
+            logger.error("Error en cmd_grafico: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error al generar el gráfico: {e}")
+
     async def cmd_exportar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -1812,6 +1846,30 @@ def construir_application(
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
 
+            elif data.startswith("animal:grafico:"):
+                tag = data.split("animal:grafico:", 1)[1].strip()
+                await query.answer()
+                if not graficos_disponibles():
+                    if query.message:
+                        await query.message.reply_text(
+                            "📈 Los gráficos no están disponibles en este servidor (falta matplotlib)."
+                        )
+                else:
+                    ruta_grafico = generar_grafico_peso(db, tag, output_dir=reportes_dir)
+                    if ruta_grafico and os.path.exists(ruta_grafico):
+                        with open(ruta_grafico, "rb") as f:
+                            if query.message:
+                                await query.message.reply_photo(
+                                    photo=f, caption=f"📈 Curva de crecimiento — {tag}",
+                                    reply_markup=crear_teclado_animal(tag),
+                                )
+                    else:
+                        if query.message:
+                            await query.message.reply_text(
+                                f"📈 No hay suficientes pesajes registrados para graficar a {tag} "
+                                "(se necesitan al menos 2)."
+                            )
+
             elif data.startswith("animal:geneal:"):
                 tag = data.split("animal:geneal:", 1)[1].strip()
                 await query.answer()
@@ -2074,6 +2132,7 @@ def construir_application(
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
+    app.add_handler(CommandHandler(["grafico", "grafica", "curva"], cmd_grafico))
     app.add_handler(CommandHandler(["status", "tablero", "finca", "resumen"], cmd_status))
     app.add_handler(CommandHandler(["sistema", "servidor", "vps"], cmd_sistema))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))

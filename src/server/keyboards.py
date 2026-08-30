@@ -238,6 +238,9 @@ def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📷 Ver Foto", callback_data=f"foto:{tag_clean}"),
         ],
         [
+            InlineKeyboardButton("📈 Gráfico de Peso", callback_data=f"animal:grafico:{tag_clean}"),
+        ],
+        [
             InlineKeyboardButton("📋 Ficha Resumen", callback_data=f"animal:resumen:{tag_clean}"),
             InlineKeyboardButton("🔍 Buscar Otro", callback_data="cmd:buscar_animal"),
         ],
