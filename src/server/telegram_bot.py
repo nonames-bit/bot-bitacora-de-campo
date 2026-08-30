@@ -103,271 +103,19 @@ def construir_application(
             "python-telegram-bot no está instalado. Instálalo con 'pip install python-telegram-bot>=21.0'"
         ) from e
 
-    def crear_teclado_guia_chat() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🐮 1. Preguntas sobre un Animal", callback_data="guia:preguntas_animal"),
-            ],
-            [
-                InlineKeyboardButton("🌿 2. Preguntas de Potreros & Voisin", callback_data="guia:preguntas_potreros"),
-            ],
-            [
-                InlineKeyboardButton("🥛 3. Preguntas de Leche & Reproducción", callback_data="guia:preguntas_reprod"),
-            ],
-            [
-                InlineKeyboardButton("💉 4. Preguntas de Medicamentos & Retiro", callback_data="guia:preguntas_sanidad"),
-            ],
-            [
-                InlineKeyboardButton("🎙️ 5. Cómo Dictar por Voz y Fotos", callback_data="guia:voz_fotos"),
-            ],
-            [
-                InlineKeyboardButton("📝 Ejemplos de Notas", callback_data="cmd:ejemplos"),
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_trabajador() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
-            ],
-            [
-                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
-                InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
-            ],
-            [
-                InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
-            ],
-            [
-                InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
-                InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
-            ],
-            [
-                InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
-            ],
-            [
-                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
-                InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
-            ],
-            [
-                InlineKeyboardButton("📊 Población & KPIs SG", callback_data="cmd:poblacion"),
-                InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
-            ],
-            [
-                InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
-                InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
-            ],
-            [
-                InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
-                InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
-            ],
-            [
-                InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
-                InlineKeyboardButton("⚙️ Servidor & Logs", callback_data="cmd:sistema"),
-            ],
-        ]
-        if rol == "OWNER":
-            keyboard.append([
-                InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
-                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
-            ])
-            keyboard.append([
-                InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
-            ])
-        else:
-            keyboard.append([
-                InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
-                InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
-            ])
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_medicamentos() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🚨 Animales en Retiro Activo", callback_data="cmd:retiros_activos"),
-            ],
-            [
-                InlineKeyboardButton("💉 Últimos Tratamientos", callback_data="cmd:ultimos_tratamientos"),
-                InlineKeyboardButton("📷 Fotos Medicamentos", callback_data="guia:fotos"),
-            ],
-            [
-                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_buscar_animal() -> InlineKeyboardMarkup:
-        try:
-            ultimos_recientes = db.query(
-                """
-                SELECT DISTINCT a.tag FROM (
-                    SELECT animal_id, fecha FROM pesajes WHERE animal_id IS NOT NULL
-                    UNION ALL
-                    SELECT vaca_id AS animal_id, fecha FROM partos WHERE vaca_id IS NOT NULL
-                    UNION ALL
-                    SELECT vaca_id AS animal_id, fecha FROM servicios WHERE vaca_id IS NOT NULL
-                    UNION ALL
-                    SELECT vaca_id AS animal_id, fecha FROM celos WHERE vaca_id IS NOT NULL
-                    UNION ALL
-                    SELECT animal_id, fecha FROM tratamientos WHERE animal_id IS NOT NULL
-                    UNION ALL
-                    SELECT animal_id, fecha FROM traslados WHERE animal_id IS NOT NULL
-                ) ev
-                JOIN animales a ON a.id_animal = ev.animal_id
-                WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
-                ORDER BY ev.fecha DESC LIMIT 4
-                """
-            )
-        except Exception:
-            ultimos_recientes = []
-        keyboard = [
-            [
-                InlineKeyboardButton("🥛 Vacas Paridas", callback_data="filtro:paridas"),
-                InlineKeyboardButton("🤰 Inseminadas / Gestantes", callback_data="filtro:inseminadas"),
-            ],
-            [
-                InlineKeyboardButton("🐂 Toros / Reproductores", callback_data="filtro:toros"),
-                InlineKeyboardButton("🍼 Crías Recientes", callback_data="filtro:crias"),
-            ],
-            [
-                InlineKeyboardButton("💊 En Retiro Médico", callback_data="cmd:retiros_activos"),
-                InlineKeyboardButton("⚖️ Últimos Pesajes", callback_data="filtro:pesajes"),
-            ],
-        ]
-        if ultimos_recientes:
-            botones_recientes = [
-                InlineKeyboardButton(f"🐮 {r['tag']}", callback_data=f"ficha:{r['tag']}")
-                for r in ultimos_recientes
-            ]
-            keyboard.append(botones_recientes)
-
-        keyboard.append([
-            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-        ])
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_preguntas_rapidas() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🥛 ¿Quién está en retiro de leche?", callback_data="faq:retiro_leche"),
-            ],
-            [
-                InlineKeyboardButton("🌿 ¿Qué potreros tienen >30d reposo?", callback_data="faq:potreros_listos"),
-            ],
-            [
-                InlineKeyboardButton("⚠️ ¿Qué vacas tienen >90d abiertas?", callback_data="faq:dias_abiertos"),
-            ],
-            [
-                InlineKeyboardButton("🍼 ¿Qué partos hubo en los últimos 30 días?", callback_data="faq:partos_mes"),
-            ],
-            [
-                InlineKeyboardButton("⚖️ ¿Últimos pesajes y ganancias?", callback_data="faq:pesajes"),
-            ],
-            [
-                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_principal(rol: Optional[str]) -> InlineKeyboardMarkup:
-        if rol in ("OWNER", "ADMIN"):
-            return crear_teclado_admin(rol)
-        return crear_teclado_trabajador()
-
-    def crear_teclado_ejemplos() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🍼 Parto", callback_data="ejemplo:parto"),
-                InlineKeyboardButton("🔥 Celo AM/PM", callback_data="ejemplo:celo"),
-            ],
-            [
-                InlineKeyboardButton("🐂 Inseminación", callback_data="ejemplo:servicio"),
-                InlineKeyboardButton("💉 Tratamiento", callback_data="ejemplo:tratamiento"),
-            ],
-            [
-                InlineKeyboardButton("⚖️ Pesaje", callback_data="ejemplo:pesaje"),
-                InlineKeyboardButton("🚚 Traslado", callback_data="ejemplo:traslado"),
-            ],
-            [
-                InlineKeyboardButton("💀 Muerte / Baja", callback_data="ejemplo:muerte"),
-                InlineKeyboardButton("📥 Entrada / Salida", callback_data="ejemplo:movimiento"),
-            ],
-            [
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
-        tag_clean = str(tag).strip()
-        keyboard = [
-            [
-                InlineKeyboardButton("⚖️ Pesajes & GMD", callback_data=f"animal:pesos:{tag_clean}"),
-                InlineKeyboardButton("🍼 Partos & Crías", callback_data=f"animal:reprod:{tag_clean}"),
-            ],
-            [
-                InlineKeyboardButton("🥛 Control Leche", callback_data=f"animal:leche:{tag_clean}"),
-                InlineKeyboardButton("💉 Sanidad & Retiro", callback_data=f"animal:sanidad:{tag_clean}"),
-            ],
-            [
-                InlineKeyboardButton("🌳 Genealogía (3G)", callback_data=f"animal:geneal:{tag_clean}"),
-                InlineKeyboardButton("📷 Ver Foto", callback_data=f"foto:{tag_clean}"),
-            ],
-            [
-                InlineKeyboardButton("📋 Ficha Resumen", callback_data=f"animal:resumen:{tag_clean}"),
-                InlineKeyboardButton("🔍 Buscar Otro", callback_data="cmd:buscar_animal"),
-            ],
-            [
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_alertas() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🔴 Partos Próximos (≤30d)", callback_data="alerta:partos"),
-                InlineKeyboardButton("🟡 Vacas para Secado", callback_data="alerta:secados"),
-            ],
-            [
-                InlineKeyboardButton("🟢 Crías para Destete", callback_data="alerta:destetes"),
-                InlineKeyboardButton("⚠️ Pérdidas de Peso (GMD)", callback_data="alerta:pesos"),
-            ],
-            [
-                InlineKeyboardButton("⛔ Retiros Sanitarios", callback_data="cmd:retiros_activos"),
-                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
-            ],
-            [
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def crear_teclado_poblacion() -> InlineKeyboardMarkup:
-        keyboard = [
-            [
-                InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
-                InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
-            ],
-            [
-                InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
-                InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-            ],
-        ]
-        return InlineKeyboardMarkup(keyboard)
+    from .keyboards import (
+        crear_teclado_admin,
+        crear_teclado_alertas,
+        crear_teclado_animal,
+        crear_teclado_buscar_animal,
+        crear_teclado_ejemplos,
+        crear_teclado_guia_chat,
+        crear_teclado_medicamentos,
+        crear_teclado_poblacion,
+        crear_teclado_preguntas_rapidas,
+        crear_teclado_principal,
+        crear_teclado_trabajador,
+    )
 
     async def cmd_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
@@ -939,7 +687,7 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             msg = formatear_panel_buscar_animal_texto()
-            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal())
+            await update.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal(db))
         except Exception as e:
             logger.error("Error en cmd_buscar_animal: %s", e, exc_info=True)
             if update.message:
@@ -1993,7 +1741,7 @@ def construir_application(
                 msg = formatear_panel_buscar_animal_texto()
                 if query.message:
                     await query.message.reply_text(
-                        msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal()
+                        msg, parse_mode="HTML", reply_markup=crear_teclado_buscar_animal(db)
                     )
 
             elif data == "cmd:medicamentos":
