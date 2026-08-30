@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import re
-from typing import Optional
 
 from ...utils import add_days, iso, to_date
 from ..reproductive_engine import fecha_palpacion, fecha_secado
@@ -202,24 +201,23 @@ class ReproduccionQueryMixin:
             lineas.append(f"<i>... y {len(resultado) - 20} más.</i>")
         return "\n".join(lineas)
 
-    def _partos_periodo(self, dias: int = 30) -> str:
-        """Lista de partos ocurridos en los últimos N días, con conteo por sexo de cría."""
-        desde = iso(add_days(self.hoy, -dias))
+    def _partos_periodo(self, desde: str, hasta: str, etiqueta: str = "en el periodo") -> str:
+        """Lista de partos ocurridos entre desde y hasta (fechas ISO), con conteo por sexo de cría."""
         partos = self.db.query(
             """
             SELECT p.*, a.tag, a.nombre
             FROM partos p
             JOIN animales a ON a.id_animal = p.vaca_id
-            WHERE p.fecha >= ? AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
+            WHERE p.fecha >= ? AND p.fecha <= ? AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
             ORDER BY p.fecha DESC
             """,
-            (desde,),
+            (desde, hasta),
         )
         if not partos:
-            return f"No hubo partos registrados en los últimos {dias} días."
+            return f"No hubo partos registrados {etiqueta}."
         machos = sum(1 for p in partos if (p["sexo_cria"] or "").strip().lower().startswith("m"))
         hembras = sum(1 for p in partos if (p["sexo_cria"] or "").strip().lower().startswith("h"))
-        lineas = [f"🍼 <b>Partos en los últimos {dias} días ({len(partos)}):</b> {hembras} hembra(s), {machos} macho(s)"]
+        lineas = [f"🍼 <b>Partos {etiqueta} ({len(partos)}):</b> {hembras} hembra(s), {machos} macho(s)"]
         for p in partos[:15]:
             nom = f" ({p['nombre']})" if p["nombre"] else ""
             sexo = f" · cría {p['sexo_cria']}" if p["sexo_cria"] else ""
@@ -228,8 +226,8 @@ class ReproduccionQueryMixin:
             lineas.append(f"<i>... y {len(partos) - 15} más.</i>")
         return "\n".join(lineas)
 
-    def _crias_por_sexo(self, sexo: str, dias: Optional[int] = None) -> str:
-        """Cuenta crías nacidas (vivas o no) filtradas por sexo, opcionalmente en un rango de días."""
+    def _crias_por_sexo(self, sexo: str, desde: str | None = None, hasta: str | None = None, etiqueta: str = "") -> str:
+        """Cuenta crías nacidas (vivas o no) filtradas por sexo, opcionalmente en un rango de fechas."""
         sexo_norm = "macho" if sexo.lower().startswith("m") else "hembra"
         query = (
             "SELECT p.* FROM partos p "
@@ -237,11 +235,11 @@ class ReproduccionQueryMixin:
             "AND (p.id_cria IS NULL OR p.id_cria != p.vaca_id)"
         )
         params: list = [f"{sexo_norm}%"]
-        if dias is not None:
-            query += " AND p.fecha >= ?"
-            params.append(iso(add_days(self.hoy, -dias)))
+        if desde is not None:
+            query += " AND p.fecha >= ? AND p.fecha <= ?"
+            params.extend([desde, hasta or iso(self.hoy)])
         crias = self.db.query(query, tuple(params))
-        etiqueta_periodo = f" en los últimos {dias} días" if dias is not None else ""
+        etiqueta_periodo = f" {etiqueta}" if etiqueta else ""
         plural = "machos" if sexo_norm == "macho" else "hembras"
         return f"🐮 Crías {plural} nacidas{etiqueta_periodo}: <b>{len(crias)}</b>."
 

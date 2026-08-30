@@ -1077,6 +1077,81 @@ def test_movimientos_venta_periodo(db):
     assert "48" not in resp
 
 
+def test_inventario_por_raza(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", raza="Holstein Neg-T")
+    db.registrar_animal("48", sexo="Macho", estado="ACTIVO", raza="Gyr")
+    db.registrar_animal("49", sexo="Hembra", estado="ACTIVO", raza="Gyr")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantas vacas holstein hay")
+    assert "No entendí" not in resp
+    assert "47" in resp
+
+    resp2 = qe.responder("cuantos animales raza gyr hay")
+    assert "48" in resp2 and "49" in resp2 and "47" not in resp2
+
+
+def test_potrero_con_mas_animales(db):
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("OLEGARIO I", "01")
+    p2 = db.registrar_potrero("VERSALLES", "02")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("49", sexo="Hembra", estado="ACTIVO", potrero=p2)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("que potrero tiene mas animales")
+    assert "No entendí" not in resp
+    assert "OLEGARIO I" in resp
+
+
+def test_animales_por_umbral_de_peso(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_pesaje("47", fecha="2026-08-01", peso_kg=450)
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO")
+    db.registrar_pesaje("48", fecha="2026-08-01", peso_kg=200)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantos animales pesan mas de 400 kilos")
+    assert "No entendí" not in resp
+    assert "47" in resp and "48" not in resp
+
+    resp2 = qe.responder("cuantos animales pesan menos de 300 kilos")
+    assert "48" in resp2 and "47" not in resp2
+
+
+def test_movimientos_entrada_periodo(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_movimiento("47", fecha="2026-08-20", tipo_movimiento="ENTRADA")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantos animales entraron este mes")
+    assert "No entendí" not in resp
+    assert "47" in resp
+
+
+def test_partos_mes_y_anio_pasado(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("47", fecha="2026-08-15")  # mes pasado respecto a hoy=2026-09-01
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("48", fecha="2025-06-01")  # año pasado
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp_mes = qe.responder("cuantos partos hubo el mes pasado")
+    assert "No entendí" not in resp_mes
+    assert "47" in resp_mes and "48" not in resp_mes
+
+    resp_anio = qe.responder("cuantos partos hubo el año pasado")
+    assert "48" in resp_anio and "47" not in resp_anio
+
+    resp_este_anio = qe.responder("cuantos partos hubo este año")
+    assert "47" in resp_este_anio and "48" not in resp_este_anio
+
+
 def test_lote_ocupacion(db):
     from src.engine.query_engine import QueryEngine
     p1 = db.registrar_potrero("BAJO", "01")

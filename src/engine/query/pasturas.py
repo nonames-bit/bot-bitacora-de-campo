@@ -166,6 +166,14 @@ class PasturasQueryMixin:
         tags_str = ", ".join(tags[:10]) + (f" y {len(tags) - 10} más" if len(tags) > 10 else "")
         return f"🌱 <b>Lote {lote}:</b> {len(tags)} animal(es) ({tags_str}) · {dias_str} de pastoreo."
 
+    def _potrero_con_mas_animales(self) -> str:
+        """Devuelve el potrero con más animales activos asignados."""
+        filas = calcular_existencias_potreros_sg(self.db, self.hoy)
+        if not filas:
+            return "No hay potreros con animales activos actualmente."
+        top = filas[0]  # ya viene ordenado por total descendente
+        return f"🌿 El potrero con más animales es <b>{top['display']}</b>, con {top['total']} animal(es)."
+
     def _potreros_listos(self) -> str:
         potreros = self.db.query("SELECT * FROM potreros")
         listos = []

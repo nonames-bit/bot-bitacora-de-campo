@@ -1,7 +1,7 @@
 """Mixin de consultas de inventario general, por categoría, pesaje y fotos."""
 from __future__ import annotations
 
-from ...utils import add_days, iso, to_date
+from ...utils import to_date
 from ..growth_engine import gmd
 from .helpers import _fmt_es_co, calcular_brackets_inventario_sg, generar_resumen_inventario_sg
 
@@ -161,29 +161,78 @@ class InventarioQueryMixin:
         emoji = {"VENDIDO": "💰", "MUERTO": "⚰️"}.get(estado_norm, "📊")
         return f"{emoji} {sujeto} {etiqueta}: <b>{_fmt_es_co(n)}</b>."
 
-    def _movimientos_periodo(self, tipo_movimiento: str, dias: int) -> str:
+    def _movimientos_periodo(self, tipo_movimiento: str, desde: str, hasta: str, etiqueta_periodo: str = "en el periodo") -> str:
         """Cuenta movimientos (VENTA/COMPRA/SALIDA/ENTRADA) registrados por el
-        bot en los últimos N días. Solo cubre movimientos dictados al bot
-        (tienen fecha real); el histórico importado de SG solo marca
+        bot entre desde y hasta (fechas ISO). Solo cubre movimientos dictados
+        al bot (tienen fecha real); el histórico importado de SG solo marca
         estado VENDIDO/MUERTO sin fecha, así que no se puede acotar por
         periodo — para el total histórico sin fecha use _conteo_por_estado."""
-        desde = iso(add_days(self.hoy, -dias))
         filas = self.db.query(
             "SELECT m.*, a.tag FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id "
-            "WHERE UPPER(m.tipo_movimiento) = ? AND m.fecha >= ? ORDER BY m.fecha DESC",
-            (tipo_movimiento.upper(), desde),
+            "WHERE UPPER(m.tipo_movimiento) = ? AND m.fecha >= ? AND m.fecha <= ? ORDER BY m.fecha DESC",
+            (tipo_movimiento.upper(), desde, hasta),
         )
         etiquetas = {"VENTA": "vendidos", "COMPRA": "comprados", "SALIDA": "de salida", "ENTRADA": "de entrada"}
-        etiqueta = etiquetas.get(tipo_movimiento.upper(), tipo_movimiento.lower())
+        etiqueta_tipo = etiquetas.get(tipo_movimiento.upper(), tipo_movimiento.lower())
         if not filas:
-            return f"No hay animales {etiqueta} registrados en los últimos {dias} días (según movimientos dictados al bot)."
-        lineas = [f"💰 <b>Animales {etiqueta} en los últimos {dias} días ({len(filas)}):</b>"]
+            return f"No hay animales {etiqueta_tipo} registrados {etiqueta_periodo} (según movimientos dictados al bot)."
+        lineas = [f"💰 <b>Animales {etiqueta_tipo} {etiqueta_periodo} ({len(filas)}):</b>"]
         for f in filas[:15]:
             precio_str = f" · ${_fmt_es_co(f['precio'])}" if f["precio"] else ""
             lineas.append(f"• {f['fecha']} — {f['tag']}{precio_str}")
         if len(filas) > 15:
             lineas.append(f"<i>... y {len(filas) - 15} más.</i>")
         return "\n".join(lineas)
+
+    def _inventario_por_raza(self, raza: str, sexo: str | None = None) -> str:
+        """Cuenta animales activos cuya raza coincide (comparación flexible,
+        ej. 'holstein' encuentra 'HOLSTEIN', 'Holstein Neg-T', etc.)."""
+        sql = "SELECT id_animal, tag, sexo, raza FROM animales WHERE estado='ACTIVO' AND raza IS NOT NULL AND UPPER(raza) LIKE ?"
+        params: list = [f"%{raza.upper()}%"]
+        if sexo == "hembra":
+            sql += " AND UPPER(sexo) LIKE 'H%'"
+        elif sexo == "macho":
+            sql += " AND UPPER(sexo) LIKE 'M%'"
+        filas = self.db.query(sql, tuple(params))
+        etiqueta = {"hembra": "vacas/hembras", "macho": "toros/machos"}.get(sexo, "animales")
+        n = len(filas)
+        if n == 0:
+            return f"No hay {etiqueta} activos de raza '{raza}'."
+        tags = [f["tag"] or str(f["id_animal"]) for f in filas]
+        muestra = ", ".join(tags[:10])
+        if n > 10:
+            muestra += f" y {n - 10} más"
+        return f"🧬 {etiqueta.capitalize()} de raza '{raza}': <b>{n}</b> ({muestra})"
+
+    def _animales_por_peso(self, umbral_kg: float, comparador: str = "mayor") -> str:
+        """Cuenta animales activos cuyo último pesaje registrado supera (o es
+        menor a) un umbral en kg."""
+        animales = self.db.query(
+            "SELECT id_animal, tag FROM animales WHERE estado='ACTIVO'"
+        )
+        coincidencias = []
+        for a in animales:
+            ult = self.db.query_one(
+                "SELECT peso_kg FROM pesajes WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+                (a["id_animal"],),
+            )
+            if not ult or ult["peso_kg"] is None:
+                continue
+            peso = ult["peso_kg"]
+            if comparador == "menor" and peso < umbral_kg:
+                coincidencias.append((a["tag"] or str(a["id_animal"]), peso))
+            elif comparador == "mayor" and peso > umbral_kg:
+                coincidencias.append((a["tag"] or str(a["id_animal"]), peso))
+
+        cmp_texto = "más de" if comparador == "mayor" else "menos de"
+        n = len(coincidencias)
+        if n == 0:
+            return f"No hay animales activos con último peso registrado {cmp_texto} {umbral_kg:.0f} kg."
+        coincidencias.sort(key=lambda x: -x[1] if comparador == "mayor" else x[1])
+        muestra = ", ".join(f"{tag} ({peso:.0f}kg)" for tag, peso in coincidencias[:10])
+        if n > 10:
+            muestra += f" y {n - 10} más"
+        return f"⚖️ Animales con {cmp_texto} {umbral_kg:.0f} kg (último pesaje): <b>{n}</b> ({muestra})"
 
     def _fotos(self, tag) -> str:
         if not tag:

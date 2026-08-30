@@ -5,9 +5,17 @@ from __future__ import annotations
 import logging
 import os
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from ...db.database import Database
+from ...parsers import nlp_engine as nlu
+from ...utils import iso, normalizar
+from .helpers import _potrero_variantes, extraer_nombre_potrero
+from .historial import HistorialQueryMixin
+from .inventario import InventarioQueryMixin
+from .pasturas import PasturasQueryMixin
+from .reproduccion import ReproduccionQueryMixin
+from .sanidad import SanidadQueryMixin
 
 _logger_sin_entender = logging.getLogger("bitacora.consultas_sin_entender")
 
@@ -24,14 +32,6 @@ def _registrar_consulta_sin_entender(texto: str) -> None:
             f.write(f"{datetime.now().isoformat(timespec='seconds')}\t{texto.strip()}\n")
     except Exception:
         _logger_sin_entender.debug("No se pudo registrar consulta sin entender: %s", texto, exc_info=True)
-from ...parsers import nlp_engine as nlu
-from ...utils import normalizar
-from .helpers import _potrero_variantes, extraer_nombre_potrero
-from .historial import HistorialQueryMixin
-from .inventario import InventarioQueryMixin
-from .pasturas import PasturasQueryMixin
-from .reproduccion import ReproduccionQueryMixin
-from .sanidad import SanidadQueryMixin
 
 
 class QueryEngine(
@@ -48,6 +48,33 @@ class QueryEngine(
     def __init__(self, db: Database, hoy: date | None = None):
         self.db = db
         self.hoy = hoy or date.today()
+
+    def _rango_periodo(self, t: str) -> tuple[str, str, str] | None:
+        """Detecta una frase de periodo en el texto normalizado y devuelve
+        (fecha_desde_iso, fecha_hasta_iso, etiqueta_legible), o None si no
+        hay ninguna. Cubre tanto ventanas móviles desde hoy (este mes, esta
+        semana, últimos N días, este año) como meses/años de calendario ya
+        cerrados (mes pasado, año pasado)."""
+        if re.search(r"\bmes\s+pasado\b", t):
+            primer_dia_actual = self.hoy.replace(day=1)
+            ultimo_dia_pasado = primer_dia_actual - timedelta(days=1)
+            primer_dia_pasado = ultimo_dia_pasado.replace(day=1)
+            return iso(primer_dia_pasado), iso(ultimo_dia_pasado), f"el mes pasado ({iso(primer_dia_pasado)} a {iso(ultimo_dia_pasado)})"
+        if re.search(r"\ba[nñ]o\s+pasado\b", t):
+            desde = date(self.hoy.year - 1, 1, 1)
+            hasta = date(self.hoy.year - 1, 12, 31)
+            return iso(desde), iso(hasta), f"el año pasado ({self.hoy.year - 1})"
+        if re.search(r"\beste\s+a[nñ]o\b", t):
+            return iso(date(self.hoy.year, 1, 1)), iso(self.hoy), f"este año ({self.hoy.year})"
+        if re.search(r"\besta\s+semana\b", t):
+            return iso(self.hoy - timedelta(days=7)), iso(self.hoy), "esta semana"
+        if re.search(r"\beste\s+mes\b", t):
+            return iso(self.hoy - timedelta(days=30)), iso(self.hoy), "este mes"
+        m = re.search(r"ultimos?\s+(\d+)\s+dias", t)
+        if m:
+            n = int(m.group(1))
+            return iso(self.hoy - timedelta(days=n)), iso(self.hoy), f"los últimos {n} días"
+        return None
 
     def responder(self, texto: str) -> str:
         t = normalizar(texto)
@@ -77,23 +104,29 @@ class QueryEngine(
                 sexo_edad = "macho"
             return self._inventario_por_edad(anios, sexo=sexo_edad)
 
-        # Ventas/compras acotadas a un periodo (ej. "vendieron este mes") usan
-        # la tabla movimientos (con fecha real); van antes del conteo histórico
-        # sin fecha para no perder el filtro de tiempo.
-        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
-            if re.search(r"\besta\s+semana\b", t):
-                dias_venta = 7
-            else:
-                m_dv = re.search(r"ultimos?\s+(\d+)\s+dias", t)
-                dias_venta = int(m_dv.group(1)) if m_dv else 30
-            return self._movimientos_periodo("VENTA", dias_venta)
-        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
-            if re.search(r"\besta\s+semana\b", t):
-                dias_compra = 7
-            else:
-                m_dc = re.search(r"ultimos?\s+(\d+)\s+dias", t)
-                dias_compra = int(m_dc.group(1)) if m_dc else 30
-            return self._movimientos_periodo("COMPRA", dias_compra)
+        # Cualquier frase de periodo reconocida (este mes, esta semana, últimos
+        # N días, este año, mes pasado, año pasado).
+        _TIENE_PERIODO = r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b|\beste\s+a[nñ]o\b|\bmes\s+pasado\b|\ba[nñ]o\s+pasado\b"
+
+        # Ventas/compras/entradas/salidas acotadas a un periodo (ej. "vendieron
+        # este mes") usan la tabla movimientos (con fecha real); van antes del
+        # conteo histórico sin fecha para no perder el filtro de tiempo.
+        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._movimientos_periodo("VENTA", rango[0], rango[1], rango[2])
+        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._movimientos_periodo("COMPRA", rango[0], rango[1], rango[2])
+        if re.search(r"\bentrad[oa]s?\b|\bentraron\b|\bingresaron\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._movimientos_periodo("ENTRADA", rango[0], rango[1], rango[2])
+        if re.search(r"\bsalid[oa]s?\b|\bsalieron\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._movimientos_periodo("SALIDA", rango[0], rango[1], rango[2])
 
         if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\bcuant|\bhay\b", t):
             sexo_vendido = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
@@ -102,20 +135,43 @@ class QueryEngine(
             sexo_muerto = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
             return self._conteo_por_estado("MUERTO", sexo=sexo_muerto)
 
+        # Conteo de animales por raza (ej. "cuántas vacas holstein hay",
+        # "cuántos animales raza gyr hay"). Va antes de la sección 8 porque
+        # el nombre de la raza no debe caer en el resumen general genérico.
+        m_raza = re.search(r"\braza\s+([a-z]+)\b", t) or re.search(
+            r"\b(holstein|gyr|brahman|cebu|pardo\s*suizo|ayrshire|normando|simental|angus|charolais|nelore|guzerat|romosinuano)\b", t
+        )
+        if m_raza and re.search(r"\bcuant|\bhay\b", t):
+            raza_buscada = m_raza.group(1)
+            sexo_raza = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
+            return self._inventario_por_raza(raza_buscada, sexo=sexo_raza)
+
+        # "Qué potrero tiene más animales"
+        if re.search(r"\bpotrero", t) and re.search(r"\bmas\s+animales\b|\bmayor\s+cantidad\b", t):
+            return self._potrero_con_mas_animales()
+
+        # Conteo de animales por umbral de peso (ej. "cuántos animales pesan
+        # más de 400 kilos"). Va antes de que "400" se confunda con un tag.
+        m_peso = re.search(r"\bmas\s+de\s+(\d+)\s*(?:kg|kilos?)\b", t) or re.search(r"\bmenos\s+de\s+(\d+)\s*(?:kg|kilos?)\b", t)
+        if m_peso and re.search(r"\bpesan?\b|\bpeso\b", t):
+            umbral_peso = float(m_peso.group(1))
+            comparador_peso = "menor" if re.search(r"\bmenos\s+de\b", t) else "mayor"
+            return self._animales_por_peso(umbral_peso, comparador=comparador_peso)
+
         # 1c. Consultas de lista de reproducción (varios animales a la vez, no un tag puntual)
         if re.search(r"\bdias?\s+abiert[oa]s?\b", t):
             m = re.search(r"(\d+)\s*dias?\s+abiert[oa]s?", t) or re.search(r"mas\s+de\s+(\d+)", t)
             umbral = int(m.group(1)) if m else 90
             return self._dias_abiertos_mayor(umbral)
-        if re.search(r"\bpartos?\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
-            if re.search(r"\besta\s+semana\b", t):
-                dias_periodo = 7
-            else:
-                m = re.search(r"ultimos?\s+(\d+)\s+dias", t)
-                dias_periodo = int(m.group(1)) if m else 30
-            return self._partos_periodo(dias_periodo)
+        if re.search(r"\bpartos?\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._partos_periodo(rango[0], rango[1], rango[2])
         if re.search(r"\btern|\bcrias?\b", t) and re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t) and re.search(r"\bcuant[oa]s?\b|\bnaci", t):
             sexo = "macho" if re.search(r"\bmacho", t) else "hembra"
+            rango_crias = self._rango_periodo(t) if re.search(_TIENE_PERIODO, t) else None
+            if rango_crias:
+                return self._crias_por_sexo(sexo, desde=rango_crias[0], hasta=rango_crias[1], etiqueta=rango_crias[2])
             return self._crias_por_sexo(sexo)
         if re.search(r"\bproxim[ao]s?\s+a?\s*parir\b|\bvan\s+a\s+parir\b", t):
             return self._vacas_proximas_parir()
