@@ -192,8 +192,7 @@ class HistorialQueryMixin:
         header.append(f"● <b>Estado:</b> {estado}")
         if estado == "HISTORICO":
             header.append(
-                "⚠️ <i>Histórico: no hace parte del hato activo. Es de un potrero/hacienda "
-                "anterior a la actual y se conserva solo por genealogía.</i>"
+                "⚠️ <i>Histórico: no hace parte del hato activo. Se conserva solo por genealogía.</i>"
             )
         header.extend([
             f"🧬 <b>Reproductivo:</b> {estado_reprod}",
