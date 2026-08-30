@@ -79,6 +79,14 @@ class QueryEngine(
     def responder(self, texto: str) -> str:
         t = normalizar(texto)
         tag = nlu.extraer_tag(texto)
+        # extraer_tag a veces toma una palabra suelta sin dígitos como si fuera
+        # un arete (ej. "semana", "lote", "vendidas") cuando en realidad la
+        # frase es una pregunta agregada, no sobre un animal puntual. Los
+        # aretes reales de esta finca siempre traen un dígito (N065, 47,
+        # JA26...) o son nombres propios de verdad (patricia) — para las
+        # ramas que solo deben activarse SIN un animal puntual, se usa esta
+        # señal más estricta en vez del `tag` crudo.
+        tag_con_digito = bool(tag) and any(c.isdigit() for c in tag)
 
         # 1. Ubicación y potrero del animal (ej. "¿en qué potrero está patricia?", "¿dónde está la vaca 47?")
         if (
@@ -127,7 +135,7 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("SALIDA", rango[0], rango[1], rango[2])
-        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(_TIENE_PERIODO, t) and not tag:
+        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(_TIENE_PERIODO, t) and not tag_con_digito:
             rango = self._rango_periodo(t)
             if rango:
                 return self._muertes_periodo(rango[0], rango[1], rango[2])
@@ -141,7 +149,7 @@ class QueryEngine(
         if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\bcuant|\bhay\b", t):
             sexo_vendido = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
             return self._conteo_por_estado("VENDIDO", sexo=sexo_vendido)
-        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(r"\bcuant|\bhay\b", t) and not tag:
+        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(r"\bcuant|\bhay\b", t) and not tag_con_digito:
             sexo_muerto = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
             return self._conteo_por_estado("MUERTO", sexo=sexo_muerto)
 

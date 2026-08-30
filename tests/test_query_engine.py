@@ -1164,6 +1164,12 @@ def test_muertes_por_periodo(db):
     assert "No entendí" not in resp
     assert "47" in resp and "48" not in resp
 
+    # Regresión: "esta semana" también fallaba porque extraer_tag tomaba la
+    # palabra "semana" (sin dígitos) como si fuera un arete real, y la
+    # condición `and not tag` de la rama bloqueaba la respuesta agregada.
+    resp_semana = qe.responder("animales muertos esta semana")
+    assert "No entendí" not in resp_semana
+
 
 def test_destetes_por_periodo_y_total(db):
     from src.engine.query_engine import QueryEngine
