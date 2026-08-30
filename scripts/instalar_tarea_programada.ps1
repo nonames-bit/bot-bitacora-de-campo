@@ -62,20 +62,40 @@ if ($tareaExistente) {
 $argumentos = "-NoProfile -ExecutionPolicy Bypass -File `"$rutaScript`" -CopiasDir `"$CopiasDir`" -UnaVez"
 $accion = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argumentos -WorkingDirectory (Split-Path $rutaScript -Parent)
 
-# Dispara ya mismo y se repite cada N minutos indefinidamente.
+# Dispara ya mismo y se repite cada N minutos. [TimeSpan]::MaxValue NO sirve
+# aqui: Task Scheduler rechaza esa duracion (genera un XML invalido,
+# "Duration:P99999999DT23H59M59S", y Register-ScheduledTask falla). En su
+# lugar se usa una duracion larga pero valida (10 anios) que en la practica
+# equivale a "para siempre" para este uso.
 $disparador = New-ScheduledTaskTrigger -Once -At (Get-Date) `
     -RepetitionInterval (New-TimeSpan -Minutes $IntervaloMinutos) `
-    -RepetitionDuration ([TimeSpan]::MaxValue)
+    -RepetitionDuration (New-TimeSpan -Days 3650)
 
 $configuracion = New-ScheduledTaskSettingsSet `
     -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -StartWhenAvailable -MultipleInstances IgnoreNew `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
 
-Register-ScheduledTask -TaskName $NombreTarea `
-    -Action $accion -Trigger $disparador -Settings $configuracion `
-    -Description "Revisa cada $IntervaloMinutos minutos si hay un backup nuevo de Software Ganadero en $CopiasDir y lo sube al bot en el VPS." `
-    -Force | Out-Null
+try {
+    Register-ScheduledTask -TaskName $NombreTarea `
+        -Action $accion -Trigger $disparador -Settings $configuracion `
+        -Description "Revisa cada $IntervaloMinutos minutos si hay un backup nuevo de Software Ganadero en $CopiasDir y lo sube al bot en el VPS." `
+        -Force -ErrorAction Stop | Out-Null
+} catch {
+    Write-Host ""
+    Write-Host "[ERROR] No se pudo registrar la tarea: $_" -ForegroundColor Red
+    Write-Host "        La tarea NO quedo instalada. Revisa el mensaje de arriba." -ForegroundColor Red
+    exit 1
+}
+
+# Verificacion real: no confiar en que Register-ScheduledTask no haya
+# lanzado una excepcion -- confirmar que la tarea de verdad existe.
+$tareaCreada = Get-ScheduledTask -TaskName $NombreTarea -ErrorAction SilentlyContinue
+if (-not $tareaCreada) {
+    Write-Host ""
+    Write-Host "[ERROR] La tarea no aparece registrada tras el intento. Algo fallo." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host ""
 Write-Host "[OK] Tarea '$NombreTarea' instalada. Correra sola cada $IntervaloMinutos minutos," -ForegroundColor Green
@@ -87,6 +107,12 @@ Write-Host "Para quitarla:  Unregister-ScheduledTask -TaskName '$NombreTarea' -C
 Write-Host "Log de cada corrida: $CopiasDir\copias_sync.log" -ForegroundColor Cyan
 
 # Dispara una corrida inmediata para no esperar el primer intervalo.
-Start-ScheduledTask -TaskName $NombreTarea
-Write-Host ""
-Write-Host "Corrida inicial disparada. Revisa $CopiasDir\copias_sync.log en unos segundos." -ForegroundColor Green
+try {
+    Start-ScheduledTask -TaskName $NombreTarea -ErrorAction Stop
+    Write-Host ""
+    Write-Host "Corrida inicial disparada. Revisa $CopiasDir\copias_sync.log en unos segundos." -ForegroundColor Green
+} catch {
+    Write-Host ""
+    Write-Host "[AVISO] La tarea quedo instalada pero no se pudo disparar la corrida inicial ($_)." -ForegroundColor Yellow
+    Write-Host "        No es grave: correra sola en el proximo intervalo de $IntervaloMinutos minutos." -ForegroundColor Yellow
+}
