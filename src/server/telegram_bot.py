@@ -1255,13 +1255,13 @@ def construir_application(
                 limite_30d = hoy + timedelta(days=30)
                 filas = db.query(
                     """
-                    SELECT a.tag, a.nombre, s.fecha_estimada_parto, p.nombre AS potrero
+                    SELECT a.tag, a.nombre, s.fep_calculada, p.nombre AS potrero
                     FROM servicios s
                     JOIN animales a ON a.id_animal = s.vaca_id
                     LEFT JOIN potreros p ON p.id = a.potrero_id
-                    WHERE a.estado = 'ACTIVO' AND s.fecha_estimada_parto IS NOT NULL
-                      AND s.fecha_estimada_parto >= ? AND s.fecha_estimada_parto <= ?
-                    ORDER BY s.fecha_estimada_parto ASC
+                    WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL
+                      AND s.fep_calculada >= ? AND s.fep_calculada <= ?
+                    ORDER BY s.fep_calculada ASC
                     """,
                     (hoy.isoformat(), limite_30d.isoformat()),
                 )
@@ -1275,7 +1275,7 @@ def construir_application(
                     botones_vacas = []
                     for r in filas_m:
                         tag_v = r["tag"] or "S/T"
-                        fep = r["fecha_estimada_parto"]
+                        fep = r["fep_calculada"]
                         dias_faltan = (to_date(fep) - hoy).days if to_date(fep) else 0
                         pot = f" · 📍 {r['potrero']}" if r["potrero"] else ""
                         lineas.append(f"• 🐮 <b>{html.escape(str(tag_v))}</b>: FEP {fep} (en {dias_faltan}d){pot}")
