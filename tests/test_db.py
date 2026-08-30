@@ -205,3 +205,16 @@ def test_detectar_duplicados_geneticos_ignora_sin_genealogia(db):
     assert db.detectar_duplicados_geneticos() == []
 
 
+def test_detectar_duplicados_geneticos_ignora_mellizos_reales(db):
+    # Un parto múltiple real (mellizos marcados en notas) no es un duplicado.
+    db.registrar_animal("MADRE1", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("PADRE1", sexo="Macho", estado="ACTIVO")
+    db.registrar_animal("N003", sexo="Hembra", estado="ACTIVO",
+                        madre_tag="MADRE1", padre_tag="PADRE1",
+                        fecha_nacimiento="2024-12-26", notas="GEMELA1")
+    db.registrar_animal("N025", sexo="Hembra", estado="ACTIVO",
+                        madre_tag="MADRE1", padre_tag="PADRE1",
+                        fecha_nacimiento="2024-12-26", notas="GEMELA2")
+    assert db.detectar_duplicados_geneticos() == []
+
+

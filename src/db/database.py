@@ -1,6 +1,7 @@
 """Capa de acceso a datos SQLite para la bitácora de campo zootécnico."""
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import date
 from typing import Optional
@@ -413,12 +414,12 @@ class Database:
         nacimiento importado dos veces bajo tags distintos (ej. 'N065' vs
         'NO65', confusión letra O / dígito 0 al transcribir o en el DBF).
         Requiere madre_id y fecha_nacimiento no nulos para evitar falsos
-        positivos entre animales sin genealogía registrada."""
-        filas = self.query(
+        positivos entre animales sin genealogía registrada. Excluye grupos
+        donde TODOS los animales tienen en sus notas una marca de mellizos
+        (ej. 'GEMELA1'/'GEMELA2'): un parto doble real no es un duplicado."""
+        grupos_raw = self.query(
             """
-            SELECT madre_id, padre_id, fecha_nacimiento,
-                   GROUP_CONCAT(id_animal) AS ids, GROUP_CONCAT(tag) AS tags,
-                   COUNT(*) AS n
+            SELECT madre_id, padre_id, fecha_nacimiento, COUNT(*) AS n
             FROM animales
             WHERE estado = 'ACTIVO' AND madre_id IS NOT NULL AND fecha_nacimiento IS NOT NULL
             GROUP BY madre_id, padre_id, fecha_nacimiento
@@ -426,16 +427,25 @@ class Database:
             ORDER BY fecha_nacimiento DESC
             """
         )
+        patron_mellizos = re.compile(r"gemel|melliz", re.IGNORECASE)
         grupos = []
-        for f in filas:
-            madre = self.get_animal(f["madre_id"])
+        for g in grupos_raw:
+            animales = self.query(
+                "SELECT id_animal, tag, notas FROM animales "
+                "WHERE estado = 'ACTIVO' AND madre_id = ? "
+                "AND (padre_id IS ? ) AND fecha_nacimiento = ?",
+                (g["madre_id"], g["padre_id"], g["fecha_nacimiento"]),
+            )
+            if animales and all(a["notas"] and patron_mellizos.search(a["notas"]) for a in animales):
+                continue  # parto múltiple real (mellizos), no un duplicado
+            madre = self.get_animal(g["madre_id"])
             grupos.append({
-                "madre_id": f["madre_id"],
-                "madre_tag": madre["tag"] if madre else str(f["madre_id"]),
-                "fecha_nacimiento": f["fecha_nacimiento"],
-                "ids": [int(x) for x in f["ids"].split(",")],
-                "tags": f["tags"].split(","),
-                "n": f["n"],
+                "madre_id": g["madre_id"],
+                "madre_tag": madre["tag"] if madre else str(g["madre_id"]),
+                "fecha_nacimiento": g["fecha_nacimiento"],
+                "ids": [a["id_animal"] for a in animales],
+                "tags": [a["tag"] for a in animales],
+                "n": g["n"],
             })
         return grupos
 
