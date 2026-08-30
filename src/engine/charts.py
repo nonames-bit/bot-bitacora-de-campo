@@ -1,5 +1,5 @@
-"""Generación de gráficos (matplotlib) para la ficha del animal y paneles
-generales de la finca.
+"""Generación de gráficos (matplotlib + seaborn) para la ficha del animal y
+paneles generales de la finca.
 
 Opcional por diseño: si matplotlib no está instalado en el entorno, las
 funciones devuelven ``None`` en vez de fallar, para que el resto del bot
@@ -12,10 +12,19 @@ sí captura (servicios + partos), no diagnósticos veterinarios reales (no
 existe todavía un evento de "palpación/confirmación de preñez" ni de "costo
 de tratamiento"). Se etiquetan explícitamente como "(estimado)" en el
 gráfico para no hacerlas pasar por datos que no son.
+
+Convenciones de diseño (todas las funciones las siguen):
+- Título de marca (verde, negrita) + SUBTÍTULO de contexto (gris, chico) con
+  cuántos animales/registros entran en el cálculo, el período analizado y
+  qué significa el indicador -- un gráfico bonito sin esto es fácil de
+  malinterpretar.
+- Solo se etiquetan los puntos que importan para la lectura (mediana, último
+  valor, meta, casos que requieren atención), nunca cada dato individual.
 """
 from __future__ import annotations
 
 import os
+import statistics
 from collections import defaultdict
 from datetime import date, timedelta
 from typing import Optional
@@ -27,13 +36,15 @@ try:
     import matplotlib
     matplotlib.use("Agg")  # backend sin pantalla: obligatorio en servidor/VPS
     import matplotlib.pyplot as plt
+    import seaborn as sns
     _MATPLOTLIB_OK = True
-    # Estilo tipográfico consistente en todos los gráficos del bot (una sola
-    # vez al importar el módulo) -- letras más limpias y legibles que el
-    # default de matplotlib, y consistentes entre sí sin repetir configuración
-    # en cada función.
+    # Tema base (seaborn) + ajustes de marca encima. sns.set_theme configura
+    # rcParams globalmente (grilla clara, tipografía, tamaños) -- una mejora
+    # de calidad visual "gratis" en los ~20 gráficos del bot sin tener que
+    # afinar cada uno a mano. Los ajustes de marca (color de título, etc.) se
+    # aplican después para que no se pierdan.
+    sns.set_theme(style="whitegrid", font="DejaVu Sans")
     plt.rcParams.update({
-        "font.family": "DejaVu Sans",
         "font.size": 10.5,
         "axes.titlesize": 13,
         "axes.titleweight": "bold",
@@ -67,14 +78,44 @@ def graficos_disponibles() -> bool:
 
 def _estilo_ejes(ax) -> None:
     """Aplica un estilo limpio consistente a todos los gráficos del bot."""
-    ax.grid(True, alpha=0.3, linewidth=0.6)
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
+    ax.grid(True, alpha=0.35, linewidth=0.6)
+    sns.despine(ax=ax)
     ax.spines["left"].set_color("#666666")
     ax.spines["bottom"].set_color("#666666")
     ax.set_axisbelow(True)
-    if ax.get_title():
-        ax.set_title(ax.get_title(), color=_COLOR_MARCA, fontweight="bold")
+
+
+def _titulo_y_subtitulo(fig, ax, titulo: str, subtitulo: str = "") -> None:
+    """Título de marca (verde, negrita, arriba de la figura) + subtítulo de
+    contexto (gris, chico, pegado al gráfico): cuántos animales/registros
+    entran, qué período se analizó y qué significa el indicador. Sin esto,
+    un gráfico bien hecho pero sin contexto es fácil de leer mal."""
+    fig.suptitle(titulo, fontsize=13, fontweight="bold", color=_COLOR_MARCA, y=0.98)
+    if subtitulo:
+        ax.set_title(subtitulo, fontsize=8.5, color="#707070", style="italic", pad=8)
+
+
+def _marcar_ultimo_valor(ax, x_ultimo, y_ultimo, texto: Optional[str] = None, color: Optional[str] = None) -> None:
+    """Resalta el último punto de una serie temporal con un marcador y una
+    etiqueta de texto. El "último valor" es uno de los pocos puntos que
+    siempre vale la pena etiquetar (es el estado actual), a diferencia de
+    etiquetar cada dato de la serie."""
+    color = color or _COLOR_MARCA
+    txt = texto if texto is not None else f"{y_ultimo:.1f}"
+    ax.scatter([x_ultimo], [y_ultimo], color=color, s=90, zorder=5, edgecolor="white", linewidth=1.3)
+    ax.annotate(f" {txt}", (x_ultimo, y_ultimo), textcoords="offset points", xytext=(6, 8),
+                fontsize=9, fontweight="bold", color=color)
+
+
+def _marcar_mediana_vertical(ax, valores: list, etiqueta_prefijo: str = "Mediana") -> Optional[float]:
+    """Dibuja una línea vertical punteada en la mediana de `valores` (para
+    gráficos de barras horizontales, ej. rankings) y la devuelve."""
+    if not valores:
+        return None
+    mediana = statistics.median(valores)
+    ax.axvline(mediana, color="#616161", linewidth=1.2, linestyle="--", alpha=0.8,
+               label=f"{etiqueta_prefijo}: {mediana:.1f}")
+    return mediana
 
 
 def _guardar(fig, output_dir: str, nombre_archivo: str) -> str:
@@ -138,6 +179,7 @@ def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
     fig, ax = plt.subplots(figsize=(7, 4.2), dpi=130)
     eje_x = xs if usar_edad else fechas
     ax.plot(eje_x, ys, marker="o", color=_COLOR_LINEA, linewidth=2.2, markersize=6, label="Peso del animal")
+    _marcar_ultimo_valor(ax, eje_x[-1], ys[-1], texto=f"{ys[-1]:.0f} kg")
 
     # Comparación contra el promedio del hato (mismo sexo, edad similar):
     # solo si hay fecha de nacimiento (eje de edad) y suficientes animales
@@ -158,7 +200,9 @@ def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
 
     tag_str = animal["tag"] or str(tag)
     nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
-    ax.set_title(f"Curva de crecimiento — {tag_str}{nombre}")
+    rango = f"{fechas[0].isoformat()} a {fechas[-1].isoformat()}"
+    _titulo_y_subtitulo(fig, ax, f"Curva de Crecimiento — {tag_str}{nombre}",
+                        f"{len(ys)} pesajes · {rango}")
     _estilo_ejes(ax)
     ax.legend(loc="upper left", fontsize=8)
 
@@ -285,6 +329,7 @@ def generar_grafico_lactancia(db, tag, output_dir: str = "data/reportes",
 
     fig, ax = plt.subplots(figsize=(7, 4.2), dpi=130)
     ax.plot(xs, ys, marker="o", color=_COLOR_LINEA, linewidth=2.2, markersize=6, label="Litros/día (individual)")
+    _marcar_ultimo_valor(ax, xs[-1], ys[-1], texto=f"{ys[-1]:.1f} L")
 
     prom = _promedio_leche_hato_por_del(db, aid)
     if prom:
@@ -296,7 +341,8 @@ def generar_grafico_lactancia(db, tag, output_dir: str = "data/reportes",
     ax.set_ylabel("Litros/día")
     tag_str = animal["tag"] or str(tag)
     nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
-    ax.set_title(f"Curva de Lactancia — {tag_str}{nombre}")
+    _titulo_y_subtitulo(fig, ax, f"Curva de Lactancia — {tag_str}{nombre}",
+                        f"{len(xs)} controles de leche · último: día {xs[-1]} de lactancia")
     _estilo_ejes(ax)
     ax.legend(loc="upper right", fontsize=8)
 
@@ -398,11 +444,13 @@ def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "dat
              label="Inventario estimado")
     ax2.set_ylabel("Inventario estimado (total activos)")
     ax2.spines["top"].set_visible(False)
+    ax2.grid(False)
 
     lineas1, etiquetas1 = ax.get_legend_handles_labels()
     lineas2, etiquetas2 = ax2.get_legend_handles_labels()
     ax.legend(lineas1 + lineas2, etiquetas1 + etiquetas2, loc="upper left", fontsize=8, ncol=2)
-    ax.set_title("Evolución del rebaño — Ganadería JA")
+    _titulo_y_subtitulo(fig, ax, "Evolución del Rebaño",
+                        f"{len(etiquetas)} meses · inventario final estimado: {niveles[-1]}")
 
     return _guardar(fig, output_dir, f"grafico_evolucion_rebano_{hoy.isoformat()}.png")
 
@@ -451,7 +499,8 @@ def generar_grafico_categorias(db, output_dir: str = "data/reportes",
         wedgeprops={"linewidth": 1.5, "edgecolor": "white"}, textprops={"fontsize": 9},
     )
     ax.legend(etiquetas, loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=9)
-    ax.set_title(f"Distribución del hato — {total_activos} animales activos")
+    _titulo_y_subtitulo(fig, ax, "Distribución del Hato por Categorías",
+                        f"{total_activos} animales activos al {hoy.isoformat()}")
     ax.axis("equal")
 
     return _guardar(fig, output_dir, f"grafico_categorias_{hoy.isoformat()}.png")
@@ -491,15 +540,24 @@ def generar_grafico_gmd_hato(db, output_dir: str = "data/reportes",
     if len(xs_h) + len(xs_m) < 2:
         return None
 
+    todos_gmd = ys_h + ys_m
+    n_negativos = sum(1 for v in todos_gmd if v < 0)
+    mediana_gmd = statistics.median(todos_gmd)
+
     fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
     if xs_h:
         ax.scatter(xs_h, ys_h, color=_PALETA[0], label="Hembras", alpha=0.75, s=45)
     if xs_m:
         ax.scatter(xs_m, ys_m, color=_PALETA[3], label="Machos", alpha=0.75, s=45)
     ax.axhline(0, color="#616161", linewidth=1, linestyle=":")
+    ax.axhline(mediana_gmd, color=_COLOR_MARCA, linewidth=1.2, linestyle="--", alpha=0.8,
+               label=f"Mediana: {mediana_gmd:.2f} kg/día")
     ax.set_xlabel("Edad al último pesaje (días)")
     ax.set_ylabel("GMD (kg/día)")
-    ax.set_title("Ganancia Media Diaria del hato")
+    subtitulo = f"{len(todos_gmd)} animales con 2+ pesajes"
+    if n_negativos:
+        subtitulo += f" · ⚠️ {n_negativos} con GMD negativa (requieren atención)"
+    _titulo_y_subtitulo(fig, ax, "Ganancia Media Diaria del Hato", subtitulo)
     _estilo_ejes(ax)
     ax.legend(loc="upper right", fontsize=9)
 
@@ -528,8 +586,9 @@ def _calcular_ieps(db) -> list[int]:
 def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
                                 hoy: Optional[date] = None,
                                 umbral_max_dias: Optional[int] = 730) -> Optional[str]:
-    """Boxplot del intervalo entre partos (IEP, en días) de todas las vacas
-    con 2 o más partos, para detectar vacas atípicas (outliers).
+    """Boxplot (con los puntos individuales superpuestos) del intervalo
+    entre partos (IEP, en días) de todas las vacas con 2 o más partos, para
+    detectar vacas atípicas (outliers).
 
     Por defecto excluye intervalos mayores a ``umbral_max_dias`` (2 años):
     en la práctica, un hato con historial importado de años atrás y con
@@ -555,20 +614,21 @@ def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",
     if len(ieps) < 3:
         return None
 
-    fig, ax = plt.subplots(figsize=(6, 5), dpi=130)
-    caja = ax.boxplot(ieps, patch_artist=True, widths=0.4,
-                      flierprops={"marker": "o", "markerfacecolor": _PALETA[3], "markersize": 6})
-    for patch in caja["boxes"]:
-        patch.set_facecolor(_PALETA[0])
-        patch.set_alpha(0.6)
+    mediana = statistics.median(ieps)
+
+    fig, ax = plt.subplots(figsize=(6, 5.5), dpi=130)
+    sns.boxplot(y=ieps, ax=ax, color=_PALETA[0], width=0.35, showfliers=False)
+    sns.stripplot(y=ieps, ax=ax, color=_PALETA[7], alpha=0.6, size=5, jitter=0.12)
     ax.axhline(365, color=_PALETA[2], linewidth=1.4, linestyle="--", label="Meta: 365 días (1 parto/año)")
+    ax.annotate(f"Mediana: {mediana:.0f}d", (0.18, mediana), fontsize=8.5, color=_COLOR_MARCA,
+                fontweight="bold", va="center")
     ax.set_ylabel("Intervalo entre partos (días)")
-    ax.set_xticks([1])
-    ax.set_xticklabels([f"{len(ieps)} intervalo(s) registrado(s)"])
-    titulo = "Intervalo Entre Partos (IEP) — detección de vacas atípicas"
+    ax.set_xticks([])
+
+    subtitulo = f"{len(ieps)} intervalo(s) · vacas con 2+ partos"
     if n_excluidos > 0:
-        titulo += f"\n({n_excluidos} intervalo(s) >{umbral_max_dias}d excluido(s): probable hueco de registro, no dato real)"
-    ax.set_title(titulo, fontsize=11)
+        subtitulo += f" · {n_excluidos} excluido(s) >{umbral_max_dias}d (probable hueco de registro)"
+    _titulo_y_subtitulo(fig, ax, "Intervalo Entre Partos (IEP)", subtitulo)
     _estilo_ejes(ax)
     ax.legend(loc="upper right", fontsize=8)
 
@@ -612,8 +672,9 @@ def generar_grafico_peso_destete_por_raza(db, output_dir: str = "data/reportes",
         ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" n={n}",
                ha="center", va="bottom", fontsize=8, rotation=0)
     ax.set_ylabel("Peso promedio al destete (kg)")
-    ax.set_title("Peso al Destete por Raza")
     ax.tick_params(axis="x", rotation=20, labelsize=9)
+    _titulo_y_subtitulo(fig, ax, "Peso al Destete por Raza",
+                        f"{sum(conteos)} destetes registrados · {len(razas)} raza(s)")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_destete_raza_{hoy.isoformat()}.png")
@@ -657,7 +718,8 @@ def generar_grafico_rendimiento_padre(db, output_dir: str = "data/reportes",
         ax.text(barra.get_width(), barra.get_y() + barra.get_height() / 2, f" n={n}",
                ha="left", va="center", fontsize=8)
     ax.set_xlabel("Peso promedio al nacer de sus crías (kg)")
-    ax.set_title("Rendimiento por Padre/Reproductor")
+    _titulo_y_subtitulo(fig, ax, "Rendimiento por Padre/Reproductor",
+                        f"{sum(conteos)} crías con peso al nacer · {len(padres)} padre(s) con 2+ crías")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_rendimiento_padre_{hoy.isoformat()}.png")
@@ -688,8 +750,9 @@ def generar_grafico_aforo_potreros(db, output_dir: str = "data/reportes",
     fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
     ax.bar(nombres, valores, color=colores)
     ax.set_ylabel("Aforo (kg/m²)")
-    ax.set_title("Aforo de Forraje por Potrero")
     ax.tick_params(axis="x", rotation=30, labelsize=8)
+    _titulo_y_subtitulo(fig, ax, "Aforo de Forraje por Potrero",
+                        f"{len(nombres)} potrero(s) · última medición cargada (no es serie histórica)")
     _estilo_ejes(ax)
 
     parches = [plt.Rectangle((0, 0), 1, 1, color=color_de_pasto[p]) for p in pastos_unicos]
@@ -729,10 +792,12 @@ def generar_grafico_ocupacion_potreros(db, output_dir: str = "data/reportes",
 
     fig, ax = plt.subplots(figsize=(7, max(3.5, 0.4 * len(nombres))), dpi=130)
     ax.barh(nombres, dias_ocup, color=colores)
-    ax.axvline(3, color="#616161", linewidth=1, linestyle=":")
+    ax.axvline(3, color="#616161", linewidth=1, linestyle=":", label="Meta Voisin: ≤3 días")
     ax.set_xlabel("Días de ocupación actual")
-    ax.set_title("Ocupación de Potreros (Rotación Voisin)")
+    _titulo_y_subtitulo(fig, ax, "Ocupación de Potreros (Rotación Voisin)",
+                        f"{len(nombres)} potrero(s) ocupado(s) al {hoy.isoformat()}")
     _estilo_ejes(ax)
+    ax.legend(loc="lower right", fontsize=8)
 
     return _guardar(fig, output_dir, f"grafico_ocupacion_potreros_{hoy.isoformat()}.png")
 
@@ -795,7 +860,8 @@ def generar_grafico_prenadas_vacias_potrero(db, output_dir: str = "data/reportes
     for i, tot in enumerate(totales):
         ax.text(prenadas[i] + vacias[i], i, f"  potrero: {tot} animales en total", va="center", fontsize=8)
     ax.set_xlabel("Hembras en edad reproductiva")
-    ax.set_title("Preñadas vs Vacías por Potrero (estimado)")
+    _titulo_y_subtitulo(fig, ax, "Preñadas vs Vacías por Potrero",
+                        f"al {hoy.isoformat()} · estimado por servicio sin parto posterior")
     _estilo_ejes(ax)
     ax.legend(loc="lower right", fontsize=8)
 
@@ -858,7 +924,8 @@ def generar_grafico_waterfall_inventario(db, meses: int = 12, output_dir: str = 
     ax.set_xticks(range(n))
     ax.set_xticklabels(categorias, fontsize=8)
     ax.set_ylabel("Inventario estimado (total activos)")
-    ax.set_title("Waterfall de Inventario Mensual")
+    _titulo_y_subtitulo(fig, ax, "Waterfall de Inventario Mensual",
+                        f"{len(etiquetas)} meses · nacimientos + compras − muertes − ventas (estimado)")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_waterfall_inventario_{hoy.isoformat()}.png")
@@ -938,17 +1005,28 @@ def generar_grafico_dias_abiertos_km(db, output_dir: str = "data/reportes",
     tiempos, supervivencia = _kaplan_meier(observaciones)
     porcentajes = [s * 100 for s in supervivencia]
 
+    # Días donde la curva cruza el 50% (mediana de días abiertos "vencidos"):
+    # el primer tiempo en el que menos de la mitad del hato sigue abierta.
+    mediana_dias = None
+    for t, p in zip(tiempos, porcentajes):
+        if p <= 50:
+            mediana_dias = t
+            break
+
     fig, ax = plt.subplots(figsize=(8, 5), dpi=130)
     ax.step(tiempos, porcentajes, where="post", color=_PALETA[3], linewidth=2.3)
     ax.fill_between(tiempos, porcentajes, step="post", color=_PALETA[3], alpha=0.12)
     ax.axhline(50, color="#9e9e9e", linewidth=1, linestyle=":")
+    if mediana_dias is not None:
+        ax.axvline(mediana_dias, color=_COLOR_MARCA, linewidth=1.2, linestyle="--")
+        ax.annotate(f"Mediana: {mediana_dias}d", (mediana_dias, 52), fontsize=8.5,
+                    color=_COLOR_MARCA, fontweight="bold")
     ax.set_xlabel("Días posparto")
     ax.set_ylabel("% de vacas aún sin servicio posterior")
     ax.set_ylim(0, 105)
-    ax.set_title("Días Abiertos — Curva de Kaplan-Meier")
+    _titulo_y_subtitulo(fig, ax, "Días Abiertos — Curva de Kaplan-Meier",
+                        f"n={len(observaciones)} intervalo(s) posparto · evento = siguiente servicio registrado")
     _estilo_ejes(ax)
-    ax.text(0.98, 0.95, f"n = {len(observaciones)} intervalo(s) posparto",
-            transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666666")
 
     return _guardar(fig, output_dir, f"grafico_dias_abiertos_km_{hoy.isoformat()}.png")
 
@@ -994,9 +1072,13 @@ def generar_grafico_leche_total_hato(db, semanas: int = 12, output_dir: str = "d
 
     fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
     ax.bar(etiquetas, litros, color=_PALETA[0])
+    ax.text(len(etiquetas) - 1, litros[-1], f" {litros[-1]:.0f} L", ha="left", va="bottom",
+            fontsize=9, fontweight="bold", color=_COLOR_MARCA)
     ax.set_ylabel("Litros totales por semana")
-    ax.set_title("Producción Total de Leche del Hato")
     ax.tick_params(axis="x", rotation=45, labelsize=8)
+    n_vacas_total = len({v for s in por_semana.values() for v in s["vacas"]})
+    _titulo_y_subtitulo(fig, ax, "Producción Total de Leche del Hato",
+                        f"{len(semanas_ordenadas)} semanas · {n_vacas_total} vaca(s) con controles")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_leche_total_{hoy.isoformat()}.png")
@@ -1028,9 +1110,11 @@ def generar_grafico_eficiencia_lechera(db, semanas: int = 12, output_dir: str = 
 
     fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
     ax.plot(etiquetas, eficiencia, marker="o", color=_PALETA[2], linewidth=2.2, markersize=6)
+    _marcar_ultimo_valor(ax, len(etiquetas) - 1, eficiencia[-1], texto=f"{eficiencia[-1]:.1f} L/vaca/día")
     ax.set_ylabel("Litros / vaca en ordeño / día")
-    ax.set_title("Eficiencia Lechera del Hato")
     ax.tick_params(axis="x", rotation=45, labelsize=8)
+    _titulo_y_subtitulo(fig, ax, "Eficiencia Lechera del Hato",
+                        f"{len(eficiencia)} semanas · litros totales ÷ vacas con control ÷ 7 días")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_eficiencia_lechera_{hoy.isoformat()}.png")
@@ -1080,9 +1164,12 @@ def generar_grafico_ranking_vacas_leche(db, output_dir: str = "data/reportes",
 
     fig, ax = plt.subplots(figsize=(8, max(3.5, 0.35 * n)), dpi=130)
     ax.barh(list(reversed(etiquetas)), list(reversed(valores)), color=list(reversed(colores)))
+    _marcar_mediana_vertical(ax, valores)
     ax.set_xlabel("Promedio de litros por control")
-    ax.set_title("Ranking de Vacas por Producción de Leche")
+    _titulo_y_subtitulo(fig, ax, "Ranking de Vacas por Producción de Leche",
+                        f"{n} vaca(s) con controles registrados · verde = mejor tercio, rojo = revisar/descartar")
     _estilo_ejes(ax)
+    ax.legend(loc="lower right", fontsize=8)
 
     return _guardar(fig, output_dir, f"grafico_ranking_leche_{hoy.isoformat()}.png")
 
@@ -1125,6 +1212,7 @@ def generar_grafico_estado_reproductivo_hato(db, output_dir: str = "data/reporte
     if expuestas == 0:
         return None
     tasa = n_prenadas / expuestas * 100
+    total_hembras = expuestas + n_nunca_servidas
 
     categorias = ["Preñadas\n(estimado)", "Vacías\n(servidas)", "Nunca\nservidas"]
     valores = [n_prenadas, n_vacias_servidas, n_nunca_servidas]
@@ -1137,7 +1225,8 @@ def generar_grafico_estado_reproductivo_hato(db, output_dir: str = "data/reporte
         ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" {v}",
                 ha="center", va="bottom", fontsize=10)
     ax.set_ylabel("Hembras en edad reproductiva")
-    ax.set_title("Estado Reproductivo del Hato")
+    _titulo_y_subtitulo(fig, ax, "Estado Reproductivo del Hato",
+                        f"{total_hembras} hembras activas ≥1 año al {hoy.isoformat()}")
     _estilo_ejes(ax)
     ax.text(0.98, 0.95, f"Tasa de preñez (sobre expuestas): {tasa:.0f}%",
             transform=ax.transAxes, ha="right", va="top", fontsize=9,
@@ -1209,7 +1298,8 @@ def generar_grafico_carga_animal_potrero(db, output_dir: str = "data/reportes",
     fig, ax = plt.subplots(figsize=(8, max(3.5, 0.4 * len(nombres))), dpi=130)
     ax.barh(nombres, cargas, color=colores)
     ax.set_xlabel("Carga animal (UGG/ha, estimado)")
-    ax.set_title("Carga Animal por Potrero")
+    _titulo_y_subtitulo(fig, ax, "Carga Animal por Potrero",
+                        f"{len(nombres)} potrero(s) · UGG = peso vivo/450kg (o estimado por edad)")
     _estilo_ejes(ax)
 
     return _guardar(fig, output_dir, f"grafico_carga_animal_{hoy.isoformat()}.png")
