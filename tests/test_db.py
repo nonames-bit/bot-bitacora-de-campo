@@ -178,6 +178,22 @@ def test_marcar_historicos_sg(db):
     assert h_nuevo["estado"] == "ACTIVO"
 
 
+def test_registrar_movimiento_es_idempotente(db):
+    """Regresión: JA457 quedó con dos filas VENTA idénticas en producción
+    (doble envío/reintento) porque registrar_movimiento insertaba sin
+    verificar duplicados, a diferencia del resto de registrar_* con dedup
+    natural. Ahora una segunda llamada con los mismos datos no duplica."""
+    id1 = db.registrar_movimiento("47", fecha="2026-08-27", tipo_movimiento="VENTA", precio=1000)
+    id2 = db.registrar_movimiento("47", fecha="2026-08-27", tipo_movimiento="VENTA", precio=1000)
+    assert id1 == id2
+    filas = db.query("SELECT * FROM movimientos WHERE animal_id = (SELECT id_animal FROM animales WHERE tag='47')")
+    assert len(filas) == 1
+
+    # Un movimiento distinto (otro tipo, u otra fecha) sí debe crear una fila nueva.
+    id3 = db.registrar_movimiento("47", fecha="2026-08-27", tipo_movimiento="COMPRA", precio=1000)
+    assert id3 != id1
+
+
 def test_detectar_duplicados_geneticos(db):
     db.registrar_animal("MADRE1", sexo="Hembra", estado="ACTIVO")
     db.registrar_animal("PADRE1", sexo="Macho", estado="ACTIVO")

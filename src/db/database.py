@@ -303,8 +303,18 @@ class Database:
     def registrar_movimiento(self, animal_tag, fecha=None, tipo_movimiento=None,
                              procedencia_destino=None, precio=None, notas=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
+        f = iso(fecha)
+        # Idempotente por (animal_id, fecha, tipo_movimiento): un animal no se
+        # vende/compra dos veces el mismo día, así que una nota repetida
+        # (doble envío, reintento de red) no debe duplicar el movimiento.
+        existente = self.query_one(
+            "SELECT id FROM movimientos WHERE animal_id = ? AND fecha = ? AND tipo_movimiento = ?",
+            (animal_id, f, tipo_movimiento),
+        )
+        if existente:
+            return existente["id"]
         return self.insert("movimientos", dict(
-            animal_id=animal_id, fecha=iso(fecha), tipo_movimiento=tipo_movimiento,
+            animal_id=animal_id, fecha=f, tipo_movimiento=tipo_movimiento,
             procedencia_destino=procedencia_destino, precio=precio, notas=notas,
         ))
 
