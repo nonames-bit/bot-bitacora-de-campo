@@ -189,8 +189,13 @@ class HistorialQueryMixin:
         if f_nac:
             edad_str = formatear_edad_zootecnica(f_nac, self.hoy)
             header.append(f"🎂 <b>Edad:</b> {edad_str}")
+        header.append(f"● <b>Estado:</b> {estado}")
+        if estado == "HISTORICO":
+            header.append(
+                "⚠️ <i>Histórico: no hace parte del hato activo. Es de un potrero/hacienda "
+                "anterior a la actual y se conserva solo por genealogía.</i>"
+            )
         header.extend([
-            f"● <b>Estado:</b> {estado}",
             f"🧬 <b>Reproductivo:</b> {estado_reprod}",
             "───────────────────",
         ])

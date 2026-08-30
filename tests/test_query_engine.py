@@ -51,6 +51,24 @@ def test_historial(qe):
     assert "Días Abiertos" in resp
 
 
+def test_historial_animal_historico_explica_por_que(db):
+    # Reportado directamente: la ficha mostraba "Estado: HISTORICO" sin
+    # ninguna explicación, y el usuario no entendía qué significaba ni por
+    # qué ese animal ya no aparecía en su inventario activo.
+    db.registrar_animal("JA146", nombre="TANGUITA", sexo="Hembra", estado="HISTORICO")
+    qe = QueryEngine(db, hoy=HOY)
+    resp = qe.responder("ja146")
+    assert "HISTORICO" in resp
+    assert "no hace parte del hato activo" in resp
+
+
+def test_historial_animal_activo_no_muestra_nota_historico(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    qe = QueryEngine(db, hoy=HOY)
+    resp = qe.responder("47")
+    assert "no hace parte del hato activo" not in resp
+
+
 def test_historial_cria_numerada_como_madre_guion_n_no_abre_ficha_madre(db):
     # Regresión real: convención de la finca de numerar crías como
     # "arete_madre-n" (ej. JA26-6). Antes del fix, "consulta ja26-6" abría
