@@ -1023,6 +1023,60 @@ def test_conteo_por_estado_vendidos_muertos(db):
     assert "1" in resp_m
 
 
+def test_potrero_mencionado_sin_palabra_potrero(db):
+    """Regresión: 'donde olegario' / 'en el corral santa martha' caían en el
+    resumen general porque extraer_nombre_potrero exige la palabra 'potrero'
+    y el matcher exacto exigía el nombre completo con sufijo (I/1)."""
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("OLEGARIO I", "01")
+    p2 = db.registrar_potrero("CORRAL SANTAMART", "02")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO", potrero=p2)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp1 = qe.responder("cuantos animales hay donde olegario")
+    assert "47" in resp1 and "Resumen General" not in resp1
+
+    resp2 = qe.responder("cuantos animales hay en el corral santa martha")
+    assert "48" in resp2 and "Resumen General" not in resp2
+
+    # Sin mención de potrero, debe seguir cayendo en el resumen general.
+    resp3 = qe.responder("total animales")
+    assert "Resumen General" in resp3
+
+    # La combinación categoría + potrero sigue teniendo prioridad sobre el
+    # match genérico de nombre de potrero (no debe perder el filtro).
+    db.registrar_parto("47", fecha="2026-08-01")
+    resp4 = qe.responder("vacas paridas que estan en el potrero olegario 1")
+    assert "Vacas paridas" in resp4
+
+
+def test_conteo_vendidos_tolera_typo_y_verbo(db):
+    """Regresión: 'cuantoa' (typo de 'cuantos') y 'vendieron' (verbo, no solo
+    el adjetivo 'vendidos') no eran reconocidos."""
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="VENDIDO")
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    for pregunta in ["cuantoa animales vendieron este mes", "cuantos animales vendieron",
+                      "cuantoa animales hay de 2 anos"]:
+        resp = qe.responder(pregunta)
+        assert "No entendí" not in resp
+
+
+def test_movimientos_venta_periodo(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="VENDIDO")
+    db.registrar_movimiento("47", fecha="2026-08-15", tipo_movimiento="VENTA", precio=1500000)
+    db.registrar_animal("48", sexo="Hembra", estado="VENDIDO")
+    db.registrar_movimiento("48", fecha="2026-01-01", tipo_movimiento="VENTA", precio=1200000)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantos animales vendieron este mes")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "48" not in resp
+
+
 def test_lote_ocupacion(db):
     from src.engine.query_engine import QueryEngine
     p1 = db.registrar_potrero("BAJO", "01")

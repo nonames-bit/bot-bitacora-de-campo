@@ -1,7 +1,7 @@
 """Mixin de consultas de inventario general, por categoría, pesaje y fotos."""
 from __future__ import annotations
 
-from ...utils import to_date
+from ...utils import add_days, iso, to_date
 from ..growth_engine import gmd
 from .helpers import _fmt_es_co, calcular_brackets_inventario_sg, generar_resumen_inventario_sg
 
@@ -160,6 +160,30 @@ class InventarioQueryMixin:
             sujeto, etiqueta = "Animales", etiquetas_m.get(estado_norm, estado_norm.lower())
         emoji = {"VENDIDO": "💰", "MUERTO": "⚰️"}.get(estado_norm, "📊")
         return f"{emoji} {sujeto} {etiqueta}: <b>{_fmt_es_co(n)}</b>."
+
+    def _movimientos_periodo(self, tipo_movimiento: str, dias: int) -> str:
+        """Cuenta movimientos (VENTA/COMPRA/SALIDA/ENTRADA) registrados por el
+        bot en los últimos N días. Solo cubre movimientos dictados al bot
+        (tienen fecha real); el histórico importado de SG solo marca
+        estado VENDIDO/MUERTO sin fecha, así que no se puede acotar por
+        periodo — para el total histórico sin fecha use _conteo_por_estado."""
+        desde = iso(add_days(self.hoy, -dias))
+        filas = self.db.query(
+            "SELECT m.*, a.tag FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id "
+            "WHERE UPPER(m.tipo_movimiento) = ? AND m.fecha >= ? ORDER BY m.fecha DESC",
+            (tipo_movimiento.upper(), desde),
+        )
+        etiquetas = {"VENTA": "vendidos", "COMPRA": "comprados", "SALIDA": "de salida", "ENTRADA": "de entrada"}
+        etiqueta = etiquetas.get(tipo_movimiento.upper(), tipo_movimiento.lower())
+        if not filas:
+            return f"No hay animales {etiqueta} registrados en los últimos {dias} días (según movimientos dictados al bot)."
+        lineas = [f"💰 <b>Animales {etiqueta} en los últimos {dias} días ({len(filas)}):</b>"]
+        for f in filas[:15]:
+            precio_str = f" · ${_fmt_es_co(f['precio'])}" if f["precio"] else ""
+            lineas.append(f"• {f['fecha']} — {f['tag']}{precio_str}")
+        if len(filas) > 15:
+            lineas.append(f"<i>... y {len(filas) - 15} más.</i>")
+        return "\n".join(lineas)
 
     def _fotos(self, tag) -> str:
         if not tag:

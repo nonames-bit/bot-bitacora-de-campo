@@ -64,9 +64,11 @@ class QueryEngine(
         if tag and re.search(r"\b(?:cuando\s+se\s+movi[oó]|cuando\s+se\s+traslad[oó]|cuando\s+se\s+cambi[oó]|cuando\s+fue\s+el\s+traslado|cuando\s+entr[oó]|traslados?|movimientos?)\b", t):
             return self._ultimo_traslado(tag)
 
-        # 1c-bis. Conteos de inventario por edad exacta o por estado (vendidos/muertos)
+        # 1c-bis. Conteos de inventario por edad exacta o por estado (vendidos/muertos).
+        # "cuant" (sin exigir la palabra completa) para tolerar errores de dictado
+        # por voz como "cuantoa" en vez de "cuantos".
         m_edad = re.search(r"\b(\d+)\s*a[nñ]os?\b", t)
-        if m_edad and re.search(r"\bcuant[oa]s?\b|\bhay\b", t) and not re.search(r"\bdias?\s+abiert", t):
+        if m_edad and re.search(r"\bcuant|\bhay\b", t) and not re.search(r"\bdias?\s+abiert", t):
             anios = int(m_edad.group(1))
             sexo_edad = None
             if re.search(r"\bvacas?\b|\bhembras?\b", t):
@@ -74,10 +76,29 @@ class QueryEngine(
             elif re.search(r"\btoros?\b|\bmachos?\b", t):
                 sexo_edad = "macho"
             return self._inventario_por_edad(anios, sexo=sexo_edad)
-        if re.search(r"\bvendid[oa]s?\b", t) and re.search(r"\bcuant[oa]s?\b|\bhay\b", t):
+
+        # Ventas/compras acotadas a un periodo (ej. "vendieron este mes") usan
+        # la tabla movimientos (con fecha real); van antes del conteo histórico
+        # sin fecha para no perder el filtro de tiempo.
+        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
+            if re.search(r"\besta\s+semana\b", t):
+                dias_venta = 7
+            else:
+                m_dv = re.search(r"ultimos?\s+(\d+)\s+dias", t)
+                dias_venta = int(m_dv.group(1)) if m_dv else 30
+            return self._movimientos_periodo("VENTA", dias_venta)
+        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b", t) and re.search(r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b", t):
+            if re.search(r"\besta\s+semana\b", t):
+                dias_compra = 7
+            else:
+                m_dc = re.search(r"ultimos?\s+(\d+)\s+dias", t)
+                dias_compra = int(m_dc.group(1)) if m_dc else 30
+            return self._movimientos_periodo("COMPRA", dias_compra)
+
+        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\bcuant|\bhay\b", t):
             sexo_vendido = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
             return self._conteo_por_estado("VENDIDO", sexo=sexo_vendido)
-        if re.search(r"\bmuert[oa]s?\b", t) and re.search(r"\bcuant[oa]s?\b|\bhay\b", t) and not tag:
+        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(r"\bcuant|\bhay\b", t) and not tag:
             sexo_muerto = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
             return self._conteo_por_estado("MUERTO", sexo=sexo_muerto)
 
@@ -168,6 +189,29 @@ class QueryEngine(
         ):
             return self._inventario_potreros(formato_sg=True)
 
+        # Consultas combinadas: categoría + potrero en una sola pregunta
+        # (ej. "vacas paridas que están en el potrero olegario 1"). Va antes
+        # de la sección 8 para que la categoría no se pierda.
+        if re.search(r"\bpotrero", t):
+            categorias_combo = None
+            for palabra, categorias in self.CATEGORIAS_FILTRO.items():
+                if re.search(rf"\b{re.escape(palabra)}\b", t):
+                    categorias_combo = categorias
+                    break
+            if categorias_combo:
+                nom_pot_combo = extraer_nombre_potrero(texto)
+                if nom_pot_combo:
+                    return self._animales_en_potrero(nom_pot_combo, categorias_filtro=categorias_combo)
+
+        # Nombre de potrero mencionado sin decir la palabra "potrero" delante
+        # (ej. "cuántos animales hay donde olegario", "...en el corral santa
+        # martha"). También antes de la sección 8: si no, "cuántos animales..."
+        # siempre gana y muestra el resumen general en vez del potrero pedido.
+        if re.search(r"\b(?:cuant[oa]s?|hay|donde|estan?|est[aá]n)\b", t):
+            campo_pot_temprano = self._potrero_mencionado(t)
+            if campo_pot_temprano:
+                return self._animales_en_potrero(campo_pot_temprano)
+
         # 8. Inventario / conteos (consultas diarias: total ganado, total vacas, novillas, inventario potreros) — incluye typo gaando
         if re.search(r"\b(?:total|totales|inventario|cuantos?|cuantas?|cuanto)\b", t) or re.search(r"\bganad", t) or re.search(r"\bga+ndo\b", t):
             # inventario por potrero tiene prioridad si menciona potrero
@@ -191,18 +235,6 @@ class QueryEngine(
             # fallback para "total ganado" con typo gaando / ga+ndo
             if re.search(r"\bga+ndo\b", t) or re.search(r"\bga+n?ado\b", t):
                 return self._inventario_general()
-        # Consultas combinadas: categoría + potrero en una sola pregunta
-        # (ej. "vacas paridas que están en el potrero olegario 1")
-        if re.search(r"\bpotrero", t):
-            categorias_combo = None
-            for palabra, categorias in self.CATEGORIAS_FILTRO.items():
-                if re.search(rf"\b{re.escape(palabra)}\b", t):
-                    categorias_combo = categorias
-                    break
-            if categorias_combo:
-                nom_pot_combo = extraer_nombre_potrero(texto)
-                if nom_pot_combo:
-                    return self._animales_en_potrero(nom_pot_combo, categorias_filtro=categorias_combo)
 
         if re.search(r"\bpotrero", t) and re.search(r"\bvac[ií]os?\b", t):
             return self._inventario_potreros(mostrar_vacios=True)
@@ -225,15 +257,9 @@ class QueryEngine(
 
         # Fallback: consulta por nombre de potrero sin la palabra "potrero" (ej. "cuantos hay en olegario 1")
         if re.search(r"\b(?:que\s+vacas?|que\s+animales?|cuantas?|cuantos?|hay|estan?|est[aá]n|listar|mostrar)\b", t):
-            potreros = self.db.query("SELECT nombre, codigo FROM potreros")
-            for p in potreros:
-                for campo in (p["nombre"], p["codigo"]):
-                    if not campo:
-                        continue
-                    for var in _potrero_variantes(normalizar(campo)):
-                        # Coincidencia de palabra completa para evitar que código '06' matchee dentro de 'n069'
-                        if var and re.search(rf"\b{re.escape(var)}\b", t):
-                            return self._animales_en_potrero(campo)
+            campo_pot = self._potrero_mencionado(t)
+            if campo_pot:
+                return self._animales_en_potrero(campo_pot)
 
         # Si el mensaje es solo el nombre exacto de un potrero (ej. "olegario 1" o "olegario 1?" )
         if len(t.split()) <= 3:
@@ -254,6 +280,43 @@ class QueryEngine(
             return self._historial(tag)
         _registrar_consulta_sin_entender(texto)
         return self._ayuda(texto)
+
+    _PALABRAS_GENERICAS_POTRERO = {"potrero", "potreros", "corral", "lote", "del", "los", "las"}
+
+    def _potrero_mencionado(self, t: str) -> str | None:
+        """Busca si el texto normalizado menciona el nombre o código de un
+        potrero registrado, sin exigir la palabra 'potrero' delante ni el
+        nombre completo (ej. 'donde olegario' -> OLEGARIO I, 'en el corral
+        santa martha' -> CORRAL SANTAMART, aunque el dato en SG venga
+        abreviado/truncado)."""
+        palabras_texto = [w for w in t.split() if len(w) >= 4]
+        if not palabras_texto:
+            return None
+        potreros = self.db.query("SELECT nombre, codigo FROM potreros")
+        mejor_campo = None
+        mejor_score = 0.0
+        for p in potreros:
+            for campo in (p["nombre"], p["codigo"]):
+                if not campo:
+                    continue
+                campo_norm = normalizar(campo).strip()
+                for var in _potrero_variantes(campo_norm):
+                    if var and re.search(rf"\b{re.escape(var)}\b", t):
+                        return campo  # coincidencia exacta del nombre completo: no hace falta seguir buscando
+
+                palabras_pot = [w for w in campo_norm.split() if w not in self._PALABRAS_GENERICAS_POTRERO and len(w) >= 5]
+                if not palabras_pot:
+                    continue
+                coincidencias = sum(
+                    1 for w in palabras_pot
+                    if any(w in wt or wt in w for wt in palabras_texto)
+                )
+                if coincidencias == 0:
+                    continue
+                score = coincidencias / len(palabras_pot)
+                if score > mejor_score:
+                    mejor_campo, mejor_score = campo, score
+        return mejor_campo if mejor_score >= 0.5 else None
 
     def _ayuda(self, texto: str = "") -> str:
         t = texto.strip() if texto else ""
