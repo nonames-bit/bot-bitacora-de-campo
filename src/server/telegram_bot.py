@@ -60,6 +60,7 @@ from .formatters import (
     formatear_sanidad_animal_tab,
     formatear_status,
     formatear_tablero_finca,
+    formatear_ultimos_registros,
     formatear_usuarios,
     guardar_backup_pendiente,
     obtener_backup_pendiente,
@@ -162,7 +163,7 @@ def construir_application(
                 return
             bot_engine = Bot(db)
             raw_text = update.message.text
-            respuesta = bot_engine.procesar_texto(raw_text)
+            respuesta = bot_engine.procesar_texto(raw_text, user_id=user_id)
 
             # Fallback inteligente con botones interactivos
             if (
@@ -249,7 +250,7 @@ def construir_application(
                 transcript = transcribe_audio(dest_path)
                 texto_audio = transcript.texto.strip()
                 if texto_audio:
-                    resp_evento = bot_engine.procesar_texto(texto_audio)
+                    resp_evento = bot_engine.procesar_texto(texto_audio, user_id=user_id)
                     await update.message.reply_text(
                         f"🎤 Audio transcrito:\n«{texto_audio}»\n\n{resp_evento}"
                     )
@@ -333,7 +334,7 @@ def construir_application(
             # Si el caption o OCR contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
             if texto_consolidado and nlu.clasificar(texto_consolidado) is not None:
                 bot_engine = Bot(db)
-                resp_evento = bot_engine.procesar_texto(texto_consolidado)
+                resp_evento = bot_engine.procesar_texto(texto_consolidado, user_id=user_id)
                 await update.message.reply_text(
                     f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
                 )
@@ -465,6 +466,102 @@ def construir_application(
             await update.message.reply_text(msg, parse_mode="HTML")
         except Exception as e:
             logger.error("Error en cmd_duplicados: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_ultimos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            filas = db.ultimos_registros(15)
+            msg = formatear_ultimos_registros(filas, auth=auth)
+            await update.message.reply_text(msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error("Error en cmd_ultimos: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_deshacer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            if not context.args or len(context.args) < 2:
+                await update.message.reply_text(
+                    "Uso: /deshacer <tabla> <id> (ver /ultimos para los comandos exactos)."
+                )
+                return
+            tabla, id_txt = context.args[0], context.args[1]
+            try:
+                id_registro = int(id_txt)
+            except ValueError:
+                await update.message.reply_text("El id debe ser un número. Revisa /ultimos.")
+                return
+
+            detalle = db.detalle_registro(tabla, id_registro)
+            if detalle is None:
+                await update.message.reply_text(
+                    "⚠️ No encontré ese registro (o la tabla no es válida). Revisa /ultimos."
+                )
+                return
+
+            context.user_data["deshacer_pendiente"] = {"tabla": tabla, "id": id_registro}
+            await update.message.reply_text(
+                f"⚠️ Vas a borrar definitivamente:\n\n<b>{detalle['resumen']}</b>\n"
+                f"Fecha: {detalle['fecha']}\n\n"
+                "Esto NO se puede deshacer desde el chat. Responde /confirmar_deshacer para borrarlo "
+                "o /cancelar_deshacer para dejarlo como está.",
+                parse_mode="HTML",
+            )
+        except Exception as e:
+            logger.error("Error en cmd_deshacer: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_confirmar_deshacer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            pendiente = context.user_data.get("deshacer_pendiente")
+            if not pendiente:
+                await update.message.reply_text("⚠️ No hay ningún /deshacer pendiente de confirmar.")
+                return
+            ok = db.eliminar_registro(pendiente["tabla"], pendiente["id"])
+            context.user_data.pop("deshacer_pendiente", None)
+            if ok:
+                await update.message.reply_text("🗑️ Registro eliminado.")
+            else:
+                await update.message.reply_text("⚠️ Ese registro ya no existía (quizás borrado desde otro chat).")
+        except Exception as e:
+            logger.error("Error en cmd_confirmar_deshacer: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_cancelar_deshacer(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            if context.user_data.pop("deshacer_pendiente", None):
+                await update.message.reply_text("✅ Cancelado. No se borró nada.")
+            else:
+                await update.message.reply_text("No había ningún /deshacer pendiente.")
+        except Exception as e:
+            logger.error("Error en cmd_cancelar_deshacer: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1968,6 +2065,10 @@ def construir_application(
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
     app.add_handler(CommandHandler(["duplicados", "duplicados_geneticos"], cmd_duplicados))
+    app.add_handler(CommandHandler(["ultimos", "ultimos_registros"], cmd_ultimos))
+    app.add_handler(CommandHandler("deshacer", cmd_deshacer))
+    app.add_handler(CommandHandler("confirmar_deshacer", cmd_confirmar_deshacer))
+    app.add_handler(CommandHandler("cancelar_deshacer", cmd_cancelar_deshacer))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))

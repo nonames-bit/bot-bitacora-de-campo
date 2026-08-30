@@ -691,6 +691,28 @@ def test_formatear_duplicados_geneticos(db):
     assert "2024-11-01" in resp
 
 
+def test_formatear_ultimos_registros_vacio_y_con_datos(db):
+    from src.server.formatters import formatear_ultimos_registros
+
+    assert "No hay eventos" in formatear_ultimos_registros([])
+
+    db.registrar_muerte("47", fecha="2026-08-20", causa_presunta="culebra", registrado_por=999)
+    filas = db.ultimos_registros(5)
+    resp = formatear_ultimos_registros(filas)
+    assert "/deshacer muertes" in resp
+    assert "47" in resp
+    assert "Muerte" in resp
+
+
+def test_comandos_deshacer_registrados():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler(["ultimos", "ultimos_registros"], cmd_ultimos)' in content
+    assert 'CommandHandler("deshacer", cmd_deshacer)' in content
+    assert 'CommandHandler("confirmar_deshacer", cmd_confirmar_deshacer)' in content
+    assert 'CommandHandler("cancelar_deshacer", cmd_cancelar_deshacer)' in content
+
+
 def test_existencias_potreros_nota_animales_sin_potrero(db):
     """Un animal ACTIVO sin potrero resoluble debe explicarse en la tabla, no
     desaparecer en silencio haciendo que el total no cuadre con el general."""

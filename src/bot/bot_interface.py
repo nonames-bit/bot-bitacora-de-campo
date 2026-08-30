@@ -29,7 +29,7 @@ class Bot:
     # ------------------------------------------------------------------ #
     # Entradas
     # ------------------------------------------------------------------ #
-    def procesar_texto(self, texto: str) -> str:
+    def procesar_texto(self, texto: str, user_id: Optional[int] = None) -> str:
         resultado = self.parser.parse(texto)
         eventos = resultado if isinstance(resultado, list) else [resultado]
 
@@ -42,7 +42,7 @@ class Bot:
                     return "No pude interpretar ese mensaje. Intente una nota como " \
                            "'pario la 47, ternero macho' o una pregunta."
             else:
-                self._registrar(ev)
+                self._registrar(ev, user_id)
                 self._generar_alertas(ev)
                 respuestas.append(self._confirmacion(ev))
 
@@ -51,12 +51,12 @@ class Bot:
                    "'pario la 47, ternero macho' o una pregunta."
         return "\n".join(respuestas)
 
-    def procesar_audio(self, audio_path: str) -> str:
+    def procesar_audio(self, audio_path: str, user_id: Optional[int] = None) -> str:
         try:
             transcript = transcribe_audio(audio_path)
         except MediaError as e:
             return f"No se pudo transcribir el audio: {e}"
-        return self.procesar_texto(transcript.texto)
+        return self.procesar_texto(transcript.texto, user_id=user_id)
 
     def procesar_imagen(self, image_path: str, caption: Optional[str] = None,
                         animal_tag: Optional[str] = None, user_id: Optional[int] = None) -> str:
@@ -100,18 +100,20 @@ class Bot:
     # ------------------------------------------------------------------ #
     # Registro de eventos en SQLite
     # ------------------------------------------------------------------ #
-    def _registrar(self, ev: ParsedEvent) -> None:
+    def _registrar(self, ev: ParsedEvent, user_id: Optional[int] = None) -> None:
         d = ev.datos
         if ev.tipo == "parto":
             self.db.registrar_parto(
                 vaca_tag=ev.animal_tag, fecha=ev.fecha,
                 sexo_cria=d.get("sexo_cria"), estado_cria=d.get("estado_cria", "VIVO"),
                 peso_nacimiento=d.get("peso_nacimiento"), id_cria_tag=d.get("id_cria"),
+                registrado_por=user_id,
             )
         elif ev.tipo == "muerte":
             self.db.registrar_muerte(
                 animal_tag=ev.animal_tag, fecha=ev.fecha,
                 causa_presunta=d.get("causa_presunta"),
+                registrado_por=user_id,
             )
         elif ev.tipo == "servicio":
             self.db.registrar_servicio(
@@ -119,10 +121,12 @@ class Bot:
                 tipo_servicio=d.get("tipo_servicio", "IA"),
                 toro_pajilla=d.get("toro_pajilla"), raza_toro=d.get("raza_toro"),
                 fep_calculada=fecha_estimada_parto(ev.fecha), estado="SERVIDA",
+                registrado_por=user_id,
             )
         elif ev.tipo == "celo":
             self.db.registrar_celo(
                 vaca_tag=ev.animal_tag, fecha=ev.fecha, am_pm=d.get("am_pm"),
+                registrado_por=user_id,
             )
         elif ev.tipo == "tratamiento":
             dias = d.get("dias_retiro")
@@ -134,18 +138,21 @@ class Bot:
                 dias_retiro_leche=leche, dias_retiro_carne=carne,
                 fecha_fin_retiro_leche=fecha_fin_retiro(ev.fecha, leche) if leche else None,
                 fecha_fin_retiro_carne=fecha_fin_retiro(ev.fecha, carne) if carne else None,
+                registrado_por=user_id,
             )
         elif ev.tipo == "pesaje":
             gmd_calc = self._calcular_gmd(ev.animal_tag, ev.fecha, d.get("peso_kg"))
             self.db.registrar_pesaje(
                 animal_tag=ev.animal_tag, fecha=ev.fecha, peso_kg=d.get("peso_kg"),
                 gmd_calculada=gmd_calc, evento=d.get("evento"),
+                registrado_por=user_id,
             )
         elif ev.tipo == "traslado":
             self.db.registrar_traslado(
                 animal_tag=ev.animal_tag, fecha=ev.fecha, lote=d.get("lote"),
                 potrero_origen=d.get("potrero_origen"),
                 potrero_destino=d.get("potrero_destino"),
+                registrado_por=user_id,
             )
         elif ev.tipo == "movimiento":
             notas = None
@@ -155,6 +162,7 @@ class Bot:
                 animal_tag=ev.animal_tag, fecha=ev.fecha,
                 tipo_movimiento=d.get("tipo_movimiento"),
                 procedencia_destino=d.get("procedencia_destino"), notas=notas,
+                registrado_por=user_id,
             )
 
     def _calcular_gmd(self, tag, fecha, peso) -> Optional[float]:

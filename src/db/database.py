@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 from ..utils import add_days, iso
@@ -12,6 +12,14 @@ from .models import SCHEMA_SQL
 
 class Database:
     """Envoltorio de sqlite3 con helpers de resolución tag → id y CRUD."""
+
+    # Tablas de eventos elegibles para el registro de auditoría y el
+    # comando /deshacer (excluye animales/potreros/alertas/fotos, que no
+    # son "eventos de campo" puntuales en el mismo sentido).
+    TABLAS_EVENTOS = (
+        "partos", "muertes", "servicios", "celos", "tratamientos",
+        "traslados", "pesajes", "movimientos",
+    )
 
     def __init__(self, path: str = ":memory:"):
         self.path = path
@@ -28,6 +36,18 @@ class Database:
             cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()]
             if "ocr_text" not in cols:
                 self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
+        except Exception:
+            pass
+        # Columnas de auditoría (quién y cuándo registró cada evento) para
+        # poder listar y deshacer registros equivocados (comando /deshacer).
+        # Las tablas creadas antes de esta migración no tenían estas columnas.
+        try:
+            for tabla in self.TABLAS_EVENTOS:
+                cols = [r["name"] for r in self.conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
+                if "creado_en" not in cols:
+                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN creado_en TEXT")
+                if "registrado_por" not in cols:
+                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN registrado_por INTEGER")
         except Exception:
             pass
         # Saneamiento idempotente de autorreferencias corruptas
@@ -195,7 +215,7 @@ class Database:
 
     def registrar_parto(self, vaca_tag, fecha=None, sexo_cria=None,
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
-                        notas=None) -> int:
+                        notas=None, registrado_por=None) -> int:
         tag_vaca_clean = str(vaca_tag).strip() if vaca_tag is not None else ""
         tag_cria_clean = str(id_cria_tag).strip() if id_cria_tag is not None else ""
 
@@ -232,15 +252,23 @@ class Database:
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,
             id_cria=id_cria, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_muerte(self, animal_tag, fecha=None, causa_presunta=None,
-                         notas=None) -> int:
+                         notas=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         return self.insert("muertes", dict(
             animal_id=animal_id, fecha=iso(fecha), causa_presunta=causa_presunta,
             notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+
+    def _ahora(self) -> str:
+        """Marca de tiempo de inserción (para /ultimos y /deshacer), distinta
+        de ``fecha`` que es la fecha del evento de campo reportada por el
+        usuario (pueden ser días distintos: se reporta hoy algo de ayer)."""
+        return datetime.now().isoformat(timespec="seconds")
 
     def _id_si_ya_existe(self, tabla: str, condiciones: dict) -> Optional[int]:
         """Busca una fila que coincida exactamente en las columnas dadas (usa
@@ -253,7 +281,7 @@ class Database:
 
     def registrar_servicio(self, vaca_tag, fecha=None, tipo_servicio=None,
                            toro_pajilla=None, raza_toro=None, inseminador=None,
-                           fep_calculada=None, estado=None) -> int:
+                           fep_calculada=None, estado=None, registrado_por=None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         f = iso(fecha)
         # Idempotente por (vaca, fecha, tipo, toro/pajilla): dos servicios
@@ -267,9 +295,10 @@ class Database:
             vaca_id=vaca_id, fecha=f, tipo_servicio=tipo_servicio,
             toro_pajilla=toro_pajilla, raza_toro=raza_toro, inseminador=inseminador,
             fep_calculada=iso(fep_calculada), estado=estado,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
-    def registrar_celo(self, vaca_tag, fecha=None, am_pm=None, notas=None) -> int:
+    def registrar_celo(self, vaca_tag, fecha=None, am_pm=None, notas=None, registrado_por=None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         f = iso(fecha)
         existente = self._id_si_ya_existe("celos", {"vaca_id": vaca_id, "fecha": f, "am_pm": am_pm})
@@ -277,13 +306,14 @@ class Database:
             return existente
         return self.insert("celos", dict(
             vaca_id=vaca_id, fecha=f, am_pm=am_pm, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_tratamiento(self, animal_tag, fecha=None, producto=None,
                               principio_activo=None, dosis=None, via=None,
                               dias_retiro_leche=0, dias_retiro_carne=0,
                               fecha_fin_retiro_leche=None, fecha_fin_retiro_carne=None,
-                              diagnostico=None) -> int:
+                              diagnostico=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         f_dosis = iso(fecha) or date.today().isoformat()
         fin_leche = iso(fecha_fin_retiro_leche)
@@ -307,11 +337,12 @@ class Database:
             fecha_fin_retiro_leche=fin_leche,
             fecha_fin_retiro_carne=fin_carne,
             diagnostico=diagnostico,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_traslado(self, animal_tag, fecha=None, lote=None,
                            potrero_origen=None, potrero_destino=None,
-                           motivo=None) -> int:
+                           motivo=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         origen = self.resolve_potrero(potrero_origen) if potrero_origen else None
         destino = self.resolve_potrero(potrero_destino) if potrero_destino else None
@@ -324,10 +355,11 @@ class Database:
         return self.insert("traslados", dict(
             animal_id=animal_id, lote=lote, fecha=f,
             potrero_origen=origen, potrero_destino=destino, motivo=motivo,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_pesaje(self, animal_tag, fecha=None, peso_kg=None,
-                         gmd_calculada=None, evento=None) -> int:
+                         gmd_calculada=None, evento=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         f = iso(fecha)
         # Mismo animal + misma fecha + mismo peso exacto: en la práctica
@@ -340,10 +372,12 @@ class Database:
         return self.insert("pesajes", dict(
             animal_id=animal_id, fecha=f, peso_kg=peso_kg,
             gmd_calculada=gmd_calculada, evento=evento,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_movimiento(self, animal_tag, fecha=None, tipo_movimiento=None,
-                             procedencia_destino=None, precio=None, notas=None) -> int:
+                             procedencia_destino=None, precio=None, notas=None,
+                             registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         f = iso(fecha)
         # Idempotente por (animal_id, fecha, tipo_movimiento): un animal no se
@@ -357,6 +391,7 @@ class Database:
         return self.insert("movimientos", dict(
             animal_id=animal_id, fecha=f, tipo_movimiento=tipo_movimiento,
             procedencia_destino=procedencia_destino, precio=precio, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def registrar_alerta(self, animal_tag, tipo_alerta, fecha_programada=None,
@@ -499,6 +534,99 @@ class Database:
                 "n": g["n"],
             })
         return grupos
+
+    def ultimos_registros(self, limite: int = 15) -> list[sqlite3.Row]:
+        """Últimos eventos registrados en cualquiera de las tablas de
+        TABLAS_EVENTOS, ordenados por momento de inserción (no por fecha del
+        evento). Usado por /ultimos y /deshacer para que un admin pueda ver
+        y corregir un registro reciente hecho por error (propio o de un
+        trabajador). Los registros creados antes de esta migración no tienen
+        creado_en y quedan al final."""
+        return self.query(
+            """
+            SELECT * FROM (
+                SELECT 'partos' AS tabla, p.id AS id, a.tag AS tag, p.fecha AS fecha,
+                       ('Parto' || CASE WHEN p.sexo_cria IS NOT NULL THEN ' - cría ' || p.sexo_cria ELSE '' END) AS resumen,
+                       p.creado_en AS creado_en, p.registrado_por AS registrado_por
+                FROM partos p LEFT JOIN animales a ON a.id_animal = p.vaca_id
+                UNION ALL
+                SELECT 'muertes', m.id, a.tag, m.fecha,
+                       ('Muerte' || CASE WHEN m.causa_presunta IS NOT NULL THEN ' - ' || m.causa_presunta ELSE '' END),
+                       m.creado_en, m.registrado_por
+                FROM muertes m LEFT JOIN animales a ON a.id_animal = m.animal_id
+                UNION ALL
+                SELECT 'servicios', s.id, a.tag, s.fecha,
+                       ('Servicio ' || COALESCE(s.tipo_servicio, '')),
+                       s.creado_en, s.registrado_por
+                FROM servicios s LEFT JOIN animales a ON a.id_animal = s.vaca_id
+                UNION ALL
+                SELECT 'celos', c.id, a.tag, c.fecha,
+                       ('Celo ' || COALESCE(c.am_pm, '')),
+                       c.creado_en, c.registrado_por
+                FROM celos c LEFT JOIN animales a ON a.id_animal = c.vaca_id
+                UNION ALL
+                SELECT 'tratamientos', t.id, a.tag, t.fecha,
+                       ('Tratamiento' || CASE WHEN t.producto IS NOT NULL THEN ' - ' || t.producto ELSE '' END),
+                       t.creado_en, t.registrado_por
+                FROM tratamientos t LEFT JOIN animales a ON a.id_animal = t.animal_id
+                UNION ALL
+                SELECT 'traslados', tr.id, a.tag, tr.fecha,
+                       'Traslado',
+                       tr.creado_en, tr.registrado_por
+                FROM traslados tr LEFT JOIN animales a ON a.id_animal = tr.animal_id
+                UNION ALL
+                SELECT 'pesajes', pe.id, a.tag, pe.fecha,
+                       ('Pesaje' || CASE WHEN pe.peso_kg IS NOT NULL THEN ' ' || pe.peso_kg || 'kg' ELSE '' END),
+                       pe.creado_en, pe.registrado_por
+                FROM pesajes pe LEFT JOIN animales a ON a.id_animal = pe.animal_id
+                UNION ALL
+                SELECT 'movimientos', mo.id, a.tag, mo.fecha,
+                       ('Movimiento ' || COALESCE(mo.tipo_movimiento, '')),
+                       mo.creado_en, mo.registrado_por
+                FROM movimientos mo LEFT JOIN animales a ON a.id_animal = mo.animal_id
+            )
+            ORDER BY creado_en IS NULL, creado_en DESC, id DESC
+            LIMIT ?
+            """,
+            (limite,),
+        )
+
+    def detalle_registro(self, tabla: str, id_registro: int) -> Optional[dict]:
+        """Detalle legible de una fila puntual de una tabla de eventos, para
+        que /deshacer muestre qué se va a borrar antes de confirmar."""
+        if tabla not in self.TABLAS_EVENTOS:
+            return None
+        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos") else "animal_id"
+        fila = self.query_one(f"SELECT * FROM {tabla} WHERE id = ?", (id_registro,))
+        if fila is None:
+            return None
+        animal = self.get_animal(fila[fk_animal]) if fila[fk_animal] is not None else None
+        tag = animal["tag"] if animal else "?"
+        resumenes = {
+            "partos": lambda f: f"Parto de {tag} — cría {f['sexo_cria'] or '?'}",
+            "muertes": lambda f: f"Muerte de {tag}" + (f" — {f['causa_presunta']}" if f["causa_presunta"] else ""),
+            "servicios": lambda f: f"Servicio de {tag} ({f['tipo_servicio'] or '?'})",
+            "celos": lambda f: f"Celo de {tag} ({f['am_pm'] or '?'})",
+            "tratamientos": lambda f: f"Tratamiento de {tag}" + (f" — {f['producto']}" if f["producto"] else ""),
+            "traslados": lambda f: f"Traslado de {tag} (lote {f['lote'] or '?'})",
+            "pesajes": lambda f: f"Pesaje de {tag}" + (f" — {f['peso_kg']}kg" if f["peso_kg"] is not None else ""),
+            "movimientos": lambda f: f"Movimiento de {tag} ({f['tipo_movimiento'] or '?'})",
+        }
+        return {
+            "tabla": tabla, "id": id_registro, "tag": tag,
+            "fecha": fila["fecha"], "resumen": resumenes[tabla](fila),
+            "creado_en": fila["creado_en"], "registrado_por": fila["registrado_por"],
+        }
+
+    def eliminar_registro(self, tabla: str, id_registro: int) -> bool:
+        """Elimina una fila puntual de una tabla de eventos por id (comando
+        /deshacer). Restringido a TABLAS_EVENTOS por allow-list: nunca borra
+        de animales/potreros u otras tablas por esta vía."""
+        if tabla not in self.TABLAS_EVENTOS:
+            raise ValueError(f"Tabla no permitida para /deshacer: {tabla}")
+        cur = self.conn.execute(f"DELETE FROM {tabla} WHERE id = ?", (id_registro,))
+        self.conn.commit()
+        return cur.rowcount > 0
 
     def ultimos_pesajes(self, animal_tag_or_id, n: int = 2) -> list[sqlite3.Row]:
         aid = self.resolve_animal(animal_tag_or_id)

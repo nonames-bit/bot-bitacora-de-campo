@@ -1188,7 +1188,10 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/usuarios</code> — Lista de usuarios registrados\n"
             "• <code>/agregar_usuario [ID] [ROL] [Nombre]</code> — Dar de alta\n"
             "• <code>/quitar_usuario [ID]</code> — Revocar acceso\n"
-            "• <code>/logs</code> — Ver últimas líneas del registro del sistema\n\n"
+            "• <code>/logs</code> — Ver últimas líneas del registro del sistema\n"
+            "• <code>/duplicados</code> — Posibles animales duplicados por genealogía\n"
+            "• <code>/ultimos</code> — Últimos eventos registrados (quién y cuándo)\n"
+            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n\n"
             "🆘 ¿Agregar un trabajador nuevo?\n"
             "1. Pídele que busque el bot y le mande /start\n"
             "2. Consigue su user_id: que él busque @userinfobot → /start (Id)\n"
@@ -1217,7 +1220,10 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/exportar</code> — Descargar backup ZIP para Software Ganadero\n"
             "• <code>/importar</code> — Instrucciones para importar backup DBF\n"
             "• <code>/confirmar_importar</code> — Procesar backup subido\n"
-            "• <code>/descartar_backup</code> — Eliminar backup pendiente\n\n"
+            "• <code>/descartar_backup</code> — Eliminar backup pendiente\n"
+            "• <code>/duplicados</code> — Posibles animales duplicados por genealogía\n"
+            "• <code>/ultimos</code> — Últimos eventos registrados (quién y cuándo)\n"
+            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n\n"
             "🏠 <i>Toca /menu o /start para abrir el panel táctil interactivo.</i>"
         )
     if rol == "TRABAJADOR":
@@ -1564,6 +1570,44 @@ def formatear_duplicados_geneticos(grupos: list[dict]) -> str:
         lineas.append(f"<i>... y {len(grupos) - 15} grupo(s) más.</i>")
     lineas.append("")
     lineas.append("<i>Revise cuál tag es el correcto en Software Ganadero antes de decidir cuál conservar.</i>")
+    return "\n".join(lineas)
+
+
+_ETIQUETAS_TABLA_EVENTO = {
+    "partos": "🐣 Parto", "muertes": "⚰️ Muerte", "servicios": "💉 Servicio",
+    "celos": "🔥 Celo", "tratamientos": "💊 Tratamiento", "traslados": "🚚 Traslado",
+    "pesajes": "⚖️ Pesaje", "movimientos": "📦 Movimiento",
+}
+
+
+def formatear_ultimos_registros(filas: list, auth: Optional[Auth] = None) -> str:
+    """Formatea la lista de últimos eventos registrados (comando /ultimos),
+    numerada para que el admin pueda referenciar cuál deshacer con
+    /deshacer <tabla> <id> tal como aparece en cada línea."""
+    if not filas:
+        return "No hay eventos registrados todavía."
+    lineas = ["🕒 <b>Últimos eventos registrados:</b>", ""]
+    for f in filas:
+        etiqueta = _ETIQUETAS_TABLA_EVENTO.get(f["tabla"], f["tabla"])
+        tag = f["tag"] or "?"
+        quien = ""
+        if f["registrado_por"] and auth is not None:
+            rol_usuario = auth.rol_de(f["registrado_por"])
+            nombre = None
+            for u in auth.listar_usuarios():
+                if u.get("user_id") == f["registrado_por"]:
+                    nombre = u.get("nombre")
+                    break
+            if nombre:
+                quien = f" · por {nombre}"
+            elif rol_usuario:
+                quien = f" · por ID {f['registrado_por']}"
+        cuando = f" ({f['creado_en']})" if f["creado_en"] else ""
+        lineas.append(
+            f"• <code>/deshacer {f['tabla']} {f['id']}</code> — {etiqueta} de {tag}, {f['fecha']}{quien}{cuando}"
+        )
+    lineas.append("")
+    lineas.append("<i>Envía el comando /deshacer de la línea que quieras corregir. Pedirá confirmación antes de borrar.</i>")
     return "\n".join(lineas)
 
 

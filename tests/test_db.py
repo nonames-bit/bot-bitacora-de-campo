@@ -276,3 +276,59 @@ def test_detectar_duplicados_geneticos_ignora_mellizos_reales(db):
     assert db.detectar_duplicados_geneticos() == []
 
 
+# ---------------------------------------------------------------------------
+# Auditoría y /deshacer: registrado_por, ultimos_registros, detalle_registro,
+# eliminar_registro. Regresión real: un trabajador o el ADMIN pueden crear
+# un registro por error (ej. "murio la 47" cuando en realidad no murió) y
+# hasta ahora no había forma de corregirlo sin restaurar toda la base de
+# datos desde un backup diario.
+# ---------------------------------------------------------------------------
+def test_registrar_muerte_guarda_quien_y_cuando(db):
+    mid = db.registrar_muerte("47", fecha="2026-08-20", causa_presunta="culebra", registrado_por=12345)
+    fila = db.query_one("SELECT * FROM muertes WHERE id = ?", (mid,))
+    assert fila["registrado_por"] == 12345
+    assert fila["creado_en"] is not None
+
+
+def test_ultimos_registros_incluye_varias_tablas_ordenado_por_insercion(db):
+    db.registrar_muerte("47", fecha="2026-08-20", causa_presunta="culebra", registrado_por=1)
+    db.registrar_parto("48", fecha="2026-08-21", sexo_cria="Macho", registrado_por=2)
+    filas = db.ultimos_registros(10)
+    tablas = {f["tabla"] for f in filas}
+    assert "muertes" in tablas
+    assert "partos" in tablas
+    # El más reciente (parto) debe ir antes que el más viejo (muerte).
+    assert [f["tabla"] for f in filas].index("partos") < [f["tabla"] for f in filas].index("muertes")
+
+
+def test_detalle_registro_describe_la_fila_correcta(db):
+    mid = db.registrar_muerte("47", fecha="2026-08-20", causa_presunta="mordedura de culebra")
+    detalle = db.detalle_registro("muertes", mid)
+    assert detalle is not None
+    assert detalle["tag"] == "47"
+    assert "mordedura de culebra" in detalle["resumen"]
+
+
+def test_detalle_registro_tabla_no_permitida_devuelve_none(db):
+    assert db.detalle_registro("animales", 1) is None
+    assert db.detalle_registro("potreros", 1) is None
+
+
+def test_eliminar_registro_borra_solo_esa_fila(db):
+    id1 = db.registrar_muerte("47", fecha="2026-08-20")
+    id2 = db.registrar_muerte("48", fecha="2026-08-21")
+    assert db.eliminar_registro("muertes", id1) is True
+    assert db.query_one("SELECT * FROM muertes WHERE id = ?", (id1,)) is None
+    assert db.query_one("SELECT * FROM muertes WHERE id = ?", (id2,)) is not None
+
+
+def test_eliminar_registro_id_inexistente_devuelve_false(db):
+    assert db.eliminar_registro("muertes", 999999) is False
+
+
+def test_eliminar_registro_tabla_no_permitida_lanza_error(db):
+    import pytest
+    with pytest.raises(ValueError):
+        db.eliminar_registro("animales", 1)
+
+
