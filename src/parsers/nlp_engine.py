@@ -110,6 +110,22 @@ def es_consulta(texto: str) -> bool:
     for w in PALABRAS_CONSULTA:
         if re.search(rf"\b{re.escape(w)}\b", t):
             return True
+    # Plural + periodo sin arete/nombre puntual: casi siempre es una pregunta
+    # agregada (ej. "animales muertos este mes", "vacas vendidas esta semana"),
+    # no un evento sobre un animal concreto (esos sí traen un arete/nombre, ej.
+    # "murió la 47"). Sin esta regla, el mensaje caía en el registro de evento
+    # y el bot llegó a "confirmar" un registro que ni siquiera se guardó.
+    if re.search(r"\b(?:animales|vacas|toros|terneros|novillas)\b", t) and re.search(
+        r"\beste\s+mes\b|\besta\s+semana\b|\bmes\s+pasado\b|\ba[nñ]o\s+pasado\b|\beste\s+a[nñ]o\b|\bultimos?\s+\d+\s+dias\b",
+        t,
+    ):
+        # Los aretes reales de la finca siempre traen al menos un dígito
+        # (N065, A057, 47...); si extraer_tag "encontró" algo sin dígitos
+        # (ej. "vendidas" en "vacas vendidas esta semana"), es una palabra
+        # suelta mal tomada como arete, no un animal puntual real.
+        tag_encontrado = extraer_tag(t)
+        if not tag_encontrado or not any(c.isdigit() for c in tag_encontrado):
+            return True
     # Potrero como consulta (ej. "potrero olegario 1" o "olegario 1" si no es evento de traslado)
     if re.search(r"\bpotrero", t) and clasificar(t) != "traslado":
         return True

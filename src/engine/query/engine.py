@@ -127,6 +127,16 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("SALIDA", rango[0], rango[1], rango[2])
+        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(_TIENE_PERIODO, t) and not tag:
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._muertes_periodo(rango[0], rango[1], rango[2])
+        if re.search(r"\bdestet[eé]s?\b", t) and re.search(_TIENE_PERIODO, t):
+            rango = self._rango_periodo(t)
+            if rango:
+                return self._destetes_periodo(rango[0], rango[1], rango[2])
+        if re.search(r"\bdestet[eé]s?\b", t) and re.search(r"\bcuant|\bhay\b", t):
+            return self._destetes_periodo("0001-01-01", iso(self.hoy), "en total")
 
         if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(r"\bcuant|\bhay\b", t):
             sexo_vendido = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)

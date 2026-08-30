@@ -172,6 +172,29 @@ def test_transcribe_audio_transcriber_callback():
     assert res.origen == "transcriber"
 
 
+# ---------------------------------------------------------------------------
+# es_consulta: distinguir preguntas agregadas de eventos sobre un animal puntual.
+# Regresión real: "animales muertos este mes" se clasificaba como evento (no
+# consulta) porque no traía ninguna palabra interrogativa explícita, y el bot
+# llegó a responder "Registrada muerte del animal lote" sin que existiera tal
+# animal -- una confirmación falsa. "vacas vendidas esta semana" tenía un
+# segundo problema encadenado: extraer_tag tomaba la palabra "vendidas" como
+# si fuera un arete real.
+@pytest.mark.parametrize("texto, esperado", [
+    ("animales muertos este mes", True),
+    ("vacas vendidas esta semana", True),
+    ("cuantos animales vendieron el mes pasado", True),
+    ("animales vendidos este año", True),
+    ("terneros nacidos ultimos 15 dias", True),
+    ("murio la 47", False),
+    ("se murio la vaca de la mancha", False),
+    ("vendi la 47", False),
+    ("pario la 47 ternero macho", False),
+])
+def test_es_consulta_plural_con_periodo_no_arete(texto, esperado):
+    assert nlu.es_consulta(texto) is esperado
+
+
 def test_transcribe_audio_sin_transcripcion_error(tmp_path):
     from src.parsers.media_handler import transcribe_audio, MediaError
     import pytest

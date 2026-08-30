@@ -184,6 +184,42 @@ class InventarioQueryMixin:
             lineas.append(f"<i>... y {len(filas) - 15} más.</i>")
         return "\n".join(lineas)
 
+    def _muertes_periodo(self, desde: str, hasta: str, etiqueta_periodo: str = "en el periodo") -> str:
+        """Cuenta muertes con fecha real (tabla muertes) entre desde y hasta.
+        A diferencia de _conteo_por_estado('MUERTO'), sí se puede acotar por
+        periodo porque muertes.fecha existe (animales.estado no trae fecha)."""
+        filas = self.db.query(
+            "SELECT mu.*, a.tag FROM muertes mu JOIN animales a ON a.id_animal = mu.animal_id "
+            "WHERE mu.fecha >= ? AND mu.fecha <= ? ORDER BY mu.fecha DESC",
+            (desde, hasta),
+        )
+        if not filas:
+            return f"No hay muertes registradas {etiqueta_periodo}."
+        lineas = [f"⚰️ <b>Muertes {etiqueta_periodo} ({len(filas)}):</b>"]
+        for f in filas[:15]:
+            causa = f" · {f['causa_presunta']}" if f["causa_presunta"] else ""
+            lineas.append(f"• {f['fecha']} — {f['tag']}{causa}")
+        if len(filas) > 15:
+            lineas.append(f"<i>... y {len(filas) - 15} más.</i>")
+        return "\n".join(lineas)
+
+    def _destetes_periodo(self, desde: str, hasta: str, etiqueta_periodo: str = "en el periodo") -> str:
+        """Cuenta destetes (pesajes.evento='DESTETE') entre desde y hasta."""
+        filas = self.db.query(
+            "SELECT p.*, a.tag FROM pesajes p JOIN animales a ON a.id_animal = p.animal_id "
+            "WHERE UPPER(p.evento) = 'DESTETE' AND p.fecha >= ? AND p.fecha <= ? ORDER BY p.fecha DESC",
+            (desde, hasta),
+        )
+        if not filas:
+            return f"No hay destetes registrados {etiqueta_periodo}."
+        lineas = [f"🐄 <b>Destetes {etiqueta_periodo} ({len(filas)}):</b>"]
+        for f in filas[:15]:
+            peso_str = f" · {f['peso_kg']:.0f}kg" if f["peso_kg"] else ""
+            lineas.append(f"• {f['fecha']} — {f['tag']}{peso_str}")
+        if len(filas) > 15:
+            lineas.append(f"<i>... y {len(filas) - 15} más.</i>")
+        return "\n".join(lineas)
+
     def _inventario_por_raza(self, raza: str, sexo: str | None = None) -> str:
         """Cuenta animales activos cuya raza coincide (comparación flexible,
         ej. 'holstein' encuentra 'HOLSTEIN', 'Holstein Neg-T', etc.)."""

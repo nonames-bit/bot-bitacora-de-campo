@@ -1152,6 +1152,35 @@ def test_partos_mes_y_anio_pasado(db):
     assert "47" in resp_este_anio and "48" not in resp_este_anio
 
 
+def test_muertes_por_periodo(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="MUERTO")
+    db.registrar_muerte("47", fecha="2026-08-20", causa_presunta="Picadura de culebra")
+    db.registrar_animal("48", sexo="Hembra", estado="MUERTO")
+    db.registrar_muerte("48", fecha="2025-01-01", causa_presunta="Vieja")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("animales muertos este mes")
+    assert "No entendí" not in resp
+    assert "47" in resp and "48" not in resp
+
+
+def test_destetes_por_periodo_y_total(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_pesaje("47", fecha="2026-08-15", peso_kg=180, evento="DESTETE")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp_semana = qe.responder("cuantos destetes hubo esta semana")
+    assert "No hay destetes" in resp_semana
+
+    resp_mes = qe.responder("cuantos destetes hubo este mes")
+    assert "47" in resp_mes
+
+    resp_total = qe.responder("cuantos destetes hay")
+    assert "47" in resp_total
+
+
 def test_lote_ocupacion(db):
     from src.engine.query_engine import QueryEngine
     p1 = db.registrar_potrero("BAJO", "01")
