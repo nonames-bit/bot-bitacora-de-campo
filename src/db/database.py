@@ -407,6 +407,38 @@ class Database:
             "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
         )
 
+    def detectar_duplicados_geneticos(self) -> list[dict]:
+        """Agrupa animales ACTIVOS por (madre_id, padre_id, fecha_nacimiento) y
+        devuelve los grupos con más de un animal: casi siempre el mismo
+        nacimiento importado dos veces bajo tags distintos (ej. 'N065' vs
+        'NO65', confusión letra O / dígito 0 al transcribir o en el DBF).
+        Requiere madre_id y fecha_nacimiento no nulos para evitar falsos
+        positivos entre animales sin genealogía registrada."""
+        filas = self.query(
+            """
+            SELECT madre_id, padre_id, fecha_nacimiento,
+                   GROUP_CONCAT(id_animal) AS ids, GROUP_CONCAT(tag) AS tags,
+                   COUNT(*) AS n
+            FROM animales
+            WHERE estado = 'ACTIVO' AND madre_id IS NOT NULL AND fecha_nacimiento IS NOT NULL
+            GROUP BY madre_id, padre_id, fecha_nacimiento
+            HAVING COUNT(*) > 1
+            ORDER BY fecha_nacimiento DESC
+            """
+        )
+        grupos = []
+        for f in filas:
+            madre = self.get_animal(f["madre_id"])
+            grupos.append({
+                "madre_id": f["madre_id"],
+                "madre_tag": madre["tag"] if madre else str(f["madre_id"]),
+                "fecha_nacimiento": f["fecha_nacimiento"],
+                "ids": [int(x) for x in f["ids"].split(",")],
+                "tags": f["tags"].split(","),
+                "n": f["n"],
+            })
+        return grupos
+
     def ultimos_pesajes(self, animal_tag_or_id, n: int = 2) -> list[sqlite3.Row]:
         aid = self.resolve_animal(animal_tag_or_id)
         if aid is None:

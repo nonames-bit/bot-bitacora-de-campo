@@ -706,6 +706,14 @@ def import_dbfs(
     if fotos_source:
         conteos["fotos"] = import_fotos(db, fotos_source, media_dir=media_dir)
 
+    if "hoja.dbf" in lectores or "partos.dbf" in lectores:
+        # El backup pudo traer el mismo nacimiento bajo un tag ligeramente
+        # distinto al ya existente (ej. "N065" vs "NO65"); el dedup de partos
+        # es por id_cria ya resuelto, así que no lo detecta por sí solo.
+        duplicados = db.detectar_duplicados_geneticos()
+        if duplicados:
+            conteos["duplicados_geneticos"] = duplicados
+
     return conteos
 
 

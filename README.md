@@ -93,6 +93,7 @@ implementado todavía.
 | `/alertas` | ✅ | ✅ | — |
 | `/animales` | ✅ | ✅ | — |
 | `/status` | ✅ | ✅ | — |
+| `/duplicados` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
 | `/reporte` [diario\|semanal\|N] | ✅ | ✅ | — |
 | `/exportar` | ✅ | ✅ | — |

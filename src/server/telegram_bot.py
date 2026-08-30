@@ -41,6 +41,7 @@ from .formatters import (
     formatear_alertas_panel,
     formatear_animales,
     formatear_ayuda,
+    formatear_duplicados_geneticos,
     formatear_estado_servidor,
     formatear_fotos,
     formatear_genealogia_animal_tab,
@@ -448,6 +449,22 @@ def construir_application(
             )
         except Exception as e:
             logger.error("Error en cmd_genetica: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_duplicados(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            grupos = db.detectar_duplicados_geneticos()
+            msg = formatear_duplicados_geneticos(grupos)
+            await update.message.reply_text(msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error("Error en cmd_duplicados: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1950,6 +1967,7 @@ def construir_application(
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
+    app.add_handler(CommandHandler(["duplicados", "duplicados_geneticos"], cmd_duplicados))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))

@@ -1539,6 +1539,23 @@ def obtener_ultimos_logs(log_file: str, lineas: int = 20) -> str:
         return f"Error al leer logs: {e}"
 
 
+def formatear_duplicados_geneticos(grupos: list[dict]) -> str:
+    """Formatea los grupos de animales activos que comparten madre+padre+fecha
+    de nacimiento (probable mismo nacimiento importado dos veces con tags
+    distintos, ej. 'N065' vs 'NO65')."""
+    if not grupos:
+        return "✅ No se detectaron animales activos duplicados por genealogía (misma madre, padre y fecha de nacimiento)."
+    lineas = [f"⚠️ <b>Posibles animales duplicados ({len(grupos)} grupo(s)):</b>", ""]
+    for g in grupos[:15]:
+        tags_str = ", ".join(g["tags"])
+        lineas.append(f"• Madre <b>{g['madre_tag']}</b>, nacido {g['fecha_nacimiento']}: {tags_str}")
+    if len(grupos) > 15:
+        lineas.append(f"<i>... y {len(grupos) - 15} grupo(s) más.</i>")
+    lineas.append("")
+    lineas.append("<i>Revise cuál tag es el correcto en Software Ganadero antes de decidir cuál conservar.</i>")
+    return "\n".join(lineas)
+
+
 def formatear_reporte_importacion(conteos: dict) -> str:
     """Formatea el reporte de importación de DBF indicando filas nuevas y duplicadas."""
     if not conteos:
@@ -1562,6 +1579,12 @@ def formatear_reporte_importacion(conteos: dict) -> str:
         "",
         "📋 Detalle por tabla:",
     ] + lineas_tablas
+
+    duplicados_geneticos = conteos.get("duplicados_geneticos")
+    if duplicados_geneticos:
+        lineas.append("")
+        lineas.append(f"⚠️ <b>{len(duplicados_geneticos)} posible(s) animal(es) duplicado(s)</b> por genealogía (misma madre/padre/fecha de nacimiento bajo tags distintos). Use /duplicados para ver el detalle.")
+
     return "\n".join(lineas)
 
 

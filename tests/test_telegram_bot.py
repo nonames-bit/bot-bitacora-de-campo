@@ -676,6 +676,21 @@ def test_total_animales_finca_no_se_confunde_con_ficha(db):
         assert "No entendí" not in resp
 
 
+def test_formatear_duplicados_geneticos(db):
+    from src.server.telegram_bot import formatear_duplicados_geneticos
+
+    assert "No se detectaron" in formatear_duplicados_geneticos([])
+
+    grupos = [{
+        "madre_id": 1, "madre_tag": "MADRE1", "fecha_nacimiento": "2024-11-01",
+        "ids": [10, 11], "tags": ["N065", "NO65"], "n": 2,
+    }]
+    resp = formatear_duplicados_geneticos(grupos)
+    assert "MADRE1" in resp
+    assert "N065" in resp and "NO65" in resp
+    assert "2024-11-01" in resp
+
+
 def test_existencias_potreros_nota_animales_sin_potrero(db):
     """Un animal ACTIVO sin potrero resoluble debe explicarse en la tabla, no
     desaparecer en silencio haciendo que el total no cuadre con el general."""

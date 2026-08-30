@@ -178,3 +178,30 @@ def test_marcar_historicos_sg(db):
     assert h_nuevo["estado"] == "ACTIVO"
 
 
+def test_detectar_duplicados_geneticos(db):
+    db.registrar_animal("MADRE1", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("PADRE1", sexo="Macho", estado="ACTIVO")
+    # Mismo nacimiento (madre+padre+fecha) importado dos veces con tags distintos
+    db.registrar_animal("N065", sexo="Hembra", estado="ACTIVO",
+                        madre_tag="MADRE1", padre_tag="PADRE1", fecha_nacimiento="2024-11-01")
+    db.registrar_animal("NO65", sexo="Hembra", estado="ACTIVO",
+                        madre_tag="MADRE1", padre_tag="PADRE1", fecha_nacimiento="2024-11-01")
+    # Animal sin relación, no debe aparecer como duplicado
+    db.registrar_animal("OTRO1", sexo="Hembra", estado="ACTIVO",
+                        madre_tag="MADRE1", padre_tag="PADRE1", fecha_nacimiento="2025-01-01")
+
+    grupos = db.detectar_duplicados_geneticos()
+    assert len(grupos) == 1
+    assert grupos[0]["madre_tag"] == "MADRE1"
+    assert grupos[0]["fecha_nacimiento"] == "2024-11-01"
+    assert set(grupos[0]["tags"]) == {"N065", "NO65"}
+
+
+def test_detectar_duplicados_geneticos_ignora_sin_genealogia(db):
+    # Dos animales sin madre_id/fecha_nacimiento no deben marcarse como duplicados
+    # entre sí solo por compartir valores NULL.
+    db.registrar_animal("A1", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("A2", sexo="Hembra", estado="ACTIVO")
+    assert db.detectar_duplicados_geneticos() == []
+
+

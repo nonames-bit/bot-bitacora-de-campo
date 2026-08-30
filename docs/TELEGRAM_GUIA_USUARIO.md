@@ -158,6 +158,7 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | `/alertas` | Muestra el **semáforo inteligente de alertas** (partos $\le 30$d, secados $\ge 200$ DEL, destetes, pérdidas de peso y retiros). | `/alertas` |
 | `/poblacion`, `/piramide` | **Tablero Poblacional**: Pirámide de edades y brackets demográficos de Software Ganadero. | `/poblacion`, `/piramide` |
 | `/genetica`, `/razas` | **Composición Genética**: Distribución racial y cruces del hato. | `/genetica`, `/razas` |
+| `/duplicados` | **Auditoría de Duplicados**: animales activos con la misma madre, padre y fecha de nacimiento (probable mismo nacimiento importado dos veces con tags distintos). | `/duplicados` |
 | `/historial <tag>` | Ficha interactiva con pestañas táctiles (Pesajes, Partos, Leche, Retiro, Genealogía). | `/historial 47`, `/consulta N069` |
 | `/buscar [tag]` | **Buscador & Fichas de Animales**: Filtros por vacas paridas, inseminadas, toros o crías. | `/buscar`, `/buscar 47` |
 | `/medicamentos`, `/retiros` | **Control Sanitario & Retiros**: Animales en retiro activo de leche/carne y tratamientos. | `/medicamentos`, `/retiros` |
