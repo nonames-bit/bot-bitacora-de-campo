@@ -429,7 +429,28 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
     return ocupados
 
 
-def formatear_tabla_potreros_sg(filas_potreros: list[dict]) -> str:
+def contar_animales_sin_potrero(db: Database) -> int:
+    """Cuenta animales ACTIVOS cuyo potrero no se puede resolver (ni traslado ni
+    potrero_id apuntan a un potrero existente). Explica por qué el total de la
+    tabla de 'Existencias por Potrero' puede ser menor que el total general de
+    activos: esos animales sí cuentan en el inventario, pero no aparecen en
+    ninguna fila de la tabla porque no tienen potrero asignado."""
+    potreros_validos = {p["id"] for p in db.query("SELECT id FROM potreros")}
+    animales = db.query("SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'")
+    n = 0
+    for a in animales:
+        aid = a["id_animal"]
+        ult = db.query_one(
+            "SELECT potrero_destino FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1",
+            (aid,),
+        )
+        pid = ult["potrero_destino"] if (ult and ult["potrero_destino"] is not None) else a["potrero_id"]
+        if pid is None or pid not in potreros_validos:
+            n += 1
+    return n
+
+
+def formatear_tabla_potreros_sg(filas_potreros: list[dict], sin_potrero: int = 0) -> str:
     """Formatea la tabla de inventario por potreros exacta a la de Software Ganadero (potreros.jpg)."""
     if not filas_potreros:
         return "📍 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>\n\nNo hay potreros con animales activos actualmente."
@@ -483,6 +504,12 @@ def formatear_tabla_potreros_sg(filas_potreros: list[dict]) -> str:
         f"<pre>\n{cuerpo_escapado}\n</pre>",
         "<i>Leyenda: CH: Cría hembra | HL: Hemb. levante | NV: Nov. vientre | VP: Vaca parida | VS: Vaca seca | CM: Cría macho | ML: Mac. levante | MC: Macho ceba | RP: Reproductor | Tot: Total activos</i>",
     ]
+    if sin_potrero > 0:
+        palabra = "animal" if sin_potrero == 1 else "animales"
+        msg.append(
+            f"⚠️ <i>{sin_potrero} {palabra} activo(s) sin potrero asignado (no aparece(n) en esta tabla, "
+            f"por eso el total general puede ser {sin_potrero} más que la suma de arriba).</i>"
+        )
     return "\n".join(msg)
 
 

@@ -10,6 +10,7 @@ from .helpers import (
     _fmt_es_co,
     _potrero_variantes,
     calcular_existencias_potreros_sg,
+    contar_animales_sin_potrero,
     formatear_ocupacion_potreros,
     formatear_tabla_potreros_sg,
 )
@@ -184,7 +185,8 @@ class PasturasQueryMixin:
     def _inventario_potreros(self, mostrar_vacios: bool = False, formato_sg: bool = False) -> str:
         if formato_sg:
             filas_sg = calcular_existencias_potreros_sg(self.db, self.hoy)
-            return formatear_tabla_potreros_sg(filas_sg)
+            sin_potrero = contar_animales_sin_potrero(self.db)
+            return formatear_tabla_potreros_sg(filas_sg, sin_potrero=sin_potrero)
 
         potreros = self.db.query("SELECT * FROM potreros")
         if not potreros:

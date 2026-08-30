@@ -619,7 +619,74 @@ def test_filtros_busqueda_sql_queries(db):
     assert q_pesajes[0]["peso_kg"] == 450
 
 
+def test_formatear_pesajes_animal_tab_no_falla_por_potrero(db):
+    """Regresión: la vista de pesajes unía contra pe.potrero_id, columna que no
+    existe en la tabla pesajes (el potrero vive en animales)."""
+    from src.server.telegram_bot import formatear_pesajes_animal_tab
+    p1 = db.registrar_potrero("Norte")
+    db.registrar_animal("47", potrero=p1, estado="ACTIVO")
+    db.registrar_pesaje("47", fecha="2026-08-01", peso_kg=200)
+    resp = formatear_pesajes_animal_tab(db, "47", hoy=date(2026, 9, 1))
+    assert "Error" not in resp
+    assert "Norte" in resp
 
+
+def test_formatear_sanidad_animal_tab_no_falla_por_potrero(db):
+    """Regresión: misma columna inexistente (t.potrero_id) en la vista de sanidad,
+    más un segundo bug encadenado (r['via_administracion'] cuando la columna real
+    es 'via')."""
+    from src.server.telegram_bot import formatear_sanidad_animal_tab
+    p1 = db.registrar_potrero("Norte")
+    db.registrar_animal("47", potrero=p1, estado="ACTIVO")
+    db.registrar_tratamiento(animal_tag="47", fecha="2026-08-01", producto="Ivermectina", via="SC")
+    resp = formatear_sanidad_animal_tab(db, "47", hoy=date(2026, 9, 1))
+    assert "Error" not in resp
+    assert "Ivermectina" in resp
+    assert "[SC]" in resp
+
+
+def test_formatear_poblacion_panel_usa_datos_reales(db):
+    """Regresión: el panel accedía a datos['hembras']/datos['machos'] (KeyError,
+    esas claves no existen) y mostraba cifras de ejemplo fijas sin importar la DB."""
+    from src.server.telegram_bot import formatear_poblacion_panel
+    p1 = db.registrar_potrero("Norte")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
+    db.registrar_parto("47", fecha="2026-01-01")
+    db.registrar_animal("T1", sexo="Macho", estado="ACTIVO", potrero=p1, nombre="TORO PADRON", fecha_nacimiento="2020-01-01")
+
+    resp = formatear_poblacion_panel(db, hoy=date(2026, 9, 1))
+    assert "Error" not in resp
+    # Ya no debe mostrar los valores de ejemplo hardcodeados del bug original.
+    assert "88 días" not in resp
+    assert "372 días" not in resp
+    assert "Vacas Totales:</b> 1" in resp
+    assert "Toros / Reproductores:</b> 1" in resp
+    assert "243 días" in resp  # días abiertos reales: parto 2026-01-01 -> hoy 2026-09-01
+
+
+def test_total_animales_finca_no_se_confunde_con_ficha(db):
+    """Regresión: 'animales' en plural no matcheaba \\banimal\\b, así que "Total
+    animales finca" caía en el fallback de ficha con tag='total'."""
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    for pregunta in ["Total animales finca", "total animales", "cuantos animales hay"]:
+        resp = qe.responder(pregunta)
+        assert "No hay registros para la total" not in resp
+        assert "No entendí" not in resp
+
+
+def test_existencias_potreros_nota_animales_sin_potrero(db):
+    """Un animal ACTIVO sin potrero resoluble debe explicarse en la tabla, no
+    desaparecer en silencio haciendo que el total no cuadre con el general."""
+    from src.engine.query_engine import QueryEngine
+    p1 = db.registrar_potrero("Norte")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("SINPOT", sexo="Hembra", estado="ACTIVO")  # sin potrero
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("existencias por potrero")
+    assert "1 animal activo" in resp
+    assert "sin potrero asignado" in resp
 
 
 

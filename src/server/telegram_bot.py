@@ -1838,13 +1838,24 @@ def construir_application(
                     )
                 elif cat == "toros":
                     titulo = "🐂 <b>Toros / Reproductores Activos:</b>"
-                    filas = db.query(
+                    # Mismo criterio de "reproductor" que el resto del bot (existencias por
+                    # potrero, fichas, etc.): nombre/nota con TORO·REPRODUCTOR·PADRON, o
+                    # >=1095 días (~3 años). Sin este filtro, "toros" mostraba cualquier
+                    # macho activo por orden de arete (terneros y levante incluidos).
+                    machos = db.query(
                         """
-                        SELECT DISTINCT a.tag, a.nombre FROM animales a
+                        SELECT a.tag, a.nombre, a.notas, a.fecha_nacimiento FROM animales a
                         WHERE a.estado = 'ACTIVO' AND (a.sexo LIKE 'M%' OR a.sexo = 'Macho')
-                        ORDER BY a.tag ASC LIMIT 9
                         """
                     )
+                    reproductores = []
+                    for m in machos:
+                        nom_m = f"{m['nombre'] or ''} {m['notas'] or ''} {m['tag'] or ''}".upper()
+                        fnac = to_date(m["fecha_nacimiento"])
+                        edad_d = (date.today() - fnac).days if fnac else None
+                        if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_d is not None and edad_d >= 1095):
+                            reproductores.append(m)
+                    filas = reproductores[:9]
                 elif cat == "crias":
                     titulo = "🍼 <b>Crías y Terneros Recientes:</b>"
                     filas = db.query(

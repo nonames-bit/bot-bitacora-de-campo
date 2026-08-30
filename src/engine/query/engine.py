@@ -159,8 +159,8 @@ class QueryEngine(
                 if re.search(r"\b(?:total|inventario|listar|mostrar|resumen|conteo|distribuci[oó]n)\b", t):
                     mostrar_vacios = bool(re.search(r"\bvac[ií]os?\b", t))
                     return self._inventario_potreros(mostrar_vacios=mostrar_vacios)
-            # conteos de ganado por categoría (ganado, gaando typo, animal, inventario)
-            if re.search(r"\b(?:ganado|ganad|ga+ndo|animal|inventario)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
+            # conteos de ganado por categoría (ganado, gaando typo, animal/animales, inventario)
+            if re.search(r"\b(?:ganado|ganad|ga+ndo|animales?|inventario)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
                 # si menciona categoría específica, delegar con filtro
                 if re.search(r"\bterner", t):
                     return self._inventario_categoria("terneros")

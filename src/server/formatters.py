@@ -44,7 +44,8 @@ def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
         """
         SELECT pe.*, p.nombre AS potrero_nom
         FROM pesajes pe
-        LEFT JOIN potreros p ON p.id = pe.potrero_id
+        JOIN animales a2 ON a2.id_animal = pe.animal_id
+        LEFT JOIN potreros p ON p.id = a2.potrero_id
         WHERE pe.animal_id = ?
         ORDER BY pe.fecha DESC, pe.id DESC
         LIMIT 15
@@ -293,7 +294,8 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
         """
         SELECT t.*, p.nombre AS potrero_nom
         FROM tratamientos t
-        LEFT JOIN potreros p ON p.id = t.potrero_id
+        JOIN animales a2 ON a2.id_animal = t.animal_id
+        LEFT JOIN potreros p ON p.id = a2.potrero_id
         WHERE t.animal_id = ?
         ORDER BY t.fecha DESC, t.id DESC
         LIMIT 10
@@ -352,7 +354,7 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
             fec = r["fecha"] or "S/F"
             med = r["producto"] or "Tratamiento"
             dos = f" ({r['dosis']})" if r["dosis"] else ""
-            via = f" [{r['via_administracion']}]" if r["via_administracion"] else ""
+            via = f" [{r['via']}]" if r["via"] else ""
             diag = f" · Diag: {r['diagnostico']}" if r["diagnostico"] else ""
             lineas.append(f"• [{fec}] 💉 <b>{med}</b>{dos}{via}{diag}")
 
@@ -552,36 +554,79 @@ def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
 
 
 def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
-    """Genera el reporte ejecutivo de población y pirámide de edades idéntico a SG App."""
+    """Genera el reporte ejecutivo de población y pirámide de edades, con datos
+    reales del hato (no valores de ejemplo)."""
     if hoy is None:
         hoy = date.today()
     datos = calcular_brackets_inventario_sg(db, hoy)
     activos = _contar_activos(db)
+    hb = datos["h_brackets"]
+    mb = datos["m_brackets"]
+
+    # Reutiliza la misma clasificación SG (CH/HL/NV/VP/VS/CM/ML/MC/RP) que ya
+    # se usa en "Existencias por Potrero", sumada a nivel de finca, para que
+    # los números de este panel siempre coincidan con esa tabla.
+    filas_sg = calcular_existencias_potreros_sg(db, hoy)
+    tot_ch = sum(f["ch"] for f in filas_sg)
+    tot_hl = sum(f["hl"] for f in filas_sg)
+    tot_nv = sum(f["nv"] for f in filas_sg)
+    tot_vp = sum(f["vp"] for f in filas_sg)
+    tot_vs = sum(f["vs"] for f in filas_sg)
+    tot_cm = sum(f["cm"] for f in filas_sg)
+    tot_ml = sum(f["ml"] for f in filas_sg)
+    tot_mc = sum(f["mc"] for f in filas_sg)
+    tot_rep = sum(f["rep"] for f in filas_sg)
+    tot_vacas = tot_vp + tot_vs
+    tot_crias = tot_ch + tot_cm
+
+    # Días abiertos promedio: vacas paridas activas sin servicio posterior al último parto.
+    vacas_paridas = db.query(
+        """
+        SELECT a.id_animal FROM partos p
+        JOIN animales a ON a.id_animal = p.vaca_id
+        WHERE a.estado = 'ACTIVO' AND p.fecha IS NOT NULL
+          AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
+        GROUP BY a.id_animal
+        """
+    )
+    dias_abiertos_lista = []
+    for v in vacas_paridas:
+        p_ult = db.ultimo_parto(v["id_animal"])
+        if not (p_ult and p_ult["fecha"] and to_date(p_ult["fecha"])):
+            continue
+        f_parto = to_date(p_ult["fecha"])
+        s_ult = db.ultimo_servicio(v["id_animal"])
+        if s_ult and s_ult["fecha"] and to_date(s_ult["fecha"]) and to_date(s_ult["fecha"]) >= f_parto:
+            continue  # ya tiene servicio posterior: no está "abierta"
+        dias_abiertos_lista.append((hoy - f_parto).days)
+    dias_abiertos_prom = round(sum(dias_abiertos_lista) / len(dias_abiertos_lista)) if dias_abiertos_lista else None
 
     lineas = [
         "📊 <b>TABLERO POBLACIONAL & KPIs ZOOTÉCNICOS</b>",
         f"🏷️ <i>Finca: 01-JA-GANADERIA-JA · Total: {activos} Cabezas</i>",
         "────────────────────────────────────────",
         "🐄 <b>ESTRUCTURA DE POBLACIÓN (SG):</b>",
-        "• 🥛 <b>Vacas Totales:</b> 91 (80 en ordeño · 11 secas)",
-        "• 🤰 <b>Novillas de Vientre:</b> 63",
-        "• 🍼 <b>Crías (0-8m):</b> 76 (36 hembras · 40 machos)",
-        "• 📈 <b>Levante Hembras:</b> 94 (&lt;1A: 21 · &gt;1A: 73)",
-        "• 📈 <b>Levante Machos:</b> 11 (&lt;1A: 9 · &gt;1A: 2)",
-        "• 🐂 <b>Toros / Reproductores:</b> 5",
+        f"• 🥛 <b>Vacas Totales:</b> {tot_vacas} ({tot_vp} paridas · {tot_vs} secas)",
+        f"• 🤰 <b>Novillas de Vientre:</b> {tot_nv}",
+        f"• 🍼 <b>Crías (&lt;1a):</b> {tot_crias} ({tot_ch} hembras · {tot_cm} machos)",
+        f"• 📈 <b>Levante Hembras (1-2a):</b> {tot_hl}",
+        f"• 📈 <b>Levante/Ceba Machos (1-2a):</b> {tot_ml + tot_mc}",
+        f"• 🐂 <b>Toros / Reproductores:</b> {tot_rep}",
         "────────────────────────────────────────",
         "🎂 <b>PIRÁMIDE POR RANGOS DE EDAD (SG):</b>",
-        f"• 0 a 1 Año:   <b>{datos['hembras']['menor_1'] + datos['machos']['menor_1']}</b> animales (♀ {datos['hembras']['menor_1']} · ♂ {datos['machos']['menor_1']})",
-        f"• 1 a 2 Años:  <b>{datos['hembras']['1_2'] + datos['machos']['1_2']}</b> animales (♀ {datos['hembras']['1_2']} · ♂ {datos['machos']['1_2']})",
-        f"• 2 a 4 Años:  <b>{datos['hembras']['2_4']}</b> hembras",
-        f"• 4 a 8 Años:  <b>{datos['hembras']['4_8']}</b> hembras adultas",
-        f"• 8 a 10 Años: <b>{datos['hembras']['8_10']}</b> hembras",
-        f"• &gt; 10 Años:  <b>{datos['hembras']['mayor_10']}</b> hembras",
+        f"• 0 a 1 Año:   <b>{hb['menor_1'] + mb['menor_1']}</b> animales (♀ {hb['menor_1']} · ♂ {mb['menor_1']})",
+        f"• 1 a 2 Años:  <b>{hb['1_2'] + mb['1_2']}</b> animales (♀ {hb['1_2']} · ♂ {mb['1_2']})",
+        f"• 2 a 4 Años:  <b>{hb['2_4']}</b> hembras",
+        f"• 4 a 8 Años:  <b>{hb['4_8']}</b> hembras adultas",
+        f"• 8 a 10 Años: <b>{hb['8_10']}</b> hembras",
+        f"• &gt; 10 Años:  <b>{hb['mayor_10']}</b> hembras",
         "────────────────────────────────────────",
-        "📈 <b>INDICADORES REPRODUCTIVOS CLAVE:</b>",
-        "• <b>IPC:</b> 88 días · <b>IEP Proyectado:</b> 372 días",
-        "• <b>Días Abiertos:</b> 207 días · <b>Servicios/Concepción:</b> 2.0",
+        "📈 <b>INDICADORES REPRODUCTIVOS:</b>",
     ]
+    if dias_abiertos_prom is not None:
+        lineas.append(f"• <b>Días Abiertos (promedio del hato):</b> {dias_abiertos_prom} días ({len(dias_abiertos_lista)} vaca(s) sin servicio tras su último parto)")
+    else:
+        lineas.append("• <b>Días Abiertos:</b> sin datos suficientes (no hay vacas paridas activas sin servicio posterior)")
     return "\n".join(lineas)
 
 
