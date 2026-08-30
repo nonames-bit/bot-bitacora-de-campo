@@ -983,6 +983,46 @@ def test_pesaje_palabra_completa(db):
     assert "180" in resp
 
 
+def test_inventario_por_edad_exacta(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2024-08-15")
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2020-01-01")
+    db.registrar_animal("49", sexo="Macho", estado="ACTIVO", fecha_nacimiento="2020-06-01")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantos animales hay de 2 anos")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "48" not in resp
+
+    resp_vacas = qe.responder("cuantas vacas de 6 anos hay")
+    assert "48" in resp_vacas
+    assert "49" not in resp_vacas  # es macho, no vaca
+
+    resp_sin = qe.responder("cuantos animales hay de 10 anos")
+    assert "No hay" in resp_sin
+
+
+def test_conteo_por_estado_vendidos_muertos(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="VENDIDO")
+    db.registrar_animal("48", sexo="Macho", estado="VENDIDO")
+    db.registrar_animal("49", sexo="Hembra", estado="MUERTO")
+    db.registrar_animal("50", sexo="Hembra", estado="ACTIVO")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp_v = qe.responder("cuantos animales vendidos hay")
+    assert "No entendí" not in resp_v
+    assert "2" in resp_v
+
+    resp_vv = qe.responder("cuantas vacas se han vendido")
+    assert "Vacas vendidas" in resp_vv
+    assert "1" in resp_vv
+
+    resp_m = qe.responder("cuantos animales muertos hay")
+    assert "1" in resp_m
+
+
 def test_lote_ocupacion(db):
     from src.engine.query_engine import QueryEngine
     p1 = db.registrar_potrero("BAJO", "01")

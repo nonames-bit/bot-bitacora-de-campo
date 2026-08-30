@@ -1416,7 +1416,12 @@ def texto_guia_preguntas_potreros() -> str:
         "📊 <b>Carga & Distribución:</b>\n"
         "• <i>«¿qué potreros están ocupados hoy?»</i>\n"
         "• <i>«cuántos animales hay en versalles»</i>\n"
-        "• <i>«dónde está el lote 2»</i>"
+        "• <i>«dónde está el lote 2»</i>\n\n"
+        "🔢 <b>Conteos por Edad o Estado:</b>\n"
+        "• <i>«cuántos animales hay de 2 años»</i>\n"
+        "• <i>«cuántas vacas de 6 años hay»</i>\n"
+        "• <i>«cuántos animales vendidos hay»</i>\n"
+        "• <i>«cuántas vacas se han muerto»</i>"
     )
 
 

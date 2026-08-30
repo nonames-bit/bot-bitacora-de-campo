@@ -99,6 +99,68 @@ class InventarioQueryMixin:
             return f"🐄 Total terneros (<12 meses): {count}."
         return self._inventario_general()
 
+    def _inventario_por_edad(self, anios: int, sexo: str | None = None) -> str:
+        """Cuenta animales activos cuya edad en años cumplidos coincide con el
+        valor pedido (ej. 'cuántos animales hay de 2 años' -> 2 <= edad < 3)."""
+        rows = self.db.query(
+            "SELECT id_animal, tag, sexo, fecha_nacimiento, madre_id FROM animales WHERE estado='ACTIVO'"
+        )
+        coincidencias = []
+        for r in rows:
+            fn = to_date(r["fecha_nacimiento"])
+            if not fn:
+                p_m = None
+                if r["madre_id"]:
+                    p_m = self.db.query_one(
+                        "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                        (r["madre_id"],),
+                    )
+                if p_m and p_m["fecha"]:
+                    fn = to_date(p_m["fecha"])
+            if not fn:
+                continue
+            edad_anios = (self.hoy - fn).days // 365
+            if edad_anios != anios:
+                continue
+            s = (r["sexo"] or "").strip().lower()
+            if sexo == "hembra" and not (s.startswith("h") or s in ("vaca", "novilla", "ternera")):
+                continue
+            if sexo == "macho" and not (s.startswith("m") or s in ("toro", "novillo", "ternero")):
+                continue
+            coincidencias.append(r["tag"] or str(r["id_animal"]))
+
+        etiqueta = {"hembra": "vacas/hembras", "macho": "toros/machos"}.get(sexo, "animales")
+        n = len(coincidencias)
+        if n == 0:
+            return f"No hay {etiqueta} activos de {anios} años."
+        muestra = ", ".join(coincidencias[:10])
+        if n > 10:
+            muestra += f" y {n - 10} más"
+        return f"🎂 {etiqueta.capitalize()} de {anios} años: <b>{n}</b> ({muestra})"
+
+    def _conteo_por_estado(self, estado: str, sexo: str | None = None) -> str:
+        """Cuenta animales (de forma histórica, sin filtrar por ACTIVO) en un
+        estado puntual como VENDIDO, MUERTO o HISTORICO."""
+        estado_norm = estado.strip().upper()
+        sql = "SELECT COUNT(*) as n FROM animales WHERE UPPER(estado) = ?"
+        params: list = [estado_norm]
+        if sexo == "hembra":
+            sql += " AND UPPER(sexo) LIKE 'H%'"
+        elif sexo == "macho":
+            sql += " AND UPPER(sexo) LIKE 'M%'"
+        row = self.db.query_one(sql, tuple(params))
+        n = int(row["n"]) if row else 0
+        etiquetas_m = {"VENDIDO": "vendidos", "MUERTO": "muertos", "HISTORICO": "históricos/dados de baja"}
+        etiquetas_f = {"VENDIDO": "vendidas", "MUERTO": "muertas", "HISTORICO": "históricas/dadas de baja"}
+        if sexo == "hembra":
+            sujeto, etiqueta = "Vacas", etiquetas_f.get(estado_norm, estado_norm.lower())
+        elif sexo == "macho":
+            sujeto, etiqueta = "Toros", etiquetas_m.get(estado_norm, estado_norm.lower())
+        else:
+            sujeto, etiqueta = "Animales", etiquetas_m.get(estado_norm, estado_norm.lower())
+        emoji = {"VENDIDO": "💰", "MUERTO": "⚰️"}.get(estado_norm, "📊")
+        return f"{emoji} {sujeto} {etiqueta}: <b>{_fmt_es_co(n)}</b>."
+
     def _fotos(self, tag) -> str:
         if not tag:
             fotos = self.db.ultimas_fotos(5)

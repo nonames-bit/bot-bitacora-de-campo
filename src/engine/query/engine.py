@@ -64,6 +64,23 @@ class QueryEngine(
         if tag and re.search(r"\b(?:cuando\s+se\s+movi[oó]|cuando\s+se\s+traslad[oó]|cuando\s+se\s+cambi[oó]|cuando\s+fue\s+el\s+traslado|cuando\s+entr[oó]|traslados?|movimientos?)\b", t):
             return self._ultimo_traslado(tag)
 
+        # 1c-bis. Conteos de inventario por edad exacta o por estado (vendidos/muertos)
+        m_edad = re.search(r"\b(\d+)\s*a[nñ]os?\b", t)
+        if m_edad and re.search(r"\bcuant[oa]s?\b|\bhay\b", t) and not re.search(r"\bdias?\s+abiert", t):
+            anios = int(m_edad.group(1))
+            sexo_edad = None
+            if re.search(r"\bvacas?\b|\bhembras?\b", t):
+                sexo_edad = "hembra"
+            elif re.search(r"\btoros?\b|\bmachos?\b", t):
+                sexo_edad = "macho"
+            return self._inventario_por_edad(anios, sexo=sexo_edad)
+        if re.search(r"\bvendid[oa]s?\b", t) and re.search(r"\bcuant[oa]s?\b|\bhay\b", t):
+            sexo_vendido = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
+            return self._conteo_por_estado("VENDIDO", sexo=sexo_vendido)
+        if re.search(r"\bmuert[oa]s?\b", t) and re.search(r"\bcuant[oa]s?\b|\bhay\b", t) and not tag:
+            sexo_muerto = "hembra" if re.search(r"\bvacas?\b|\bhembras?\b", t) else ("macho" if re.search(r"\btoros?\b|\bmachos?\b", t) else None)
+            return self._conteo_por_estado("MUERTO", sexo=sexo_muerto)
+
         # 1c. Consultas de lista de reproducción (varios animales a la vez, no un tag puntual)
         if re.search(r"\bdias?\s+abiert[oa]s?\b", t):
             m = re.search(r"(\d+)\s*dias?\s+abiert[oa]s?", t) or re.search(r"mas\s+de\s+(\d+)", t)
