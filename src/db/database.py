@@ -242,20 +242,41 @@ class Database:
             notas=notas,
         ))
 
+    def _id_si_ya_existe(self, tabla: str, condiciones: dict) -> Optional[int]:
+        """Busca una fila que coincida exactamente en las columnas dadas (usa
+        IS para que los None comparen correctamente contra NULL) y devuelve
+        su id, o None si no existe. Usado por los registrar_* de eventos en
+        vivo para que un reintento/doble envío no duplique la fila."""
+        where = " AND ".join(f"{k} IS ?" for k in condiciones)
+        fila = self.query_one(f"SELECT id FROM {tabla} WHERE {where}", tuple(condiciones.values()))
+        return fila["id"] if fila else None
+
     def registrar_servicio(self, vaca_tag, fecha=None, tipo_servicio=None,
                            toro_pajilla=None, raza_toro=None, inseminador=None,
                            fep_calculada=None, estado=None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
+        f = iso(fecha)
+        # Idempotente por (vaca, fecha, tipo, toro/pajilla): dos servicios
+        # reales el mismo día con distinto toro sí deben quedar ambos.
+        existente = self._id_si_ya_existe("servicios", {
+            "vaca_id": vaca_id, "fecha": f, "tipo_servicio": tipo_servicio, "toro_pajilla": toro_pajilla,
+        })
+        if existente:
+            return existente
         return self.insert("servicios", dict(
-            vaca_id=vaca_id, fecha=iso(fecha), tipo_servicio=tipo_servicio,
+            vaca_id=vaca_id, fecha=f, tipo_servicio=tipo_servicio,
             toro_pajilla=toro_pajilla, raza_toro=raza_toro, inseminador=inseminador,
             fep_calculada=iso(fep_calculada), estado=estado,
         ))
 
     def registrar_celo(self, vaca_tag, fecha=None, am_pm=None, notas=None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
+        f = iso(fecha)
+        existente = self._id_si_ya_existe("celos", {"vaca_id": vaca_id, "fecha": f, "am_pm": am_pm})
+        if existente:
+            return existente
         return self.insert("celos", dict(
-            vaca_id=vaca_id, fecha=iso(fecha), am_pm=am_pm, notas=notas,
+            vaca_id=vaca_id, fecha=f, am_pm=am_pm, notas=notas,
         ))
 
     def registrar_tratamiento(self, animal_tag, fecha=None, producto=None,
@@ -272,6 +293,13 @@ class Database:
         if not fin_carne and dias_retiro_carne and int(dias_retiro_carne) > 0:
             fin_carne = iso(add_days(f_dosis, int(dias_retiro_carne)))
 
+        # Idempotente por (animal, fecha, producto, dosis, via): dos
+        # tratamientos reales el mismo día con distinta dosis/vía sí quedan.
+        existente = self._id_si_ya_existe("tratamientos", {
+            "animal_id": animal_id, "fecha": f_dosis, "producto": producto, "dosis": dosis, "via": via,
+        })
+        if existente:
+            return existente
         return self.insert("tratamientos", dict(
             animal_id=animal_id, fecha=f_dosis, producto=producto,
             principio_activo=principio_activo, dosis=dosis, via=via,
@@ -287,16 +315,30 @@ class Database:
         animal_id = self.resolve_animal(animal_tag, crear=True)
         origen = self.resolve_potrero(potrero_origen) if potrero_origen else None
         destino = self.resolve_potrero(potrero_destino) if potrero_destino else None
+        f = iso(fecha)
+        existente = self._id_si_ya_existe("traslados", {
+            "animal_id": animal_id, "fecha": f, "potrero_destino": destino,
+        })
+        if existente:
+            return existente
         return self.insert("traslados", dict(
-            animal_id=animal_id, lote=lote, fecha=iso(fecha),
+            animal_id=animal_id, lote=lote, fecha=f,
             potrero_origen=origen, potrero_destino=destino, motivo=motivo,
         ))
 
     def registrar_pesaje(self, animal_tag, fecha=None, peso_kg=None,
                          gmd_calculada=None, evento=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
+        f = iso(fecha)
+        # Mismo animal + misma fecha + mismo peso exacto: en la práctica
+        # siempre es la misma nota reenviada, no dos pesajes reales idénticos.
+        existente = self._id_si_ya_existe("pesajes", {
+            "animal_id": animal_id, "fecha": f, "peso_kg": peso_kg,
+        })
+        if existente:
+            return existente
         return self.insert("pesajes", dict(
-            animal_id=animal_id, fecha=iso(fecha), peso_kg=peso_kg,
+            animal_id=animal_id, fecha=f, peso_kg=peso_kg,
             gmd_calculada=gmd_calculada, evento=evento,
         ))
 
@@ -307,12 +349,11 @@ class Database:
         # Idempotente por (animal_id, fecha, tipo_movimiento): un animal no se
         # vende/compra dos veces el mismo día, así que una nota repetida
         # (doble envío, reintento de red) no debe duplicar el movimiento.
-        existente = self.query_one(
-            "SELECT id FROM movimientos WHERE animal_id = ? AND fecha = ? AND tipo_movimiento = ?",
-            (animal_id, f, tipo_movimiento),
-        )
+        existente = self._id_si_ya_existe("movimientos", {
+            "animal_id": animal_id, "fecha": f, "tipo_movimiento": tipo_movimiento,
+        })
         if existente:
-            return existente["id"]
+            return existente
         return self.insert("movimientos", dict(
             animal_id=animal_id, fecha=f, tipo_movimiento=tipo_movimiento,
             procedencia_destino=procedencia_destino, precio=precio, notas=notas,

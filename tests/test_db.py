@@ -194,6 +194,48 @@ def test_registrar_movimiento_es_idempotente(db):
     assert id3 != id1
 
 
+def test_registrar_pesaje_es_idempotente(db):
+    id1 = db.registrar_pesaje("47", fecha="2026-08-01", peso_kg=200)
+    id2 = db.registrar_pesaje("47", fecha="2026-08-01", peso_kg=200)
+    assert id1 == id2
+    # Peso distinto el mismo día (corrección real) sí debe crear otra fila.
+    id3 = db.registrar_pesaje("47", fecha="2026-08-01", peso_kg=205)
+    assert id3 != id1
+
+
+def test_registrar_tratamiento_es_idempotente_pero_permite_dosis_distinta(db):
+    id1 = db.registrar_tratamiento("47", fecha="2026-08-01", producto="Ivermectina", dosis="10ml")
+    id2 = db.registrar_tratamiento("47", fecha="2026-08-01", producto="Ivermectina", dosis="10ml")
+    assert id1 == id2
+    # Mismo día, mismo producto, dosis distinta: dos aplicaciones reales.
+    id3 = db.registrar_tratamiento("47", fecha="2026-08-01", producto="Ivermectina", dosis="5ml")
+    assert id3 != id1
+
+
+def test_registrar_traslado_es_idempotente(db):
+    p1 = db.registrar_potrero("Norte")
+    id1 = db.registrar_traslado("47", fecha="2026-08-01", potrero_destino=p1)
+    id2 = db.registrar_traslado("47", fecha="2026-08-01", potrero_destino=p1)
+    assert id1 == id2
+
+
+def test_registrar_celo_es_idempotente_pero_permite_am_y_pm(db):
+    id1 = db.registrar_celo("47", fecha="2026-08-01", am_pm="AM")
+    id2 = db.registrar_celo("47", fecha="2026-08-01", am_pm="AM")
+    assert id1 == id2
+    # Celo en la mañana y otro observado en la tarde del mismo día: ambos reales.
+    id3 = db.registrar_celo("47", fecha="2026-08-01", am_pm="PM")
+    assert id3 != id1
+
+
+def test_registrar_servicio_es_idempotente_pero_permite_toro_distinto(db):
+    id1 = db.registrar_servicio("47", fecha="2026-08-01", tipo_servicio="IA", toro_pajilla="TORO 1")
+    id2 = db.registrar_servicio("47", fecha="2026-08-01", tipo_servicio="IA", toro_pajilla="TORO 1")
+    assert id1 == id2
+    id3 = db.registrar_servicio("47", fecha="2026-08-01", tipo_servicio="IA", toro_pajilla="TORO 2")
+    assert id3 != id1
+
+
 def test_detectar_duplicados_geneticos(db):
     db.registrar_animal("MADRE1", sexo="Hembra", estado="ACTIVO")
     db.registrar_animal("PADRE1", sexo="Macho", estado="ACTIVO")
