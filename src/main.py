@@ -42,7 +42,14 @@ def main(argv=None) -> int:
 
     bot = Bot(db)
 
-    if args.exportar and not (args.texto or args.audio or args.imagen):
+    # --importar y/o --exportar son modos de lote (CLI, cron, watcher remoto
+    # por SSH): deben terminar solos apenas hacen su trabajo. Sin este
+    # chequeo (antes solo miraba --exportar, nunca --importar), un
+    # `--importar archivo.zip` sin --texto/--audio/--imagen caía al modo
+    # interactivo de abajo y se quedaba bloqueado en input() esperando una
+    # línea que nunca llega cuando se invoca por SSH no interactivo -- el
+    # import ya había terminado, pero el proceso nunca salía.
+    if (args.importar or args.exportar) and not (args.texto or args.audio or args.imagen):
         db.close()
         return 0
 
