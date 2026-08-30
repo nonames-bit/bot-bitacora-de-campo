@@ -148,13 +148,21 @@ CREATE TABLE IF NOT EXISTS fotos (
     notas TEXT,
     ocr_text TEXT
 );
+
+CREATE TABLE IF NOT EXISTS import_sg_historial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha_iso TEXT,
+    archivo TEXT,
+    nuevos INTEGER,
+    duplicados INTEGER
+);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
-    "alertas", "fotos",
+    "alertas", "fotos", "import_sg_historial",
 ]
 
 

@@ -342,6 +342,25 @@ def test_import_zip_real(db):
     assert conteos2["animales"]["duplicados"] > 0
 
 
+def test_import_zip_registra_en_import_sg_historial(db):
+    # Regresión real: no había forma de saber si el bot estaba usando el
+    # backup de hoy sin adivinar por la fecha de modificación del archivo
+    # .db. import_zip() debe dejar un registro consultable por /sistema
+    # cada vez que se importa un backup (manual o por el vigilante).
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    zip_path = os.path.join(root, "docs", "Datos20260823.Zip")
+    if not os.path.exists(zip_path):
+        pytest.skip("Archivo de datos DBF no disponible")
+
+    assert db.ultimo_import_sg() is None
+    import_zip(db, zip_path)
+    ultimo = db.ultimo_import_sg()
+    assert ultimo is not None
+    assert ultimo["archivo"] == "Datos20260823.Zip"
+    assert ultimo["nuevos"] > 0
+    assert ultimo["fecha_iso"] is not None
+
+
 def test_import_fotos_directo_e_idempotente(db, tmp_path):
     import io
     import zipfile

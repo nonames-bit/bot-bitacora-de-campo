@@ -503,6 +503,16 @@ def test_formatear_estado_servidor(db, tmp_path):
     assert "INTEGRACIÓN DE MODELOS & APIS" in resp
     assert "Whisper" in resp
     assert "Pytesseract" in resp
+    # Regresión real: sin registro explícito de importaciones de Software
+    # Ganadero, no había forma de confirmar "¿ya está usando el backup de
+    # hoy?" salvo adivinar por la fecha de modificación del .db.
+    assert "Último backup SG importado" in resp
+    assert "Nunca" in resp
+
+    db.registrar_import_sg("Datos20260830.Zip", {"animales": {"nuevos": 5, "duplicados": 1}})
+    resp2 = formatear_estado_servidor(db, auth, ":memory:")
+    assert "Datos20260830.Zip" in resp2
+    assert "5 nuevos" in resp2
 
 
 def test_formatear_panel_medicamentos(db):

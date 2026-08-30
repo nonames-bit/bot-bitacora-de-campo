@@ -491,6 +491,33 @@ class Database:
     def ultimas_fotos(self, limit: int = 10) -> list[sqlite3.Row]:
         return self.query("SELECT * FROM fotos ORDER BY id DESC LIMIT ?", (limit,))
 
+    def registrar_import_sg(self, archivo: str, conteos: dict) -> int:
+        """Registra que se importó un backup de Software Ganadero: cuándo,
+        qué archivo y cuántas filas nuevas/duplicadas trajo en total. Usado
+        tanto por /confirmar_importar (subida manual por Telegram) como por
+        el vigilante automático (copias_watcher), ya que ambos llaman a
+        import_zip() -- un solo punto de registro para las dos vías."""
+        nuevos = 0
+        duplicados = 0
+        for tabla, res in conteos.items():
+            if isinstance(res, dict):
+                nuevos += res.get("nuevos", 0)
+                duplicados += res.get("duplicados", 0)
+        # os.path.basename() depende del SO (no separa por "\" en Linux); el
+        # vigilante de Windows puede pasar una ruta con backslashes aunque
+        # esto corra en el VPS (Linux), así que se separa manualmente por
+        # ambos separadores para quedar siempre solo con el nombre del archivo.
+        nombre_archivo = str(archivo).replace("\\", "/").rsplit("/", 1)[-1]
+        return self.insert("import_sg_historial", dict(
+            fecha_iso=self._ahora(),
+            archivo=nombre_archivo,
+            nuevos=nuevos,
+            duplicados=duplicados,
+        ))
+
+    def ultimo_import_sg(self) -> Optional[sqlite3.Row]:
+        return self.query_one("SELECT * FROM import_sg_historial ORDER BY id DESC LIMIT 1")
+
     # ------------------------------------------------------------------ #
     # Consultas frecuentes
     # ------------------------------------------------------------------ #

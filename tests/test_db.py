@@ -363,3 +363,34 @@ def test_condicion_corporal_aparece_en_historial(db):
     assert hist["condicion_corporal"][0]["valor"] == 3.5
 
 
+# ---------------------------------------------------------------------------
+# Registro de importaciones de Software Ganadero (¿está usando el backup de
+# hoy?)
+# ---------------------------------------------------------------------------
+def test_registrar_import_sg_y_consultar_ultimo(db):
+    assert db.ultimo_import_sg() is None
+    db.registrar_import_sg("Datos20260830.Zip", {
+        "animales": {"nuevos": 5, "duplicados": 2},
+        "partos": {"nuevos": 3, "duplicados": 0},
+    })
+    ultimo = db.ultimo_import_sg()
+    assert ultimo["archivo"] == "Datos20260830.Zip"
+    assert ultimo["nuevos"] == 8
+    assert ultimo["duplicados"] == 2
+    assert ultimo["fecha_iso"] is not None
+
+
+def test_registrar_import_sg_usa_solo_el_nombre_del_archivo(db):
+    # El vigilante local pasa una ruta absoluta de Windows; solo el nombre
+    # del archivo importa para el registro (no la ruta completa del disco
+    # del usuario).
+    db.registrar_import_sg(r"C:\Usati\Copias\Datos20260830.Zip", {})
+    assert db.ultimo_import_sg()["archivo"] == "Datos20260830.Zip"
+
+
+def test_ultimo_import_sg_devuelve_el_mas_reciente(db):
+    db.registrar_import_sg("Datos20260828.Zip", {"animales": {"nuevos": 1, "duplicados": 0}})
+    db.registrar_import_sg("Datos20260830.Zip", {"animales": {"nuevos": 2, "duplicados": 0}})
+    assert db.ultimo_import_sg()["archivo"] == "Datos20260830.Zip"
+
+

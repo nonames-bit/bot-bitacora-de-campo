@@ -1099,6 +1099,12 @@ def formatear_estado_servidor(
         size_str = f"{mb_size:.2f} MB"
 
     ts_str = _obtener_fecha_ultimo_backup(db, db_path)
+    ultimo_import = db.ultimo_import_sg()
+    if ultimo_import and ultimo_import["fecha_iso"]:
+        f_import = ultimo_import["fecha_iso"][:16].replace("T", " ")
+        import_str = f"{f_import} — {ultimo_import['archivo']} ({ultimo_import['nuevos']} nuevos)"
+    else:
+        import_str = "⚠️ Nunca (no se ha importado ningún backup de SG desde que existe este registro)"
     total_animales = db.count("animales")
     total_eventos = (
         db.count("partos") + db.count("servicios") + db.count("celos") +
@@ -1131,6 +1137,7 @@ def formatear_estado_servidor(
         f"• <b>Archivo:</b> {db_path or 'data/bitacora.db'} ({size_str})",
         f"• <b>Registros:</b> {_fmt_es_co(total_animales)} animales · {_fmt_es_co(total_eventos)} eventos históricos",
         f"• <b>Última sincronización / Backup:</b> {ts_str}",
+        f"• <b>Último backup SG importado:</b> {import_str}",
         "",
         f"👥 <b>USUARIOS AUTORIZADOS ({len(usuarios)}):</b>",
         f"• 👑 Dueño (OWNER): <b>{n_owner}</b>",
