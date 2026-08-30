@@ -918,6 +918,62 @@ def test_vacas_lactancia_larga(db):
     assert "47" in resp2
 
 
+def test_partos_atrasados(db):
+    from src.engine.query_engine import QueryEngine
+    # 47: FEP vencida, sin parto desde ese servicio -> debe salir en la lista.
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="47", fecha="2025-11-01", fep_calculada="2026-08-11")
+    # 12: FEP vencida pero ya parió después del servicio -> no debe salir.
+    db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="12", fecha="2025-11-01", fep_calculada="2026-08-11")
+    db.registrar_parto(vaca_tag="12", fecha="2026-08-15")
+    # 33: FEP todavía no vencida -> no debe salir.
+    db.registrar_animal("33", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio(vaca_tag="33", fecha="2026-08-01", fep_calculada="2027-05-11")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué vacas debían haber parido?")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "12" not in resp
+    assert "33" not in resp
+
+    resp2 = qe.responder("vacas atrasadas de parto")
+    assert "47" in resp2
+
+
+def test_animales_perdiendo_peso(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Macho", estado="ACTIVO")
+    db.registrar_pesaje(animal_tag="47", fecha="2026-08-01", peso_kg=300)
+    db.registrar_pesaje(animal_tag="47", fecha="2026-08-20", peso_kg=280)  # bajó
+    db.registrar_animal("12", sexo="Macho", estado="ACTIVO")
+    db.registrar_pesaje(animal_tag="12", fecha="2026-08-01", peso_kg=300)
+    db.registrar_pesaje(animal_tag="12", fecha="2026-08-20", peso_kg=320)  # subió
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué animales están perdiendo peso?")
+    assert "No entendí" not in resp
+    assert "47" in resp
+    assert "12" not in resp
+
+
+def test_condicion_corporal_consulta(db):
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_condicion_corporal("47", fecha="2026-08-01", valor=2.5)
+    db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=3.5)
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("condición corporal de la 47")
+    assert "No entendí" not in resp
+    assert "3.5" in resp
+    assert "2026-08-20" in resp
+
+    resp_sin_datos = qe.responder("condición corporal de la 99")
+    assert "No hay" in resp_sin_datos
+
+
 def test_cuantos_partos_tiene_nombre(db):
     from src.engine.query_engine import QueryEngine
     db.registrar_animal("47", nombre="patricia", sexo="Hembra", estado="ACTIVO")

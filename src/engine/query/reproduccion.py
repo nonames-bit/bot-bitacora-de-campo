@@ -266,6 +266,57 @@ class ReproduccionQueryMixin:
             lineas.append(f"• {s['tag']}{nom}: FEP {s['fep_calculada']}")
         return "\n".join(lineas)
 
+    def _partos_atrasados(self) -> str:
+        """Hembras activas cuya Fecha Estimada de Parto (FEP) ya se venció y
+        no tienen un parto registrado desde ese servicio: señal de aborto no
+        reportado, servicio fallido o fecha de servicio mal registrada.
+        Basado en la sección 13.13 del manual de Software Ganadero
+        ('Hembras que debían haber parido'). Solo se considera el servicio
+        más reciente de cada vaca."""
+        hoy_iso = iso(self.hoy)
+        servicios = self.db.query(
+            """
+            SELECT s.*, a.tag, a.nombre
+            FROM servicios s
+            JOIN animales a ON a.id_animal = s.vaca_id
+            WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL AND s.fep_calculada < ?
+            ORDER BY s.fecha DESC
+            """,
+            (hoy_iso,),
+        )
+        vistas: set = set()
+        atrasadas = []
+        for s in servicios:
+            if s["vaca_id"] in vistas:
+                continue
+            vistas.add(s["vaca_id"])
+            parto = self.db.query_one(
+                "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
+                (s["vaca_id"], s["fecha"]),
+            )
+            if parto:
+                continue
+            fep_date = to_date(s["fep_calculada"])
+            dias_atraso = (self.hoy - fep_date).days if fep_date else 0
+            nom = f" ({s['nombre']})" if s["nombre"] else ""
+            atrasadas.append((
+                dias_atraso,
+                f"{s['tag']}{nom}: FEP {s['fep_calculada']} ({dias_atraso} días de atraso)",
+            ))
+
+        if not atrasadas:
+            return "✅ No hay hembras con parto atrasado: todas las FEP vencidas ya tienen parto registrado."
+        atrasadas.sort(key=lambda x: -x[0])
+        lineas = [f"🔴 <b>Hembras que debían haber parido ({len(atrasadas)}):</b>"]
+        lineas.extend(f"• {texto}" for _, texto in atrasadas[:20])
+        if len(atrasadas) > 20:
+            lineas.append(f"<i>... y {len(atrasadas) - 20} más.</i>")
+        lineas.append("")
+        lineas.append(
+            "<i>Revise si hubo aborto no reportado, servicio fallido o la fecha del servicio quedó mal registrada.</i>"
+        )
+        return "\n".join(lineas)
+
     def _vacas_lactancia_larga(self, umbral_del: int = 200) -> str:
         """Vacas activas con días en leche (DEL) desde el último parto por encima del umbral
         (candidatas a secado)."""

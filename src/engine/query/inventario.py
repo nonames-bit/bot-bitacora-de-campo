@@ -25,6 +25,60 @@ class InventarioQueryMixin:
                     f"fue {ganancia:.3f} kg/día.")
         return f"La {tag} pesó {peso} kg el {ultimo['fecha']}."
 
+    def _condicion_corporal(self, tag) -> str:
+        if not tag:
+            return "¿De cuál animal desea la condición corporal? (ej. 'condición corporal de la 47')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No hay registro de condición corporal para la {tag}."
+        registro = self.db.ultima_condicion_corporal(aid)
+        if registro is None:
+            return f"No hay condición corporal registrada para la {tag}."
+        return f"La {tag} tiene condición corporal <b>{registro['valor']}</b> (registrada el {registro['fecha']})."
+
+    def _animales_perdiendo_peso(self) -> str:
+        """Animales activos cuyos dos últimos pesajes muestran ganancia diaria
+        negativa (están perdiendo peso): señal de un problema sanitario o
+        nutricional. Basado en la sección 13.14 del manual de Software
+        Ganadero ('Animales perdiendo peso')."""
+        candidatos = self.db.query(
+            """
+            SELECT a.id_animal, a.tag, a.nombre
+            FROM animales a
+            WHERE a.estado = 'ACTIVO' AND (
+                SELECT COUNT(*) FROM pesajes p WHERE p.animal_id = a.id_animal
+            ) >= 2
+            """
+        )
+        resultado = []
+        for c in candidatos:
+            pesajes = self.db.ultimos_pesajes(c["id_animal"], 2)
+            if len(pesajes) < 2:
+                continue
+            ultimo, anterior = pesajes[0], pesajes[1]
+            if ultimo["peso_kg"] is None or anterior["peso_kg"] is None:
+                continue
+            d1, d2 = to_date(anterior["fecha"]), to_date(ultimo["fecha"])
+            if not d1 or not d2 or (d2 - d1).days <= 0:
+                continue
+            ganancia = gmd(ultimo["peso_kg"], anterior["peso_kg"], (d2 - d1).days)
+            if ganancia >= 0:
+                continue
+            nom = f" ({c['nombre']})" if c["nombre"] else ""
+            resultado.append((
+                ganancia,
+                f"{c['tag']}{nom}: {anterior['peso_kg']:.0f}→{ultimo['peso_kg']:.0f}kg "
+                f"({ultimo['fecha']}), {ganancia:.3f} kg/día",
+            ))
+        if not resultado:
+            return "✅ No hay animales activos con pérdida de peso entre sus dos últimos pesajes."
+        resultado.sort(key=lambda x: x[0])  # más negativo primero
+        lineas = [f"⚠️ <b>Animales perdiendo peso ({len(resultado)}):</b>"]
+        lineas.extend(f"• {texto}" for _, texto in resultado[:20])
+        if len(resultado) > 20:
+            lineas.append(f"<i>... y {len(resultado) - 20} más.</i>")
+        return "\n".join(lineas)
+
     def _inventario_general(self) -> str:
         total = self.db.query_one("SELECT COUNT(*) as n FROM animales WHERE estado='ACTIVO'")
         n_total = int(total["n"]) if total else 0

@@ -195,6 +195,39 @@ def test_es_consulta_plural_con_periodo_no_arete(texto, esperado):
     assert nlu.es_consulta(texto) is esperado
 
 
+# ---------------------------------------------------------------------------
+# Condición corporal (BCS): nueva capacidad, calca el patrón de pesaje pero
+# con una salvedad -- sin valor numérico es una PREGUNTA, no un registro.
+@pytest.mark.parametrize("texto, esperado", [
+    ("condición corporal de la 47 es 3.5", "3.5"),
+    ("la 12 tiene condición corporal 3", "3"),
+    ("puntaje corporal 4.0 de la 105", "4.0"),
+])
+def test_extraer_condicion_corporal(texto, esperado):
+    tag = nlu.extraer_tag(texto)
+    valor = nlu.extraer_condicion_corporal(texto, tag_excluir=tag)
+    assert valor == float(esperado)
+
+
+def test_clasificar_condicion_corporal():
+    assert nlu.clasificar("condición corporal de la 47 es 3.5") == "condicion_corporal"
+
+
+def test_parse_condicion_corporal(parser):
+    ev = parser.parse("condición corporal de la 47 es 3.5")
+    assert ev.tipo == "condicion_corporal"
+    assert ev.animal_tag == "47"
+    assert ev.datos["valor"] == 3.5
+
+
+def test_parse_condicion_corporal_sin_valor_es_consulta(parser):
+    # Regresión: "condición corporal de la 47" sin número es una pregunta
+    # implícita ("¿cuál es...?"), no un registro con valor=None. Mismo tipo
+    # de bug que causó el falso "Registrada muerte del animal lote".
+    ev = parser.parse("condición corporal de la 47")
+    assert ev.tipo == "consulta"
+
+
 def test_transcribe_audio_sin_transcripcion_error(tmp_path):
     from src.parsers.media_handler import transcribe_audio, MediaError
     import pytest

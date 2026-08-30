@@ -332,3 +332,34 @@ def test_eliminar_registro_tabla_no_permitida_lanza_error(db):
         db.eliminar_registro("animales", 1)
 
 
+# ---------------------------------------------------------------------------
+# Condición corporal (BCS)
+# ---------------------------------------------------------------------------
+def test_registrar_condicion_corporal_y_consultar_ultima(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_condicion_corporal("47", fecha="2026-08-01", valor=3.0)
+    db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=3.5, registrado_por=99)
+
+    ultima = db.ultima_condicion_corporal("47")
+    assert ultima["valor"] == 3.5
+    assert ultima["fecha"] == "2026-08-20"
+    assert ultima["registrado_por"] == 99
+
+
+def test_registrar_condicion_corporal_es_idempotente(db):
+    id1 = db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=3.5)
+    id2 = db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=3.5)
+    assert id1 == id2
+    # Mismo animal y fecha, distinto valor: sí debe quedar como fila nueva.
+    id3 = db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=4.0)
+    assert id3 != id1
+
+
+def test_condicion_corporal_aparece_en_historial(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_condicion_corporal("47", fecha="2026-08-20", valor=3.5)
+    hist = db.historial("47")
+    assert len(hist["condicion_corporal"]) == 1
+    assert hist["condicion_corporal"][0]["valor"] == 3.5
+
+

@@ -195,6 +195,19 @@ class QueryEngine(
             return self._vacas_proximas_parir()
         if re.search(r"\bsecar\b", t) or (re.search(r"\blactancia\b", t) and re.search(r"\bdias\b", t)):
             return self._vacas_lactancia_larga()
+        # "Hembras que debían haber parido" (manual SG 13.13): FEP vencida sin
+        # parto registrado desde ese servicio.
+        if re.search(r"\bdeb[ií]an?\s+haber\s+parido\b", t) or (
+            re.search(r"\batrasad[ao]s?\b", t) and re.search(r"\bpart[oa]|\bvacas?\b|\bpreñ", t)
+        ):
+            return self._partos_atrasados()
+        # "Animales perdiendo peso" (manual SG 13.14): GMD negativa entre los
+        # dos últimos pesajes.
+        if re.search(
+            r"\bperdiendo\s+peso\b|\bperdieron\s+peso\b|\bbajando\s+de\s+peso\b|\bbajaron\s+de\s+peso\b|\bperdiendo\s+kilos\b",
+            t,
+        ):
+            return self._animales_perdiendo_peso()
 
         # 2. Partos y maternidad
         if re.search(r"\bcuant[oa]s?\s+partos\b", t):
@@ -247,6 +260,10 @@ class QueryEngine(
         # 7. Pesaje y crecimiento
         if re.search(r"\bpes[oó]\b|\bpesaje\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
+
+        # 7b. Condición corporal
+        if re.search(r"\bcondici[oó]n\s+corporal\b|\bpuntaje\s+corporal\b", t):
+            return self._condicion_corporal(tag)
 
         # Ocupación por lote (ej. "días de pastoreo del lote 1")
         if re.search(r"\blote\s+([a-z0-9]+)", t) and re.search(r"\bdias\b|\bpastoreo\b|\bocupaci[oó]n\b|\bdonde\b", t):

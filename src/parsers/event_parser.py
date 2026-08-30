@@ -123,6 +123,15 @@ class EventParser:
         handler = getattr(self, f"_parse_{intento}", None)
         if handler:
             handler(ev, t)
+
+        # "condición corporal de la 47" sin ningún número después de la frase
+        # es una PREGUNTA ("¿cuál es...?" implícito), no un registro: no hay
+        # valor que guardar. Sin esto, se intentaría registrar una condición
+        # corporal con valor=None. Mismo tipo de bug que causó el falso
+        # "Registrada muerte del animal lote" con preguntas sin verbo/valor.
+        if intento == "condicion_corporal" and ev.datos.get("valor") is None:
+            return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
+
         return ev
 
     def parse_events(self, texto: str) -> list[ParsedEvent]:
@@ -183,6 +192,9 @@ class EventParser:
             evento = "NACIMIENTO"
         ev.datos["peso_kg"] = peso
         ev.datos["evento"] = evento
+
+    def _parse_condicion_corporal(self, ev: ParsedEvent, t: str) -> None:
+        ev.datos["valor"] = nlu.extraer_condicion_corporal(t, tag_excluir=ev.animal_tag)
 
     def _parse_traslado(self, ev: ParsedEvent, t: str) -> None:
         potreros = nlu.extraer_potreros(t)

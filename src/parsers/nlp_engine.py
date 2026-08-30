@@ -55,6 +55,9 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\bpesaje\b", r"\bpes[oó]\b", r"\bpeso\s+\d",
         r"\d+\s*(?:kg|kilos|kilogramos)\b", r"\bkilogramos\b", r"\bkilos\b",
     ]),
+    ("condicion_corporal", [
+        r"\bcondici[oó]n\s+corporal\b", r"\bpuntaje\s+corporal\b",
+    ]),
     ("movimiento", [
         r"\bentraron\b", r"\bentr[oó]\b", r"\bsalieron\b", r"\bsali[oó]\b",
         r"\bcompr[aeoó]\b", r"\bcomprad[oa]s?\b", r"\bcomprad[oa]\b", r"\bventa\b",
@@ -253,6 +256,26 @@ def extraer_peso(texto: str) -> Optional[float]:
     m = re.search(r"\bpeso\s+(\d+(?:[.,]\d+)?)\b", t)
     if m:
         return _f(m.group(1))
+    return None
+
+
+def extraer_condicion_corporal(texto: str, tag_excluir: Optional[str] = None) -> Optional[float]:
+    """Extrae el valor de condición corporal (escala 1-5 o 1-9 según el
+    hato), ej. 'condición corporal de la 47 es 3.5', 'puntaje corporal 3'.
+    Busca el primer número después de la frase clave, descartando el
+    número que resulte ser el propio arete del animal (ej. 'de la 47') si
+    se pasa ``tag_excluir``, para no confundir el arete con el valor."""
+    t = normalizar(texto)
+    m_frase = re.search(r"condici[oó]n\s+corporal|puntaje\s+corporal", t)
+    if not m_frase:
+        return None
+    resto = t[m_frase.end():]
+    tag_norm = str(tag_excluir).strip().lower().lstrip("0") if tag_excluir else None
+    for m_num in re.finditer(r"\d+(?:[.,]\d+)?", resto):
+        valor = m_num.group(0)
+        if tag_norm and valor.lstrip("0") == tag_norm:
+            continue
+        return _f(valor)
     return None
 
 

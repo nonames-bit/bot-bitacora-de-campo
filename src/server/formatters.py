@@ -346,6 +346,10 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
     else:
         lineas.append("🥩 <b>Retiro de Carne:</b> ✅ <b>LIBRE (Sin restricción)</b>")
 
+    cc = db.ultima_condicion_corporal(aid)
+    if cc:
+        lineas.append(f"📏 <b>Condición Corporal:</b> {cc['valor']} (registrada el {cc['fecha']})")
+
     if not filas_t:
         lineas.append("\n📋 <i>Sin historial de tratamientos médicos registrados.</i>")
     else:
@@ -1338,6 +1342,12 @@ def texto_ejemplo_evento(tipo: str) -> str:
             "<code>salieron 8 toros vendidos para ceba</code>\n\n"
             "💡 <i>Inventario:</i> Actualiza altas y bajas del hato general."
         ),
+        "condicion_corporal": (
+            "📏 <b>Ejemplo de Condición Corporal:</b>\n"
+            "<code>condición corporal de la 47 es 3.5</code>\n"
+            "<code>la 12 tiene condición corporal 3</code>\n\n"
+            "💡 <i>Uso:</i> Se guarda por fecha, igual que un pesaje; sirve para ver la tendencia nutricional del animal."
+        ),
     }
     return ejemplos.get(tipo, "Selecciona una categoría para ver su ejemplo de nota de campo.")
 
@@ -1406,7 +1416,8 @@ def texto_guia_preguntas_animal() -> str:
         "⚖️ <b>Pesajes & Crecimiento:</b>\n"
         "• <i>«¿cuánto pesó la N069?»</i>\n"
         "• <i>«último pesaje del novillo A060»</i>\n"
-        "• <i>«ganancia diaria de la 47»</i>\n\n"
+        "• <i>«ganancia diaria de la 47»</i>\n"
+        "• <i>«condición corporal de la 47»</i>\n\n"
         "🌳 <b>Genealogía & Crías:</b>\n"
         "• <i>«¿quién es la madre de patricia?»</i>\n"
         "• <i>«quién es el padre de la 47»</i>\n"
@@ -1454,7 +1465,9 @@ def texto_guia_preguntas_reproduccion() -> str:
         "⚠️ <b>Días Abiertos & Fertilidad:</b>\n"
         "• <i>«¿qué vacas tienen más de 90 días abiertas?»</i>\n"
         "• <i>«vacas vacías sin inseminar»</i>\n"
-        "• <i>«vacas con celo pendiente de servicio»</i>\n\n"
+        "• <i>«vacas con celo pendiente de servicio»</i>\n"
+        "• <i>«¿qué vacas debían haber parido?»</i> (FEP vencida, revisar)\n"
+        "• <i>«¿qué animales están perdiendo peso?»</i>\n\n"
         "🍼 <b>Partos del Hato:</b>\n"
         "• <i>«¿qué partos hubo este mes?»</i>\n"
         "• <i>«partos de los últimos 30 días»</i>\n"

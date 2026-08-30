@@ -147,6 +147,11 @@ class Bot:
                 gmd_calculada=gmd_calc, evento=d.get("evento"),
                 registrado_por=user_id,
             )
+        elif ev.tipo == "condicion_corporal":
+            self.db.registrar_condicion_corporal(
+                animal_tag=ev.animal_tag, fecha=ev.fecha, valor=d.get("valor"),
+                registrado_por=user_id,
+            )
         elif ev.tipo == "traslado":
             self.db.registrar_traslado(
                 animal_tag=ev.animal_tag, fecha=ev.fecha, lote=d.get("lote"),
@@ -231,6 +236,8 @@ class Bot:
             return f"Registrado tratamiento de {tag}: {d.get('producto') or 'fármaco'}."
         if ev.tipo == "pesaje":
             return f"Registrado pesaje de la {tag}: {d.get('peso_kg')} kg."
+        if ev.tipo == "condicion_corporal":
+            return f"Registrada condición corporal de la {tag}: {d.get('valor')}."
         if ev.tipo == "traslado":
             return f"Registrado traslado (lote {d.get('lote') or '?'})."
         if ev.tipo == "movimiento":

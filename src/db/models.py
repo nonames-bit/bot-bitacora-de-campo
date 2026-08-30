@@ -119,6 +119,14 @@ CREATE TABLE IF NOT EXISTS movimientos (
     notas TEXT
 );
 
+CREATE TABLE IF NOT EXISTS condicion_corporal (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER,
+    fecha TEXT,
+    valor REAL,
+    notas TEXT
+);
+
 CREATE TABLE IF NOT EXISTS alertas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER,
@@ -145,7 +153,8 @@ CREATE TABLE IF NOT EXISTS fotos (
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "pesajes", "movimientos", "alertas", "fotos",
+    "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
+    "alertas", "fotos",
 ]
 
 

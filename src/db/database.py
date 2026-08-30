@@ -18,7 +18,7 @@ class Database:
     # son "eventos de campo" puntuales en el mismo sentido).
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
-        "traslados", "pesajes", "movimientos",
+        "traslados", "pesajes", "movimientos", "condicion_corporal",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -394,6 +394,30 @@ class Database:
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
+    def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
+                                     notas=None, registrado_por=None) -> int:
+        animal_id = self.resolve_animal(animal_tag, crear=True)
+        f = iso(fecha)
+        # Mismo animal + misma fecha + mismo valor: nota reenviada, no dos
+        # evaluaciones reales idénticas el mismo día.
+        existente = self._id_si_ya_existe("condicion_corporal", {
+            "animal_id": animal_id, "fecha": f, "valor": valor,
+        })
+        if existente:
+            return existente
+        return self.insert("condicion_corporal", dict(
+            animal_id=animal_id, fecha=f, valor=valor, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+    def ultima_condicion_corporal(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        if aid is None:
+            return None
+        return self.query_one(
+            "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
+        )
+
     def registrar_alerta(self, animal_tag, tipo_alerta, fecha_programada=None,
                          estado="PENDIENTE", descripcion=None) -> int:
         animal_id = self.resolve_animal(animal_tag) if animal_tag else None
@@ -584,6 +608,11 @@ class Database:
                        ('Movimiento ' || COALESCE(mo.tipo_movimiento, '')),
                        mo.creado_en, mo.registrado_por
                 FROM movimientos mo LEFT JOIN animales a ON a.id_animal = mo.animal_id
+                UNION ALL
+                SELECT 'condicion_corporal', cc.id, a.tag, cc.fecha,
+                       ('Condición corporal' || CASE WHEN cc.valor IS NOT NULL THEN ' ' || cc.valor ELSE '' END),
+                       cc.creado_en, cc.registrado_por
+                FROM condicion_corporal cc LEFT JOIN animales a ON a.id_animal = cc.animal_id
             )
             ORDER BY creado_en IS NULL, creado_en DESC, id DESC
             LIMIT ?
@@ -611,6 +640,7 @@ class Database:
             "traslados": lambda f: f"Traslado de {tag} (lote {f['lote'] or '?'})",
             "pesajes": lambda f: f"Pesaje de {tag}" + (f" — {f['peso_kg']}kg" if f["peso_kg"] is not None else ""),
             "movimientos": lambda f: f"Movimiento de {tag} ({f['tipo_movimiento'] or '?'})",
+            "condicion_corporal": lambda f: f"Condición corporal de {tag}" + (f" — {f['valor']}" if f["valor"] is not None else ""),
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,
@@ -663,6 +693,9 @@ class Database:
             "traslados": self.query("SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "pesajes": self.query("SELECT * FROM pesajes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "movimientos": self.query("SELECT * FROM movimientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
+            "condicion_corporal": self.query(
+                "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha", (aid,)
+            ),
             "fotos": self.query("SELECT * FROM fotos WHERE animal_id = ? OR tag = ? ORDER BY fecha", (aid, tag)),
         }
 
