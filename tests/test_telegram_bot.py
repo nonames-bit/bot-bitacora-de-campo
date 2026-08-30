@@ -769,6 +769,7 @@ def test_comando_graficos_panel_registrado():
     for tipo in (
         "evolucion", "waterfall", "categorias", "gmd", "iep", "iep_completo",
         "destete_raza", "padre", "aforo", "ocupacion", "prenadas", "dias_abiertos_km",
+        "leche_total", "eficiencia_lechera", "ranking_leche", "reproductivo_hato", "carga_animal",
     ):
         assert tipo in GRAFICOS_PANEL
 

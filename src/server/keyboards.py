@@ -287,6 +287,19 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📉 Días Abiertos (Kaplan-Meier)", callback_data="panel_grafico:dias_abiertos_km"),
         ],
         [
+            InlineKeyboardButton("🧬 Estado Reproductivo del Hato", callback_data="panel_grafico:reproductivo_hato"),
+        ],
+        [
+            InlineKeyboardButton("🥛 Producción Total de Leche", callback_data="panel_grafico:leche_total"),
+            InlineKeyboardButton("⚡ Eficiencia Lechera", callback_data="panel_grafico:eficiencia_lechera"),
+        ],
+        [
+            InlineKeyboardButton("🏆 Ranking de Vacas por Leche", callback_data="panel_grafico:ranking_leche"),
+        ],
+        [
+            InlineKeyboardButton("🐄 Carga Animal por Potrero (UGG/ha)", callback_data="panel_grafico:carga_animal"),
+        ],
+        [
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ],
     ]

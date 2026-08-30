@@ -16,7 +16,8 @@ gráfico para no hacerlas pasar por datos que no son.
 from __future__ import annotations
 
 import os
-from datetime import date
+from collections import defaultdict
+from datetime import date, timedelta
 from typing import Optional
 
 from ..utils import to_date
@@ -950,3 +951,265 @@ def generar_grafico_dias_abiertos_km(db, output_dir: str = "data/reportes",
             transform=ax.transAxes, ha="right", va="top", fontsize=8, color="#666666")
 
     return _guardar(fig, output_dir, f"grafico_dias_abiertos_km_{hoy.isoformat()}.png")
+
+
+# --------------------------------------------------------------------- #
+# Producción de leche del hato (agregada, no individual)
+# --------------------------------------------------------------------- #
+def _controles_leche_por_semana(db) -> dict:
+    """Agrupa todos los controles de leche por semana (lunes de esa semana):
+    {lunes: {"litros": total, "vacas": {ids}}}. Se agrupa por semana y no
+    por día porque el control es semanal, no diario -- un total "por día"
+    tendría casi todos los días en cero."""
+    controles = db.query(
+        "SELECT animal_id, fecha, litros FROM produccion_leche WHERE litros IS NOT NULL AND fecha IS NOT NULL"
+    )
+    por_semana: dict = defaultdict(lambda: {"litros": 0.0, "vacas": set()})
+    for c in controles:
+        f = to_date(c["fecha"])
+        if not f:
+            continue
+        lunes = f - timedelta(days=f.weekday())
+        por_semana[lunes]["litros"] += float(c["litros"])
+        por_semana[lunes]["vacas"].add(c["animal_id"])
+    return por_semana
+
+
+def generar_grafico_leche_total_hato(db, semanas: int = 12, output_dir: str = "data/reportes",
+                                     hoy: Optional[date] = None) -> Optional[str]:
+    """Litros totales del hato por semana (suma de todos los controles
+    registrados esa semana), para ver la tendencia de producción total de
+    la finca en el tiempo."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    por_semana = _controles_leche_por_semana(db)
+    if len(por_semana) < 2:
+        return None
+
+    semanas_ordenadas = sorted(por_semana.keys())[-semanas:]
+    etiquetas = [s.strftime("%d-%b") for s in semanas_ordenadas]
+    litros = [por_semana[s]["litros"] for s in semanas_ordenadas]
+
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
+    ax.bar(etiquetas, litros, color=_PALETA[0])
+    ax.set_ylabel("Litros totales por semana")
+    ax.set_title("Producción Total de Leche del Hato")
+    ax.tick_params(axis="x", rotation=45, labelsize=8)
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_leche_total_{hoy.isoformat()}.png")
+
+
+def generar_grafico_eficiencia_lechera(db, semanas: int = 12, output_dir: str = "data/reportes",
+                                       hoy: Optional[date] = None) -> Optional[str]:
+    """Litros por vaca en ordeño por día, por semana: total de litros de esa
+    semana dividido entre las vacas con control esa semana y entre 7 días.
+    Es el indicador de eficiencia, no solo de volumen -- una finca puede
+    producir más litros totales solo por tener más vacas, sin ser más
+    eficiente por vaca."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    por_semana = _controles_leche_por_semana(db)
+    if len(por_semana) < 2:
+        return None
+
+    semanas_ordenadas = sorted(por_semana.keys())[-semanas:]
+    etiquetas = [s.strftime("%d-%b") for s in semanas_ordenadas]
+    eficiencia = [
+        por_semana[s]["litros"] / len(por_semana[s]["vacas"]) / 7
+        for s in semanas_ordenadas if por_semana[s]["vacas"]
+    ]
+    if len(eficiencia) < 2:
+        return None
+
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=130)
+    ax.plot(etiquetas, eficiencia, marker="o", color=_PALETA[2], linewidth=2.2, markersize=6)
+    ax.set_ylabel("Litros / vaca en ordeño / día")
+    ax.set_title("Eficiencia Lechera del Hato")
+    ax.tick_params(axis="x", rotation=45, labelsize=8)
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_eficiencia_lechera_{hoy.isoformat()}.png")
+
+
+def generar_grafico_ranking_vacas_leche(db, output_dir: str = "data/reportes",
+                                        hoy: Optional[date] = None) -> Optional[str]:
+    """Ranking de vacas activas por promedio de litros/control, para
+    identificar las mejores productoras y las candidatas a revisar/
+    descartar de un vistazo. Verde = tercio superior, rojo = tercio
+    inferior (candidatas a revisión), azul = medio."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    filas = db.query(
+        """
+        SELECT pl.animal_id AS animal_id, a.tag AS tag, a.nombre AS nombre,
+               AVG(pl.litros) AS promedio, COUNT(*) AS n
+        FROM produccion_leche pl
+        JOIN animales a ON a.id_animal = pl.animal_id
+        WHERE pl.litros IS NOT NULL AND a.estado = 'ACTIVO'
+        GROUP BY pl.animal_id
+        """
+    )
+    if len(filas) < 3:
+        return None
+
+    filas_ordenadas = sorted(filas, key=lambda f: -f["promedio"])
+    etiquetas = []
+    valores = []
+    for f in filas_ordenadas:
+        nom = f"{f['tag']} ({f['nombre']})" if f["nombre"] else f["tag"]
+        etiquetas.append(nom)
+        valores.append(f["promedio"])
+
+    n = len(valores)
+    tercio = max(1, n // 3)
+    colores = []
+    for i in range(n):
+        if i < tercio:
+            colores.append("#00C853")
+        elif i >= n - tercio:
+            colores.append("#EF5350")
+        else:
+            colores.append(_PALETA[0])
+
+    fig, ax = plt.subplots(figsize=(8, max(3.5, 0.35 * n)), dpi=130)
+    ax.barh(list(reversed(etiquetas)), list(reversed(valores)), color=list(reversed(colores)))
+    ax.set_xlabel("Promedio de litros por control")
+    ax.set_title("Ranking de Vacas por Producción de Leche")
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_ranking_leche_{hoy.isoformat()}.png")
+
+
+# --------------------------------------------------------------------- #
+# Estado reproductivo agregado del hato
+# --------------------------------------------------------------------- #
+def generar_grafico_estado_reproductivo_hato(db, output_dir: str = "data/reportes",
+                                             hoy: Optional[date] = None) -> Optional[str]:
+    """Estado reproductivo de todo el hato (no por potrero): hembras nunca
+    servidas, vacías servidas y preñadas (estimado), más la tasa de preñez
+    sobre las hembras expuestas (servidas). Misma limitación que el resto
+    de las estimaciones reproductivas de este archivo: "preñada" es un
+    servicio abierto sin parto posterior, no un diagnóstico real."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    hembras = db.query(
+        "SELECT id_animal, fecha_nacimiento FROM animales "
+        "WHERE estado = 'ACTIVO' AND LOWER(SUBSTR(sexo, 1, 1)) = 'h'"
+    )
+    n_prenadas = 0
+    n_vacias_servidas = 0
+    n_nunca_servidas = 0
+    for h in hembras:
+        fnac = to_date(h["fecha_nacimiento"])
+        if fnac and (hoy - fnac).days < 365:
+            continue  # cría, no aplica
+        ult_serv = db.ultimo_servicio(h["id_animal"])
+        if ult_serv is None:
+            n_nunca_servidas += 1
+            continue
+        if _hembra_prenada_estimado(db, h["id_animal"]):
+            n_prenadas += 1
+        else:
+            n_vacias_servidas += 1
+
+    expuestas = n_prenadas + n_vacias_servidas
+    if expuestas == 0:
+        return None
+    tasa = n_prenadas / expuestas * 100
+
+    categorias = ["Preñadas\n(estimado)", "Vacías\n(servidas)", "Nunca\nservidas"]
+    valores = [n_prenadas, n_vacias_servidas, n_nunca_servidas]
+    colores = [_PALETA[2], _PALETA[3], _PALETA[4]]
+
+    fig, ax = plt.subplots(figsize=(7, 5.5), dpi=130)
+    barras = ax.bar(categorias, valores, color=colores)
+    ax.set_ylim(0, max(valores) * 1.22)
+    for barra, v in zip(barras, valores):
+        ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" {v}",
+                ha="center", va="bottom", fontsize=10)
+    ax.set_ylabel("Hembras en edad reproductiva")
+    ax.set_title("Estado Reproductivo del Hato")
+    _estilo_ejes(ax)
+    ax.text(0.98, 0.95, f"Tasa de preñez (sobre expuestas): {tasa:.0f}%",
+            transform=ax.transAxes, ha="right", va="top", fontsize=9,
+            color=_COLOR_MARCA, fontweight="bold")
+
+    return _guardar(fig, output_dir, f"grafico_estado_reproductivo_{hoy.isoformat()}.png")
+
+
+# --------------------------------------------------------------------- #
+# Carga animal por hectárea (UGG/ha)
+# --------------------------------------------------------------------- #
+def _ugg_de_animal(db, animal_id: int, fecha_nacimiento, hoy: date) -> float:
+    """Estima las Unidades Gran Ganado (UGG, 1 UGG = 450 kg de peso vivo) de
+    un animal. Usa su último pesaje real si existe; si no, un estimado por
+    categoría de edad (cría/levante/adulto) -- menos preciso, pero evita
+    dejar fuera del cálculo a los animales sin pesaje registrado."""
+    ultimo_peso = db.query_one(
+        "SELECT peso_kg FROM pesajes WHERE animal_id = ? AND peso_kg IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+        (animal_id,),
+    )
+    if ultimo_peso and ultimo_peso["peso_kg"]:
+        return float(ultimo_peso["peso_kg"]) / 450.0
+    fnac = to_date(fecha_nacimiento)
+    edad = (hoy - fnac).days if fnac else None
+    if edad is not None and edad < 365:
+        return 0.3
+    if edad is not None and edad < 730:
+        return 0.6
+    return 1.0
+
+
+def generar_grafico_carga_animal_potrero(db, output_dir: str = "data/reportes",
+                                         hoy: Optional[date] = None) -> Optional[str]:
+    """UGG/ha por potrero, usando el último peso conocido de cada animal (o
+    un estimado por categoría cuando no hay pesaje) sobre el área real de
+    cada potrero. Útil para detectar sobrecarga antes de que se note en el
+    pasto."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+
+    grupos = calcular_existencias_potreros_sg(db, hoy)
+    if not grupos:
+        return None
+
+    potreros_area = {p["id"]: p["area_has"] for p in db.query("SELECT id, area_has FROM potreros")}
+
+    nombres = []
+    cargas = []
+    for g in grupos:
+        area_total = sum(potreros_area.get(pid) or 0 for pid in g.get("ids", set()))
+        if not area_total:
+            continue
+        ugg_total = sum(
+            _ugg_de_animal(db, a["id_animal"], a["fecha_nacimiento"], hoy)
+            for a in g.get("animales", [])
+        )
+        nombres.append(g["display"])
+        cargas.append(ugg_total / area_total)
+
+    if not nombres:
+        return None
+
+    orden = sorted(range(len(nombres)), key=lambda i: -cargas[i])
+    nombres = [nombres[i] for i in orden]
+    cargas = [cargas[i] for i in orden]
+    colores = ["#EF5350" if c > 3 else ("#FFC107" if c > 2 else "#00C853") for c in cargas]
+
+    fig, ax = plt.subplots(figsize=(8, max(3.5, 0.4 * len(nombres))), dpi=130)
+    ax.barh(nombres, cargas, color=colores)
+    ax.set_xlabel("Carga animal (UGG/ha, estimado)")
+    ax.set_title("Carga Animal por Potrero")
+    _estilo_ejes(ax)
+
+    return _guardar(fig, output_dir, f"grafico_carga_animal_{hoy.isoformat()}.png")

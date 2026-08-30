@@ -9,17 +9,22 @@ from src.engine.charts import (
     _calcular_ieps,
     _kaplan_meier,
     generar_grafico_aforo_potreros,
+    generar_grafico_carga_animal_potrero,
     generar_grafico_categorias,
     generar_grafico_dias_abiertos_km,
+    generar_grafico_eficiencia_lechera,
+    generar_grafico_estado_reproductivo_hato,
     generar_grafico_evolucion_rebano,
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
     generar_grafico_iep_boxplot_completo,
     generar_grafico_lactancia,
+    generar_grafico_leche_total_hato,
     generar_grafico_ocupacion_potreros,
     generar_grafico_peso,
     generar_grafico_peso_destete_por_raza,
     generar_grafico_prenadas_vacias_potrero,
+    generar_grafico_ranking_vacas_leche,
     generar_grafico_rendimiento_padre,
     generar_grafico_waterfall_inventario,
     graficos_disponibles,
@@ -360,3 +365,82 @@ def test_generar_grafico_lactancia_sin_parto_devuelve_none(db, tmp_path):
 
 def test_generar_grafico_lactancia_animal_inexistente_devuelve_none(db, tmp_path):
     assert generar_grafico_lactancia(db, "no-existe-999", output_dir=str(tmp_path)) is None
+
+
+# ---------------------------------------------------------------------------
+# Producción de leche del hato (agregada): total, eficiencia, ranking
+# ---------------------------------------------------------------------------
+def _sembrar_leche_semanal(db, semanas=3, vacas=3):
+    from datetime import timedelta
+    for i in range(vacas):
+        tag = f"V{i}"
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO")
+        for s in range(semanas):
+            f = date(2026, 6, 1) + timedelta(weeks=s)
+            db.registrar_leche(tag, fecha=f.isoformat(), litros=10.0 + i + s)
+
+
+def test_generar_grafico_leche_total_hato(db, tmp_path):
+    _sembrar_leche_semanal(db)
+    ruta = generar_grafico_leche_total_hato(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_leche_total_hato_sin_datos_devuelve_none(db, tmp_path):
+    assert generar_grafico_leche_total_hato(db, output_dir=str(tmp_path)) is None
+
+
+def test_generar_grafico_eficiencia_lechera(db, tmp_path):
+    _sembrar_leche_semanal(db)
+    ruta = generar_grafico_eficiencia_lechera(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_ranking_vacas_leche(db, tmp_path):
+    _sembrar_leche_semanal(db)
+    ruta = generar_grafico_ranking_vacas_leche(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_ranking_vacas_leche_pocas_vacas_devuelve_none(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_leche("47", fecha="2026-06-01", litros=10.0)
+    assert generar_grafico_ranking_vacas_leche(db, output_dir=str(tmp_path)) is None
+
+
+# ---------------------------------------------------------------------------
+# Estado reproductivo agregado del hato
+# ---------------------------------------------------------------------------
+def test_generar_grafico_estado_reproductivo_hato(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2022-01-01")
+    db.registrar_servicio(vaca_tag="47", fecha="2026-01-01", fep_calculada="2026-10-08")
+    db.registrar_animal("48", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2022-01-01")
+    ruta = generar_grafico_estado_reproductivo_hato(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_estado_reproductivo_hato_sin_expuestas_devuelve_none(db, tmp_path):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2022-01-01")
+    assert generar_grafico_estado_reproductivo_hato(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+# ---------------------------------------------------------------------------
+# Carga animal por hectárea (UGG/ha)
+# ---------------------------------------------------------------------------
+def test_generar_grafico_carga_animal_potrero(db, tmp_path):
+    p1 = db.registrar_potrero("Norte", area_has=5.0)
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2022-01-01")
+    db.registrar_pesaje(animal_tag="47", fecha="2026-08-01", peso_kg=450)
+    ruta = generar_grafico_carga_animal_potrero(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_carga_animal_potrero_sin_area_devuelve_none(db, tmp_path):
+    p1 = db.registrar_potrero("Norte")  # sin area_has
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2022-01-01")
+    assert generar_grafico_carga_animal_potrero(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None

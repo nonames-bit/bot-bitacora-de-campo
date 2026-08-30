@@ -16,17 +16,22 @@ from ..bot.bot_interface import Bot
 from ..db.database import Database
 from ..engine.charts import (
     generar_grafico_aforo_potreros,
+    generar_grafico_carga_animal_potrero,
     generar_grafico_categorias,
     generar_grafico_dias_abiertos_km,
+    generar_grafico_eficiencia_lechera,
+    generar_grafico_estado_reproductivo_hato,
     generar_grafico_evolucion_rebano,
     generar_grafico_gmd_hato,
     generar_grafico_iep_boxplot,
     generar_grafico_iep_boxplot_completo,
     generar_grafico_lactancia,
+    generar_grafico_leche_total_hato,
     generar_grafico_ocupacion_potreros,
     generar_grafico_peso,
     generar_grafico_peso_destete_por_raza,
     generar_grafico_prenadas_vacias_potrero,
+    generar_grafico_ranking_vacas_leche,
     generar_grafico_rendimiento_padre,
     generar_grafico_waterfall_inventario,
     graficos_disponibles,
@@ -114,6 +119,11 @@ GRAFICOS_PANEL = {
     "ocupacion": (generar_grafico_ocupacion_potreros, "🔄 Ocupación de Potreros (Voisin)"),
     "prenadas": (generar_grafico_prenadas_vacias_potrero, "🤰 Preñadas vs Vacías por Potrero (estimado)"),
     "dias_abiertos_km": (generar_grafico_dias_abiertos_km, "📉 Días Abiertos (curva de Kaplan-Meier)"),
+    "leche_total": (generar_grafico_leche_total_hato, "🥛 Producción Total de Leche del Hato"),
+    "eficiencia_lechera": (generar_grafico_eficiencia_lechera, "⚡ Eficiencia Lechera del Hato"),
+    "ranking_leche": (generar_grafico_ranking_vacas_leche, "🏆 Ranking de Vacas por Producción"),
+    "reproductivo_hato": (generar_grafico_estado_reproductivo_hato, "🧬 Estado Reproductivo del Hato"),
+    "carga_animal": (generar_grafico_carga_animal_potrero, "🐄 Carga Animal por Potrero (UGG/ha)"),
 }
 
 
