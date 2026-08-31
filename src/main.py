@@ -21,6 +21,7 @@ def main(argv=None) -> int:
     parser.add_argument("--texto", help="Procesa un mensaje de texto y termina")
     parser.add_argument("--audio", help="Procesa un archivo de audio")
     parser.add_argument("--imagen", help="Procesa un archivo de imagen")
+    parser.add_argument("--despacho", action="store_true", help="Genera y muestra el Despacho Matutino")
     args = parser.parse_args(argv)
 
     if args.server:
@@ -30,6 +31,12 @@ def main(argv=None) -> int:
 
     db = Database(args.db or "bitacora.db")
     db.create_tables()
+
+    if args.despacho:
+        from src.server.formatters import formatear_despacho_matutino
+        print(formatear_despacho_matutino(db))
+        db.close()
+        return 0
 
     if args.importar:
         conteos = import_zip(db, args.importar)

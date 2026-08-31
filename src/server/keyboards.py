@@ -38,25 +38,44 @@ def crear_teclado_guia_chat() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def crear_teclado_trabajador() -> InlineKeyboardMarkup:
+def crear_teclado_despacho_matutino() -> InlineKeyboardMarkup:
     keyboard = [
         [
-            InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
             InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
+            InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
         ],
         [
             InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+            InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
+        ],
+        [
+            InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_trabajador() -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton("🌅 Despacho Matutino", callback_data="cmd:despacho"),
+            InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
+        ],
+        [
+            InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
+            InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+        ],
+        [
             InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
+            InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
         ],
         [
             InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
         ],
         [
             InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
-            InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
-        ],
-        [
-            InlineKeyboardButton("📖 Ver Todos los Comandos", callback_data="cmd:ayuda"),
+            InlineKeyboardButton("📖 Todos los Comandos", callback_data="cmd:ayuda"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -64,23 +83,24 @@ def crear_teclado_trabajador() -> InlineKeyboardMarkup:
 def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
     keyboard = [
         [
-            InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
+            InlineKeyboardButton("🌅 Despacho Matutino", callback_data="cmd:despacho"),
             InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
         ],
         [
+            InlineKeyboardButton("🔍 Buscar Animal / Ficha", callback_data="cmd:buscar_animal"),
             InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+        ],
+        [
             InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
-        ],
-        [
             InlineKeyboardButton("📊 Población & KPIs SG", callback_data="cmd:poblacion"),
-            InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
         ],
         [
+            InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
             InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
-            InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
             InlineKeyboardButton("📊 Gráficos de la Finca", callback_data="cmd:graficos"),
+            InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
             InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),

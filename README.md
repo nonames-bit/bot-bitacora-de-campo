@@ -361,8 +361,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 ### ⏳ En Progreso / Calibración Continua
 - [ ] Calibración de parámetros y retroalimentación de uso en campo.
 
-### 📋 Hoja de Ruta Pendiente
-- [ ] Mejoras continuas en modelos de visión especializada.
+### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
+- [ ] **Fase 4 — El Despacho Matutino**: Briefing 5:30 AM con inseminaciones AM-PM, Voisin día 3 y listo ≥30d, palpación/eco día 35/60, celo perdido >50d y alertas push ≥4d.
+- [ ] **Fase 5 — Reproducción Completa + Termo**: Evento palpación directo con S/C y tasa concepción, termo por canastilla con descuento auto y recarga N2 21-30d + OCR factura via easyocr, simulador cruzamiento 1-toque consanguinidad 3G y ranking fertilidad toro.
+- [ ] **Fase 6 — Economía + Balance Forrajero**: Costeo tratamiento/suplemento (Costo/kg y Margen $/L), balance MS oferta vs demanda (2.8% PV x UGG) y ajuste UGG/ha por lluvia IDEAM.
+- [ ] **Fase 7 — PWA Oficina + Corral Offline**: Dashboard web ejecutivo, fichas QR en PDF por lote, identificación arete foto/RFID barro y modo offline lite con cola + SOS.
+- [ ] **Fase 8 — Visión Multimodal**: Estimación BCS foto 1.0-5.0 con Gemini Vision, OCR arete avanzado (sucio/botón) y NDVI Sentinel-2 via qgis-mcp con carga dinámica.
 
 ---
 

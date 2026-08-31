@@ -1876,3 +1876,244 @@ def formatear_panel_preguntas_rapidas_texto() -> str:
         "────────────────────────────────────────\n"
         "Seleccione una pregunta para obtener la respuesta zootécnica al instante:"
     )
+
+
+def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_nombre: str = "GANADERÍA JA") -> str:
+    """Genera el Despacho Matutino (Morning Briefing) con las tareas críticas del día:
+    1. Ordeño & Retiros sanitarios (bloqueo preventivo de leche al tanque).
+    2. Inseminaciones AM por regla AM-PM (celos de ayer PM).
+    3. Rotación de pasturas Voisin (sobreocupación >=3d y potrero en descanso listo).
+    4. Calendario reproductivo (ecografías d35, palpaciones d60, partos próximos 7d).
+    5. Conteo del hato activo.
+    """
+    if hoy is None:
+        hoy = date.today()
+    hoy_iso = hoy.isoformat()
+    ayer = add_days(hoy, -1)
+    ayer_iso = ayer.isoformat()
+    lim_7d = add_days(hoy, 7).isoformat()
+
+    dias_sem = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
+    meses_es = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+    nombre_dia = dias_sem[hoy.weekday()]
+    fecha_bonita = f"{nombre_dia}, {hoy.day} de {meses_es[hoy.month]} de {hoy.year}"
+
+    lineas = [
+        f"🌅 <b>DESPACHO MATUTINO — {finca_nombre}</b>",
+        f"📅 <i>{fecha_bonita} · 05:30 AM</i>",
+        "────────────────────────────────────────",
+    ]
+
+    # 1. 🥛 Control de Ordeño & Retiros Sanitarios (Prioridad Crítica)
+    retiros_leche = db.query(
+        """
+        SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM tratamientos t
+        JOIN animales a ON a.id_animal = t.animal_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND t.fecha_fin_retiro_leche IS NOT NULL
+          AND t.fecha_fin_retiro_leche >= ?
+        ORDER BY t.fecha_fin_retiro_leche ASC
+        """,
+        (hoy_iso,),
+    )
+
+    retiros_carne = db.query(
+        """
+        SELECT t.*, a.tag, a.nombre
+        FROM tratamientos t
+        JOIN animales a ON a.id_animal = t.animal_id
+        WHERE a.estado = 'ACTIVO'
+          AND t.fecha_fin_retiro_carne IS NOT NULL
+          AND t.fecha_fin_retiro_carne >= ?
+        ORDER BY t.fecha_fin_retiro_carne ASC
+        """,
+        (hoy_iso,),
+    )
+
+    if retiros_leche:
+        lineas.append(f"⛔ <b>¡ALERTA DE ORDEÑO! VACAS EN RETIRO ({len(retiros_leche)}):</b>")
+        lineas.append("⚠️ <i>NO echar esta leche al tanque bajo ninguna circunstancia:</i>")
+        for r in retiros_leche:
+            tag_nom = r["tag"] or f"#{r['animal_id']}"
+            if r["nombre"]:
+                tag_nom += f" ({r['nombre']})"
+            f_fin = to_date(r["fecha_fin_retiro_leche"])
+            d_quedan = (f_fin - hoy).days if f_fin else 0
+            d_txt = f"Quedan {d_quedan}d" if d_quedan > 0 else "Último día hoy"
+            med = r["producto"] or "Fármaco"
+            lineas.append(f"• 🔴 <b>{_esc(tag_nom)}</b> — {_esc(med)} (⛔ {d_txt}, hasta {r['fecha_fin_retiro_leche']})")
+        lineas.append("")
+    else:
+        lineas.append("🥛 <b>Control de Ordeño:</b> ✅ <b>Tanque de Leche Libre</b> (0 vacas en retiro sanitario).")
+
+    if retiros_carne:
+        lineas.append(f"🥩 <b>Retiro de Carne:</b> ⚠️ {len(retiros_carne)} animales en carencia (no aptos para sacrificio).\n")
+    else:
+        lineas.append("")
+
+    # 2. 🧬 Inseminaciones de la Mañana (Regla AM-PM)
+    celos_ayer_pm = db.query(
+        """
+        SELECT c.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM celos c
+        JOIN animales a ON a.id_animal = c.vaca_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND c.fecha = ?
+          AND (UPPER(c.am_pm) LIKE '%PM%' OR UPPER(c.am_pm) = 'TARDE')
+        ORDER BY c.id DESC
+        """,
+        (ayer_iso,),
+    )
+
+    alertas_ia_hoy = db.query(
+        """
+        SELECT al.*, a.tag, a.nombre
+        FROM alertas al
+        JOIN animales a ON a.id_animal = al.animal_id
+        WHERE a.estado = 'ACTIVO'
+          AND al.tipo_alerta = 'INSEMINACION_PROGRAMADA'
+          AND al.estado = 'PENDIENTE'
+          AND al.fecha_programada = ?
+        """,
+        (hoy_iso,),
+    )
+
+    vacas_inseminar = []
+    vistos_ia = set()
+    for c in celos_ayer_pm:
+        tag_v = c["tag"] or f"#{c['vaca_id']}"
+        nom_v = f" ({c['nombre']})" if c["nombre"] else ""
+        if c["vaca_id"] not in vistos_ia:
+            vistos_ia.add(c["vaca_id"])
+            vacas_inseminar.append(f"• 💉 <b>{_esc(tag_v)}{_esc(nom_v)}</b> — Celo observado ayer PM <i>(Inseminar antes de las 10:00 AM)</i>")
+
+    for al in alertas_ia_hoy:
+        tag_v = al["tag"] or f"#{al['animal_id']}"
+        nom_v = f" ({al['nombre']})" if al["nombre"] else ""
+        if al["animal_id"] not in vistos_ia:
+            vistos_ia.add(al["animal_id"])
+            vacas_inseminar.append(f"• 💉 <b>{_esc(tag_v)}{_esc(nom_v)}</b> — Inseminación programada para hoy")
+
+    if vacas_inseminar:
+        lineas.append(f"🔥 <b>INSEMINACIONES DE ESTA MAÑANA ({len(vacas_inseminar)}):</b>")
+        lineas.extend(vacas_inseminar)
+        lineas.append("")
+    else:
+        lineas.append("🧬 <b>Inseminaciones AM:</b> Sin servicios de regla AM-PM programados para hoy.\n")
+
+    # 3. 🌿 Pasturas & Rotación Voisin del Día
+    existencias_pot = calcular_existencias_potreros_sg(db, hoy)
+    potreros_sobreocupados = []
+    potreros_listos_reposo = []
+
+    for ep in existencias_pot:
+        if ep["total"] > 0:
+            pot_nom = ep["display"]
+            f_ing = to_date(ep.get("fecha_ingreso_reciente"))
+            d_ocu = (hoy - f_ing).days if f_ing else None
+            if d_ocu is not None and d_ocu >= 3:
+                potreros_sobreocupados.append((pot_nom, d_ocu, ep["total"]))
+
+    todos_potreros = db.query(
+        "SELECT id, codigo, nombre, dias_reposo, aforo_kg_m2 FROM potreros WHERE dias_reposo IS NOT NULL AND dias_reposo >= 30 ORDER BY dias_reposo DESC LIMIT 3"
+    )
+    for p in todos_potreros:
+        pot_nom = (p["nombre"] or p["codigo"] or f"Potrero #{p['id']}").strip()
+        has_animales = any(ep["display"].strip().upper() == pot_nom.upper() and ep["total"] > 0 for ep in existencias_pot)
+        if not has_animales:
+            potreros_listos_reposo.append((pot_nom, p["dias_reposo"], p["aforo_kg_m2"]))
+
+    lineas.append("🌿 <b>PASTURAS & ROTACIÓN VOISIN:</b>")
+    if potreros_sobreocupados:
+        for p_nom, d_ocu, cant in potreros_sobreocupados:
+            semaforo = "🔴" if d_ocu >= 4 else "🟡"
+            lineas.append(f"• {semaforo} <b>Rotar hoy:</b> Potrero <b>{_esc(p_nom)}</b> ({cant} animales, lleva <b>{d_ocu} días</b> de pastoreo).")
+    else:
+        lineas.append("• ✅ Todos los potreros en pastoreo están en tiempo óptimo (≤2 días).")
+
+    if potreros_listos_reposo:
+        p_rec, d_rep, afo = potreros_listos_reposo[0]
+        afo_txt = f" · Aforo: {afo:.2f} kg/m²" if afo else ""
+        lineas.append(f"• 🌱 <b>Entrada recomendada:</b> Potrero <b>{_esc(p_rec)}</b> (<b>{d_rep} días</b> de reposo óptimo{afo_txt}).")
+    lineas.append("")
+
+    # 4. 🤰 Calendario Reproductivo & Veterinario
+    partos_7d = db.query(
+        """
+        SELECT s.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM servicios s
+        JOIN animales a ON a.id_animal = s.vaca_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND s.fep_calculada IS NOT NULL
+          AND s.fep_calculada >= ? AND s.fep_calculada <= ?
+        ORDER BY s.fep_calculada ASC
+        LIMIT 5
+        """,
+        (hoy_iso, lim_7d),
+    )
+
+    servicios_eco = db.query(
+        """
+        SELECT s.*, a.tag, a.nombre
+        FROM servicios s
+        JOIN animales a ON a.id_animal = s.vaca_id
+        WHERE a.estado = 'ACTIVO'
+          AND s.fecha IS NOT NULL
+          AND s.fecha = ?
+        """,
+        (add_days(hoy, -35).isoformat(),),
+    )
+
+    servicios_palp = db.query(
+        """
+        SELECT s.*, a.tag, a.nombre
+        FROM servicios s
+        JOIN animales a ON a.id_animal = s.vaca_id
+        WHERE a.estado = 'ACTIVO'
+          AND s.fecha IS NOT NULL
+          AND s.fecha = ?
+        """,
+        (add_days(hoy, -60).isoformat(),),
+    )
+
+    tareas_vet = []
+    if servicios_eco:
+        for se in servicios_eco:
+            tag_v = se["tag"] or f"#{se['vaca_id']}"
+            tareas_vet.append(f"• 🔬 <b>Ecografía (Día 35):</b> Vaca <b>{_esc(tag_v)}</b> (Servicio del {se['fecha']})")
+
+    if servicios_palp:
+        for sp in servicios_palp:
+            tag_v = sp["tag"] or f"#{sp['vaca_id']}"
+            tareas_vet.append(f"• 🩺 <b>Palpación (Día 60):</b> Vaca <b>{_esc(tag_v)}</b> (Servicio del {sp['fecha']})")
+
+    if partos_7d:
+        for p7 in partos_7d:
+            tag_v = p7["tag"] or f"#{p7['vaca_id']}"
+            f_fep = to_date(p7["fep_calculada"])
+            d_fep = (f_fep - hoy).days if f_fep else 0
+            d_fep_txt = "¡Hoy o mañana!" if d_fep <= 1 else f"en {d_fep} días"
+            tareas_vet.append(f"• 🍼 <b>Parto próximo:</b> Vaca <b>{_esc(tag_v)}</b> — FEP: {p7['fep_calculada']} ({d_fep_txt})")
+
+    if tareas_vet:
+        lineas.append(f"🤰 <b>CALENDARIO REPRODUCTIVO & VETERINARIO ({len(tareas_vet)}):</b>")
+        lineas.extend(tareas_vet)
+        lineas.append("")
+
+    # 5. 📊 Resumen de Inventario Rápido
+    activos = _contar_activos(db)
+    datos_brk = calcular_brackets_inventario_sg(db, hoy)
+    n_h = datos_brk["total_hembras"]
+    n_m = datos_brk["total_machos"]
+    n_cr = datos_brk["terneros_menor_12m"]
+
+    lineas.append("📊 <b>INVENTARIO ACTIVO:</b>")
+    lineas.append(f"• 🐄 <b>{activos} animales totales</b> ({n_h} hembras, {n_m} machos · {n_cr} terneros &lt;12m).")
+    lineas.append("────────────────────────────────────────")
+    lineas.append("💡 <i>¡Excelente y productiva jornada para todo el equipo de campo!</i>")
+
+    return "\n".join(lineas)

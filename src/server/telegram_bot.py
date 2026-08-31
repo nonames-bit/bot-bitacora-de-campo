@@ -63,6 +63,7 @@ from .formatters import (
     formatear_alertas_panel,
     formatear_animales,
     formatear_ayuda,
+    formatear_despacho_matutino,
     formatear_duplicados_geneticos,
     formatear_estado_servidor,
     formatear_fotos,
@@ -156,6 +157,7 @@ def construir_application(
         crear_teclado_alertas,
         crear_teclado_animal,
         crear_teclado_buscar_animal,
+        crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
         crear_teclado_graficos,
         crear_teclado_guia_chat,
@@ -507,6 +509,26 @@ def construir_application(
             )
         except Exception as e:
             logger.error("Error en handle_document: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_despacho(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_despacho_matutino(db)
+            await _enviar_texto_seguro(
+                update.message,
+                msg,
+                parse_mode="HTML",
+                reply_markup=crear_teclado_despacho_matutino(),
+            )
+        except Exception as e:
+            logger.error("Error en cmd_despacho: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1515,6 +1537,21 @@ def construir_application(
                     except Exception:
                         await query.message.reply_text(msg)
 
+            elif data == "cmd:despacho":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_despacho_matutino(db)
+                if query.message:
+                    await _enviar_texto_seguro(
+                        query.message,
+                        msg,
+                        parse_mode="HTML",
+                        reply_markup=crear_teclado_despacho_matutino(),
+                    )
+
             elif data == "cmd:alertas":
                 await query.answer()
                 if not auth.es_autorizado(user_id):
@@ -2345,6 +2382,7 @@ def construir_application(
     app.add_handler(CommandHandler(["buscar", "buscar_animal", "buscador"], cmd_buscar_animal))
     app.add_handler(CommandHandler(["medicamentos", "tratamientos", "farmacia", "retiros", "retiro"], cmd_medicamentos))
     app.add_handler(CommandHandler(["preguntas", "faq", "consultas"], cmd_preguntas_rapidas))
+    app.add_handler(CommandHandler(["despacho", "matutino", "hoy", "briefing"], cmd_despacho))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
@@ -2379,6 +2417,38 @@ def construir_application(
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_texto))
+
+    # Tarea proactiva programada: Despacho Matutino diario (ej. 05:30 AM)
+    async def _tarea_despacho_matutino(context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            msg = formatear_despacho_matutino(db)
+            teclado = crear_teclado_despacho_matutino()
+            for u in auth.listar_usuarios():
+                u_id = u.get("user_id")
+                u_rol = u.get("rol")
+                if u_id and u_rol in ("OWNER", "ADMIN", "TRABAJADOR"):
+                    try:
+                        await context.bot.send_message(
+                            chat_id=u_id,
+                            text=msg,
+                            parse_mode="HTML",
+                            reply_markup=teclado,
+                        )
+                    except Exception as eu:
+                        logger.warning("No se pudo enviar despacho matutino a usuario %s: %s", u_id, eu)
+        except Exception as e:
+            logger.error("Error ejecutando _tarea_despacho_matutino: %s", e, exc_info=True)
+
+    if app.job_queue:
+        import datetime
+        hora_env = os.getenv("DESPACHO_HORA", "05:30")
+        try:
+            h, m = map(int, hora_env.split(":"))
+            hora_despacho = datetime.time(hour=h, minute=m)
+            app.job_queue.run_daily(_tarea_despacho_matutino, time=hora_despacho)
+            logger.info("Tarea de Despacho Matutino programada diariamente a las %02d:%02d", h, m)
+        except Exception as ejq:
+            logger.warning("No se pudo programar despacho matutino en job_queue: %s", ejq)
 
     return app
 
