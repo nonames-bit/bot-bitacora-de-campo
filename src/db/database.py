@@ -156,6 +156,19 @@ class Database:
             return None
         return self.query_one("SELECT * FROM animales WHERE id_animal = ?", (aid,))
 
+    def renombrar_animal(self, tag_viejo, tag_nuevo) -> Optional[int]:
+        """Cambia el tag de un animal ya existente (ej. al pasar de código
+        temporal a chapeta definitiva), conservando su id_animal y por lo
+        tanto todo su historial ya registrado."""
+        aid = self.animal_id(tag_viejo)
+        if aid is None:
+            return None
+        nuevo = str(tag_nuevo).strip()
+        if not nuevo or self.animal_id(nuevo) is not None:
+            return None
+        self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (nuevo, aid))
+        return aid
+
     def potrero_id(self, codigo_o_nombre) -> Optional[int]:
         if codigo_o_nombre is None or codigo_o_nombre == "":
             return None

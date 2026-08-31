@@ -1228,7 +1228,8 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/logs</code> — Ver últimas líneas del registro del sistema\n"
             "• <code>/duplicados</code> — Posibles animales duplicados por genealogía\n"
             "• <code>/ultimos</code> — Últimos eventos registrados (quién y cuándo)\n"
-            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n\n"
+            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n"
+            "• <code>/renombrar_animal [tag_viejo] [tag_nuevo]</code> — Cambiar el código temporal de una cría por su chapeta definitiva (conserva el historial)\n\n"
             "🆘 ¿Agregar un trabajador nuevo?\n"
             "1. Pídele que busque el bot y le mande /start\n"
             "2. Consigue su user_id: que él busque @userinfobot → /start (Id)\n"
@@ -1273,7 +1274,8 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/descartar_backup</code> — Eliminar backup pendiente\n"
             "• <code>/duplicados</code> — Posibles animales duplicados por genealogía\n"
             "• <code>/ultimos</code> — Últimos eventos registrados (quién y cuándo)\n"
-            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n\n"
+            "• <code>/deshacer [tabla] [id]</code> — Corregir/borrar un registro por error (pide confirmación)\n"
+            "• <code>/renombrar_animal [tag_viejo] [tag_nuevo]</code> — Cambiar el código temporal de una cría por su chapeta definitiva (conserva el historial)\n\n"
             "🏠 <i>Toca /menu o /start para abrir el panel táctil interactivo.</i>"
         )
     if rol == "TRABAJADOR":

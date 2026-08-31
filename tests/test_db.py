@@ -449,6 +449,28 @@ def test_registrar_consulta_animal_tag_inexistente_no_deja_rastro(db):
 
 
 # ---------------------------------------------------------------------------
+# Renombrado de crías: código temporal de SG (madre-N) -> chapeta definitiva
+# ---------------------------------------------------------------------------
+def test_renombrar_animal_conserva_id(db):
+    id_original = db.registrar_animal(tag="A090-6", fecha_nacimiento="2026-08-01")
+    aid = db.renombrar_animal("A090-6", "B234")
+    assert aid == id_original
+    assert db.animal_id("A090-6") is None
+    assert db.animal_id("B234") == id_original
+
+
+def test_renombrar_animal_tag_viejo_inexistente(db):
+    assert db.renombrar_animal("NOEXISTE", "B234") is None
+
+
+def test_renombrar_animal_tag_nuevo_ya_ocupado_no_lo_hace(db):
+    db.registrar_animal(tag="A090-6")
+    db.registrar_animal(tag="B234")
+    assert db.renombrar_animal("A090-6", "B234") is None
+    assert db.animal_id("A090-6") is not None
+
+
+# ---------------------------------------------------------------------------
 # Registro de importaciones de Software Ganadero (¿está usando el backup de
 # hoy?)
 # ---------------------------------------------------------------------------
