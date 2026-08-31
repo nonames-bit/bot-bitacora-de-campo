@@ -170,6 +170,16 @@ CREATE TABLE IF NOT EXISTS consultas_animal (
     ultima_fecha TEXT
 );
 
+CREATE TABLE IF NOT EXISTS recordatorios_programados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mensaje TEXT NOT NULL,
+    fecha_programada TEXT,
+    hora TEXT,
+    creado_por INTEGER,
+    estado TEXT DEFAULT 'PENDIENTE',
+    creado_en TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
 CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
@@ -182,6 +192,7 @@ CREATE INDEX IF NOT EXISTS idx_traslados_animal_fecha ON traslados(animal_id, fe
 CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
+CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha_estado ON recordatorios_programados(fecha_programada, estado);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -189,6 +200,7 @@ TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
+    "recordatorios_programados",
 ]
 
 
@@ -328,5 +340,16 @@ class Foto:
     user_id: Optional[int] = None
     notas: Optional[str] = None
     ocr_text: Optional[str] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class RecordatorioProgramado:
+    mensaje: str
+    fecha_programada: Optional[str] = None
+    hora: Optional[str] = None
+    creado_por: Optional[int] = None
+    estado: Optional[str] = "PENDIENTE"
+    creado_en: Optional[str] = None
     id: Optional[int] = None
 

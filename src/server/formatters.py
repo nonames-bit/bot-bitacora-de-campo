@@ -1880,11 +1880,10 @@ def formatear_panel_preguntas_rapidas_texto() -> str:
 
 def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_nombre: str = "GANADERÍA JA") -> str:
     """Genera el Despacho Matutino (Morning Briefing) con las tareas críticas del día:
-    1. Ordeño & Retiros sanitarios (bloqueo preventivo de leche al tanque).
-    2. Inseminaciones AM por regla AM-PM (celos de ayer PM).
-    3. Rotación de pasturas Voisin (sobreocupación >=3d y potrero en descanso listo).
+    1. Ordeño & Retiros sanitarios (solo si hay alertas activas).
+    2. Inseminaciones AM por regla AM-PM (celos de ayer PM) y programadas.
+    3. Recordatorios programados del día (tareas, rotaciones, vacunas).
     4. Calendario reproductivo (ecografías d35, palpaciones d60, partos próximos 7d).
-    5. Conteo del hato activo.
     """
     if hoy is None:
         hoy = date.today()
@@ -1904,7 +1903,7 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
         "────────────────────────────────────────",
     ]
 
-    # 1. 🥛 Control de Ordeño & Retiros Sanitarios (Prioridad Crítica)
+    # 1. 🥛 Control de Ordeño & Retiros Sanitarios (Solo alerta si hay vacas en retiro)
     retiros_leche = db.query(
         """
         SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nom
@@ -1945,13 +1944,9 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
             med = r["producto"] or "Fármaco"
             lineas.append(f"• 🔴 <b>{_esc(tag_nom)}</b> — {_esc(med)} (⛔ {d_txt}, hasta {r['fecha_fin_retiro_leche']})")
         lineas.append("")
-    else:
-        lineas.append("🥛 <b>Control de Ordeño:</b> ✅ <b>Tanque de Leche Libre</b> (0 vacas en retiro sanitario).")
 
     if retiros_carne:
         lineas.append(f"🥩 <b>Retiro de Carne:</b> ⚠️ {len(retiros_carne)} animales en carencia (no aptos para sacrificio).\n")
-    else:
-        lineas.append("")
 
     # 2. 🧬 Inseminaciones de la Mañana (Regla AM-PM)
     celos_ayer_pm = db.query(
@@ -2004,41 +1999,20 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
     else:
         lineas.append("🧬 <b>Inseminaciones AM:</b> Sin servicios de regla AM-PM programados para hoy.\n")
 
-    # 3. 🌿 Pasturas & Rotación Voisin del Día
-    existencias_pot = calcular_existencias_potreros_sg(db, hoy)
-    potreros_sobreocupados = []
-    potreros_listos_reposo = []
+    # 3. 📌 Recordatorios Programados
+    try:
+        recordatorios = db.listar_recordatorios_pendientes(fecha=hoy_iso)
+    except Exception:
+        recordatorios = []
 
-    for ep in existencias_pot:
-        if ep["total"] > 0:
-            pot_nom = ep["display"]
-            f_ing = to_date(ep.get("fecha_ingreso_reciente"))
-            d_ocu = (hoy - f_ing).days if f_ing else None
-            if d_ocu is not None and d_ocu >= 3:
-                potreros_sobreocupados.append((pot_nom, d_ocu, ep["total"]))
-
-    todos_potreros = db.query(
-        "SELECT id, codigo, nombre, dias_reposo, aforo_kg_m2 FROM potreros WHERE dias_reposo IS NOT NULL AND dias_reposo >= 30 ORDER BY dias_reposo DESC LIMIT 3"
-    )
-    for p in todos_potreros:
-        pot_nom = (p["nombre"] or p["codigo"] or f"Potrero #{p['id']}").strip()
-        has_animales = any(ep["display"].strip().upper() == pot_nom.upper() and ep["total"] > 0 for ep in existencias_pot)
-        if not has_animales:
-            potreros_listos_reposo.append((pot_nom, p["dias_reposo"], p["aforo_kg_m2"]))
-
-    lineas.append("🌿 <b>PASTURAS & ROTACIÓN VOISIN:</b>")
-    if potreros_sobreocupados:
-        for p_nom, d_ocu, cant in potreros_sobreocupados:
-            semaforo = "🔴" if d_ocu >= 4 else "🟡"
-            lineas.append(f"• {semaforo} <b>Rotar hoy:</b> Potrero <b>{_esc(p_nom)}</b> ({cant} animales, lleva <b>{d_ocu} días</b> de pastoreo).")
+    if recordatorios:
+        lineas.append(f"📌 <b>RECORDATORIOS PROGRAMADOS ({len(recordatorios)}):</b>")
+        for rec in recordatorios:
+            h_txt = f"[{rec['hora']}] " if rec["hora"] else ""
+            lineas.append(f"• ⏰ {h_txt}<b>{_esc(rec['mensaje'])}</b>")
+        lineas.append("")
     else:
-        lineas.append("• ✅ Todos los potreros en pastoreo están en tiempo óptimo (≤2 días).")
-
-    if potreros_listos_reposo:
-        p_rec, d_rep, afo = potreros_listos_reposo[0]
-        afo_txt = f" · Aforo: {afo:.2f} kg/m²" if afo else ""
-        lineas.append(f"• 🌱 <b>Entrada recomendada:</b> Potrero <b>{_esc(p_rec)}</b> (<b>{d_rep} días</b> de reposo óptimo{afo_txt}).")
-    lineas.append("")
+        lineas.append("📌 <b>Recordatorios:</b> Sin recordatorios programados.\n")
 
     # 4. 🤰 Calendario Reproductivo & Veterinario
     partos_7d = db.query(
@@ -2104,15 +2078,6 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
         lineas.extend(tareas_vet)
         lineas.append("")
 
-    # 5. 📊 Resumen de Inventario Rápido
-    activos = _contar_activos(db)
-    datos_brk = calcular_brackets_inventario_sg(db, hoy)
-    n_h = datos_brk["total_hembras"]
-    n_m = datos_brk["total_machos"]
-    n_cr = datos_brk["terneros_menor_12m"]
-
-    lineas.append("📊 <b>INVENTARIO ACTIVO:</b>")
-    lineas.append(f"• 🐄 <b>{activos} animales totales</b> ({n_h} hembras, {n_m} machos · {n_cr} terneros &lt;12m).")
     lineas.append("────────────────────────────────────────")
     lineas.append("💡 <i>¡Excelente y productiva jornada para todo el equipo de campo!</i>")
 

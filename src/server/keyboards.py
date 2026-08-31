@@ -41,6 +41,10 @@ def crear_teclado_guia_chat() -> InlineKeyboardMarkup:
 def crear_teclado_despacho_matutino() -> InlineKeyboardMarkup:
     keyboard = [
         [
+            InlineKeyboardButton("🥛 Registrar Leche Hoy", callback_data="cmd:registrar_leche"),
+            InlineKeyboardButton("⏰ Programar Recordatorio", callback_data="cmd:programar_recordatorio"),
+        ],
+        [
             InlineKeyboardButton("🚨 Alertas del Día", callback_data="cmd:alertas"),
             InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
         ],
