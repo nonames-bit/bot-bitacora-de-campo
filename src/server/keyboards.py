@@ -259,51 +259,81 @@ def crear_teclado_animal(tag: str) -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def crear_teclado_graficos() -> InlineKeyboardMarkup:
-    """Menú de gráficos generales de la finca (distinto de los gráficos por
-    animal, que viven en crear_teclado_animal)."""
+
+def crear_teclado_animal_detalle(tag: str) -> InlineKeyboardMarkup:
+    """Teclado compacto para sub-vistas de un animal (pesajes, leche, sanidad, genealogía, gráficos).
+
+    Solo muestra botones de navegación simplificada [◀ Volver a Ficha | 🏠 Menú Principal]
+    para evitar saturar la pantalla debajo de las consultas de detalle.
+    """
+    tag_clean = str(tag).strip()
     keyboard = [
         [
-            InlineKeyboardButton("📈 Evolución del Rebaño", callback_data="panel_grafico:evolucion"),
-            InlineKeyboardButton("🌊 Waterfall de Inventario", callback_data="panel_grafico:waterfall"),
+            InlineKeyboardButton(f"◀ Volver a Ficha ({tag_clean})", callback_data=f"ficha:{tag_clean}"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_graficos() -> InlineKeyboardMarkup:
+    """Menú de gráficos generales de la finca agrupados en 4 categorías zootécnicas:
+    Hato, Reproducción & Genética, Pasturas & Rotación y Producción Lechera."""
+    keyboard = [
+        # --- Categoría 1: HATO ---
+        [
+            InlineKeyboardButton("─── 🐄 HATO ───", callback_data="noop:hato"),
+        ],
+        [
+            InlineKeyboardButton("📈 Evolución", callback_data="panel_grafico:evolucion"),
+            InlineKeyboardButton("🌊 Waterfall", callback_data="panel_grafico:waterfall"),
         ],
         [
             InlineKeyboardButton("🥧 Categorías del Hato", callback_data="panel_grafico:categorias"),
         ],
+        # --- Categoría 2: REPRODUCCIÓN ---
+        [
+            InlineKeyboardButton("─── 🧬 REPRODUCCIÓN ───", callback_data="noop:reprod"),
+        ],
         [
             InlineKeyboardButton("⚖️ GMD del Hato", callback_data="panel_grafico:gmd"),
-            InlineKeyboardButton("📦 Intervalo Entre Partos", callback_data="panel_grafico:iep"),
+            InlineKeyboardButton("📦 IEP (2 años)", callback_data="panel_grafico:iep"),
         ],
         [
-            InlineKeyboardButton("📦 IEP Histórico Completo", callback_data="panel_grafico:iep_completo"),
-        ],
-        [
+            InlineKeyboardButton("📦 IEP Histórico", callback_data="panel_grafico:iep_completo"),
             InlineKeyboardButton("🐄 Destete por Raza", callback_data="panel_grafico:destete_raza"),
-            InlineKeyboardButton("🐂 Rendimiento por Padre", callback_data="panel_grafico:padre"),
         ],
         [
-            InlineKeyboardButton("🌱 Aforo por Potrero", callback_data="panel_grafico:aforo"),
-            InlineKeyboardButton("🔄 Ocupación de Potreros", callback_data="panel_grafico:ocupacion"),
+            InlineKeyboardButton("🐂 Rendimiento Padre", callback_data="panel_grafico:padre"),
+            InlineKeyboardButton("🤰 Preñadas vs Vacías", callback_data="panel_grafico:prenadas"),
         ],
         [
-            InlineKeyboardButton("🤰 Preñadas vs Vacías por Potrero", callback_data="panel_grafico:prenadas"),
+            InlineKeyboardButton("📉 Días Abiertos KM", callback_data="panel_grafico:dias_abiertos_km"),
+            InlineKeyboardButton("🧬 Estado Reproductivo", callback_data="panel_grafico:reproductivo_hato"),
+        ],
+        # --- Categoría 3: PASTURAS ---
+        [
+            InlineKeyboardButton("─── 🌱 PASTURAS ───", callback_data="noop:pasturas"),
         ],
         [
-            InlineKeyboardButton("📉 Días Abiertos (Kaplan-Meier)", callback_data="panel_grafico:dias_abiertos_km"),
+            InlineKeyboardButton("🌱 Aforo Potreros", callback_data="panel_grafico:aforo"),
+            InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
         ],
         [
-            InlineKeyboardButton("🧬 Estado Reproductivo del Hato", callback_data="panel_grafico:reproductivo_hato"),
+            InlineKeyboardButton("🐄 Carga Animal (UGG/ha)", callback_data="panel_grafico:carga_animal"),
+        ],
+        # --- Categoría 4: LECHE ---
+        [
+            InlineKeyboardButton("─── 🥛 LECHE ───", callback_data="noop:leche"),
         ],
         [
-            InlineKeyboardButton("🥛 Producción Total de Leche", callback_data="panel_grafico:leche_total"),
+            InlineKeyboardButton("🥛 Producción Total", callback_data="panel_grafico:leche_total"),
             InlineKeyboardButton("⚡ Eficiencia Lechera", callback_data="panel_grafico:eficiencia_lechera"),
         ],
         [
-            InlineKeyboardButton("🏆 Ranking de Vacas por Leche", callback_data="panel_grafico:ranking_leche"),
+            InlineKeyboardButton("🏆 Ranking de Vacas", callback_data="panel_grafico:ranking_leche"),
         ],
-        [
-            InlineKeyboardButton("🐄 Carga Animal por Potrero (UGG/ha)", callback_data="panel_grafico:carga_animal"),
-        ],
+        # --- Navegación ---
         [
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ],
@@ -346,6 +376,18 @@ def crear_teclado_alertas() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
+
+def crear_teclado_alertas_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para la vista de detalle de alertas."""
+    keyboard = [
+        [
+            InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 def crear_teclado_poblacion() -> InlineKeyboardMarkup:
     keyboard = [
         [
@@ -354,6 +396,17 @@ def crear_teclado_poblacion() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🔍 Buscar Animal", callback_data="cmd:buscar_animal"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_poblacion_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para la sub-vista de composición genética y población."""
+    keyboard = [
+        [
+            InlineKeyboardButton("📊 Volver a Población", callback_data="cmd:poblacion"),
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ],
     ]

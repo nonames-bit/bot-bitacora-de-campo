@@ -155,7 +155,9 @@ def construir_application(
     from .keyboards import (
         crear_teclado_admin,
         crear_teclado_alertas,
+        crear_teclado_alertas_detalle,
         crear_teclado_animal,
+        crear_teclado_animal_detalle,
         crear_teclado_buscar_animal,
         crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
@@ -164,6 +166,7 @@ def construir_application(
         crear_teclado_guia_chat,
         crear_teclado_medicamentos,
         crear_teclado_poblacion,
+        crear_teclado_poblacion_detalle,
         crear_teclado_preguntas_rapidas,
         crear_teclado_principal,
         crear_teclado_trabajador,
@@ -633,7 +636,7 @@ def construir_application(
                 return
             msg = formatear_genetica_panel(db)
             await update.message.reply_text(
-                msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+                msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion_detalle()
             )
         except Exception as e:
             logger.error("Error en cmd_genetica: %s", e, exc_info=True)
@@ -1174,7 +1177,7 @@ def construir_application(
                 with open(ruta_grafico, "rb") as f:
                     await update.message.reply_photo(
                         photo=f, caption=f"📈 Curva de crecimiento — {tag}",
-                        reply_markup=crear_teclado_animal(tag),
+                        reply_markup=crear_teclado_animal_detalle(tag),
                     )
             else:
                 await update.message.reply_text(
@@ -1207,7 +1210,7 @@ def construir_application(
                 with open(ruta_grafico, "rb") as f:
                     await update.message.reply_photo(
                         photo=f, caption=f"📉 Curva de lactancia — {tag}",
-                        reply_markup=crear_teclado_animal(tag),
+                        reply_markup=crear_teclado_animal_detalle(tag),
                     )
             else:
                 await update.message.reply_text(
@@ -1436,6 +1439,10 @@ def construir_application(
                 return
 
             data = query.data
+            if data.startswith("noop") or data.startswith("section:"):
+                await query.answer()
+                return
+
             if data == "menu:principal":
                 await query.answer()
                 rol = auth.rol_de(user_id)
@@ -1696,10 +1703,10 @@ def construir_application(
                 if query.message:
                     try:
                         await query.message.reply_text(
-                            msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion()
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_poblacion_detalle()
                         )
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_poblacion())
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_poblacion_detalle())
 
             elif data == "alerta:partos":
                 await query.answer()
@@ -1719,7 +1726,10 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🔴 <b>Próximos Partos (≤30 días):</b>\n\n✅ No hay partos proyectados para los próximos 30 días."
-                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                    btn_a = [[
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]]
                 else:
                     total_p = len(filas)
                     filas_m = filas[:15]
@@ -1763,7 +1773,10 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🟡 <b>Vacas Candidatas para Secado (≥200 DEL):</b>\n\n✅ No hay vacas en lactancia prolongada pendientes de secado."
-                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                    btn_a = [[
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]]
                 else:
                     total_s = len(filas)
                     filas_m = filas[:15]
@@ -1805,7 +1818,10 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🟢 <b>Crías en Edad de Destete (≥200 días):</b>\n\n✅ No hay terneros pendientes de destete en este rango."
-                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                    btn_a = [[
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]]
                 else:
                     total_c = len(filas)
                     filas_m = filas[:15]
@@ -1861,7 +1877,10 @@ def construir_application(
                                 perdidas.append((tag_a, gmd, kg_diff, ult["peso_kg"], pen["peso_kg"], ult["potrero"]))
                 if not perdidas:
                     txt = "⚠️ <b>Alertas de Pérdida de Peso (GMD &lt; 0):</b>\n\n✅ Ningún animal activo registró pérdida de peso en su último pesaje."
-                    btn_a = [[InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas")]]
+                    btn_a = [[
+                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
+                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+                    ]]
                 else:
                     total_p = len(perdidas)
                     perdidas_m = sorted(perdidas, key=lambda x: x[1])[:15]
@@ -2095,13 +2114,18 @@ def construir_application(
                 if foto_path and os.path.exists(foto_path):
                     with open(foto_path, "rb") as f:
                         if query.message:
-                            await query.message.reply_photo(photo=f, caption=f"📷 Foto del animal {tag}")
+                            await query.message.reply_photo(
+                                photo=f, caption=f"📷 Foto del animal {tag}", reply_markup=crear_teclado_animal_detalle(tag)
+                            )
                     return
 
                 filas = db.fotos_de(tag, limit=5)
                 if not filas:
                     if query.message:
-                        await query.message.reply_text(f"📷 No hay fotos registradas para el animal {tag}.")
+                        await query.message.reply_text(
+                            f"📷 No hay fotos registradas para el animal {tag}.",
+                            reply_markup=crear_teclado_animal_detalle(tag),
+                        )
                     return
                 for r in filas:
                     ruta = r["ruta"]
@@ -2111,11 +2135,14 @@ def construir_application(
                     if ruta and os.path.exists(ruta):
                         with open(ruta, "rb") as f:
                             if query.message:
-                                await query.message.reply_photo(photo=f, caption=pie)
+                                await query.message.reply_photo(
+                                    photo=f, caption=pie, reply_markup=crear_teclado_animal_detalle(tag)
+                                )
                     else:
                         if query.message:
                             await query.message.reply_text(
-                                f"📷 Foto {tag} [{fec}] (archivo no disponible en servidor)."
+                                f"📷 Foto {tag} [{fec}] (archivo no disponible en servidor).",
+                                reply_markup=crear_teclado_animal_detalle(tag),
                             )
 
             elif data.startswith("animal:pesos:") or data.startswith("pesos:"):
@@ -2124,9 +2151,9 @@ def construir_application(
                 msg = formatear_pesajes_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data.startswith("animal:reprod:") or data.startswith("repro:"):
                 tag = data.split(":", 2)[-1].strip()
@@ -2134,9 +2161,9 @@ def construir_application(
                 msg = formatear_reprod_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data.startswith("animal:leche:"):
                 tag = data.split("animal:leche:", 1)[1].strip()
@@ -2144,9 +2171,9 @@ def construir_application(
                 msg = formatear_leche_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data.startswith("animal:sanidad:") or data.startswith("retiro:"):
                 tag = data.split(":", 2)[-1].strip()
@@ -2154,9 +2181,9 @@ def construir_application(
                 msg = formatear_sanidad_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data.startswith("animal:grafico:"):
                 tag = data.split("animal:grafico:", 1)[1].strip()
@@ -2173,7 +2200,7 @@ def construir_application(
                             if query.message:
                                 await query.message.reply_photo(
                                     photo=f, caption=f"📈 Curva de crecimiento — {tag}",
-                                    reply_markup=crear_teclado_animal(tag),
+                                    reply_markup=crear_teclado_animal_detalle(tag),
                                 )
                     else:
                         if query.message:
@@ -2197,7 +2224,7 @@ def construir_application(
                             if query.message:
                                 await query.message.reply_photo(
                                     photo=f, caption=f"📉 Curva de lactancia — {tag}",
-                                    reply_markup=crear_teclado_animal(tag),
+                                    reply_markup=crear_teclado_animal_detalle(tag),
                                 )
                     else:
                         if query.message:
@@ -2239,9 +2266,9 @@ def construir_application(
                 msg = formatear_genealogia_animal_tab(db, tag)
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data.startswith("animal:resumen:") or data.startswith("ficha:"):
                 tag = data.split(":", 2)[-1].strip()
@@ -2264,9 +2291,9 @@ def construir_application(
                 msg = qe.responder(f"en que potrero esta {tag}")
                 if query.message:
                     try:
-                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag))
                     except Exception:
-                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal(tag))
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
 
             elif data == "cmd:historial":
                 await query.answer()
