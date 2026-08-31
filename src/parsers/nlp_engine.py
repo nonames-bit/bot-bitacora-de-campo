@@ -122,7 +122,8 @@ PALABRAS_NO_TAG = {
     "servir", "inseminar", "inseminacion", "inseminaciones", "servicios", "palpacion", "palpaciones",
     "palpe", "palpar", "diagnostico", "diagnosticos", "gestacion", "gestaciones", "ecografia", "ecografias",
     "chequeo", "chequeos", "prenada", "prenado", "vacia", "vacio", "gestante", "confirmada",
-    "confirmado", "pajuela", "pajuelas", "termo", "nitrogeno", "canastilla", "dias", "dia", "meses",
+    "confirmado", "pajuela", "pajuelas", "termo", "nitrogeno", "canastilla", "dias", "dia",
+    "mes", "meses", "semana", "semanas", "medio", "media",
 }
 
 
@@ -427,21 +428,131 @@ def extraer_resultado_diagnostico(texto: str) -> str:
     return "PREÑADA"
 
 
+_NUMS_TEXTO = {
+    "un": 1.0,
+    "uno": 1.0,
+    "una": 1.0,
+    "dos": 2.0,
+    "tres": 3.0,
+    "cuatro": 4.0,
+    "cinco": 5.0,
+    "seis": 6.0,
+    "siete": 7.0,
+    "ocho": 8.0,
+    "nueve": 9.0,
+    "diez": 10.0,
+}
+
+_PAT_NUM = r"(?:\d+(?:[.,]\d+)?|un[oa]?|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez)"
+
+
+def _parse_num_val(s: str) -> Optional[float]:
+    s = s.strip().lower()
+    if s in _NUMS_TEXTO:
+        return _NUMS_TEXTO[s]
+    try:
+        return float(s.replace(",", "."))
+    except ValueError:
+        return None
+
+
 def extraer_dias_gestacion(texto: str) -> Optional[int]:
-    """Extrae los días de gestación estimados (ej. '60 días' -> 60)."""
+    """Extrae los días de gestación estimados a partir de días, semanas o meses.
+
+    Conversiones zootécnicas:
+      - 'X meses' -> X * 30 días
+      - 'X semanas' -> X * 7 días
+      - 'X meses Y días' / 'X meses y medio' -> X * 30 + Y días (o + 15 días)
+      - 'X semanas Y días' / 'X semanas y media' -> X * 7 + Y días (o + 3.5 días)
+    """
+    if not texto:
+        return None
     t = normalizar(texto)
-    m = re.search(r"\b(\d{1,3})\s*(?:d[ií]as|dias|d)\b", t)
-    if m:
+
+    # 1. Caso especial: "medio mes"
+    if re.search(r"\bmedi[oa]\s+mes\b", t):
+        return 15
+
+    # 2. Meses + Días: ej. "2 meses y 15 días", "2 meses 15 días", "2 meses con 10 dias"
+    m_mes_dia = re.search(
+        rf"\b({_PAT_NUM})\s*mes(?:es)?\s*(?:y|con|\+)?\s*({_PAT_NUM})\s*(?:d[ií]as?|d)\b",
+        t,
+    )
+    if m_mes_dia:
+        n_meses = _parse_num_val(m_mes_dia.group(1))
+        n_dias = _parse_num_val(m_mes_dia.group(2))
+        if n_meses is not None and n_dias is not None:
+            return int(round(n_meses * 30 + n_dias))
+
+    # 3. Meses + Medio: ej. "2 meses y medio", "un mes y medio", "1 mes y medio", "2 meses y media"
+    m_mes_medio = re.search(
+        rf"\b({_PAT_NUM})\s*mes(?:es)?\s*(?:y\s+)?medi[oa]\b",
+        t,
+    )
+    if m_mes_medio:
+        n_meses = _parse_num_val(m_mes_medio.group(1))
+        if n_meses is not None:
+            return int(round(n_meses * 30 + 15))
+
+    # 4. Semanas + Días: ej. "3 semanas y 2 días", "3 semanas 2 dias"
+    m_sem_dia = re.search(
+        rf"\b({_PAT_NUM})\s*(?:semanas?|sem)\s*(?:y|con|\+)?\s*({_PAT_NUM})\s*(?:d[ií]as?|d)\b",
+        t,
+    )
+    if m_sem_dia:
+        n_sem = _parse_num_val(m_sem_dia.group(1))
+        n_dias = _parse_num_val(m_sem_dia.group(2))
+        if n_sem is not None and n_dias is not None:
+            return int(round(n_sem * 7 + n_dias))
+
+    # 5. Semanas + Medio: ej. "2 semanas y media"
+    m_sem_medio = re.search(
+        rf"\b({_PAT_NUM})\s*(?:semanas?|sem)\s*(?:y\s+)?medi[oa]\b",
+        t,
+    )
+    if m_sem_medio:
+        n_sem = _parse_num_val(m_sem_medio.group(1))
+        if n_sem is not None:
+            return int(round(n_sem * 7 + 3.5))
+
+    # 6. Meses solos: ej. "3 meses", "1 mes", "2.5 meses", "tres meses"
+    m_mes = re.search(
+        rf"\b({_PAT_NUM})\s*mes(?:es)?\b",
+        t,
+    )
+    if m_mes:
+        n_meses = _parse_num_val(m_mes.group(1))
+        if n_meses is not None:
+            return int(round(n_meses * 30))
+
+    # 7. Semanas solas: ej. "8 semanas", "1 semana", "ocho semanas"
+    m_sem = re.search(
+        rf"\b({_PAT_NUM})\s*(?:semanas?|sem)\b",
+        t,
+    )
+    if m_sem:
+        n_sem = _parse_num_val(m_sem.group(1))
+        if n_sem is not None:
+            return int(round(n_sem * 7))
+
+    # 8. Días solos: ej. "60 días", "60 dias", "60 d", "60d"
+    m_dia = re.search(
+        rf"\b({_PAT_NUM})\s*(?:d[ií]as?|d)\b",
+        t,
+    )
+    if m_dia:
+        n_dias = _parse_num_val(m_dia.group(1))
+        if n_dias is not None:
+            return int(round(n_dias))
+
+    # 9. Fallback explícito tras "preñada"/"gestante" sin unidad (ej. "preñada de 60", "preñada 60")
+    m_raw = re.search(r"\b(?:pre[nñ]ad[oa]|gestante)\s+(?:de\s+)?(\d{1,3})\b", t)
+    if m_raw:
         try:
-            return int(m.group(1))
+            return int(m_raw.group(1))
         except ValueError:
             pass
-    m2 = re.search(r"\b(?:pre[nñ]ad[oa]|gestante)\s+(?:de\s+)?(\d{1,3})\b", t)
-    if m2:
-        try:
-            return int(m2.group(1))
-        except ValueError:
-            pass
+
     return None
 
 

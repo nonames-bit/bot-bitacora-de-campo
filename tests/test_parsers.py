@@ -280,3 +280,31 @@ def test_transcribe_audio_sin_transcripcion_error(tmp_path):
         transcribe_audio(audio_inexistente)
 
 
+# ---------------------------------------------------------------------------
+# Diagnóstico de gestación: extracción de días, semanas y meses de gestación.
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("texto, esperado", [
+    ("palpe a023 esta prenada 3 meses", 90),
+    ("palpe la 47 confirmada preñada 60 días", 60),
+    ("palpe la 47 prenada 2 meses 15 dias", 75),
+    ("palpe la 47 prenada 2 meses y 15 dias", 75),
+    ("palpe la 105 prenada 2 meses y medio", 75),
+    ("palpe la 47 prenada 8 semanas", 56),
+    ("palpe la 47 prenada 3 semanas y 2 dias", 23),
+    ("vaca 12 prenada 1 mes", 30),
+    ("prenada medio mes", 15),
+    ("palpe la 47 prenada 2.5 meses", 75),
+    ("palpe la 47 prenada 60", 60),
+])
+def test_extraer_dias_gestacion(texto, esperado):
+    assert nlu.extraer_dias_gestacion(texto) == esperado
+
+
+def test_parse_diagnostico_gestacion_3_meses(parser):
+    ev = parser.parse("palpe a023 esta prenada 3 meses")
+    assert ev.tipo == "diagnostico_gestacion"
+    assert ev.animal_tag == "a023"
+    assert ev.datos["resultado"] == "PREÑADA"
+    assert ev.datos["dias_gestacion"] == 90
+
+

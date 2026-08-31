@@ -82,6 +82,53 @@ def test_parser_palpacion_variantes_texto():
     assert ev3.datos["dias_gestacion"] == 90
 
 
+def test_parser_palpacion_meses_y_semanas():
+    """Verifica la conversión a días cuando se ingresan meses, semanas o fracciones."""
+    parser = EventParser(hoy=date(2026, 8, 31))
+
+    # Bug report principal: "palpe a023 esta prenada 3 meses" -> 90 días
+    ev1 = parser.parse("palpe a023 esta prenada 3 meses")
+    assert ev1.tipo == "diagnostico_gestacion"
+    assert ev1.animal_tag == "a023"
+    assert ev1.datos["resultado"] == "PREÑADA"
+    assert ev1.datos["dias_gestacion"] == 90
+
+    # Meses + Días: "2 meses 15 días" -> 75 días
+    ev2 = parser.parse("palpe la 47 prenada 2 meses 15 dias")
+    assert ev2.tipo == "diagnostico_gestacion"
+    assert ev2.animal_tag == "47"
+    assert ev2.datos["resultado"] == "PREÑADA"
+    assert ev2.datos["dias_gestacion"] == 75
+
+    # Meses + Días con conjunción: "2 meses y 15 dias" -> 75 días
+    ev3 = parser.parse("palpe la 47 preñada 2 meses y 15 días")
+    assert ev3.tipo == "diagnostico_gestacion"
+    assert ev3.animal_tag == "47"
+    assert ev3.datos["resultado"] == "PREÑADA"
+    assert ev3.datos["dias_gestacion"] == 75
+
+    # Meses + Medio: "2 meses y medio" -> 75 días
+    ev4 = parser.parse("palpe la 105 prenada 2 meses y medio")
+    assert ev4.tipo == "diagnostico_gestacion"
+    assert ev4.animal_tag == "105"
+    assert ev4.datos["resultado"] == "PREÑADA"
+    assert ev4.datos["dias_gestacion"] == 75
+
+    # Semanas: "8 semanas" -> 56 días
+    ev5 = parser.parse("palpe la 47 prenada 8 semanas")
+    assert ev5.tipo == "diagnostico_gestacion"
+    assert ev5.animal_tag == "47"
+    assert ev5.datos["resultado"] == "PREÑADA"
+    assert ev5.datos["dias_gestacion"] == 56
+
+    # 1 mes -> 30 días
+    ev6 = parser.parse("palpe la vaca 12 prenada 1 mes")
+    assert ev6.tipo == "diagnostico_gestacion"
+    assert ev6.animal_tag == "12"
+    assert ev6.datos["resultado"] == "PREÑADA"
+    assert ev6.datos["dias_gestacion"] == 30
+
+
 def test_db_registrar_diagnostico_y_listar(db: Database):
     """Prueba el registro en BD de diagnósticos gestacionales y su idempotencia."""
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
@@ -384,3 +431,45 @@ def test_diagnostico_vacia_limpia_fep_y_alertas(db: Database):
     # No debe salir en vacas con palpación pendiente
     qe = QueryEngine(db, hoy=date(2026, 8, 31))
     assert "47" not in qe.responder("¿qué vacas tienen palpación pendiente?")
+
+
+def test_flujo_palpacion_3_meses_a023_y_aislamiento_a022(db: Database):
+    """Verifica que 'palpe a023 esta prenada 3 meses' registre 90 días y que su ficha muestre PREÑADA (90d), mientras a022 sigue VACIA."""
+    db.registrar_animal("A022", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("A023", sexo="Hembra", estado="ACTIVO")
+
+    bot = Bot(db, hoy=date(2026, 8, 31))
+
+    # A022 se diagnostica VACIA previamente
+    resp_vacia = bot.procesar_texto("palpe a022 VACIA")
+    assert "Registrado diagnóstico" in resp_vacia
+    assert "VACIA" in resp_vacia
+
+    # A023 se diagnostica PREÑADA 3 meses
+    resp_prenada = bot.procesar_texto("palpe a023 esta prenada 3 meses")
+    assert "Registrado diagnóstico de gestación de la a023" in resp_prenada
+    assert "PREÑADA" in resp_prenada
+    assert "90 días" in resp_prenada
+    assert "3 días" not in resp_prenada
+
+    # Consulta ficha / historial A023
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))
+    resp_ficha_23 = qe.responder("ficha A023")
+    assert "PREÑADA" in resp_ficha_23
+    assert "90 días" in resp_ficha_23
+    assert "3 días" not in resp_ficha_23
+
+    # Validar que formatear_historial de A023 muestre 90 días
+    hist_23 = formatear_historial(db, "A023", hoy=date(2026, 8, 31))
+    assert "PREÑADA" in hist_23
+    assert "90 días" in hist_23
+    assert "3 días" not in hist_23
+
+    # Verificar que A022 sigue VACIA y no se mezclaron los registros
+    resp_ficha_22 = qe.responder("ficha A022")
+    assert "VACIA" in resp_ficha_22
+    assert "PREÑADA" not in resp_ficha_22
+
+    hist_22 = formatear_historial(db, "A022", hoy=date(2026, 8, 31))
+    assert "VACIA" in hist_22
+    assert "PREÑADA" not in hist_22
