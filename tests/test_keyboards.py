@@ -3,6 +3,7 @@ from src.server.keyboards import (
     crear_teclado_admin,
     crear_teclado_alertas_detalle,
     crear_teclado_animal_detalle,
+    crear_teclado_ayuda_menu,
     crear_teclado_buscar_animal,
     crear_teclado_grafico_detalle,
     crear_teclado_graficos,
@@ -171,6 +172,16 @@ def test_teclado_sistema_menu_default_sin_args():
     assert "menu:principal" in callbacks
 
 
+def test_teclado_ayuda_menu():
+    teclado = crear_teclado_ayuda_menu()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:ayuda" in callbacks
+    assert "guia:chat_hub" in callbacks
+    assert "cmd:ejemplos" in callbacks
+    assert "menu:campo" in callbacks
+    assert "menu:principal" in callbacks
+
+
 def test_teclado_admin_compacto_agrupa_sistema():
     teclado = crear_teclado_admin("OWNER")
     callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
@@ -182,6 +193,16 @@ def test_teclado_admin_compacto_agrupa_sistema():
     assert "cmd:usuarios" not in callbacks
 
 
+def test_teclado_admin_compacto_agrupa_ayuda():
+    teclado = crear_teclado_admin("OWNER")
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:ayuda_menu" in callbacks
+    # Las opciones de ayuda individuales ya no saturan el menú principal
+    assert "guia:chat_hub" not in callbacks
+    assert "menu:campo" not in callbacks
+    assert "cmd:ayuda" not in callbacks
+
+
 def test_teclado_trabajador_sin_sistema():
     teclado = crear_teclado_trabajador()
     callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
@@ -190,6 +211,16 @@ def test_teclado_trabajador_sin_sistema():
     assert "cmd:exportar" not in callbacks
     assert "cmd:sistema" not in callbacks
     assert "cmd:usuarios" not in callbacks
+
+
+def test_teclado_trabajador_compacto_agrupa_ayuda():
+    teclado = crear_teclado_trabajador()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:ayuda_menu" in callbacks
+    # Las opciones de ayuda individuales ya no saturan el menú principal
+    assert "guia:chat_hub" not in callbacks
+    assert "cmd:ejemplos" not in callbacks
+    assert "cmd:ayuda" not in callbacks
 
 
 def test_teclado_principal_segun_rol():

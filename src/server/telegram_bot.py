@@ -158,6 +158,7 @@ def construir_application(
         crear_teclado_alertas_detalle,
         crear_teclado_animal,
         crear_teclado_animal_detalle,
+        crear_teclado_ayuda_menu,
         crear_teclado_buscar_animal,
         crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
@@ -1537,6 +1538,20 @@ def construir_application(
                         parse_mode="HTML",
                         reply_markup=InlineKeyboardMarkup(btn),
                     )
+
+            elif data == "cmd:ayuda_menu":
+                await query.answer()
+                msg = (
+                    "❓ <b>Ayuda & Guías</b>\n\n"
+                    "Selecciona una opción para consultar el manual, guías interactivas o ejemplos:"
+                )
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_ayuda_menu()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_ayuda_menu())
 
             elif data == "cmd:ejemplos":
                 await query.answer()

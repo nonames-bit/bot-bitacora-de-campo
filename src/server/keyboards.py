@@ -60,6 +60,23 @@ def crear_teclado_despacho_matutino() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+def crear_teclado_ayuda_menu() -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
+            InlineKeyboardButton("💬 Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
+        ],
+        [
+            InlineKeyboardButton("📝 Ejemplos de Notas", callback_data="cmd:ejemplos"),
+            InlineKeyboardButton("💡 Guía de Campo", callback_data="menu:campo"),
+        ],
+        [
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 def crear_teclado_trabajador() -> InlineKeyboardMarkup:
     keyboard = [
         [
@@ -75,11 +92,7 @@ def crear_teclado_trabajador() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
         ],
         [
-            InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
-        ],
-        [
-            InlineKeyboardButton("📝 Cómo Anotar Reportes", callback_data="cmd:ejemplos"),
-            InlineKeyboardButton("📖 Todos los Comandos", callback_data="cmd:ayuda"),
+            InlineKeyboardButton("❓ Ayuda & Guías", callback_data="cmd:ayuda_menu"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -107,14 +120,10 @@ def crear_teclado_admin(rol: Optional[str] = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
-            InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
-        ],
-        [
             InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
         ],
         [
-            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
-            InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
+            InlineKeyboardButton("❓ Ayuda & Guías", callback_data="cmd:ayuda_menu"),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
