@@ -170,12 +170,17 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
         "SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha DESC",
         (aid,),
     )
+    diagnosticos = db.query(
+        "SELECT * FROM diagnosticos_gestacion WHERE vaca_id = ? ORDER BY fecha DESC, id DESC",
+        (aid,),
+    )
 
     n_partos = len(partos)
     n_serv = len(servicios)
     n_celos = len(celos)
+    n_diags = len(diagnosticos)
 
-    lineas.append(f"• <b>Total Partos:</b> {n_partos} | <b>Servicios:</b> {n_serv} | <b>Celos:</b> {n_celos}")
+    lineas.append(f"• <b>Total Partos:</b> {n_partos} | <b>Servicios:</b> {n_serv} | <b>Diagnósticos:</b> {n_diags} | <b>Celos:</b> {n_celos}")
 
     if partos:
         ult_p = partos[0]
@@ -189,6 +194,14 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
             if f_p1 and f_p2:
                 iep = (f_p1 - f_p2).days
                 lineas.append(f"• <b>Último IEP:</b> <b>{iep} días</b>")
+
+    if diagnosticos:
+        ult_d = diagnosticos[0]
+        dias_g = ult_d["dias_gestacion"] if "dias_gestacion" in ult_d.keys() else None
+        dias_d = f" ({dias_g}d)" if dias_g else ""
+        res_ult = ult_d["resultado"] if "resultado" in ult_d.keys() else ult_d["resultado"]
+        ico_d = "🤰" if (res_ult or "").upper() == "PREÑADA" else "⭕"
+        lineas.append(f"• <b>Último Diagnóstico:</b> [{ult_d['fecha']}] {ico_d} <b>{res_ult}</b>{dias_d}")
 
     if servicios:
         ult_s = servicios[0]
@@ -206,6 +219,16 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
             sx = f" ({p['sexo_cria'].lower()})" if p["sexo_cria"] else ""
             peso = f" · {p['peso_nacimiento']} kg" if p["peso_nacimiento"] else ""
             lineas.append(f"• [{fec}] 🐮 <b>{c_tag}</b>{sx}{peso}")
+
+    if diagnosticos:
+        lineas.append("\n🩺 <b>Historial de Diagnósticos de Gestación:</b>")
+        for d in diagnosticos[:5]:
+            fec = d["fecha"] or "S/F"
+            res = d["resultado"] or "PREÑADA"
+            ico = "🤰" if res.upper() == "PREÑADA" else "⭕"
+            dias_g2 = d["dias_gestacion"] if "dias_gestacion" in d.keys() else None
+            dias = f" · {dias_g2}d gestación" if dias_g2 else ""
+            lineas.append(f"• [{fec}] {ico} <b>{res}</b>{dias}")
 
     if servicios:
         lineas.append("\n🐂 <b>Historial de Inseminaciones & Montas:</b>")
@@ -2103,7 +2126,7 @@ def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> st
     criticas = [p for p in pajuelas if p["cantidad"] <= 2]
 
     lineas = [
-        "🧬 <b>MÓDULO DE REPRODUCCIÓN & TERMO CRIOGÉNICO</b>",
+        "🤰 <b>MÓDULO DE REPRODUCCIÓN & TERMO CRIOGÉNICO</b>",
         "────────────────────────────────────────",
     ]
 

@@ -118,6 +118,15 @@ class ReproduccionQueryMixin:
         )
         pendientes = []
         for s in servicios:
+            estado_s = s["estado"] if "estado" in s.keys() else None
+            if (estado_s or "").upper() in ("CONFIRMADA", "FALLIDO", "VACIA", "VACÍA", "PREÑADA", "PRENADA"):
+                continue
+            diag = self.db.query_one(
+                "SELECT id FROM diagnosticos_gestacion WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
+                (s["vaca_id"], s["fecha"]),
+            )
+            if diag:
+                continue
             palp = fecha_palpacion(s["fecha"])
             if palp is None or palp < hoy:
                 continue

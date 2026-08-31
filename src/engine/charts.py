@@ -973,11 +973,24 @@ def generar_grafico_ocupacion_potreros(db, output_dir: str = "data/reportes",
 
 
 def _hembra_prenada_estimado(db, aid: int) -> bool:
-    """Estimación: True si el último servicio de la hembra no tiene un
-    parto registrado después de esa fecha (no hay diagnóstico de preñez
-    real en el sistema -- ver nota del módulo)."""
+    """Estimación: True si el último servicio o diagnóstico de la hembra
+    indica preñez activa y no tiene un parto registrado después de esa fecha."""
+    ult_diag = db.ultimo_diagnostico(aid)
     ult = db.ultimo_servicio(aid)
+    if ult_diag and ult_diag["fecha"]:
+        f_diag = to_date(ult_diag["fecha"])
+        f_serv = to_date(ult["fecha"]) if ult and ult["fecha"] else None
+        if not f_serv or not f_diag or f_diag >= f_serv:
+            res = (ult_diag["resultado"] or "").upper()
+            parto = db.query_one(
+                "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1", (aid, ult_diag["fecha"])
+            )
+            return bool(res in ("PREÑADA", "PRENADA", "CONFIRMADA", "POSITIVA") and parto is None)
+
     if ult is None or not ult["fecha"]:
+        return False
+    estado_ult = ult["estado"] if "estado" in ult.keys() else None
+    if (estado_ult or "").upper() in ("FALLIDO", "VACIA", "VACÍA"):
         return False
     parto = db.query_one(
         "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1", (aid, ult["fecha"])

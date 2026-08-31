@@ -72,6 +72,7 @@ class HistorialQueryMixin:
         partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != _row_get(p, "id_cria")]
         servicios = [] if es_macho else h.get("servicios", [])
         celos = [] if es_macho else h.get("celos", [])
+        diagnosticos = [] if es_macho else h.get("diagnosticos", [])
         tratamientos = h.get("tratamientos", [])
         pesajes = h.get("pesajes", [])
         fotos = h.get("fotos", [])
@@ -131,15 +132,31 @@ class HistorialQueryMixin:
         else:
             ult_parto = partos[-1] if partos else None
             ult_servicio = servicios[-1] if servicios else None
+            ult_diagnostico = diagnosticos[-1] if diagnosticos else None
+
+            f_up = to_date(ult_parto["fecha"]) if ult_parto else None
+            da = (self.hoy - f_up).days if f_up else 0
+            f_us = to_date(ult_servicio["fecha"]) if ult_servicio else None
+            f_ud = to_date(ult_diagnostico["fecha"]) if ult_diagnostico else None
+            serv_post_parto = bool(f_us and f_up and f_us >= f_up)
+
+            # Determinar si el último diagnóstico está activo para el ciclo actual
+            diag_activo = None
+            if ult_diagnostico:
+                diag_post_parto = bool(not f_up or not f_ud or f_ud >= f_up)
+                diag_post_servicio = bool(not f_us or not f_ud or f_ud >= f_us)
+                if diag_post_parto and diag_post_servicio:
+                    diag_activo = ult_diagnostico
 
             if partos:
                 tipo_animal = "Vaca"
-                f_up = to_date(ult_parto["fecha"]) if ult_parto else None
-                da = (self.hoy - f_up).days if f_up else 0
-                f_us = to_date(ult_servicio["fecha"]) if ult_servicio else None
-                serv_post_parto = bool(f_us and f_up and f_us >= f_up)
-
-                if da > 305:
+                if diag_activo:
+                    res_diag = (diag_activo["resultado"] or "").strip().upper()
+                    if res_diag in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA", "NO PREÑADA", "NO PRENADA"):
+                        estado_reprod = "VACIA"
+                    else:
+                        estado_reprod = "PREÑADA"
+                elif da > 305:
                     if len(partos) > 1 and not serv_post_parto:
                         estado_reprod = "VACA ESCOTERA"
                     elif serv_post_parto:
@@ -161,7 +178,13 @@ class HistorialQueryMixin:
                     estado_reprod = "NOVILLA LEVANTE"
                 else:  # >= 18 meses (edad apta para vientre)
                     tipo_animal = "Novilla"
-                    if ult_servicio:
+                    if diag_activo:
+                        res_diag = (diag_activo["resultado"] or "").strip().upper()
+                        if res_diag in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA", "NO PREÑADA", "NO PRENADA"):
+                            estado_reprod = "VACIA"
+                        else:
+                            estado_reprod = "PREÑADA"
+                    elif ult_servicio:
                         estado_reprod = "NOVILLA VIENTRE SERVIDA"
                     else:
                         estado_reprod = "NOVILLA VIENTRE"
@@ -169,6 +192,13 @@ class HistorialQueryMixin:
                 if (animal["madre_id"] and animal["madre_id"] != aid) or p_nac:
                     tipo_animal = "Ternera"
                     estado_reprod = "CRÍA HEMBRA"
+                elif diag_activo:
+                    tipo_animal = "Novilla"
+                    res_diag = (diag_activo["resultado"] or "").strip().upper()
+                    if res_diag in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA", "NO PREÑADA", "NO PRENADA"):
+                        estado_reprod = "VACIA"
+                    else:
+                        estado_reprod = "PREÑADA"
                 elif ult_servicio:
                     tipo_animal = "Novilla"
                     estado_reprod = "NOVILLA VIENTRE SERVIDA"
@@ -236,11 +266,28 @@ class HistorialQueryMixin:
                     fep = s["fep_calculada"] or iso(fecha_estimada_parto(s["fecha"]))
                     f_palp = iso(fecha_palpacion(s["fecha"]))
                     f_sec = iso(fecha_secado(fep))
-                    reprod.append(f"  Palpación Rectal: PENDIENTE ({f_palp}, día 60)")
-                    reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
-                    reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
+                    if diag_activo:
+                        d_dias = f" ({diag_activo['dias_gestacion']} días)" if diag_activo["dias_gestacion"] else ""
+                        reprod.append(f"  Último diagnóstico: {diag_activo['resultado']} el {diag_activo['fecha']}{d_dias}")
+                        if (diag_activo["resultado"] or "").upper() in ("PREÑADA", "PRENADA", "CONFIRMADA", "POSITIVA"):
+                            reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
+                            reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
+                    else:
+                        reprod.append(f"  Palpación Rectal: PENDIENTE ({f_palp}, día 60)")
+                        reprod.append(f"  FEP (Fecha Estimada Parto): {fep} (+283 días)")
+                        reprod.append(f"  Secado Programado: {f_sec} (FEP − 60 días)")
             else:
                 reprod.append("• servicios: 0 registro(s).")
+
+            if diagnosticos:
+                d = ult_diagnostico
+                dias_info = f" ({d['dias_gestacion']} días)" if d["dias_gestacion"] else ""
+                resp_val = d["responsable"] if "responsable" in d.keys() else None
+                resp_info = f" · Resp: {resp_val}" if resp_val else ""
+                reprod.append(f"• diagnósticos: {len(diagnosticos)} registro(s)")
+                reprod.append(f"  Último diagnóstico: {d['resultado']} el {d['fecha']}{dias_info}{resp_info}")
+            else:
+                reprod.append("• diagnósticos: 0 registro(s).")
 
             if celos:
                 c = celos[-1]
@@ -250,6 +297,7 @@ class HistorialQueryMixin:
         else:
             reprod.append("• partos: 0 registro(s).")
             reprod.append("• servicios: 0 registro(s).")
+            reprod.append("• diagnósticos: 0 registro(s).")
 
         # Datos de origen / nacimiento si el animal nació en la finca o tiene madre registrada
         madre_id = animal["madre_id"] or (p_nac["vaca_id"] if p_nac else None)
