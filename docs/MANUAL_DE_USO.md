@@ -8,26 +8,32 @@
 ## 📑 Tabla de Contenidos
 1. [Introducción & Visión General](#1-introducción--visión-general)
 2. [Estructura de Roles y Accesos (RBAC)](#2-estructura-de-roles-y-accesos-rbac)
-3. [Guía Rápida de Inicio](#3-guía-rápida-de-inicio)
+3. [Guía Rápida de Inicio y Menú Principal Compacto](#3-guía-rápida-de-inicio-y-menú-principal-compacto)
 4. [Operación en Campo para Trabajadores & Mayordomo](#4-operación-en-campo-para-trabajadores--mayordomo)
    - [4.1 Registro por Mensajes de Texto](#41-registro-por-mensajes-de-texto)
-   - [4.2 Dictado por Notas de Voz (Whisper + IA)](#42-dictado-por-notas-de-voz-whisper--ia)
-   - [4.3 Fotografías con OCR (Aretes y Medicamentos)](#43-fotografías-con-ocr-aretes-y-medicamentos)
+   - [4.2 Control de Leche (Total del Hato e Individual)](#42-control-de-leche-total-del-hato-e-individual)
+   - [4.3 Programación de Recordatorios de Campo](#43-programación-de-recordatorios-de-campo)
+   - [4.4 Dictado por Notas de Voz (Whisper + IA)](#44-dictado-por-notas-de-voz-whisper--ia)
+   - [4.5 Fotografías con OCR (Aretes y Medicamentos)](#45-fotografías-con-ocr-aretes-y-medicamentos)
 5. [Fichas Zootécnicas Interactivas con Pestañas Táctiles](#5-fichas-zootécnicas-interactivas-con-pestañas-táctiles)
 6. [Cómo Preguntarle al Bot (Lenguaje Natural)](#6-cómo-preguntarle-al-bot-lenguaje-natural)
-7. [Centro de Alertas Semafórico de Campo](#7-centro-de-alertas-semafórico-de-campo)
-8. [Tableros Ejecutivos, KPIs e Informes SG](#8-tableros-ejecutivos-kpis-e-informes-sg)
+7. [Despacho Matutino (05:30 AM) y Centro de Alertas](#7-despacho-matutino-0530-am-y-centro-de-alertas)
+   - [7.1 El Despacho Matutino (Morning Briefing)](#71-el-despacho-matutino-morning-briefing)
+   - [7.2 Centro de Alertas Semafórico de Campo](#72-centro-de-alertas-semafórico-de-campo)
+8. [Tableros Ejecutivos, KPIs, Gráficos e Informes SG](#8-tableros-ejecutivos-kpis-gráficos-e-informes-sg)
    - [8.1 Tablero Zootécnico de la Finca (/status)](#81-tablero-zootécnico-de-la-finca-status)
    - [8.2 Población y Pirámide de Edades (/poblacion)](#82-población-y-pirámide-de-edades-poblacion)
    - [8.3 Composición Genética y Razas (/genetica)](#83-composición-genética-y-razas-genetica)
    - [8.4 Matriz de Potreros y Rotación Voisin (/potreros, /ocupacion)](#84-matriz-de-potreros-y-rotación-voisin-potreros-ocupacion)
-   - [8.5 Reportes Profesionales en PDF (/reporte)](#85-reportes-profesionales-en-pdf-reporte)
-9. [Sincronización con Software Ganadero (SG)](#9-sincronización-con-software-ganadero-sg)
-   - [9.1 Importación de Backups ZIP por Telegram](#91-importación-de-backups-zip-por-telegram)
-   - [9.2 Sincronización Automática por Carpeta COPIAS (70+ MB)](#92-sincronización-automática-por-carpeta-copias-70-mb)
-   - [9.3 Exportación de Datos para SG (/exportar)](#93-exportación-de-datos-para-sg-exportar)
-10. [Administración de Usuarios y Servidor](#10-administración-de-usuarios-y-servidor)
-11. [Tabla Resumen de Comandos](#11-tabla-resumen-de-comandos)
+   - [8.5 Gráficos Zootécnicos de la Finca en 4 Categorías (/graficos)](#85-gráficos-zootécnicos-de-la-finca-en-4-categorías-graficos)
+   - [8.6 Reportes Profesionales en PDF (/reporte)](#86-reportes-profesionales-en-pdf-reporte)
+9. [Submenús Unificados de Sistema y Ayuda](#9-submenús-unificados-de-sistema-y-ayuda)
+10. [Sincronización con Software Ganadero (SG)](#10-sincronización-con-software-ganadero-sg)
+    - [10.1 Importación de Backups ZIP por Telegram](#101-importación-de-backups-zip-por-telegram)
+    - [10.2 Sincronización Automática por Carpeta COPIAS (70+ MB)](#102-sincronización-automática-por-carpeta-copias-70-mb)
+    - [10.3 Exportación de Datos para SG (/exportar)](#103-exportación-de-datos-para-sg-exportar)
+11. [Administración de Usuarios y Servidor](#11-administración-de-usuarios-y-servidor)
+12. [Tabla Resumen de Comandos](#12-tabla-resumen-de-comandos)
 
 ---
 
@@ -72,14 +78,16 @@ El acceso al bot está estrictamente protegido. Cada usuario de Telegram tiene u
 
 ---
 
-## 3. Guía Rápida de Inicio
+## 3. Guía Rápida de Inicio y Menú Principal Compacto
 
 1. Abre la aplicación **Telegram** en tu teléfono o computador.
 2. Busca el bot de la ganadería (ej. `@GanaderiaJABot`).
-3. Presiona el botón **Iniciar** o envía el comando `/start`.
-4. El bot desplegará automáticamente tu **Menú Principal Interactivo**:
-   - Si eres **Trabajador**: Verás el panel didáctico de campo con botones táctiles para buscar animales, ver potreros y guías de uso.
-   - Si eres **Owner/Admin**: Verás el panel de control completo con tableros ejecutivos, reportes PDF y exportaciones.
+3. Presiona el botón **Iniciar** o envía el comando `/start` (o `/menu`).
+4. El bot desplegará automáticamente tu **Menú Principal Compacto e Interactivo**:
+   - **Para Trabajadores:** Vista directa de campo con acceso a `[ 🌅 Despacho Matutino ]`, `[ 🚨 Alertas del Día ]`, `[ 🔍 Buscar Animal / Ficha ]`, `[ 🌿 Potreros & Pasturas ]`, `[ 💊 Medicamentos & Retiro ]`, `[ 📷 Galería de Fotos ]` y submenú `[ ❓ Ayuda & Guías ]`.
+   - **Para Administradores y Dueño (ADMIN/OWNER):** Panel ejecutivo con accesos zootécnicos directos y dos submenús agrupados para evitar desorden visual:
+     - `[ 📦 Sistema & Reportes ]`: Agrupa Reporte PDF, Backup ZIP, Servidor, Logs y Usuarios.
+     - `[ ❓ Ayuda & Guías ]`: Agrupa Manual de Comandos, Cómo Preguntar, Ejemplos de Notas y Guía de Campo.
 
 ---
 
@@ -99,7 +107,31 @@ No necesitas llenar formularios ni recordar formatos rígidos. Escribe la noveda
 
 ---
 
-### 4.2 Dictado por Notas de Voz (Whisper + IA)
+### 4.2 Control de Leche (Total del Hato e Individual)
+El bot permite registrar tanto la producción general del día como el pesaje lechero individual de cada vaca:
+
+* **🥛 Registro Total del Hato (Tanque del Día):**
+  - Escribe el comando `/leche <litros>` (ej. `/leche 475` o `/leche 482.5`).
+  - O pulsa el botón **`[ 🥛 Registrar Leche Hoy ]`** desde el Despacho Matutino y el bot te pedirá el valor.
+  - Guarda automáticamente el registro en la base de datos vinculado a la fecha de hoy sin requerir ID de animal (`animal_id = NULL`).
+* **🐮 Control Lechero Individual por Vaca:**
+  - Escribe el mensaje natural: `la 47 dio 12 litros de leche` o `pesaje de leche de la 12 fue 14.5 litros`.
+  - El bot calcula los Días en Lactancia (**DEL**), actualiza la curva y registra el historial productivo.
+
+---
+
+### 4.3 Programación de Recordatorios de Campo
+Para que el equipo nunca olvide una labor, rotación o vacuna:
+
+* **Comando:** `/programar YYYY-MM-DD HH:MM mensaje`
+  - Ejemplo: `/programar 2026-09-01 08:00 Rotar potrero Bajo a Guayabal`
+  - Ejemplo: `/programar 2026-09-05 06:30 Vacunación aftosa lote de ordeño`
+* **Desde Botón:** Toca **`[ ⏰ Programar Recordatorio ]`** en el Despacho Matutino y envía la fecha, hora y texto.
+* Los recordatorios quedan guardados en la base de datos (`recordatorios_programados`) y se presentan automáticamente en el **Despacho Matutino de las 05:30 AM** del día correspondiente.
+
+---
+
+### 4.4 Dictado por Notas de Voz (Whisper + IA)
 1. En el corral o potrero, mantén presionado el botón del **micrófono** en Telegram.
 2. Habla con calma y claridad contando la novedad:
    * *«Don Julio, le aviso que parió la 47 un ternero macho vivo de 38 kilos en santa martha»*
@@ -110,7 +142,7 @@ No necesitas llenar formularios ni recordar formatos rígidos. Escribe la noveda
 
 ---
 
-### 4.3 Fotografías con OCR (Aretes y Medicamentos)
+### 4.5 Fotografías con OCR (Aretes y Medicamentos)
 * 🏷️ **Fotos de Aretes / Ganado:**
   Toma una foto de frente al arete del animal. El sistema leerá automáticamente el número (ej. `N069`, `JA26`, `47`) y te abrirá su ficha técnica completa al instante.
 * 💊 **Fotos de Frascos de Medicamentos:**
@@ -120,12 +152,13 @@ No necesitas llenar formularios ni recordar formatos rígidos. Escribe la noveda
 
 ## 5. Fichas Zootécnicas Interactivas con Pestañas Táctiles
 
-Al consultar un animal (escribiendo su número ej. `47`, `/consulta N069` o enviando su foto), el bot responde con su ficha zootécnica estructurada, su edad exacta, potrero actual y una **botonera de navegación táctil**:
+Al consultar un animal (escribiendo su número ej. `47`, `/consulta N069` o enviando su foto), el bot responde con su ficha zootécnica estructurada, su edad exacta, potrero actual y una **botonera de navegación táctil completa**:
 
 ```
 [ ⚖️ Pesajes & GMD ]    [ 🍼 Partos & Crías ]
 [ 🥛 Control Leche ]    [ 💉 Sanidad & Retiro ]
 [ 🌳 Genealogía (3G) ]   [ 📷 Ver Foto ]
+[ 📈 Gráfico de Peso ]  [ 📉 Curva de Lactancia ]
 [ 📋 Ficha Resumen ]    [ 🔍 Buscar Otro ]
 [ 🏠 Menú Principal ]
 ```
@@ -136,6 +169,9 @@ Al consultar un animal (escribiendo su número ej. `47`, `/consulta N069` o envi
 * **💉 Sanidad & Retiro:** **Semáforo de retiro** con cuenta regresiva de días para ordeño y sacrificio, junto con el historial clínico de aplicaciones.
 * **🌳 Genealogía (3G):** Árbol genealógico en 3 generaciones (Padre, Abuelos paternos, Madre, Abuelos maternos) y lista de crías descendientes.
 * **📷 Ver Foto:** Despliega la fotografía del animal guardada en el sistema.
+* **📈 Gráfico de Peso / 📉 Curva de Lactancia:** Genera al instante la gráfica ponderal o de producción láctea individual del animal.
+
+> 💡 **Navegación Limpia de Detalle:** Al entrar a cualquiera de estas pestañas o gráficos, la botonera se reduce automáticamente a solo dos botones: `[ ◀ Volver a Ficha (TAG) ]` y `[ 🏠 Menú Principal ]`, manteniendo la pantalla despejada y fácil de leer en el teléfono.
 
 ---
 
@@ -168,7 +204,49 @@ Puedes hacerle preguntas abiertas al bot como a un asistente humano (accede tamb
 
 ---
 
-## 7. Centro de Alertas Semafórico de Campo
+## 7. Despacho Matutino (05:30 AM) y Centro de Alertas
+
+### 7.1 El Despacho Matutino (Morning Briefing)
+Todos los días a las **05:30 AM** (o en cualquier momento escribiendo `/despacho`, `/matutino`, `/hoy`, `/briefing` o pulsando `[ 🌅 Despacho Matutino ]`), el bot genera un resumen ejecutivo y operativo enfocado exclusivamente en las tareas prioritarias del día:
+
+```
+🌅 DESPACHO MATUTINO — GANADERÍA JA
+📅 Lunes, 31 de Agosto de 2026 · 05:30 AM
+────────────────────────────────────────
+⛔ ¡ALERTA DE ORDEÑO! VACAS EN RETIRO (1):
+⚠️ NO echar esta leche al tanque bajo ninguna circunstancia:
+• 🔴 8 (Margarita) — Oxitetraciclina (⛔ Quedan 3d, hasta 2026-09-03)
+
+🔥 INSEMINACIONES DE ESTA MAÑANA (1):
+• 💉 33 (Lucero) — Celo observado ayer PM (Inseminar antes de las 10:00 AM)
+
+📌 RECORDATORIOS PROGRAMADOS (1):
+• ⏰ [08:00] Rotar potrero Bajo a Guayabal
+
+🤰 CALENDARIO REPRODUCTIVO & VETERINARIO (2):
+• 🔬 Ecografía (Día 35): Vaca 15 (Servicio del 2026-07-27)
+• 🍼 Parto próximo: Vaca 47 — FEP: 2026-09-02 (en 2 días)
+────────────────────────────────────────
+💡 ¡Excelente y productiva jornada para todo el equipo de campo!
+```
+
+**Estructura del Despacho Matutino:**
+1. **🥛 Control de Ordeño & Retiro:** Solo se muestra si hay vacas en periodo de carencia activo con alerta roja y fecha límite. Si no hay retiros, no satura el mensaje.
+2. **🧬 Inseminaciones AM (Regla AM-PM):** Lista vacas con celo visto la tarde anterior para inseminar antes de las 10:00 AM, más servicios programados para la fecha.
+3. **📌 Recordatorios Programados:** Tareas, rotaciones y compromisos agendados para la fecha con su hora asignada.
+4. **🤰 Calendario Reproductivo & Veterinario:** Ecografías del día 35, confirmaciones por palpación del día 60 y partos esperados dentro de los próximos 7 días.
+
+**Botonera de Acción Rápida del Despacho:**
+```
+[ 🥛 Registrar Leche Hoy ]   [ ⏰ Programar Recordatorio ]
+[ 🚨 Alertas del Día ]       [ 💊 Medicamentos & Retiro ]
+[ 🌿 Potreros & Pasturas ]   [ 🐮 Tablero de la Finca ]
+[ 🔍 Buscar Animal ]         [ 🏠 Menú Principal ]
+```
+
+---
+
+### 7.2 Centro de Alertas Semafórico de Campo
 
 El comando `/alertas` (o botón `[ 🚨 Alertas del Día ]`) analiza el hato activo y presenta un semáforo interactivo:
 
@@ -186,7 +264,7 @@ Al tocar cualquiera de los botones de alerta, el bot lista los animales involucr
 
 ---
 
-## 8. Tableros Ejecutivos, KPIs e Informes SG
+## 8. Tableros Ejecutivos, KPIs, Gráficos e Informes SG
 
 ### 8.1 Tablero Zootécnico de la Finca (`/status`, `/finca`, `/tablero`)
 Resumen ejecutivo con:
@@ -208,7 +286,34 @@ Gráfico de distribución racial del hato (Holstein, Gyr, Cebú, Pardo Suizo, Ay
 * **Matriz Zootécnica SG:** Tabla de 9 columnas (`CH`, `HL`, `NV`, `VP`, `VS`, `CM`, `ML`, `MC`, `RP`, `Total`) idéntica a Software Ganadero.
 * **Semáforo Voisin:** Días de ocupación en verde (1-3d), amarillo (4-6d) y rojo ($\ge 7$d sobreocupación).
 
-### 8.5 Reportes Profesionales en PDF (`/reporte`)
+### 8.5 Gráficos Zootécnicos de la Finca en 4 Categorías (`/graficos`)
+Al pulsar el botón `[ 📊 Gráficos de la Finca ]` o enviar `/graficos`, el bot abre un panel estructurado en 4 grandes dominios zootécnicos:
+
+1. 🐄 **HATO:**
+   - **📈 Evolución:** Crecimiento y variación temporal de la población total activa.
+   - **🌊 Waterfall:** Gráfico de cascada de entradas, nacimientos, ventas y bajas.
+   - **🥧 Categorías del Hato:** Distribución porcentual por categorías zootécnicas.
+2. 🧬 **REPRODUCCIÓN & GENÉTICA:**
+   - **⚖️ GMD del Hato:** Curva de Ganancia Media Diaria ponderal del ganado.
+   - **📦 IEP (2 años):** Intervalo Entre Partos reciente con distribución estadística.
+   - **📦 IEP Histórico:** Historial multianual de intervalos reproductivos.
+   - **🐄 Destete por Raza:** Peso al destete según la genética y cruzamientos.
+   - **🐂 Rendimiento Padre:** Evaluación de toros por peso y ganancia de crías.
+   - **🤰 Preñadas vs Vacías:** Estado de preñez general del hato reproductor.
+   - **📉 Días Abiertos KM:** Curva Kaplan-Meier de vacías y probabilidad de preñez.
+   - **🧬 Estado Reproductivo:** Distribución integral de estados ginecológicos.
+3. 🌱 **PASTURAS & ROTACIÓN:**
+   - **🌱 Aforo Potreros:** Biomasa disponible (kg MV/m² y kg MS/ha).
+   - **🔄 Ocupación Voisin:** Semáforo de días de pastoreo y periodos de reposo.
+   - **🐄 Carga Animal:** Carga instantánea en Unidades Gran Ganado por hectárea (UGG/ha).
+4. 🥛 **PRODUCCIÓN LECHERA:**
+   - **🥛 Producción Total:** Historial de litros diarios entregados al tanque.
+   - **⚡ Eficiencia Lechera:** Litros promedio por vaca en ordeño vs vacas totales.
+   - **🏆 Ranking de Vacas:** Top de mejores productoras por volumen de leche.
+
+> 🖼️ **Vista Detalle de Gráficos:** Cada imagen generada incluye un teclado limpio con solo dos opciones: `[ ◀ Volver a Gráficos ]` y `[ 🏠 Menú Principal ]`.
+
+### 8.6 Reportes Profesionales en PDF (`/reporte`)
 Genera y envía un archivo PDF institucional con la identidad visual verde de **Ganadería JA**:
 * `/reporte`: Reporte semanal consolidado con tablas de novedades, pesajes y alertas.
 * `/reporte diario`: Reporte de las últimas 24 horas.
@@ -216,29 +321,52 @@ Genera y envía un archivo PDF institucional con la identidad visual verde de **
 
 ---
 
-## 9. Sincronización con Software Ganadero (SG)
+## 9. Submenús Unificados de Sistema y Ayuda
 
-### 9.1 Importación de Backups ZIP por Telegram
+Para mantener la pantalla del celular limpia y libre de botones repetidos, el bot organiza las opciones secundarias en dos submenús agrupados:
+
+### 📦 A. Submenú «Sistema & Reportes» (`cmd:sistema_menu`)
+Accesible desde el menú principal de administradores y dueños:
+* `[ 📋 Reporte Semanal PDF ]`: Descarga inmediata del informe zootécnico.
+* `[ 📦 Descargar Backup ZIP ]`: Genera y exporta el paquete DBF para Software Ganadero.
+* `[ ⚙️ Servidor & Sistema ]`: Diagnóstico de hardware VPS, memoria RAM, SSD y estado SQLite.
+* `[ 📜 Ver Últimos Logs ]`: Muestra los últimos eventos técnicos del sistema.
+* `[ 👥 Usuarios / Permisos ]` *(Solo OWNER)*: Gestión de altas y bajas de personal.
+* `[ 🏠 Menú Principal ]`: Retorno directo.
+
+### ❓ B. Submenú «Ayuda & Guías» (`cmd:ayuda_menu`)
+Accesible para todos los roles:
+* `[ 📖 Manual / Comandos ]`: Despliegue completo de comandos y sintaxis.
+* `[ 💬 Cómo Preguntar al Chat ]`: Centro de ejemplos de preguntas cotidianas en lenguaje natural.
+* `[ 📝 Ejemplos de Notas ]`: Guía didáctica de cómo redactar partos, celos, traslados y remedios.
+* `[ 💡 Guía de Campo ]`: Vista de campo guiada para el personal de corral.
+* `[ 🏠 Menú Principal ]`: Retorno directo.
+
+---
+
+## 10. Sincronización con Software Ganadero (SG)
+
+### 10.1 Importación de Backups ZIP por Telegram
 1. Exporta la copia de seguridad `.Zip` en Software Ganadero.
 2. Si pesa menos de 20 MB, envíala como **Documento** al chat del bot en Telegram.
 3. El bot te responderá confirmando el tamaño recibido.
 4. Escribe `/confirmar_importar` para procesarlo.
 5. El importador deduplica automáticamente por llaves zootécnicas y emite el reporte de nuevos y duplicados.
 
-### 9.2 Sincronización Automática por Carpeta COPIAS (70+ MB)
+### 10.2 Sincronización Automática por Carpeta COPIAS (70+ MB)
 Para backups pesados (con fotos históricas):
 * El vigilante de segundo plano (`copias_watcher` en VPS o `schtasks` en Windows) monitorea la carpeta `C:\Usati\Copias` o `data/copias/`.
 * Al detectar un nuevo `.Zip`, lo procesa e importa automáticamente.
 * Envía una notificación instantánea al `OWNER` por Telegram sin intervención manual.
 
-### 9.3 Exportación de Datos para SG (`/exportar`)
+### 10.3 Exportación de Datos para SG (`/exportar`)
 * `/exportar`: Genera y envía un paquete `.Zip` con las 8 tablas DBF listas para Software Ganadero.
 * `/exportar csv`: Exporta toda la base de datos en archivos CSV tabulares.
 * `/exportar json`: Exporta la base en formato JSON.
 
 ---
 
-## 10. Administración de Usuarios y Servidor
+## 11. Administración de Usuarios y Servidor
 
 *(Comandos exclusivos para el rol `OWNER`)*
 
@@ -258,14 +386,19 @@ Para backups pesados (con fotos históricas):
 
 ---
 
-## 11. Tabla Resumen de Comandos
+## 12. Tabla Resumen de Comandos
 
 | Comando | Nivel de Acceso | Descripción |
 | :--- | :--- | :--- |
-| `/start`, `/menu` | Todos | Abre el menú interactivo con botones táctiles. |
+| `/start`, `/menu` | Todos | Abre el menú interactivo compacto con botones táctiles. |
+| `/despacho`, `/matutino`, `/hoy` | Todos | Genera el briefing matutino de ordeño, inseminaciones AM, recordatorios y repro. |
+| `/leche <litros>` | Todos | Registra la producción total de leche del hato del día. |
+| `/programar <fecha> <hora> <msg>` | Todos | Agenda un recordatorio de campo (ej. `/programar 2026-09-01 08:00 Rotar potrero`). |
+| `/graficos` | Admin / Owner | Panel de gráficos interactivos organizados en 4 categorías zootécnicas. |
+| `/grafico_leche [tag]` | Todos | Genera la curva de lactancia individual de una vaca. |
 | `/guia`, `/preguntar` | Todos | Centro de guía con ejemplos de cómo hacer preguntas al chat. |
 | `/buscar [tag]` | Todos | Buscador de fichas de animales con filtros por categoría. |
-| `/historial <tag>` | Todos | Ficha técnica interactiva del animal con pestañas. |
+| `/historial <tag>` | Todos | Ficha técnica interactiva del animal con pestañas y gráficos. |
 | `/fotos [tag]` | Todos | Galería fotográfica general o fotos de un animal. |
 | `/alertas` | Todos | Semáforo inteligente de partos, secados, destetes y retiros. |
 | `/medicamentos` | Todos | Panel de control sanitario, fármacos y retiros activos. |

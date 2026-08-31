@@ -82,12 +82,16 @@ implementado todavía.
 | Comando / Acción | 👑 OWNER | 🛠️ ADMIN | 📋 TRABAJADOR |
 |------------------|:--------:|:---------:|:--------------:|
 | `/menu` / `/start` (Panel táctil limpio) | ✅ | ✅ | ✅ |
+| `/despacho` / `/matutino` / `/hoy` | ✅ | ✅ | ✅ |
+| `/leche <litros>` (total hato en tanque) | ✅ | ✅ | ✅ |
+| `/programar <fecha> <hora> <msg>` | ✅ | ✅ | ✅ |
 | `/ayuda` / `/help` / `/comandos` | ✅ | ✅ | ✅ |
 | Texto libre (8 eventos) | ✅ | ✅ | ✅ |
 | Nota de voz (Whisper) | ✅ | ✅ | ✅ |
 | Foto (OCR arete y medicamentos) | ✅ | ✅ | ✅ |
 | `/historial <tag>` / `/consulta <tag>` | ✅ | ✅ | ✅ |
 | `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
+| `/graficos` (4 categorías zootécnicas) | ✅ | ✅ | — |
 | `/potreros` / `/potreros sg` | ✅ | ✅ | — |
 | `/ocupacion` / `/rotacion` (Voisin) | ✅ | ✅ | — |
 | `/alertas` | ✅ | ✅ | — |
@@ -107,19 +111,16 @@ implementado todavía.
 
 ### Comandos principales
 
-- **Todos los roles:** `/menu` y `/start` (tablero visual corto y táctil diferenciado por rol), `/ayuda` (listado exhaustivo de comandos), **texto libre**
+- **Todos los roles:** `/menu` y `/start` (tablero visual corto y táctil diferenciado por rol), `/despacho` / `/matutino` / `/hoy` (resumen matutino de 05:30 AM con alertas de ordeño, celos AM-PM, recordatorios y repro), `/leche <litros>` (registro rápido de producción total de leche del hato en tanque), `/programar <fecha> <hora> <msg>` (agenda recordatorios para el despacho), `/ayuda` (listado exhaustivo de comandos), **texto libre**
   con los 8 eventos zootécnicos, **nota de voz** (transcripción automática con Whisper
   y ejecución del evento o consulta), `/consulta <tag>` / `/historial <tag>` (ficha zootécnica
-  completa del animal con entrega automática de su fotografía), **foto** (con detección OCR de tag y medicamento en frasco;
+  completa del animal con entrega automática de fotografía y curva láctea/peso), **foto** (con detección OCR de tag y medicamento en frasco;
   se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
   consultar imágenes de los animales.
-- **OWNER y ADMIN:** `/potreros` y `/potreros sg` (matriz exacta de existencias por potrero de Software Ganadero),
+- **OWNER y ADMIN:** `/graficos` (panel interactivo de gráficos en 4 categorías: Hato, Reproducción, Pasturas y Leche con vista detalle simplificada), `/potreros` y `/potreros sg` (matriz exacta de existencias por potrero de Software Ganadero),
   `/ocupacion` / `/rotacion` (días de pastoreo y descanso Voisin con semáforo), `/alertas`,
   `/animales`, `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF institucional con logo `GANADERÍA JA`),
   `/exportar` (genera y envía el archivo ZIP con las 8 tablas DBF para Software Ganadero),
-  `/importar` (guía de importación), enviar el `.zip` del backup directamente como
-  documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
-  `/descartar_backup` (elimina el backup pendiente sin procesar).
   `/importar` (guía de importación), enviar el `.zip` del backup directamente como
   documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
   `/descartar_backup` (elimina el backup pendiente sin procesar).
@@ -350,10 +351,16 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Menús divididos en 3 bloques claros (Operación en Campo, Zootecnia & Informes SG, Sistema y Administración).
     - **Centro de Guía de Consultas & Chat** (`/guia`, `/preguntar`): Hub categorizado con ejemplos de preguntas sobre animales, potreros, leche/reproducción, sanidad y dictado por voz/fotos.
     - Guía de ayuda enriquecida con ejemplos de dictado por voz y notas de campo.
+  - [x] **Despacho Matutino (05:30 AM), Control Lechero y Recordatorios**:
+    - Generador del Despacho Matutino (`formatear_despacho_matutino`): reporte matutino con retiros sanitarios activos de ordeño, inseminaciones AM por regla AM-PM, recordatorios del día y calendario reproductivo (eco d35, palpación d60, partos 7d) con botones de acción rápida.
+    - Registro de producción total del hato vía `/leche <litros>` (tabla `produccion_leche` con `animal_id` NULL) y control lechero individual.
+    - Programación de recordatorios de campo vía `/programar YYYY-MM-DD HH:MM mensaje` y persistencia en tabla `recordatorios_programados`.
+    - Gráficos zootécnicos organizados en 4 categorías (`/graficos`: Hato, Reproducción, Pasturas, Leche) y vista de detalle compacta con solo 2 botones de navegación.
+    - Menú principal interactivo compactado con submenús unificados `[ 📦 Sistema & Reportes ]` y `[ ❓ Ayuda & Guías ]`.
   - [x] **Manual Integral de Uso y Operación** ([`docs/MANUAL_DE_USO.md`](docs/MANUAL_DE_USO.md)): Guía completa de extremo a extremo para el dueño, administradores y personal de corral.
 - [x] **Auditoría Técnica y Hardening de Concurrencia & Robustez**:
   - [x] Modo WAL en SQLite (`PRAGMA journal_mode=WAL`), `PRAGMA busy_timeout=10000`, `foreign_keys=ON` y `check_same_thread=False` para evitar bloqueos por concurrencia entre Telegram, el vigilante de copias y respaldos.
-  - [x] Creación de índices en `SCHEMA_SQL` para acelerar consultas de inventario, partos, servicios, pesajes y traslados.
+  - [x] Creación de índices en `SCHEMA_SQL` (incluyendo `idx_recordatorios_fecha_estado`) para acelerar consultas de inventario, partos, servicios, pesajes y traslados.
   - [x] Escapado seguro de entidades HTML (`_esc`) y chunking automático de mensajes extensos (`_enviar_texto_seguro` en Telegram).
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
 - [x] Suite de pruebas con pytest: **402 pruebas en verde** (100% pasando)

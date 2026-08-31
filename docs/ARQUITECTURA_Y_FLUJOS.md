@@ -52,9 +52,10 @@ Este documento describe la arquitectura modular, el modelo de datos, los flujos 
 ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                                CAPA DE DATOS Y PERSISTENCIA                                     │
 │  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                 Database (SQLite)                                         │  │
+│  │                                 Database (SQLite — WAL Mode)                              │  │
 │  │  Tablas: animales · partos · celos · servicios · tratamientos · pesajes · traslados       │  │
-│  │          muertes · movimientos · potreros · alertas · fotos                               │  │
+│  │          muertes · movimientos · potreros · alertas · fotos · produccion_leche            │  │
+│  │          recordatorios_programados · import_sg_historial · consultas_animal               │  │
 │  └──────────────────────────────┬──────────────────────────────────────────┬─────────────────┘  │
 └─────────────────────────────────┼──────────────────────────────────────────┼────────────────────┘
                                   │                                          │
@@ -133,7 +134,44 @@ Entrada de Texto / Foto
         ├─► Pesaje ───────► Registra peso ──────────► Calcula GMD y peso ajustado 205 días
         ├─► Traslado ─────► Registra movimiento ────► Actualiza ocupación/reposo potrero (Voisin)
         ├─► Muerte ───────► Registra baja ──────────► Estado = MUERTO (excluido de inventario activo)
-        └─► Movimiento ───► Compra/Venta/Entrada ───► Alta/Baja en inventario
+        ├─► Movimiento ───► Compra/Venta/Entrada ───► Alta/Baja en inventario
+        ├─► Leche Hato ───► /leche <litros> ────────► Guarda en produccion_leche (animal_id = NULL)
+        └─► Programar ────► /programar <fecha> ─────► Guarda en recordatorios_programados (estado PENDIENTE)
+```
+
+### 3.1 Flujo del Despacho Matutino (05:30 AM)
+
+El Despacho Matutino (`formatear_despacho_matutino`) se ejecuta automáticamente cada mañana a las 05:30 AM (vía `scripts/enviar_despacho.py` en cron/systemd) o bajo demanda con `/despacho`. Consolida 4 consultas prioritarias para la operación del día:
+
+```text
+ Cron 05:30 AM / /despacho
+            │
+            ▼
+┌────────────────────────────────────────────────────────┐
+│             formatear_despacho_matutino()              │
+└───────────┬──────────────┬──────────────┬──────────────┘
+            │              │              │              │
+            ▼              ▼              ▼              ▼
+┌─────────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────────┐
+│ 1. Ordeño &     │ │ 2. Celos AM  │ │ 3. Tareas    │ │ 4. Calendario   │
+│    Retiros      │ │    (AM-PM)   │ │    Agendadas │ │    Reproductivo │
+│                 │ │              │ │              │ │                 │
+│ • tratamientos  │ │ • celos ayer │ │ • recordato- │ │ • servicios FEP │
+│   fin_retiro    │ │   PM/tarde   │ │   rios_pro-  │ │   próximos 7d   │
+│   >= hoy        │ │ • alertas IA │ │   gramados   │ │ • ecografía d35 │
+│ • Solo alerta   │ │   programada │ │   pendientes │ │ • palpación d60 │
+│   si hay casos  │ │   para hoy   │ │   de hoy     │ │                 │
+└─────────┬───────┘ └──────┬───────┘ └──────┬───────┘ └────────┬────────┘
+          │                │                │                  │
+          └────────────────┼────────────────┴──────────────────┘
+                           ▼
+              Mensaje Telegram Formateado
+                           +
+          Botonera de Acción Rápida (8 botones)
+    [ 🥛 Registrar Leche ]  [ ⏰ Programar Recordatorio ]
+    [ 🚨 Alertas Día ]      [ 💊 Medicamentos ]
+    [ 🌿 Potreros ]         [ 🐮 Tablero Finca ]
+    [ 🔍 Buscar Animal ]    [ 🏠 Menú Principal ]
 ```
 
 ---
@@ -154,6 +192,30 @@ Entrada de Texto / Foto
 - **Edad humana** (`formatear_edad_zootecnica` en `src/engine/query_engine.py`): `🎂 Edad: 7 años 3 meses (2.667 días)` / `8 meses (243 días)` / `12 días`, inferida desde `animales.fecha_nacimiento` o `partos.fecha` de la madre (<450d). Visible en header de `/historial`.
 - **Estados SG fieles**: `CRÍA MACHO (<8m)`, `LEVANTE (8-18m)`, `TORETE (18-30m)`, `TORO (>30m)` / `CRÍA HEMBRA`, `NOVILLA LEVANTE (12-18m)`, `NOVILLA VIENTRE (≥18m)`, `VACA PARIDA (≤305d)` vs `VACA SECA/ESCOTERA (>305d)`. Partos/días abiertos solo para hembras; partos autorreferenciados (`vaca_id == id_cria`) se excluyen y se bloquean para machos.
 - **`/status` filtrado por finca**: `Activos: 338 (GANADERIA-JA 01-JA)` sin `Histórico`; `Potrero + reposo` ignora reposos absurdos `>365d` (ej. JARA 3.232d histórico) y `Potrero + animales` cuenta solo `estado='ACTIVO'` por último traslado; `Actualizado` usa `mtime` de `data/bitacora.db` (fecha del último backup SG) con fallback a `MAX(partos.fecha)`.
+
+### 4.2 Modelo de Datos Extendido & Hardening Concurrente (WAL)
+
+La base de datos SQLite opera con parámetros de concurrencia y confiabilidad para alta carga:
+- **Modo WAL (`PRAGMA journal_mode=WAL`):** Permite lecturas y escrituras simultáneas sin bloqueos mutuos entre los procesos del Bot de Telegram, los observadores de backups y las tareas programadas.
+- **Tolerancia a Bloqueos (`PRAGMA busy_timeout=10000`):** Espera hasta 10 segundos antes de fallar por contención de base de datos.
+- **Integridad Referencial (`PRAGMA foreign_keys=ON`):** Asegura consistencia relacional.
+
+**Tablas Nuevas Integradas:**
+- `produccion_leche`: Registra pesajes individuales de leche vinculados a `animal_id`, o registros de producción total diaria del hato en el tanque (`animal_id = NULL`).
+- `recordatorios_programados`: Tareas de campo agendadas con `mensaje`, `fecha_programada`, `hora`, `creado_por`, `estado` (`PENDIENTE`/`ENVIADO`) y `creado_en`.
+
+**Índices Compuestos de Rendimiento:**
+- `idx_recordatorios_fecha_estado` en `recordatorios_programados(fecha_programada, estado)`
+- `idx_animales_tag` en `animales(tag)` y `idx_animales_estado` en `animales(estado)`
+- `idx_animales_potrero` en `animales(potrero_id)`
+- `idx_partos_vaca_fecha` en `partos(vaca_id, fecha)` e `idx_partos_cria` en `partos(id_cria)`
+- `idx_servicios_vaca_fecha` en `servicios(vaca_id, fecha)`
+- `idx_celos_vaca_fecha` en `celos(vaca_id, fecha)`
+- `idx_tratamientos_animal_fecha` en `tratamientos(animal_id, fecha)`
+- `idx_traslados_animal_fecha` en `traslados(animal_id, fecha)`
+- `idx_pesajes_animal_fecha` en `pesajes(animal_id, fecha)`
+- `idx_movimientos_animal_fecha` en `movimientos(animal_id, fecha)`
+- `idx_fotos_animal_tag` en `fotos(animal_id, tag)`
 
 ---
 
@@ -209,13 +271,17 @@ Texto "parió la 47 y vacune la 12 con 20ml"
 
 | Comando / Recurso | 👑 OWNER | 🛠️ ADMIN | 📋 TRABAJADOR |
 |---|:---:|:---:|:---:|
-| `/start`, `/help` | ✅ | ✅ | ✅ |
+| `/start`, `/help`, `/menu` | ✅ | ✅ | ✅ |
+| `/despacho`, `/matutino`, `/hoy` | ✅ | ✅ | ✅ |
+| `/leche <litros>` | ✅ | ✅ | ✅ |
+| `/programar <fecha> <hora> <msg>` | ✅ | ✅ | ✅ |
 | Registro de 8 eventos (texto) | ✅ | ✅ | ✅ |
 | Notas de voz / Fotos de campo | ✅ | ✅ | ✅ |
 | Consultas lenguaje natural | ✅ | ✅ | ✅ |
 | `/fotos [tag]` | ✅ | ✅ | ✅ |
 | `/alertas` | ✅ | ✅ | ❌ |
 | `/historial <tag>` | ✅ | ✅ | ❌ |
+| `/graficos` | ✅ | ✅ | ❌ |
 | `/potreros` | ✅ | ✅ | ❌ |
 | `/animales` | ✅ | ✅ | ❌ |
 | `/status` | ✅ | ✅ | ❌ |

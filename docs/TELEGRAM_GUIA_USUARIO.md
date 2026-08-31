@@ -60,6 +60,18 @@ Dígale qué lote o animal movió, de qué potrero y a cuál.
 
 Dígale el animal y cuántos kilos pesó.
 
+### 🥛 Control de Leche (Individual y Total)
+> `la 47 dio 12 litros de leche`  *(Vaca individual)*  
+> `/leche 475`  *(Total del hato recogido hoy en el tanque)*
+
+Dígale los litros de una vaca o use `/leche <litros>` para anotar todo el tanque del día de una sola vez.
+
+### ⏰ Recordatorios de Campo
+> `/programar 2026-09-01 08:00 Rotar potrero Bajo a Guayabal`  
+> `/programar 2026-09-05 06:30 Vacunación aftosa en el corral`
+
+Dígale la fecha (`AAAA-MM-DD`), la hora (`HH:MM`) y la tarea. El bot se lo recordará en el **Despacho Matutino** de ese día.
+
 ### 📥 Entrada / Salida (compra o venta)
 > `entraron 15 novillas compradas en subasta`
 
@@ -104,40 +116,61 @@ Usted no necesita memorizar comandos difíciles. Puede hacerle preguntas directa
 
 ---
 
-## 4. Teclado Táctil Interactivo y Menús Diferenciados 🔘📱
+## 4. El Despacho Matutino de las 05:30 AM (`/despacho`) 🌅
 
-El bot adapta su pantalla y botones de acuerdo a quién lo está usando:
+Todos los días a las **05:30 AM**, el bot envía automáticamente a su chat el resumen operativo de la mañana. También puede pedirlo en cualquier momento escribiendo `/despacho`, `/matutino`, `/hoy` o pulsando el botón `[ 🌅 Despacho Matutino ]`.
 
-### 🤠 A. Menú de Campo para Trabajadores / Mayordomo
-Diseñado para ser **100% didáctico y visual**. El personal de campo no ve comandos complejos ni reportes administrativos; solo ve botones que le enseñan y facilitan su labor:
-- `[ 📝 Cómo Anotar Reportes ]`: Abre ejemplos listos para copiar de partos, celos, servicios, remedios, pesajes y traslados.
-- `[ 🔍 Cómo Hacer Preguntas ]`: Guía didáctica con ejemplos de preguntas cotidianas (*«¿en qué potrero está patricia?»*, *«¿cuándo parió la 47?»*, etc.).
-- `[ 📷 Fotos Aretes y Remedios ]`: Guía paso a paso de cómo fotografiar aretes y etiquetas de frascos de remedios para que el bot los lea solo.
-- `[ 🐮 Consultar un Animal ]`: Muestra cómo ver la ficha y foto de cualquier vaca escribiendo su número o nombre.
-- `[ 🎤 Cómo Mandar Audios ]`: Consejos para enviar notas de voz claras desde el potrero.
-- `[ 📷 Galería de Fotos ]`: Muestra las últimas fotos registradas en la finca.
+### ¿Qué incluye el Despacho?
+1. ⛔ **Control de Ordeño & Retiros Sanitarios:** Le muestra de inmediato qué vacas tienen retiro activo y cuándo vence, para **no echar esa leche al tanque**. Si ninguna vaca tiene retiro, no satura el mensaje.
+2. 🔥 **Inseminaciones de la Mañana (Regla AM-PM):** Lista las vacas que mostraron celo ayer por la tarde para inseminar antes de las 10:00 AM, más servicios programados.
+3. 📌 **Recordatorios Programados:** Compromisos del día anotados previamente (rotar potreros, vacunar lotes, desparasitar).
+4. 🤰 **Calendario Reproductivo & Veterinario:** Ecografías del día 35, palpaciones del día 60 y partos programados para los próximos 7 días.
 
-### 👑 B. Panel de Control para Dueño (OWNER) y Administradores (ADMIN)
-Tablero de mando integral con acceso inmediato a los reportes y gestión zootécnica:
-- `[ 📊 Inventario Hato ]`: Resumen zootécnico del ganado activo por categorías.
-- `[ ⚠️ Alertas Pendientes ]`: Ecografías, palpaciones y secados programados.
-- `[ 🌿 Potreros Voisin ]`: Estado de rotación y potreros que cumplieron su descanso.
-- `[ 📋 Reporte Semanal PDF ]`: Genera y descarga el informe PDF completo de la semana.
-- `[ 📦 Descargar Backup ZIP ]`: Exporta el paquete ZIP listo para Software Ganadero (SG).
-- `[ 📷 Galería de Fotos ]`: Galería fotográfica general.
-- `[ 👥 Usuarios / Permisos ]` *(Solo OWNER)*: Administra altas y bajas de trabajadores.
-- `[ ⚙️ Estado Servidor ]`: Salud de la base de datos, memoria y registros del sistema.
-- `[ 💡 Modo Guía de Campo ]`: Permite al dueño ver el menú didáctico de los trabajadores.
-
-### 📷 Fotos Automáticas de Animales
-Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `/historial patricia` o escribiendo `patricia` o `47`), el bot **busca automáticamente su foto en la galería del backup** y se la envía adjunta a la ficha técnica, junto con botones interactivos:
-- `[ ⚖️ Pesajes ]` `[ 🧬 Reproducción ]`
-- `[ 🌱 Potrero ]` `[ 💊 Retiro ]`
-- `[ 📷 Ver Foto ]` `[ 📋 Ficha Completa ]`
+### Botones de Acción Rápida en el Despacho:
+- `[ 🥛 Registrar Leche Hoy ]`: Le pide los litros del tanque para guardarlos al instante.
+- `[ ⏰ Programar Recordatorio ]`: Le guía para agendar una labor futura con fecha y hora.
+- `[ 🚨 Alertas del Día ]` · `[ 💊 Medicamentos & Retiro ]` · `[ 🌿 Potreros & Pasturas ]` · `[ 🐮 Tablero de la Finca ]` · `[ 🔍 Buscar Animal ]` · `[ 🏠 Menú Principal ]`.
 
 ---
 
-## 5. También puede mandar notas de voz y fotos 🎤📷
+## 5. Teclado Táctil Interactivo y Menús Compactos 🔘📱
+
+El bot adapta su pantalla y botones de acuerdo a quién lo está usando para mantener la vista limpia y sin desorden:
+
+### 🤠 A. Menú de Campo para Trabajadores / Mayordomo
+Diseñado para ser **100% didáctico y visual**:
+- `[ 🌅 Despacho Matutino ]`: Tareas del día, retiros de ordeño y celos a inseminar.
+- `[ 🚨 Alertas del Día ]`: Semáforo de partos próximos, secados y retiros.
+- `[ 🔍 Buscar Animal / Ficha ]`: Buscador por aretes recientes o por categorías (paridas, inseminadas, toros, crías).
+- `[ 🌿 Potreros & Pasturas ]`: Matriz de potreros ocupados y días de pastoreo.
+- `[ 💊 Medicamentos & Retiro ]`: Fármacos aplicados y días de carencia.
+- `[ 📷 Galería de Fotos ]`: Fotos de animales y novedades de campo.
+- `[ ❓ Ayuda & Guías ]`: Submenú con ejemplos de notas, guía de cómo preguntar y manual de campo.
+
+### 👑 B. Panel de Control para Dueño (OWNER) y Administradores (ADMIN)
+Tablero ejecutivo que organiza las herramientas en accesos directos y submenús limpios:
+- Accesos zootécnicos directos: `[ 🌅 Despacho Matutino ]`, `[ 🚨 Alertas del Día ]`, `[ 🔍 Buscar Animal ]`, `[ 🌿 Potreros ]`, `[ 💊 Medicamentos ]`, `[ 📊 Población & KPIs ]`, `[ 🧬 Composición Genética ]`, `[ 🐮 Tablero Finca ]`.
+- `[ 📊 Gráficos de la Finca ]`: Panel interactivo organizado en 4 categorías:
+  - 🐄 **Hato:** Evolución, Waterfall (cascada de movimientos) y Categorías del Hato.
+  - 🧬 **Reproducción:** GMD del Hato, IEP 2 años, IEP histórico, Destete por Raza, Rendimiento del Padre, Preñadas vs Vacías, Días Abiertos Kaplan-Meier y Estado Reproductivo.
+  - 🌱 **Pasturas:** Aforo de Potreros, Ocupación Voisin y Carga Animal (UGG/ha).
+  - 🥛 **Leche:** Producción Total del Hato, Eficiencia Lechera y Ranking de Vacas.
+- `[ 📦 Sistema & Reportes ]`: Submenú que reúne:
+  - `[ 📋 Reporte Semanal PDF ]`
+  - `[ 📦 Descargar Backup ZIP ]`
+  - `[ ⚙️ Servidor & Sistema ]`
+  - `[ 📜 Ver Últimos Logs ]`
+  - `[ 👥 Usuarios / Permisos ]` *(Solo OWNER)*
+- `[ ❓ Ayuda & Guías ]`: Submenú unificado de manuales, cómo preguntar y ejemplos.
+
+### 📷 Fichas Zootécnicas y Curvas Individuales
+Al consultar cualquier animal (escribiendo su número ej. `47`, `/consulta N069` o enviando foto), el bot envía su ficha con foto y botones interactivos:
+- `[ ⚖️ Pesajes & GMD ]` · `[ 🍼 Partos & Crías ]` · `[ 🥛 Control Leche ]` · `[ 💉 Sanidad & Retiro ]` · `[ 🌳 Genealogía (3G) ]` · `[ 📷 Ver Foto ]` · `[ 📈 Gráfico de Peso ]` · `[ 📉 Curva de Lactancia ]`.
+- **Navegación limpia de 2 botones:** Al ver cualquier detalle o gráfico, la botonera se reduce a `[ ◀ Volver a Ficha (TAG) / Gráficos | 🏠 Menú Principal ]` para evitar llenar la pantalla de botones innecesarios.
+
+---
+
+## 6. También puede mandar notas de voz y fotos 🎤📷
 
 - **Nota de voz:** mantenga presionado el micrófono y cuente la novedad hablando. El bot la transcribe y procesa automáticamente con inteligencia artificial.
 - **Foto:** saque una foto del arete, del frasco del remedio o del animal y mándela con o sin texto. El OCR del bot detecta automáticamente el arete o medicamento y lo registra.
@@ -145,11 +178,16 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 
 ---
 
-## 6. Comandos de Consulta y Administración (Dueño y Administrador)
+## 7. Comandos de Consulta y Administración
 
 | Comando | Para qué sirve | Ejemplo de uso |
 |---|---|---|
-| `/menu` o `/start` | Abre el **Menú Táctil de Botones** interactivo y visual. | `/menu`, `/start` |
+| `/menu` o `/start` | Abre el **Menú Táctil de Botones** interactivo y compacto. | `/menu`, `/start` |
+| `/despacho`, `/matutino`, `/hoy` | Genera el **Despacho Matutino de las 05:30 AM** con retiros, inseminaciones AM y tareas. | `/despacho`, `/matutino` |
+| `/leche <litros>` | Anota la **Producción Total de Leche del Hato** de hoy en el tanque. | `/leche 475`, `/leche 480.5` |
+| `/programar <fecha> <hora> <msg>` | Agenda un **Recordatorio de Campo** para el Despacho Matutino. | `/programar 2026-09-01 08:00 Rotar potrero Bajo` |
+| `/graficos` | Panel interactivo de **Gráficos Zootécnicos en 4 Categorías** (Hato/Repro/Pasturas/Leche). | `/graficos` |
+| `/grafico_leche [tag]` | Genera la **Curva de Lactancia individual** (litros vs días en leche). | `/grafico_leche N069`, `/grafico_leche 47` |
 | `/guia` o `/preguntar` | **Centro de Guía de Consultas**: Ejemplos de cómo preguntar al chat sobre animales, potreros, leche y sanidad. | `/guia`, `/preguntar` |
 | `/ayuda` o `/help` | Muestra la **Lista Completa de Comandos** y sintaxis. | `/ayuda`, `/comandos` |
 | `/reporte` | Genera y envía el **Reporte en PDF** (semanal por defecto). | `/reporte`, `/reporte diario`, `/reporte 15` |
@@ -158,7 +196,7 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 | `/alertas` | Muestra el **semáforo inteligente de alertas** (partos $\le 30$d, secados $\ge 200$ DEL, destetes, pérdidas de peso y retiros). | `/alertas` |
 | `/poblacion`, `/piramide` | **Tablero Poblacional**: Pirámide de edades y brackets demográficos de Software Ganadero. | `/poblacion`, `/piramide` |
 | `/genetica`, `/razas` | **Composición Genética**: Distribución racial y cruces del hato. | `/genetica`, `/razas` |
-| `/duplicados` | **Auditoría de Duplicados**: animales activos con la misma madre, padre y fecha de nacimiento (probable mismo nacimiento importado dos veces con tags distintos). | `/duplicados` |
+| `/duplicados` | **Auditoría de Duplicados**: animales activos con la misma madre, padre y fecha de nacimiento. | `/duplicados` |
 | `/historial <tag>` | Ficha interactiva con pestañas táctiles (Pesajes, Partos, Leche, Retiro, Genealogía). | `/historial 47`, `/consulta N069` |
 | `/buscar [tag]` | **Buscador & Fichas de Animales**: Filtros por vacas paridas, inseminadas, toros o crías. | `/buscar`, `/buscar 47` |
 | `/medicamentos`, `/retiros` | **Control Sanitario & Retiros**: Animales en retiro activo de leche/carne y tratamientos. | `/medicamentos`, `/retiros` |
@@ -178,14 +216,14 @@ Cuando cualquier usuario consulte la ficha de un animal (ej. `/consulta a009`, `
 
 ---
 
-## 4. ¿El bot le dijo "No autorizado"? ⛔
+## 8. ¿El bot le dijo "No autorizado"? ⛔
 
 Si al mandarle `/start` o cualquier nota el bot le responde **"No autorizado"**,
 significa que su número **todavía no está dado de alta** en el sistema.
 
 👉 **Avísele al dueño.** Solo él puede agregarlo para que pueda usar el bot.
 
-### 4.1 Cómo agregar un nuevo trabajador (solo dueño) 👥
+### 8.1 Cómo agregar un nuevo trabajador (solo dueño) 👥
 
 Si llega un trabajador nuevo a la finca o cambia de celular, el dueño puede darle acceso en 4 pasos sencillos **directamente desde su Telegram** (sin necesidad de reiniciar el bot ni tocar el servidor):
 
@@ -215,7 +253,7 @@ Si llega un trabajador nuevo a la finca o cambia de celular, el dueño puede dar
 
 ---
 
-## 5. Consejos para que el bot entienda bien
+## 9. Consejos para que el bot entienda bien
 
 - Mencione siempre el **número del animal** (el tag o arete), por ejemplo "la 47".
 - Para traslados, diga **de dónde a dónde**.
@@ -226,15 +264,13 @@ Si llega un trabajador nuevo a la finca o cambia de celular, el dueño puede dar
 
 ---
 
-## 6. ¿Y el dueño qué puede ver?
+## 10. ¿Y el dueño qué puede ver?
 
-El dueño (y el administrador) pueden consultar desde su celular las alertas, el
-historial de cada animal, los potreros listos, el inventario y el estado del
-sistema. Usted solo se encarga de **mandar las novedades**; el bot hace el resto.
+El dueño (y el administrador) pueden consultar desde su celular el despacho matutino, alertas, historial de cada animal, potreros listos, gráficos zootécnicos, inventario y estado del sistema. Usted solo se encarga de **mandar las novedades**; el bot hace el resto.
 
 ---
 
-## 7. Sincronización automática por carpeta COPIAS (Backups grandes de 70 MB) 📦⚡
+## 11. Sincronización automática por carpeta COPIAS (Backups grandes de 70 MB) 📦⚡
 
 Cuando el backup de Software Ganadero contiene fotos y tablas históricas completas, suele pesar **más de 20 MB** (habitualmente 70 MB o más), por lo que Telegram no permite enviarlo por chat directo.
 
