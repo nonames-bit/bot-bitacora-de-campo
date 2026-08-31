@@ -311,6 +311,21 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(keyboard)
 
 
+def crear_teclado_grafico_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para la vista de detalle de un gráfico general.
+
+    Solo muestra botones de navegación simplificada para evitar saturar
+    la pantalla debajo de la imagen del gráfico.
+    """
+    keyboard = [
+        [
+            InlineKeyboardButton("◀ Volver a Gráficos", callback_data="cmd:graficos"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 def crear_teclado_alertas() -> InlineKeyboardMarkup:
     keyboard = [
         [

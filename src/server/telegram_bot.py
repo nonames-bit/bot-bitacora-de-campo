@@ -159,6 +159,7 @@ def construir_application(
         crear_teclado_buscar_animal,
         crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
+        crear_teclado_grafico_detalle,
         crear_teclado_graficos,
         crear_teclado_guia_chat,
         crear_teclado_medicamentos,
@@ -2224,7 +2225,7 @@ def construir_application(
                         with open(ruta_grafico, "rb") as f:
                             if query.message:
                                 await query.message.reply_photo(
-                                    photo=f, caption=titulo, reply_markup=crear_teclado_graficos(),
+                                    photo=f, caption=titulo, reply_markup=crear_teclado_grafico_detalle(),
                                 )
                     else:
                         if query.message:

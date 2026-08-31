@@ -1,5 +1,9 @@
 """Pruebas de construcción de teclados táctiles (InlineKeyboardMarkup)."""
-from src.server.keyboards import crear_teclado_buscar_animal
+from src.server.keyboards import (
+    crear_teclado_buscar_animal,
+    crear_teclado_grafico_detalle,
+    crear_teclado_graficos,
+)
 
 
 def _tags_botones(teclado):
@@ -36,3 +40,22 @@ def test_teclado_buscar_animal_se_actualiza_al_reconsultar(db):
     db.registrar_consulta_animal("A048", hoy="2026-08-03")
     teclado = crear_teclado_buscar_animal(db)
     assert _tags_botones(teclado) == ["A048", "A088"]
+
+
+def test_teclado_grafico_detalle_tiene_solo_dos_botones():
+    teclado = crear_teclado_grafico_detalle()
+    botones = [btn for fila in teclado.inline_keyboard for btn in fila]
+    assert len(botones) == 2
+    assert botones[0].text == "◀ Volver a Gráficos"
+    assert botones[0].callback_data == "cmd:graficos"
+    assert botones[1].text == "🏠 Menú Principal"
+    assert botones[1].callback_data == "menu:principal"
+
+
+def test_teclado_graficos_mantiene_menu_completo():
+    teclado = crear_teclado_graficos()
+    botones = [btn for fila in teclado.inline_keyboard for btn in fila]
+    assert len(botones) > 10
+    callbacks = [btn.callback_data for btn in botones]
+    assert "panel_grafico:evolucion" in callbacks
+    assert "menu:principal" in callbacks
