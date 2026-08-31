@@ -84,7 +84,7 @@ def crear_teclado_trabajador() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
-def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
+def crear_teclado_admin(rol: Optional[str] = None) -> InlineKeyboardMarkup:
     keyboard = [
         [
             InlineKeyboardButton("🌅 Despacho Matutino", callback_data="cmd:despacho"),
@@ -108,26 +108,35 @@ def crear_teclado_admin(rol: Optional[str]) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("💬 Guía: Cómo Preguntar al Chat", callback_data="guia:chat_hub"),
-            InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
         ],
         [
-            InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
-            InlineKeyboardButton("⚙️ Servidor & Logs", callback_data="cmd:sistema"),
+            InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
+        ],
+        [
+            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
+            InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
         ],
     ]
-    if rol == "OWNER":
+    return InlineKeyboardMarkup(keyboard)
+
+def crear_teclado_sistema_menu(rol: Optional[str] = None) -> InlineKeyboardMarkup:
+    keyboard = [
+        [
+            InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
+            InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
+        ],
+        [
+            InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+            InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
+        ],
+    ]
+    if rol == "OWNER" or rol is None:
         keyboard.append([
             InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
-            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
         ])
-        keyboard.append([
-            InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
-        ])
-    else:
-        keyboard.append([
-            InlineKeyboardButton("💡 Modo Guía de Campo", callback_data="menu:campo"),
-            InlineKeyboardButton("📖 Manual / Comandos", callback_data="cmd:ayuda"),
-        ])
+    keyboard.append([
+        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+    ])
     return InlineKeyboardMarkup(keyboard)
 
 def crear_teclado_medicamentos() -> InlineKeyboardMarkup:

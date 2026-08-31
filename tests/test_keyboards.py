@@ -1,11 +1,15 @@
 """Pruebas de construcción de teclados táctiles (InlineKeyboardMarkup)."""
 from src.server.keyboards import (
+    crear_teclado_admin,
     crear_teclado_alertas_detalle,
     crear_teclado_animal_detalle,
     crear_teclado_buscar_animal,
     crear_teclado_grafico_detalle,
     crear_teclado_graficos,
     crear_teclado_poblacion_detalle,
+    crear_teclado_principal,
+    crear_teclado_sistema_menu,
+    crear_teclado_trabajador,
 )
 
 
@@ -132,3 +136,71 @@ def test_teclado_graficos_organizado_por_4_categorias():
 
     # 5. MENÚ PRINCIPAL
     assert "menu:principal" in callbacks
+
+
+def test_teclado_sistema_menu_owner():
+    teclado = crear_teclado_sistema_menu("OWNER")
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:reporte" in callbacks
+    assert "cmd:exportar" in callbacks
+    assert "cmd:sistema" in callbacks
+    assert "cmd:logs" in callbacks
+    assert "cmd:usuarios" in callbacks
+    assert "menu:principal" in callbacks
+
+
+def test_teclado_sistema_menu_admin():
+    teclado = crear_teclado_sistema_menu("ADMIN")
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:reporte" in callbacks
+    assert "cmd:exportar" in callbacks
+    assert "cmd:sistema" in callbacks
+    assert "cmd:logs" in callbacks
+    assert "cmd:usuarios" not in callbacks
+    assert "menu:principal" in callbacks
+
+
+def test_teclado_sistema_menu_default_sin_args():
+    teclado = crear_teclado_sistema_menu()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:reporte" in callbacks
+    assert "cmd:exportar" in callbacks
+    assert "cmd:sistema" in callbacks
+    assert "cmd:logs" in callbacks
+    assert "cmd:usuarios" in callbacks
+    assert "menu:principal" in callbacks
+
+
+def test_teclado_admin_compacto_agrupa_sistema():
+    teclado = crear_teclado_admin("OWNER")
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:sistema_menu" in callbacks
+    # Las opciones de sistema individuales ya no saturan el menú principal
+    assert "cmd:reporte" not in callbacks
+    assert "cmd:exportar" not in callbacks
+    assert "cmd:sistema" not in callbacks
+    assert "cmd:usuarios" not in callbacks
+
+
+def test_teclado_trabajador_sin_sistema():
+    teclado = crear_teclado_trabajador()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:sistema_menu" not in callbacks
+    assert "cmd:reporte" not in callbacks
+    assert "cmd:exportar" not in callbacks
+    assert "cmd:sistema" not in callbacks
+    assert "cmd:usuarios" not in callbacks
+
+
+def test_teclado_principal_segun_rol():
+    t_owner = crear_teclado_principal("OWNER")
+    cb_owner = [btn.callback_data for fila in t_owner.inline_keyboard for btn in fila]
+    assert "cmd:sistema_menu" in cb_owner
+
+    t_admin = crear_teclado_principal("ADMIN")
+    cb_admin = [btn.callback_data for fila in t_admin.inline_keyboard for btn in fila]
+    assert "cmd:sistema_menu" in cb_admin
+
+    t_trab = crear_teclado_principal("TRABAJADOR")
+    cb_trab = [btn.callback_data for fila in t_trab.inline_keyboard for btn in fila]
+    assert "cmd:sistema_menu" not in cb_trab

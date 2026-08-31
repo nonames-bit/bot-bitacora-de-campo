@@ -299,7 +299,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] **`/status` depurado para GANADERIA-JA 01-JA**: solo `Activos: 338 (GANADERIA-JA 01-JA)` sin `Histórico`, `Potrero + reposo` filtra reposos absurdos `>365d` (JARA 3.232d → `Ninguno`), `Potrero + animales` usa último traslado + `estado='ACTIVO'`, `Actualizado` usa mtime del `data/bitacora.db` (fecha del último backup SG) con fallback a `MAX(partos.fecha)`.
 - [x] **Resumen SG inventario por brackets** (replica foto SG 339): tabla `Hembras <1, 1-2, 2-4, 4-8, 8-10, >10` y `Machos <1, 1-2, >2, Reproductor` con `Nro` y `Distrib.%` + `Total 339`, solo `estado='ACTIVO'` (GANADERIA-JA 01-JA), potreros ocupados con `% del total`; igual que `/animales` y `/status`.
 - [x] **Menús diferenciados y UX interactiva optimizada**:
-  - Panel corto y táctil para `/start` y `/menu` (`crear_teclado_trabajador` y `crear_teclado_admin`).
+  - Panel corto y táctil para `/start` y `/menu` (`crear_teclado_trabajador` y `crear_teclado_admin`), con menú compacto de administración que agrupa Reportes, Backup, Servidor y Usuarios en submenú dedicado (`crear_teclado_sistema_menu`).
   - Menú de campo 100% didáctico para trabajadores (`[ 📝 Cómo Anotar Reportes ]`, `[ 🔍 Cómo Hacer Preguntas ]`, `[ 📷 Fotos Aretes y Remedios ]`, `[ 🐮 Consultar un Animal ]`, `[ 🎤 Cómo Mandar Audios ]`).
   - Listado completo de comandos reservado para `/ayuda` y `/help`.
 - [x] **Existencias por potrero fieles a Software Ganadero (SG)**:

@@ -169,6 +169,7 @@ def construir_application(
         crear_teclado_poblacion_detalle,
         crear_teclado_preguntas_rapidas,
         crear_teclado_principal,
+        crear_teclado_sistema_menu,
         crear_teclado_trabajador,
     )
 
@@ -997,6 +998,9 @@ def construir_application(
                 ],
                 [
                     InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
+                    InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
+                ],
+                [
                     InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                 ],
             ])
@@ -1594,8 +1598,11 @@ def construir_application(
                 teclado_u = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]
+                    ],
                 ])
                 if query.message:
                     await query.message.reply_text(msg, reply_markup=teclado_u)
@@ -1616,8 +1623,9 @@ def construir_application(
                         InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
                     ],
                     [
+                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]
+                    ],
                 ])
                 if query.message:
                     try:
@@ -2018,6 +2026,25 @@ def construir_application(
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_st)
 
+            elif data == "cmd:sistema_menu":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                rol = auth.rol_de(user_id)
+                msg = (
+                    "📦 <b>Sistema & Reportes</b>\n\n"
+                    "Opciones de administración técnica, reportes y respaldos de la finca:"
+                )
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_sistema_menu(rol)
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_sistema_menu(rol))
+
             elif data == "cmd:sistema":
                 await query.answer()
                 if not auth.puede_administrar(user_id):
@@ -2036,6 +2063,9 @@ def construir_application(
                     ],
                     [
                         InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
+                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                     ],
                 ])
