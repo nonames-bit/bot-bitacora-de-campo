@@ -532,6 +532,62 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
+    async def cmd_leche(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            args = context.args or []
+            if not args:
+                await update.message.reply_text("🥛 Uso: /leche <litros>  ej. /leche 475\nO pulsa 🥛 Registrar Leche Hoy y escribe el total del día.")
+                return
+            try:
+                litros = float(args[0].replace(",", "."))
+            except ValueError:
+                await update.message.reply_text("❌ Litros inválido. Ej: /leche 475 o /leche 475.5")
+                return
+            fecha_hoy = date.today().isoformat()
+            db.registrar_leche(animal_tag=None, fecha=fecha_hoy, litros=litros, registrado_por=user_id)
+            await update.message.reply_text(f"✅ Leche registrada: <b>{litros} L</b> el {fecha_hoy} (total hato)", parse_mode="HTML")
+        except Exception as e:
+            logger.error("Error en cmd_leche: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_programar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            texto = " ".join(context.args or []).strip()
+            if not texto:
+                await update.message.reply_text("⏰ Uso: /programar YYYY-MM-DD HH:MM mensaje\nEj: /programar 2026-09-01 08:00 Rotar potrero Bajo a Guayabal\nO usa el botón ⏰ Programar Recordatorio.")
+                return
+            partes = texto.split(maxsplit=2)
+            if len(partes) < 3:
+                await update.message.reply_text("❌ Formato incompleto. Ej: /programar 2026-09-01 08:00 Rotar potrero")
+                return
+            fecha, hora, mensaje = partes[0], partes[1], partes[2]
+            # validación básica
+            from datetime import datetime as _dt
+            try:
+                _dt.strptime(f"{fecha} {hora}", "%Y-%m-%d %H:%M")
+            except ValueError:
+                await update.message.reply_text("❌ Fecha/hora inválida. Usa YYYY-MM-DD HH:MM")
+                return
+            rid = db.registrar_recordatorio(mensaje=mensaje, fecha_programada=fecha, hora=hora, creado_por=user_id)
+            await update.message.reply_text(f"✅ Recordatorio #{rid} programado para <b>{fecha} {hora}</b>:\n<i>{html.escape(mensaje)}</i>", parse_mode="HTML")
+        except Exception as e:
+            logger.error("Error en cmd_programar: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
     async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -692,6 +748,43 @@ def construir_application(
                 await update.message.reply_text("No había ningún /deshacer pendiente.")
         except Exception as e:
             logger.error("Error en cmd_cancelar_deshacer: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_renombrar_animal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            if len(context.args) != 2:
+                await update.message.reply_text(
+                    "Uso: /renombrar_animal <tag_viejo> <tag_nuevo>\n"
+                    "Ej. /renombrar_animal A090-6 B234\n\n"
+                    "Úselo cuando una cría tenía el código temporal que asigna "
+                    "Software Ganadero al nacer y ya le pusieron la chapeta "
+                    "definitiva: conserva todo el historial ya registrado."
+                )
+                return
+            tag_viejo, tag_nuevo = context.args
+            if db.animal_id(tag_viejo) is None:
+                await update.message.reply_text(f"⚠️ No existe ningún animal con el tag «{tag_viejo}».")
+                return
+            if db.animal_id(tag_nuevo) is not None:
+                await update.message.reply_text(f"⚠️ Ya existe un animal con el tag «{tag_nuevo}». No se puede renombrar.")
+                return
+            aid = db.renombrar_animal(tag_viejo, tag_nuevo)
+            if aid is None:
+                await update.message.reply_text("❌ No se pudo renombrar el animal.")
+                return
+            await update.message.reply_text(
+                f"🏷️ Listo: «{tag_viejo}» ahora es «{tag_nuevo}» (se conservó todo su historial).",
+                reply_markup=crear_teclado_animal(tag_nuevo),
+            )
+        except Exception as e:
+            logger.error("Error en cmd_renombrar_animal: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -1552,6 +1645,16 @@ def construir_application(
                         reply_markup=crear_teclado_despacho_matutino(),
                     )
 
+            elif data == "cmd:registrar_leche":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text("🥛 Envía: /leche <litros>\nEj: /leche 475  (total del hato hoy)")
+
+            elif data == "cmd:programar_recordatorio":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text("⏰ Envía: /programar YYYY-MM-DD HH:MM mensaje\nEj: /programar 2026-09-01 08:00 Rotar potrero Bajo")
+
             elif data == "cmd:alertas":
                 await query.answer()
                 if not auth.es_autorizado(user_id):
@@ -2383,6 +2486,8 @@ def construir_application(
     app.add_handler(CommandHandler(["medicamentos", "tratamientos", "farmacia", "retiros", "retiro"], cmd_medicamentos))
     app.add_handler(CommandHandler(["preguntas", "faq", "consultas"], cmd_preguntas_rapidas))
     app.add_handler(CommandHandler(["despacho", "matutino", "hoy", "briefing"], cmd_despacho))
+    app.add_handler(CommandHandler(["leche", "leche_total", "produccion"], cmd_leche))
+    app.add_handler(CommandHandler(["programar", "recordatorio", "programar_recordatorio"], cmd_programar))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
@@ -2391,6 +2496,7 @@ def construir_application(
     app.add_handler(CommandHandler("deshacer", cmd_deshacer))
     app.add_handler(CommandHandler("confirmar_deshacer", cmd_confirmar_deshacer))
     app.add_handler(CommandHandler("cancelar_deshacer", cmd_cancelar_deshacer))
+    app.add_handler(CommandHandler("renombrar_animal", cmd_renombrar_animal))
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
