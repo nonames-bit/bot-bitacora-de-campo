@@ -736,6 +736,16 @@ def test_comando_renombrar_animal_registrado():
     assert 'CommandHandler("renombrar_animal", cmd_renombrar_animal)' in content
 
 
+def test_tablero_finca_enlaza_graficos_no_servidor():
+    # El Tablero de la Finca (zootécnico) ya no atajo directo a Servidor &
+    # Sistema (mezclaba salud del hato con salud del servidor); en su lugar
+    # enlaza a Gráficos de la Finca, su contraparte visual.
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert '"⚙️ Servidor & Sistema", callback_data="cmd:sistema"' not in content
+    assert content.count('"📊 Gráficos de la Finca", callback_data="cmd:graficos"') >= 2
+
+
 def test_comando_grafico_registrado():
     import pathlib
     content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")

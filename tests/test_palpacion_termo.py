@@ -9,6 +9,7 @@ from src.parsers.event_parser import EventParser
 from src.server.formatters import (
     formatear_diagnosticos_recientes,
     formatear_estado_termo,
+    formatear_historial,
     formatear_kpis_reproduccion,
     formatear_panel_reproduccion,
     formatear_stock_pajuelas,
@@ -308,3 +309,78 @@ def test_teclados_reproduccion():
     callbacks_det = [btn.callback_data for fila in t_det.inline_keyboard for btn in fila]
     assert "cmd:reprod_menu" in callbacks_det
     assert "menu:principal" in callbacks_det
+
+
+def test_ficha_refleja_diagnostico_vacia_no_sin_palpar(db: Database):
+    """Reproduce el bug: vaca parida registrada como VACIA debe mostrar VACIA y no SIN PALPAR."""
+    db.registrar_animal("A022", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("A022", fecha="2026-05-01", sexo_cria="Hembra")
+
+    # Registrar palpación VACIA
+    bot = Bot(db, hoy=date(2026, 8, 31))
+    resp_bot = bot.procesar_texto("palpe a022 VACIA")
+    assert "Registrado diagnóstico" in resp_bot
+    assert "VACIA" in resp_bot
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))
+    resp_ficha = qe.responder("ficha A022")
+
+    # Validar que la ficha contiene VACIA y NO "SIN PALPAR"
+    assert "VACIA" in resp_ficha
+    assert "SIN PALPAR" not in resp_ficha
+    assert "PARIDA SIN PALPAR" not in resp_ficha
+    assert "🧬 <b>Reproductivo:</b> VACIA" in resp_ficha
+    assert "Último diagnóstico: VACIA el 2026-08-31" in resp_ficha
+    assert "diagnósticos: 1 registro(s)" in resp_ficha
+
+    # Validar formatear_historial
+    resp_fmt = formatear_historial(db, "A022", hoy=date(2026, 8, 31))
+    assert "VACIA" in resp_fmt
+    assert "SIN PALPAR" not in resp_fmt
+
+
+def test_ficha_refleja_diagnostico_prenada(db: Database):
+    """Verifica que una palpación confirmada PREÑADA actualice el estado reproductivo y la FEP."""
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_servicio("47", fecha="2026-06-30", tipo_servicio="IA", toro_pajilla="502")
+
+    # Registrar diagnóstico positivo
+    db.registrar_diagnostico("47", fecha="2026-08-31", resultado="PREÑADA", dias_gestacion=60)
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))
+    resp = qe.responder("ficha 47")
+
+    assert "PREÑADA" in resp
+    assert "SIN PALPAR" not in resp
+    assert "Palpación Rectal: PENDIENTE" not in resp
+    assert "🧬 <b>Reproductivo:</b> PREÑADA" in resp
+    assert "Último diagnóstico: PREÑADA el 2026-08-31 (60 días)" in resp
+    assert "diagnósticos: 1 registro(s)" in resp
+
+
+def test_diagnostico_vacia_limpia_fep_y_alertas(db: Database):
+    """Verifica que registrar VACIA limpie fep_calculada de servicios y cancele alertas de preñez."""
+    bot = Bot(db, hoy=date(2026, 8, 31))
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+
+    # Registrar servicio que genera alertas y FEP
+    bot.procesar_texto("insemine la 47 con toro 502")
+    serv = db.ultimo_servicio("47")
+    assert serv["fep_calculada"] is not None
+
+    # Registrar diagnóstico VACIA
+    db.registrar_diagnostico("47", fecha="2026-08-31", resultado="VACIA")
+
+    # FEP en servicio debe estar limpia (NULL) y estado FALLIDO
+    serv_post = db.ultimo_servicio("47")
+    assert serv_post["estado"] == "FALLIDO"
+    assert serv_post["fep_calculada"] is None
+
+    # Alertas de parto / secado deben estar canceladas
+    alerta_parto = db.query_one("SELECT * FROM alertas WHERE animal_id = ? AND tipo_alerta = 'PARTO_ESPERADO'", (db.animal_id("47"),))
+    if alerta_parto:
+        assert alerta_parto["estado"] == "CANCELADA"
+
+    # No debe salir en vacas con palpación pendiente
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))
+    assert "47" not in qe.responder("¿qué vacas tienen palpación pendiente?")

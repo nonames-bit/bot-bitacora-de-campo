@@ -1155,7 +1155,7 @@ def construir_application(
                 ],
                 [
                     InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
-                    InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                    InlineKeyboardButton("📊 Gráficos de la Finca", callback_data="cmd:graficos"),
                 ],
                 [
                     InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
@@ -2253,7 +2253,7 @@ def construir_application(
                     ],
                     [
                         InlineKeyboardButton("🌿 Potreros Voisin", callback_data="cmd:potreros"),
-                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
+                        InlineKeyboardButton("📊 Gráficos de la Finca", callback_data="cmd:graficos"),
                     ],
                     [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),

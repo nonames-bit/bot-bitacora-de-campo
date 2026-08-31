@@ -7,6 +7,7 @@ from src.server.keyboards import (
     crear_teclado_buscar_animal,
     crear_teclado_grafico_detalle,
     crear_teclado_graficos,
+    crear_teclado_poblacion,
     crear_teclado_poblacion_detalle,
     crear_teclado_principal,
     crear_teclado_sistema_detalle,
@@ -215,6 +216,26 @@ def test_teclado_admin_compacto_agrupa_ayuda():
     assert "guia:chat_hub" not in callbacks
     assert "menu:campo" not in callbacks
     assert "cmd:ayuda" not in callbacks
+
+
+def test_teclado_admin_composicion_genetica_solo_via_poblacion():
+    # cmd:genetica ya no es un atajo directo del menú principal: solo vive
+    # dentro de Población & KPIs SG, para no tener dos caminos a la misma
+    # pantalla (y no repetir el ícono 🧬 junto a Reproducción & Termo).
+    teclado_admin = crear_teclado_admin("OWNER")
+    callbacks_admin = [btn.callback_data for fila in teclado_admin.inline_keyboard for btn in fila]
+    assert "cmd:genetica" not in callbacks_admin
+    assert "cmd:poblacion" in callbacks_admin
+
+    teclado_pob = crear_teclado_poblacion()
+    callbacks_pob = [btn.callback_data for fila in teclado_pob.inline_keyboard for btn in fila]
+    assert "cmd:genetica" in callbacks_pob
+
+
+def test_teclado_graficos_enlaza_de_vuelta_al_tablero_finca():
+    teclado = crear_teclado_graficos()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:status" in callbacks
 
 
 def test_teclado_trabajador_sin_sistema():

@@ -687,18 +687,34 @@ class Database:
 
         # Actualizar estado del servicio más reciente de la vaca
         if res_norm == "PREÑADA":
-            self.execute(
-                """
-                UPDATE servicios
-                SET estado = 'CONFIRMADA'
-                WHERE id = (
-                    SELECT id FROM servicios
-                    WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
-                    ORDER BY fecha DESC LIMIT 1
-                ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE')
-                """,
-                (vaca_id, f),
-            )
+            f_date = to_date(f)
+            fep_diag = iso(add_days(f_date, 283 - dias_g)) if (dias_g and dias_g > 0 and f_date) else None
+            if fep_diag:
+                self.execute(
+                    """
+                    UPDATE servicios
+                    SET estado = 'CONFIRMADA', fep_calculada = ?
+                    WHERE id = (
+                        SELECT id FROM servicios
+                        WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
+                        ORDER BY fecha DESC LIMIT 1
+                    ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE' OR estado = 'CONFIRMADA')
+                    """,
+                    (fep_diag, vaca_id, f),
+                )
+            else:
+                self.execute(
+                    """
+                    UPDATE servicios
+                    SET estado = 'CONFIRMADA'
+                    WHERE id = (
+                        SELECT id FROM servicios
+                        WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
+                        ORDER BY fecha DESC LIMIT 1
+                    ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE')
+                    """,
+                    (vaca_id, f),
+                )
             # Marcar alertas de palpación / ecografía pendientes como cumplidas
             self.execute(
                 """
@@ -712,14 +728,23 @@ class Database:
             self.execute(
                 """
                 UPDATE servicios
-                SET estado = 'FALLIDO'
+                SET estado = 'FALLIDO', fep_calculada = NULL
                 WHERE id = (
                     SELECT id FROM servicios
                     WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
                     ORDER BY fecha DESC LIMIT 1
-                ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE')
+                ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE' OR estado = 'CONFIRMADA')
                 """,
                 (vaca_id, f),
+            )
+            # Cancelar alertas asociadas a la preñez que queden pendientes
+            self.execute(
+                """
+                UPDATE alertas
+                SET estado = 'CANCELADA', fecha_cumplida = ?
+                WHERE animal_id = ? AND tipo_alerta IN ('PARTO_ESPERADO', 'SECADO', 'PALPACION', 'ECOGRAFIA') AND estado = 'PENDIENTE'
+                """,
+                (f, vaca_id),
             )
 
         return diag_id
@@ -1142,7 +1167,7 @@ class Database:
             "SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha", (aid,)
         )
         diagnosticos = [] if es_macho else self.query(
-            "SELECT * FROM diagnosticos_gestacion WHERE vaca_id = ? ORDER BY fecha", (aid,)
+            "SELECT * FROM diagnosticos_gestacion WHERE vaca_id = ? ORDER BY fecha ASC, id ASC", (aid,)
         )
         return {
             "partos": partos_propios,
