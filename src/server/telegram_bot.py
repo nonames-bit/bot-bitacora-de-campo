@@ -1749,10 +1749,7 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🔴 <b>Próximos Partos (≤30 días):</b>\n\n✅ No hay partos proyectados para los próximos 30 días."
-                    btn_a = [[
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]]
+                    teclado_a = crear_teclado_alertas_detalle()
                 else:
                     total_p = len(filas)
                     filas_m = filas[:15]
@@ -1771,12 +1768,10 @@ def construir_application(
                     btn_a = []
                     for i in range(0, min(len(botones_vacas), 15), 3):
                         btn_a.append(botones_vacas[i:i+3])
-                    btn_a.append([
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ])
+                    btn_a.extend(crear_teclado_alertas_detalle().inline_keyboard)
+                    teclado_a = InlineKeyboardMarkup(btn_a)
                 if query.message:
-                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=teclado_a)
 
             elif data == "alerta:secados":
                 await query.answer()
@@ -1796,10 +1791,7 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🟡 <b>Vacas Candidatas para Secado (≥200 DEL):</b>\n\n✅ No hay vacas en lactancia prolongada pendientes de secado."
-                    btn_a = [[
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]]
+                    teclado_a = crear_teclado_alertas_detalle()
                 else:
                     total_s = len(filas)
                     filas_m = filas[:15]
@@ -1817,12 +1809,10 @@ def construir_application(
                     btn_a = []
                     for i in range(0, min(len(botones_vacas), 15), 3):
                         btn_a.append(botones_vacas[i:i+3])
-                    btn_a.append([
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ])
+                    btn_a.extend(crear_teclado_alertas_detalle().inline_keyboard)
+                    teclado_a = InlineKeyboardMarkup(btn_a)
                 if query.message:
-                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=teclado_a)
 
             elif data == "alerta:destetes":
                 await query.answer()
@@ -1841,10 +1831,7 @@ def construir_application(
                 )
                 if not filas:
                     txt = "🟢 <b>Crías en Edad de Destete (≥200 días):</b>\n\n✅ No hay terneros pendientes de destete en este rango."
-                    btn_a = [[
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]]
+                    teclado_a = crear_teclado_alertas_detalle()
                 else:
                     total_c = len(filas)
                     filas_m = filas[:15]
@@ -1863,12 +1850,10 @@ def construir_application(
                     btn_a = []
                     for i in range(0, min(len(botones_crias), 15), 3):
                         btn_a.append(botones_crias[i:i+3])
-                    btn_a.append([
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ])
+                    btn_a.extend(crear_teclado_alertas_detalle().inline_keyboard)
+                    teclado_a = InlineKeyboardMarkup(btn_a)
                 if query.message:
-                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=teclado_a)
 
             elif data == "alerta:pesos":
                 await query.answer()
@@ -1900,10 +1885,7 @@ def construir_application(
                                 perdidas.append((tag_a, gmd, kg_diff, ult["peso_kg"], pen["peso_kg"], ult["potrero"]))
                 if not perdidas:
                     txt = "⚠️ <b>Alertas de Pérdida de Peso (GMD &lt; 0):</b>\n\n✅ Ningún animal activo registró pérdida de peso en su último pesaje."
-                    btn_a = [[
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ]]
+                    teclado_a = crear_teclado_alertas_detalle()
                 else:
                     total_p = len(perdidas)
                     perdidas_m = sorted(perdidas, key=lambda x: x[1])[:15]
@@ -1919,12 +1901,10 @@ def construir_application(
                     btn_a = []
                     for i in range(0, min(len(botones_p), 15), 3):
                         btn_a.append(botones_p[i:i+3])
-                    btn_a.append([
-                        InlineKeyboardButton("⚠️ Volver a Alertas", callback_data="cmd:alertas"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ])
+                    btn_a.extend(crear_teclado_alertas_detalle().inline_keyboard)
+                    teclado_a = InlineKeyboardMarkup(btn_a)
                 if query.message:
-                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(btn_a))
+                    await query.message.reply_text(txt, parse_mode="HTML", reply_markup=teclado_a)
 
             elif data == "cmd:potreros":
                 await query.answer()
