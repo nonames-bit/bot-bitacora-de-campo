@@ -37,6 +37,13 @@ Los tipos de evento posibles en este dominio son:
    - datos:
      - am_pm: 'AM' (mañana/madrugada) o 'PM' (tarde/noche) (o null)
 
+4. 'diagnostico_gestacion' / 'palpacion':
+   - animal_tag: tag de la vaca
+   - datos:
+     - resultado: 'PREÑADA' o 'VACIA' (por defecto 'PREÑADA')
+     - dias_gestacion: int con días de gestación estimados (o null)
+     - responsable: nombre del veterinario/palpador (o null)
+
 Si la nota contiene MÚLTIPLES eventos de este dominio, extrae TODOS en la
 lista 'eventos'. Responde ÚNICAMENTE JSON con la estructura
 {"eventos": [{"tipo": "parto", "animal_tag": "47", "fecha": null, "datos": {...}}]}.
@@ -66,7 +73,7 @@ def parse(
     eventos: list[ParsedEvent] = []
     for item in eventos_raw:
         tipo = item.get("tipo")
-        if tipo not in ("parto", "servicio", "celo"):
+        if tipo not in ("parto", "servicio", "celo", "diagnostico_gestacion"):
             continue
 
         tag = normalizar_tag(item.get("animal_tag"))
@@ -112,5 +119,17 @@ def _limpiar_datos(tipo: str, datos: dict) -> dict:
         if am_pm:
             am_pm_str = str(am_pm).upper()
             datos["am_pm"] = "AM" if "AM" in am_pm_str else ("PM" if "PM" in am_pm_str else None)
+
+    elif tipo == "diagnostico_gestacion":
+        res = str(datos.get("resultado", "PREÑADA")).upper()
+        if "VAC" in res or "NEG" in res or "ABIER" in res:
+            datos["resultado"] = "VACIA"
+        else:
+            datos["resultado"] = "PREÑADA"
+        if "dias_gestacion" in datos and datos["dias_gestacion"] is not None:
+            try:
+                datos["dias_gestacion"] = int(datos["dias_gestacion"])
+            except (ValueError, TypeError):
+                datos["dias_gestacion"] = None
 
     return datos

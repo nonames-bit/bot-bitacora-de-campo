@@ -180,6 +180,37 @@ CREATE TABLE IF NOT EXISTS recordatorios_programados (
     creado_en TEXT
 );
 
+CREATE TABLE IF NOT EXISTS diagnosticos_gestacion (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    vaca_id INTEGER NOT NULL,
+    fecha TEXT,
+    resultado TEXT NOT NULL,
+    dias_gestacion INTEGER,
+    responsable TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS pajuelas_inventario (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    codigo_toro TEXT NOT NULL,
+    raza TEXT,
+    procedencia TEXT,
+    canastilla TEXT,
+    cantidad INTEGER DEFAULT 0,
+    costo REAL DEFAULT 0.0,
+    fecha_ingreso TEXT,
+    creado_en TEXT
+);
+
+CREATE TABLE IF NOT EXISTS termo_nitrogeno (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha_recarga TEXT NOT NULL,
+    proxima_recarga TEXT,
+    dias_intervalo INTEGER DEFAULT 21,
+    creado_en TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
 CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
@@ -193,6 +224,9 @@ CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha)
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
 CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha_estado ON recordatorios_programados(fecha_programada, estado);
+CREATE INDEX IF NOT EXISTS idx_diagnosticos_vaca_fecha ON diagnosticos_gestacion(vaca_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro);
+CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -200,7 +234,8 @@ TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
-    "recordatorios_programados",
+    "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
+    "termo_nitrogeno",
 ]
 
 
@@ -352,4 +387,39 @@ class RecordatorioProgramado:
     estado: Optional[str] = "PENDIENTE"
     creado_en: Optional[str] = None
     id: Optional[int] = None
+
+
+@dataclass
+class DiagnosticoGestacion:
+    vaca_id: Optional[int] = None
+    fecha: Optional[str] = None
+    resultado: Optional[str] = "PREÑADA"
+    dias_gestacion: Optional[int] = None
+    responsable: Optional[str] = None
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class PajuelaInventario:
+    codigo_toro: str = ""
+    raza: Optional[str] = None
+    procedencia: Optional[str] = None
+    canastilla: Optional[str] = None
+    cantidad: int = 0
+    costo: float = 0.0
+    fecha_ingreso: Optional[str] = None
+    creado_en: Optional[str] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class TermoNitrogeno:
+    fecha_recarga: str = ""
+    proxima_recarga: Optional[str] = None
+    dias_intervalo: int = 21
+    creado_en: Optional[str] = None
+    id: Optional[int] = None
+
 

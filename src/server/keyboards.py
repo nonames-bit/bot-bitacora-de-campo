@@ -108,18 +108,19 @@ def crear_teclado_admin(rol: Optional[str] = None) -> InlineKeyboardMarkup:
             InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
         ],
         [
+            InlineKeyboardButton("🧬 Reproducción & Termo", callback_data="cmd:reprod_menu"),
             InlineKeyboardButton("💊 Medicamentos & Retiro", callback_data="cmd:medicamentos"),
+        ],
+        [
             InlineKeyboardButton("📊 Población & KPIs SG", callback_data="cmd:poblacion"),
-        ],
-        [
             InlineKeyboardButton("🧬 Composición Genética", callback_data="cmd:genetica"),
+        ],
+        [
             InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
-        ],
-        [
             InlineKeyboardButton("📊 Gráficos de la Finca", callback_data="cmd:graficos"),
-            InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
+            InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
             InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
         ],
         [
@@ -136,16 +137,32 @@ def crear_teclado_sistema_menu(rol: Optional[str] = None) -> InlineKeyboardMarku
         ],
         [
             InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
-            InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
         ],
     ]
+    # "Ver Últimos Logs" y "Usuarios / Permisos" solo los procesa el handler
+    # para el OWNER (rechaza a ADMIN con un mensaje de error) — se ocultan
+    # aquí para no mostrar botones que van a rebotar.
     if rol == "OWNER" or rol is None:
         keyboard.append([
+            InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
             InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
         ])
     keyboard.append([
         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
     ])
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_sistema_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para las sub-vistas de Sistema & Reportes (estado del
+    servidor, usuarios, logs): solo navegación de vuelta, sin repetir los
+    botones de acción que ya viven en el menú padre."""
+    keyboard = [
+        [
+            InlineKeyboardButton("◀ Volver a Sistema & Reportes", callback_data="cmd:sistema_menu"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
     return InlineKeyboardMarkup(keyboard)
 
 def crear_teclado_medicamentos() -> InlineKeyboardMarkup:
@@ -429,3 +446,37 @@ def crear_teclado_poblacion_detalle() -> InlineKeyboardMarkup:
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_reproduccion(rol: Optional[str] = None) -> InlineKeyboardMarkup:
+    """Menú de gestión reproductiva, termo criogénico y diagnósticos."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🧪 Stock Pajuelas", callback_data="cmd:pajuelas"),
+            InlineKeyboardButton("❄️ N₂ / Termo", callback_data="cmd:termo"),
+        ],
+        [
+            InlineKeyboardButton("🩺 Diagnósticos Gestación", callback_data="cmd:diagnosticos"),
+            InlineKeyboardButton("📊 Tasa Concepción & S/C", callback_data="cmd:kpi_reprod"),
+        ],
+        [
+            InlineKeyboardButton("🐂 Rendimiento Toros", callback_data="panel_grafico:padre"),
+            InlineKeyboardButton("🤰 Preñadas vs Vacías", callback_data="panel_grafico:prenadas"),
+        ],
+        [
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_reproduccion_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para sub-vistas del módulo de reproducción."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🧬 Volver a Reproducción", callback_data="cmd:reprod_menu"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+

@@ -6,7 +6,7 @@ import sqlite3
 from datetime import date, datetime
 from typing import Optional
 
-from ..utils import add_days, iso
+from ..utils import add_days, iso, to_date
 from .models import SCHEMA_SQL
 
 
@@ -19,7 +19,7 @@ class Database:
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
         "traslados", "pesajes", "movimientos", "condicion_corporal",
-        "produccion_leche",
+        "produccion_leche", "diagnosticos_gestacion",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -316,12 +316,18 @@ class Database:
         })
         if existente:
             return existente
-        return self.insert("servicios", dict(
+        serv_id = self.insert("servicios", dict(
             vaca_id=vaca_id, fecha=f, tipo_servicio=tipo_servicio,
             toro_pajilla=toro_pajilla, raza_toro=raza_toro, inseminador=inseminador,
             fep_calculada=iso(fep_calculada), estado=estado,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+        if (tipo_servicio or "").upper() == "IA" and toro_pajilla:
+            try:
+                self.descontar_pajuela(toro_pajilla, cantidad=1)
+            except Exception:
+                pass
+        return serv_id
 
     def registrar_celo(self, vaca_tag, fecha=None, am_pm=None, notas=None, registrado_por=None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
@@ -650,6 +656,314 @@ class Database:
             "SELECT * FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
         )
 
+    # ------------------------------------------------------------------ #
+    # Reproducción y Diagnóstico Gestacional (Fase 5.1)
+    # ------------------------------------------------------------------ #
+    def registrar_diagnostico(self, vaca_tag, fecha=None, resultado="PREÑADA",
+                              dias_gestacion=None, responsable=None, registrado_por=None) -> int:
+        vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
+        f = iso(fecha) or date.today().isoformat()
+        res_str = str(resultado or "PREÑADA").strip().upper()
+        if res_str in ("PRENADA", "PREÑADA", "CONFIRMADA", "POSITIVA", "GESTANTE"):
+            res_norm = "PREÑADA"
+        elif res_str in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA", "NO PREÑADA", "NO PRENADA"):
+            res_norm = "VACIA"
+        else:
+            res_norm = res_str
+
+        dias_g = int(dias_gestacion) if (dias_gestacion is not None and str(dias_gestacion).isdigit()) else None
+
+        existente = self._id_si_ya_existe("diagnosticos_gestacion", {
+            "vaca_id": vaca_id, "fecha": f, "resultado": res_norm,
+        })
+        if existente:
+            return existente
+
+        diag_id = self.insert("diagnosticos_gestacion", dict(
+            vaca_id=vaca_id, fecha=f, resultado=res_norm,
+            dias_gestacion=dias_g, responsable=responsable,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+        # Actualizar estado del servicio más reciente de la vaca
+        if res_norm == "PREÑADA":
+            self.execute(
+                """
+                UPDATE servicios
+                SET estado = 'CONFIRMADA'
+                WHERE id = (
+                    SELECT id FROM servicios
+                    WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
+                    ORDER BY fecha DESC LIMIT 1
+                ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE')
+                """,
+                (vaca_id, f),
+            )
+            # Marcar alertas de palpación / ecografía pendientes como cumplidas
+            self.execute(
+                """
+                UPDATE alertas
+                SET estado = 'CUMPLIDA', fecha_cumplida = ?
+                WHERE animal_id = ? AND tipo_alerta IN ('PALPACION', 'ECOGRAFIA') AND estado = 'PENDIENTE'
+                """,
+                (f, vaca_id),
+            )
+        elif res_norm == "VACIA":
+            self.execute(
+                """
+                UPDATE servicios
+                SET estado = 'FALLIDO'
+                WHERE id = (
+                    SELECT id FROM servicios
+                    WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
+                    ORDER BY fecha DESC LIMIT 1
+                ) AND (estado IS NULL OR estado = 'SERVIDA' OR estado = 'PENDIENTE')
+                """,
+                (vaca_id, f),
+            )
+
+        return diag_id
+
+    def listar_diagnosticos(self, vaca_tag_or_id=None, limit: int = 50) -> list[sqlite3.Row]:
+        if vaca_tag_or_id is not None:
+            aid = self.resolve_animal(vaca_tag_or_id)
+            if aid is None:
+                return []
+            return self.query(
+                """
+                SELECT d.*, a.tag, a.nombre
+                FROM diagnosticos_gestacion d
+                JOIN animales a ON a.id_animal = d.vaca_id
+                WHERE d.vaca_id = ?
+                ORDER BY d.fecha DESC, d.id DESC
+                LIMIT ?
+                """,
+                (aid, limit),
+            )
+        return self.query(
+            """
+            SELECT d.*, a.tag, a.nombre
+            FROM diagnosticos_gestacion d
+            JOIN animales a ON a.id_animal = d.vaca_id
+            ORDER BY d.fecha DESC, d.id DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+
+    def ultimo_diagnostico(self, vaca_tag_or_id) -> Optional[sqlite3.Row]:
+        aid = self.resolve_animal(vaca_tag_or_id)
+        if aid is None:
+            return None
+        return self.query_one(
+            "SELECT * FROM diagnosticos_gestacion WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+            (aid,),
+        )
+
+    def kpis_reproductivos_concepcion(self, toro_pajilla: Optional[str] = None) -> dict:
+        """Calcula Tasa de Concepción (%) y Servicios por Concepción (S/C)."""
+        where_serv = ""
+        params_serv: list = []
+        if toro_pajilla:
+            where_serv = "WHERE UPPER(toro_pajilla) = UPPER(?) OR toro_pajilla LIKE ?"
+            params_serv = [toro_pajilla.strip(), f"%{toro_pajilla.strip()}%"]
+
+        servicios = self.query(
+            f"SELECT s.*, a.tag FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id {where_serv} ORDER BY s.fecha DESC",
+            tuple(params_serv),
+        )
+
+        total_servicios = len(servicios)
+        prenadas_serv = sum(1 for s in servicios if (s["estado"] or "").upper() in ("CONFIRMADA", "PREÑADA", "PRENADA", "PREÑADA_ECO", "PREÑADA_PALP"))
+        vacias_serv = sum(1 for s in servicios if (s["estado"] or "").upper() in ("FALLIDO", "VACIA", "VACÍA", "ABIERTA"))
+
+        diagnosticos = self.query("SELECT * FROM diagnosticos_gestacion")
+        diag_prenadas = sum(1 for d in diagnosticos if (d["resultado"] or "").upper() in ("PREÑADA", "PRENADA", "CONFIRMADA", "POSITIVA"))
+        diag_vacias = sum(1 for d in diagnosticos if (d["resultado"] or "").upper() in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA"))
+
+        total_prenadas = prenadas_serv if toro_pajilla else max(prenadas_serv, diag_prenadas)
+        total_vacias = vacias_serv if toro_pajilla else max(vacias_serv, diag_vacias)
+        total_evaluados = total_prenadas + total_vacias
+
+        tasa_concepcion = round((total_prenadas / total_evaluados) * 100.0, 1) if total_evaluados > 0 else 0.0
+        sc = round(total_servicios / total_prenadas, 2) if total_prenadas > 0 else None
+
+        toros_rows = self.query(
+            """
+            SELECT DISTINCT toro_pajilla FROM servicios
+            WHERE toro_pajilla IS NOT NULL AND toro_pajilla != ''
+            ORDER BY toro_pajilla ASC
+            """
+        )
+        por_toro = []
+        for tr in toros_rows:
+            t_nom = tr["toro_pajilla"]
+            servs_t = [s for s in servicios if (s["toro_pajilla"] or "").strip().upper() == t_nom.strip().upper()]
+            if not servs_t:
+                continue
+            n_serv = len(servs_t)
+            n_pre = sum(1 for s in servs_t if (s["estado"] or "").upper() in ("CONFIRMADA", "PREÑADA", "PRENADA"))
+            n_vac = sum(1 for s in servs_t if (s["estado"] or "").upper() in ("FALLIDO", "VACIA", "VACÍA"))
+            n_eval = n_pre + n_vac
+            tc = round((n_pre / n_eval) * 100.0, 1) if n_eval > 0 else 0.0
+            sc_t = round(n_serv / n_pre, 2) if n_pre > 0 else None
+            por_toro.append({
+                "toro": t_nom,
+                "servicios": n_serv,
+                "evaluados": n_eval,
+                "prenadas": n_pre,
+                "vacias": n_vac,
+                "tasa_concepcion": tc,
+                "sc": sc_t,
+            })
+
+        return {
+            "total_servicios": total_servicios,
+            "total_evaluados": total_evaluados,
+            "total_prenadas": total_prenadas,
+            "total_vacias": total_vacias,
+            "tasa_concepcion": tasa_concepcion,
+            "servicios_por_concepcion": sc,
+            "por_toro": por_toro,
+        }
+
+    # ------------------------------------------------------------------ #
+    # Termo Criogénico y Pajuelas (Fase 5.1)
+    # ------------------------------------------------------------------ #
+    def registrar_pajuela(self, codigo_toro: str, raza: Optional[str] = None,
+                          procedencia: Optional[str] = None, canastilla: Optional[str] = None,
+                          cantidad: int = 1, costo: float = 0.0, fecha_ingreso: Optional[str] = None) -> int:
+        toro_clean = str(codigo_toro).strip()
+        if not toro_clean:
+            raise ValueError("Código de toro requerido")
+        canastilla_clean = str(canastilla).strip() if canastilla else None
+        f_ing = iso(fecha_ingreso) or date.today().isoformat()
+        cant = int(cantidad)
+
+        if canastilla_clean:
+            fila = self.query_one(
+                "SELECT id, cantidad FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) AND UPPER(canastilla) = UPPER(?) LIMIT 1",
+                (toro_clean, canastilla_clean),
+            )
+        else:
+            fila = self.query_one(
+                "SELECT id, cantidad FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+                (toro_clean,),
+            )
+
+        if fila:
+            pid = fila["id"]
+            self.execute(
+                """
+                UPDATE pajuelas_inventario
+                SET cantidad = cantidad + ?,
+                    raza = COALESCE(?, raza),
+                    procedencia = COALESCE(?, procedencia),
+                    canastilla = COALESCE(?, canastilla),
+                    costo = CASE WHEN ? > 0 THEN ? ELSE costo END
+                WHERE id = ?
+                """,
+                (cant, raza, procedencia, canastilla_clean, float(costo), float(costo), pid),
+            )
+            return pid
+
+        return self.insert("pajuelas_inventario", dict(
+            codigo_toro=toro_clean,
+            raza=raza,
+            procedencia=procedencia,
+            canastilla=canastilla_clean,
+            cantidad=cant,
+            costo=float(costo),
+            fecha_ingreso=f_ing,
+            creado_en=self._ahora(),
+        ))
+
+    def descontar_pajuela(self, codigo_toro: str, cantidad: int = 1) -> bool:
+        if not codigo_toro:
+            return False
+        toro_clean = str(codigo_toro).strip()
+        cant = int(cantidad)
+        fila = self.query_one(
+            "SELECT id, cantidad FROM pajuelas_inventario WHERE (UPPER(codigo_toro) = UPPER(?) OR codigo_toro LIKE ?) AND cantidad >= ? ORDER BY id ASC LIMIT 1",
+            (toro_clean, f"%{toro_clean}%", cant),
+        )
+        if fila:
+            self.execute(
+                "UPDATE pajuelas_inventario SET cantidad = cantidad - ? WHERE id = ?",
+                (cant, fila["id"]),
+            )
+            return True
+        return False
+
+    def listar_pajuelas(self) -> list[sqlite3.Row]:
+        return self.query("SELECT * FROM pajuelas_inventario ORDER BY COALESCE(canastilla, 'ZZ'), codigo_toro ASC")
+
+    def obtener_pajuela(self, codigo_toro: str) -> Optional[sqlite3.Row]:
+        t = str(codigo_toro).strip()
+        return self.query_one(
+            "SELECT * FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) OR codigo_toro LIKE ? LIMIT 1",
+            (t, f"%{t}%"),
+        )
+
+    def alertas_stock_pajuelas(self, umbral_critico: int = 2) -> list[sqlite3.Row]:
+        return self.query(
+            "SELECT * FROM pajuelas_inventario WHERE cantidad <= ? ORDER BY cantidad ASC, codigo_toro ASC",
+            (umbral_critico,),
+        )
+
+    def registrar_recarga_nitrogeno(self, fecha_recarga=None, dias_intervalo: int = 21, proxima_recarga=None) -> int:
+        f_rec = iso(fecha_recarga) or date.today().isoformat()
+        intervalo = int(dias_intervalo) if dias_intervalo else 21
+        if proxima_recarga:
+            prox = iso(proxima_recarga)
+        else:
+            prox = iso(add_days(f_rec, intervalo))
+
+        recarga_id = self.insert("termo_nitrogeno", dict(
+            fecha_recarga=f_rec,
+            proxima_recarga=prox,
+            dias_intervalo=intervalo,
+            creado_en=self._ahora(),
+        ))
+
+        self.execute(
+            "UPDATE alertas SET estado = 'CUMPLIDA', fecha_cumplida = ? WHERE tipo_alerta = 'RECARGA_NITROGENO' AND estado = 'PENDIENTE'",
+            (f_rec,),
+        )
+        self.insert("alertas", dict(
+            animal_id=None,
+            tipo_alerta="RECARGA_NITROGENO",
+            fecha_programada=prox,
+            estado="PENDIENTE",
+            descripcion=f"Recarga periódica de nitrógeno líquido para termo ({intervalo} días)",
+        ))
+
+        return recarga_id
+
+    def ultimo_estado_termo(self, hoy=None) -> Optional[dict]:
+        fecha_ref = to_date(hoy) or date.today()
+        row = self.query_one("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC, id DESC LIMIT 1")
+        if not row:
+            return None
+        f_rec = to_date(row["fecha_recarga"])
+        prox = to_date(row["proxima_recarga"]) or (add_days(f_rec, row["dias_intervalo"]) if f_rec else None)
+        dias_desde = (fecha_ref - f_rec).days if f_rec else 0
+        dias_restantes = (prox - fecha_ref).days if prox else 0
+        alerta_critica = dias_restantes <= 5
+
+        return {
+            "id": row["id"],
+            "fecha_recarga": row["fecha_recarga"],
+            "proxima_recarga": iso(prox),
+            "dias_intervalo": row["dias_intervalo"],
+            "dias_desde_recarga": dias_desde,
+            "dias_restantes": dias_restantes,
+            "alerta_critica": alerta_critica,
+        }
+
+    def listar_recargas_nitrogeno(self, limit: int = 10) -> list[sqlite3.Row]:
+        return self.query("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC, id DESC LIMIT ?", (limit,))
+
     def detectar_duplicados_geneticos(self) -> list[dict]:
         """Agrupa animales ACTIVOS por (madre_id, padre_id, fecha_nacimiento) y
         devuelve los grupos con más de un animal: casi siempre el mismo
@@ -750,6 +1064,11 @@ class Database:
                        ('Leche' || CASE WHEN pl.litros IS NOT NULL THEN ' ' || pl.litros || 'L' ELSE '' END),
                        pl.creado_en, pl.registrado_por
                 FROM produccion_leche pl LEFT JOIN animales a ON a.id_animal = pl.animal_id
+                UNION ALL
+                SELECT 'diagnosticos_gestacion', dg.id, a.tag, dg.fecha,
+                       ('Diagnóstico gestación: ' || COALESCE(dg.resultado, 'PREÑADA') || CASE WHEN dg.dias_gestacion IS NOT NULL THEN ' (' || dg.dias_gestacion || 'd)' ELSE '' END),
+                       dg.creado_en, dg.registrado_por
+                FROM diagnosticos_gestacion dg LEFT JOIN animales a ON a.id_animal = dg.vaca_id
             )
             ORDER BY creado_en IS NULL, creado_en DESC, id DESC
             LIMIT ?
@@ -762,7 +1081,7 @@ class Database:
         que /deshacer muestre qué se va a borrar antes de confirmar."""
         if tabla not in self.TABLAS_EVENTOS:
             return None
-        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos") else "animal_id"
+        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else "animal_id"
         fila = self.query_one(f"SELECT * FROM {tabla} WHERE id = ?", (id_registro,))
         if fila is None:
             return None
@@ -779,6 +1098,7 @@ class Database:
             "movimientos": lambda f: f"Movimiento de {tag} ({f['tipo_movimiento'] or '?'})",
             "condicion_corporal": lambda f: f"Condición corporal de {tag}" + (f" — {f['valor']}" if f["valor"] is not None else ""),
             "produccion_leche": lambda f: f"Producción de leche de {tag}" + (f" — {f['litros']}L" if f["litros"] is not None else ""),
+            "diagnosticos_gestacion": lambda f: f"Diagnóstico de gestación de {tag}: {f['resultado'] or '?'}" + (f" ({f['dias_gestacion']}d)" if f["dias_gestacion"] else ""),
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,
@@ -821,11 +1141,15 @@ class Database:
         celos = [] if es_macho else self.query(
             "SELECT * FROM celos WHERE vaca_id = ? ORDER BY fecha", (aid,)
         )
+        diagnosticos = [] if es_macho else self.query(
+            "SELECT * FROM diagnosticos_gestacion WHERE vaca_id = ? ORDER BY fecha", (aid,)
+        )
         return {
             "partos": partos_propios,
             "nacimiento": self.query("SELECT * FROM partos WHERE id_cria = ? ORDER BY fecha", (aid,)),
             "servicios": servicios,
             "celos": celos,
+            "diagnosticos": diagnosticos,
             "muertes": self.query("SELECT * FROM muertes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "tratamientos": self.query("SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "traslados": self.query("SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha", (aid,)),

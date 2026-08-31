@@ -9,6 +9,7 @@ from src.server.keyboards import (
     crear_teclado_graficos,
     crear_teclado_poblacion_detalle,
     crear_teclado_principal,
+    crear_teclado_sistema_detalle,
     crear_teclado_sistema_menu,
     crear_teclado_trabajador,
 )
@@ -151,14 +152,27 @@ def test_teclado_sistema_menu_owner():
 
 
 def test_teclado_sistema_menu_admin():
+    # "Ver Últimos Logs" y "Usuarios / Permisos" los rechaza el handler para
+    # cualquiera que no sea OWNER (auth.puede_gestionar_usuarios), así que un
+    # ADMIN no debe ver ninguno de los dos botones.
     teclado = crear_teclado_sistema_menu("ADMIN")
     callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
     assert "cmd:reporte" in callbacks
     assert "cmd:exportar" in callbacks
     assert "cmd:sistema" in callbacks
-    assert "cmd:logs" in callbacks
+    assert "cmd:logs" not in callbacks
     assert "cmd:usuarios" not in callbacks
     assert "menu:principal" in callbacks
+
+
+def test_teclado_sistema_detalle_tiene_dos_botones():
+    teclado = crear_teclado_sistema_detalle()
+    botones = [btn for fila in teclado.inline_keyboard for btn in fila]
+    assert len(botones) == 2
+    assert botones[0].text == "◀ Volver a Sistema & Reportes"
+    assert botones[0].callback_data == "cmd:sistema_menu"
+    assert botones[1].text == "🏠 Menú Principal"
+    assert botones[1].callback_data == "menu:principal"
 
 
 def test_teclado_sistema_menu_default_sin_args():

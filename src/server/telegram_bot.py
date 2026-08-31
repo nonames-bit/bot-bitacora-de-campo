@@ -64,17 +64,21 @@ from .formatters import (
     formatear_animales,
     formatear_ayuda,
     formatear_despacho_matutino,
+    formatear_diagnosticos_recientes,
     formatear_duplicados_geneticos,
     formatear_estado_servidor,
+    formatear_estado_termo,
     formatear_fotos,
     formatear_genealogia_animal_tab,
     formatear_genetica_panel,
     formatear_historial,
     formatear_instrucciones_importar,
+    formatear_kpis_reproduccion,
     formatear_leche_animal_tab,
     formatear_panel_buscar_animal_texto,
     formatear_panel_medicamentos,
     formatear_panel_preguntas_rapidas_texto,
+    formatear_panel_reproduccion,
     formatear_pesajes_animal_tab,
     formatear_poblacion_panel,
     formatear_potreros,
@@ -82,6 +86,7 @@ from .formatters import (
     formatear_reprod_animal_tab,
     formatear_sanidad_animal_tab,
     formatear_status,
+    formatear_stock_pajuelas,
     formatear_tablero_finca,
     formatear_ultimos_registros,
     formatear_usuarios,
@@ -170,6 +175,9 @@ def construir_application(
         crear_teclado_poblacion_detalle,
         crear_teclado_preguntas_rapidas,
         crear_teclado_principal,
+        crear_teclado_reproduccion,
+        crear_teclado_reproduccion_detalle,
+        crear_teclado_sistema_detalle,
         crear_teclado_sistema_menu,
         crear_teclado_trabajador,
     )
@@ -645,6 +653,189 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
+    async def cmd_reprod_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            rol = auth.rol_de(user_id)
+            msg = formatear_panel_reproduccion(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion(rol)
+            )
+        except Exception as e:
+            logger.error("Error en cmd_reprod_menu: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_pajuela_stock(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_stock_pajuelas(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_pajuela_stock: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_pajuela_add(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            args = context.args or []
+            if not args or len(args) < 2:
+                await update.message.reply_text(
+                    "💡 <b>Uso del comando /pajuela_add:</b>\n"
+                    "<code>/pajuela_add &lt;código_toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>\n\n"
+                    "<b>Ejemplo:</b>\n"
+                    "<code>/pajuela_add 502 10 Brahman C1 35000</code>",
+                    parse_mode="HTML",
+                )
+                return
+
+            codigo_toro = args[0].strip()
+            try:
+                cantidad = int(args[1])
+            except ValueError:
+                await update.message.reply_text("❌ La cantidad debe ser un número entero (ej. 10).")
+                return
+
+            raza = args[2].strip() if len(args) >= 3 else None
+            canastilla = args[3].strip() if len(args) >= 4 else None
+            costo = 0.0
+            if len(args) >= 5:
+                try:
+                    costo = float(args[4].replace(",", ".").replace("$", ""))
+                except ValueError:
+                    costo = 0.0
+
+            db.registrar_pajuela(
+                codigo_toro=codigo_toro,
+                cantidad=cantidad,
+                raza=raza,
+                canastilla=canastilla,
+                costo=costo,
+            )
+
+            msg = (
+                f"✅ <b>Pajuelas Registradas con Éxito</b>\n"
+                f"• Toro: <b>{codigo_toro}</b>\n"
+                f"• Cantidad ingresada: <b>+{cantidad} unidades</b>\n"
+            )
+            if raza:
+                msg += f"• Raza: {raza}\n"
+            if canastilla:
+                msg += f"• Canastilla: {canastilla}\n"
+            if costo > 0:
+                msg += f"• Costo unitario: ${_fmt_es_co(costo)}\n"
+
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_pajuela_add: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_termo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_estado_termo(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_termo: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_recarga_n2(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            args = context.args or []
+            fecha_recarga = None
+            dias_intervalo = 21
+            if len(args) >= 1:
+                fecha_recarga = args[0].strip()
+            if len(args) >= 2:
+                try:
+                    dias_intervalo = int(args[1])
+                except ValueError:
+                    dias_intervalo = 21
+
+            db.registrar_recarga_nitrogeno(
+                fecha_recarga=fecha_recarga,
+                dias_intervalo=dias_intervalo,
+            )
+            msg = formatear_estado_termo(db)
+            await update.message.reply_text(
+                f"✅ <b>Recarga de Nitrógeno Registrada</b>\n\n" + msg,
+                parse_mode="HTML",
+                reply_markup=crear_teclado_reproduccion_detalle(),
+            )
+        except Exception as e:
+            logger.error("Error en cmd_recarga_n2: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_diagnosticos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_diagnosticos_recientes(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_diagnosticos: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_kpi_reprod(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_kpis_reproduccion(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_kpi_reprod: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
     async def cmd_duplicados(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -990,20 +1181,9 @@ def construir_application(
             msg = formatear_estado_servidor(db, auth, db.path if hasattr(db, "path") else None)
             teclado = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
-                    InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
-                ],
-                [
-                    InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
-                    InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
-                ],
-                [
                     InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
-                    InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
                 ],
-                [
-                    InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                ],
+                *crear_teclado_sistema_detalle().inline_keyboard,
             ])
             try:
                 await update.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado)
@@ -1610,15 +1790,7 @@ def construir_application(
                         await query.message.reply_text("⛔ Solo el propietario (OWNER) puede ver la lista de usuarios.")
                     return
                 msg = formatear_usuarios(auth)
-                teclado_u = InlineKeyboardMarkup([
-                    [
-                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
-                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
-                    ],
-                    [
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ],
-                ])
+                teclado_u = crear_teclado_sistema_detalle()
                 if query.message:
                     await query.message.reply_text(msg, reply_markup=teclado_u)
 
@@ -1635,12 +1807,8 @@ def construir_application(
                 teclado_l = InlineKeyboardMarkup([
                     [
                         InlineKeyboardButton("🔄 Refrescar Logs", callback_data="cmd:logs"),
-                        InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
                     ],
-                    [
-                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ],
+                    *crear_teclado_sistema_detalle().inline_keyboard,
                 ])
                 if query.message:
                     try:
@@ -1700,6 +1868,82 @@ def construir_application(
                         )
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=crear_teclado_alertas())
+
+            elif data in ("cmd:reprod_menu", "cmd:reproduccion_menu"):
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                rol = auth.rol_de(user_id)
+                msg = formatear_panel_reproduccion(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion(rol)
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_reproduccion(rol))
+
+            elif data == "cmd:pajuelas":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_stock_pajuelas(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_reproduccion_detalle())
+
+            elif data == "cmd:termo":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_estado_termo(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_reproduccion_detalle())
+
+            elif data == "cmd:diagnosticos":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_diagnosticos_recientes(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_reproduccion_detalle())
+
+            elif data == "cmd:kpi_reprod":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_kpis_reproduccion(db)
+                if query.message:
+                    try:
+                        await query.message.reply_text(
+                            msg, parse_mode="HTML", reply_markup=crear_teclado_reproduccion_detalle()
+                        )
+                    except Exception:
+                        await query.message.reply_text(msg, reply_markup=crear_teclado_reproduccion_detalle())
 
             elif data == "cmd:poblacion":
                 await query.answer()
@@ -2049,20 +2293,9 @@ def construir_application(
                 msg = formatear_estado_servidor(db, auth, db.path if hasattr(db, "path") else None)
                 teclado_sis = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("🐮 Tablero de la Finca", callback_data="cmd:status"),
-                        InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),
-                    ],
-                    [
-                        InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
-                        InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
-                    ],
-                    [
                         InlineKeyboardButton("🔄 Actualizar", callback_data="cmd:sistema"),
-                        InlineKeyboardButton("📦 Sistema & Reportes", callback_data="cmd:sistema_menu"),
                     ],
-                    [
-                        InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
-                    ],
+                    *crear_teclado_sistema_detalle().inline_keyboard,
                 ])
                 if query.message:
                     try:
@@ -2544,6 +2777,13 @@ def construir_application(
     app.add_handler(CommandHandler("alertas", cmd_alertas))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
+    app.add_handler(CommandHandler(["reproduccion", "reprod", "reproduccion_menu"], cmd_reprod_menu))
+    app.add_handler(CommandHandler(["pajuela_stock", "pajuelas", "stock_pajuelas"], cmd_pajuela_stock))
+    app.add_handler(CommandHandler(["pajuela_add", "pajuela_agregar"], cmd_pajuela_add))
+    app.add_handler(CommandHandler(["termo", "termo_nitrogeno", "nitrogeno"], cmd_termo))
+    app.add_handler(CommandHandler(["recarga_n2", "recarga_nitrogeno"], cmd_recarga_n2))
+    app.add_handler(CommandHandler(["diagnosticos", "palpaciones"], cmd_diagnosticos))
+    app.add_handler(CommandHandler(["kpi_reprod", "concepcion", "tasa_concepcion"], cmd_kpi_reprod))
     app.add_handler(CommandHandler(["duplicados", "duplicados_geneticos"], cmd_duplicados))
     app.add_handler(CommandHandler(["ultimos", "ultimos_registros"], cmd_ultimos))
     app.add_handler(CommandHandler("deshacer", cmd_deshacer))

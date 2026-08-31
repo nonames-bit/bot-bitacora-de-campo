@@ -26,12 +26,15 @@ Automatización proactiva de rutinas operativas diarias enviadas a primera hora 
 
 ### 🧬 FASE 5: Reproducción Completa + Termo de Inseminación
 Control reproductivo de precisión, gestión del tanque criogénico y genética asistida.
-- **Evento Palpación Directo:** Registro de diagnóstico gestacional con estados Servida/Confirmada (S/C, Vacía/Preñada), cálculo automático de tasa de concepción por lote, toro e inseminador.
-- **Gestión del Termo Criogénico:** Inventario de pajuelas organizado por canastilla/cánula, descuento automático tras cada servicio/IA registrado.
-- **Control de Nitrógeno Líquido ($N_2$):** Alertas de recarga periódica cada 21–30 días y lectura/OCR de facturas de compra de pajuelas y recarga vía `easyocr`.
-- **Simulador de Cruzamiento en 1-Toque:** Análisis instantáneo de consanguinidad en 3 generaciones (3G) antes de aplicar el servicio para evitar endogamia.
-- **Eventos Reproductivos Críticos:** Registro formal de abortos y partos distócicos/difíciles como eventos zootécnicos propios con métricas de impacto.
-- **Ranking de Fertilidad por Toro:** Tablero comparativo de porcentaje de preñez y efectividad genética por reproductor/pajuela.
+- **[EN PROGRESO] Fase 5.1 — Evento Palpación Directo & Termo Criogénico:**
+  - Parser NLU para diagnósticos gestacionales directos (Preñada / Vacía con días de gestación).
+  - Tabla `diagnosticos_gestacion` con historial y cálculo dinámico de Tasa de Concepción (%) y Servicios por Concepción (S/C) por reproductor.
+  - Gestión completa del Termo Criogénico: tablas `pajuelas_inventario` y `termo_nitrogeno`, descuento automático de pajuelas al registrar servicio IA, alertas de stock crítico y control de recargas periódicas de $N_2$ (21–30 días).
+  - Comandos Telegram `/pajuela_add`, `/pajuela_stock`, `/termo`, `/recarga_n2`, `/diagnosticos`, `/kpi_reprod` y teclado dedicado de Reproducción.
+- **[PENDIENTE] Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada:**
+  - Simulador de Cruzamiento en 1-Toque: Análisis instantáneo de consanguinidad en 3 generaciones (3G) antes de aplicar el servicio para evitar endogamia.
+  - Eventos Reproductivos Críticos: Registro formal de abortos y partos distócicos/difíciles como eventos zootécnicos propios con métricas de impacto.
+  - Ranking de Fertilidad por Toro y lectura/OCR de facturas de pajuelas/$N_2$ vía `easyocr`.
 
 ---
 

@@ -162,6 +162,13 @@ class EventParser:
     def _parse_muerte(self, ev: ParsedEvent, t: str) -> None:
         ev.datos["causa_presunta"] = _causa_muerte(t)
 
+    def _parse_diagnostico_gestacion(self, ev: ParsedEvent, t: str) -> None:
+        resultado = nlu.extraer_resultado_diagnostico(t)
+        dias = nlu.extraer_dias_gestacion(t)
+        ev.datos["resultado"] = resultado
+        ev.datos["dias_gestacion"] = dias
+        ev.datos["responsable"] = nlu.extraer_responsable(t)
+
     def _parse_servicio(self, ev: ParsedEvent, t: str) -> None:
         tipo = "MONTA" if re.search(r"\bmont", t) else "IA"
         toro = nlu.extraer_toro(t)

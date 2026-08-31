@@ -356,3 +356,103 @@ class ReproduccionQueryMixin:
         if len(resultado) > 20:
             lineas.append(f"<i>... y {len(resultado) - 20} más.</i>")
         return "\n".join(lineas)
+
+    # ------------------------------------------------------------------ #
+    # Consultas Fase 5.1: Termo de Inseminación, Pajuelas y Diagnósticos
+    # ------------------------------------------------------------------ #
+    def _stock_pajuelas(self, codigo_toro: Optional[str] = None) -> str:
+        """Consulta el inventario de pajuelas en el termo criogénico."""
+        if codigo_toro:
+            paj = self.db.obtener_pajuela(codigo_toro)
+            if not paj:
+                return f"🧪 No hay registro de pajuelas para el toro <b>{codigo_toro}</b>."
+            can = f" (Canastilla {paj['canastilla']})" if paj["canastilla"] else ""
+            raza = f" · {paj['raza']}" if paj["raza"] else ""
+            alerta = " ⚠️ [STOCK CRÍTICO]" if paj["cantidad"] <= 2 else ""
+            costo_str = f"\n• Costo unitario: ${paj['costo']:,.0f}" if paj["costo"] else ""
+            return (
+                f"🧪 <b>Pajuelas Toro {paj['codigo_toro']}{raza}</b>\n"
+                f"• Stock disponible: <b>{paj['cantidad']} unidades</b>{alerta}\n"
+                f"• Ubicación: {can or 'Sin canastilla asignada'}"
+                f"{costo_str}"
+            ).strip()
+
+        pajuelas = self.db.listar_pajuelas()
+        if not pajuelas:
+            return "🧪 El termo criogénico no tiene pajuelas registradas actualmente."
+
+        total_unidades = sum(p["cantidad"] for p in pajuelas)
+        lineas = [f"🧪 <b>Inventario de Pajuelas ({len(pajuelas)} toros, {total_unidades} pajuelas):</b>"]
+        for p in pajuelas:
+            can = f" [Canastilla {p['canastilla']}]" if p["canastilla"] else ""
+            raza = f" ({p['raza']})" if p["raza"] else ""
+            aviso = " ⚠️ <i>(Bajo)</i>" if p["cantidad"] <= 2 else ""
+            lineas.append(f"• <b>{p['codigo_toro']}</b>{raza}: {p['cantidad']} unid.{can}{aviso}")
+        return "\n".join(lineas)
+
+    def _estado_termo_nitrogeno(self) -> str:
+        """Estado del tanque criogénico y días restantes para la próxima recarga de N2."""
+        termo = self.db.ultimo_estado_termo(self.hoy)
+        if not termo:
+            return "❄️ No hay registro de recargas de nitrógeno en el termo criogénico."
+
+        f_rec = termo["fecha_recarga"]
+        prox = termo["proxima_recarga"]
+        dias_desde = termo["dias_desde_recarga"]
+        dias_rest = termo["dias_restantes"]
+
+        if dias_rest < 0:
+            icono = "🚨"
+            estado_txt = f"<b>VENCIDO</b> (atraso de {abs(dias_rest)} días)"
+        elif dias_rest <= 5:
+            icono = "⚠️"
+            estado_txt = f"<b>CRÍTICO</b> ({dias_rest} días restantes)"
+        else:
+            icono = "✅"
+            estado_txt = f"<b>NORMAL</b> ({dias_rest} días restantes)"
+
+        return (
+            f"❄️ <b>Estado del Termo Criogénico (Nitrógeno Líquido)</b>\n"
+            f"• Estado: {icono} {estado_txt}\n"
+            f"• Última recarga: <b>{f_rec}</b> (hace {dias_desde} días)\n"
+            f"• Próxima recarga: <b>{prox}</b>\n"
+            f"• Intervalo seguro: cada {termo['dias_intervalo']} días"
+        )
+
+    def _kpis_concepcion_y_sc(self, toro: Optional[str] = None) -> str:
+        """Reporte de Tasa de Concepción y Servicios por Concepción (S/C)."""
+        kpis = self.db.kpis_reproductivos_concepcion(toro)
+        if not kpis or (kpis["total_servicios"] == 0 and kpis["total_evaluados"] == 0):
+            return "📊 No hay suficientes servicios o diagnósticos registrados para calcular KPIs de concepción."
+
+        sc_str = f"{kpis['servicios_por_concepcion']:.2f}" if kpis["servicios_por_concepcion"] else "N/D"
+        lineas = [
+            "🧬 <b>KPIs Reproductivos — Eficiencia de Inseminación</b>",
+            f"• Total servicios: <b>{kpis['total_servicios']}</b> | Evaluados: <b>{kpis['total_evaluados']}</b>",
+            f"• Confirmadas preñadas: <b>{kpis['total_prenadas']}</b>",
+            f"• Vacías / Fallidos: <b>{kpis['total_vacias']}</b>",
+            f"• 🎯 <b>Tasa de Concepción: {kpis['tasa_concepcion']:.1f}%</b>",
+            f"• 🐂 <b>Servicios por Concepción (S/C): {sc_str}</b> (Meta: ≤ 1.7)",
+        ]
+
+        if kpis.get("por_toro") and len(kpis["por_toro"]) > 1:
+            lineas.append("\n<b>Desglose por Reproductor / Pajuela:</b>")
+            for t in kpis["por_toro"][:8]:
+                sc_t = f"{t['sc']:.2f}" if t['sc'] else "N/D"
+                lineas.append(f"• <b>{t['toro']}</b>: {t['tasa_concepcion']:.1f}% concepción ({t['prenadas']}/{t['evaluados']}) | S/C: {sc_t}")
+
+        return "\n".join(lineas)
+
+    def _ultimos_diagnosticos_gestacion(self, limit: int = 10) -> str:
+        """Lista los diagnósticos de gestación más recientes."""
+        diags = self.db.listar_diagnosticos(limit=limit)
+        if not diags:
+            return "🩺 No hay diagnósticos de gestación registrados recientemente."
+
+        lineas = [f"🩺 <b>Últimos {len(diags)} Diagnósticos de Gestación:</b>"]
+        for d in diags:
+            res_ico = "🤰" if (d["resultado"] or "").upper() == "PREÑADA" else "⭕"
+            dias = f" ({d['dias_gestacion']}d gestación)" if d["dias_gestacion"] else ""
+            nom = f" ({d['nombre']})" if d["nombre"] else ""
+            lineas.append(f"• {d['fecha']} — {d['tag']}{nom}: {res_ico} <b>{d['resultado']}</b>{dias}")
+        return "\n".join(lineas)

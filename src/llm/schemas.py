@@ -43,7 +43,7 @@ def _lista_eventos(tipos_enum: list[str], propiedades_datos: dict) -> dict:
 
 
 SCHEMA_REPRODUCCION = _lista_eventos(
-    ["parto", "servicio", "celo"],
+    ["parto", "servicio", "celo", "diagnostico_gestacion"],
     {
         # parto
         "sexo_cria": {"type": "string", "enum": ["Macho", "Hembra"], "nullable": True},
@@ -56,6 +56,10 @@ SCHEMA_REPRODUCCION = _lista_eventos(
         "raza_toro": {"type": "string", "nullable": True},
         # celo
         "am_pm": {"type": "string", "enum": ["AM", "PM"], "nullable": True},
+        # diagnostico_gestacion
+        "resultado": {"type": "string", "enum": ["PREÑADA", "VACIA"], "nullable": True},
+        "dias_gestacion": {"type": "integer", "nullable": True},
+        "responsable": {"type": "string", "nullable": True},
     },
 )
 

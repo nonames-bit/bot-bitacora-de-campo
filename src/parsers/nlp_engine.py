@@ -32,6 +32,16 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\bse muri[oó]\b", r"\bmuri[oó]\b", r"\bmuert[oa]\b",
         r"\bfalleci[oó]\b", r"\bse m[ou]ri[oó]?\b",
     ]),
+    ("diagnostico_gestacion", [
+        r"\bpalp[eé]\b", r"\bpalpaci[oó]n\b", r"\bpalpar\b",
+        r"\bdiagn[oó]stic[oa]\s+(?:de\s+)?gestaci[oó]n\b",
+        r"\bconfirmad[oa]\s+pre[nñ]ad[oa]\b",
+        r"\bconfirmad[oa]\s+vac[ií]a\b",
+        r"\bpre[nñ]ad[oa]\b",
+        r"\bvac[ií]a\b",
+        r"\bgestante\b",
+        r"\bchequeo\s+reproductivo\b",
+    ]),
     ("servicio", [
         r"\binsemin", r"\bservicio\b", r"\bmont[aóe]\b", r"\bcon toro\b",
         r"\bpajilla\b", r"\btoro\s+[a-z0-9]",
@@ -85,6 +95,13 @@ PREFIJOS_TAG = (
     "secado de", "secado de la", "secado de el", "madre de", "padre de", "quien es",
     "cuando se movio", "cuando se traslado", "cuando se cambio", "cuando entro", "cuando paso",
     "traslado de", "traslado de la", "traslado de el", "movimiento de",
+    "palpe", "palpe la", "palpe el", "palpe a la", "palpe a el", "palpacion de", "palpacion de la", "palpacion de el",
+    "palpacion", "palpaciones", "palpar", "palpar la", "palpar el",
+    "diagnostico de gestacion", "diagnostico de gestacion de", "diagnostico de gestacion de la", "diagnostico de gestacion de el",
+    "diagnostico de gestacion la", "diagnostico de gestacion el", "diagnostico gestacional", "diagnostico gestacional de",
+    "diagnostico gestacional de la", "diagnostico gestacional la", "diagnostico de", "diagnostico de la", "diagnostico de el",
+    "diagnostico", "diagnosticos", "gestacion", "gestacion de", "gestacion de la", "gestacion de el", "gestacion la", "gestacion el",
+    "ecografia de", "ecografia de la", "ecografia", "chequeo de", "chequeo de la", "chequeo",
 )
 
 # Palabras que no son tags de animal aunque vayan precedidas de "la"/"el".
@@ -103,6 +120,9 @@ PALABRAS_NO_TAG = {
     "movio", "movieron", "traslado", "trasladaron", "cambio", "cambiaron", "entro", "entraron", "paso", "pasaron",
     "debo", "debe", "deben", "debemos", "tengo", "tiene", "tienen", "tenemos", "hay", "les", "le", "me", "te", "se", "nos",
     "servir", "inseminar", "inseminacion", "inseminaciones", "servicios", "palpacion", "palpaciones",
+    "palpe", "palpar", "diagnostico", "diagnosticos", "gestacion", "gestaciones", "ecografia", "ecografias",
+    "chequeo", "chequeos", "prenada", "prenado", "vacia", "vacio", "gestante", "confirmada",
+    "confirmado", "pajuela", "pajuelas", "termo", "nitrogeno", "canastilla", "dias", "dia", "meses",
 }
 
 
@@ -397,6 +417,45 @@ def extraer_am_pm(texto: str) -> Optional[str]:
     return None
 
 
+def extraer_resultado_diagnostico(texto: str) -> str:
+    """Extrae el resultado del diagnóstico: 'PREÑADA' o 'VACIA'."""
+    t = normalizar(texto)
+    if re.search(r"\b(?:vac[ií]a|abierta|negativa|no\s+pre[nñ]ad[oa])\b", t):
+        return "VACIA"
+    if re.search(r"\b(?:pre[nñ]ad[oa]|gestante|positiva|confirmad[oa]|pre[nñ]ez)\b", t):
+        return "PREÑADA"
+    return "PREÑADA"
+
+
+def extraer_dias_gestacion(texto: str) -> Optional[int]:
+    """Extrae los días de gestación estimados (ej. '60 días' -> 60)."""
+    t = normalizar(texto)
+    m = re.search(r"\b(\d{1,3})\s*(?:d[ií]as|dias|d)\b", t)
+    if m:
+        try:
+            return int(m.group(1))
+        except ValueError:
+            pass
+    m2 = re.search(r"\b(?:pre[nñ]ad[oa]|gestante)\s+(?:de\s+)?(\d{1,3})\b", t)
+    if m2:
+        try:
+            return int(m2.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+def extraer_responsable(texto: str) -> Optional[str]:
+    """Extrae el nombre del veterinario/palpador si se menciona."""
+    t = normalizar(texto)
+    m = re.search(r"\b(?:por|veterinario|dr|palpador|resp|responsable)\s+([a-z]+)\b", t)
+    if m:
+        val = m.group(1).capitalize()
+        if val.lower() not in PALABRAS_NO_TAG:
+            return val
+    return None
+
+
 def _f(s: str) -> float:
     return float(s.replace(",", "."))
 
@@ -423,3 +482,12 @@ class NLUEngine:
     @staticmethod
     def extraer_fecha(texto, base=None):
         return parse_fecha(texto, base)
+
+    @staticmethod
+    def extraer_resultado_diagnostico(texto):
+        return extraer_resultado_diagnostico(texto)
+
+    @staticmethod
+    def extraer_dias_gestacion(texto):
+        return extraer_dias_gestacion(texto)
+

@@ -14,7 +14,7 @@ from ..engine.reproductive_engine import (fecha_ecografia, fecha_estimada_parto,
 from ..parsers.event_parser import EventParser, ParsedEvent
 from ..parsers.media_handler import (MediaError, extract_image_info,
                                      transcribe_audio)
-from ..utils import iso, to_date
+from ..utils import add_days, iso, to_date
 
 
 class Bot:
@@ -115,6 +115,14 @@ class Bot:
                 causa_presunta=d.get("causa_presunta"),
                 registrado_por=user_id,
             )
+        elif ev.tipo == "diagnostico_gestacion":
+            self.db.registrar_diagnostico(
+                vaca_tag=ev.animal_tag, fecha=ev.fecha,
+                resultado=d.get("resultado", "PREÑADA"),
+                dias_gestacion=d.get("dias_gestacion"),
+                responsable=d.get("responsable"),
+                registrado_por=user_id,
+            )
         elif ev.tipo == "servicio":
             self.db.registrar_servicio(
                 vaca_tag=ev.animal_tag, fecha=ev.fecha,
@@ -202,6 +210,16 @@ class Bot:
                                      descripcion="Secado programado (FEP - 60 días)")
             self.db.registrar_alerta(tag, "PARTO_ESPERADO", fep,
                                      descripcion="Fecha estimada de parto")
+        elif ev.tipo == "diagnostico_gestacion":
+            if (ev.datos.get("resultado") or "").upper() == "PREÑADA":
+                dias = ev.datos.get("dias_gestacion")
+                if dias and int(dias) > 0:
+                    dias_rest = 283 - int(dias)
+                    fep = add_days(ev.fecha, dias_rest)
+                    self.db.registrar_alerta(tag, "SECADO", fecha_secado(fep),
+                                             descripcion="Secado programado (FEP - 60 días)")
+                    self.db.registrar_alerta(tag, "PARTO_ESPERADO", fep,
+                                             descripcion="Fecha estimada de parto confirmada")
         elif ev.tipo == "celo":
             prog = programar_inseminacion(ev.fecha, ev.datos.get("am_pm"))
             if prog["fecha"]:
@@ -233,6 +251,10 @@ class Bot:
             return f"Registrado parto de la {tag} (cría {sexo.lower()})."
         if ev.tipo == "muerte":
             return f"Registrada muerte del animal {tag}."
+        if ev.tipo == "diagnostico_gestacion":
+            res = d.get("resultado", "PREÑADA")
+            dias_str = f" ({d['dias_gestacion']} días)" if d.get("dias_gestacion") else ""
+            return f"Registrado diagnóstico de gestación de la {tag}: {res}{dias_str}."
         if ev.tipo == "servicio":
             return f"Registrado servicio ({d.get('tipo_servicio', 'IA')}) de la {tag}."
         if ev.tipo == "celo":

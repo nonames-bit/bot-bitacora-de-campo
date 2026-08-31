@@ -2084,3 +2084,221 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
     lineas.append("💡 <i>¡Excelente y productiva jornada para todo el equipo de campo!</i>")
 
     return "\n".join(lineas)
+
+
+# ---------------------------------------------------------------------- #
+# Módulo Reproducción & Termo Criogénico (Fase 5.1)
+# ---------------------------------------------------------------------- #
+def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> str:
+    """Panel principal del módulo de Reproducción y Termo Criogénico."""
+    if hoy is None:
+        hoy = date.today()
+
+    termo = db.ultimo_estado_termo(hoy)
+    pajuelas = db.listar_pajuelas()
+    kpis = db.kpis_reproductivos_concepcion()
+
+    total_pajuelas = sum(p["cantidad"] for p in pajuelas)
+    n_toros = len(pajuelas)
+    criticas = [p for p in pajuelas if p["cantidad"] <= 2]
+
+    lineas = [
+        "🧬 <b>MÓDULO DE REPRODUCCIÓN & TERMO CRIOGÉNICO</b>",
+        "────────────────────────────────────────",
+    ]
+
+    # Estado del termo
+    if termo:
+        dias_rest = termo["dias_restantes"]
+        if dias_rest < 0:
+            ico_t = "🚨"
+            t_txt = f"VENCIDO ({abs(dias_rest)} días de atraso)"
+        elif dias_rest <= 5:
+            ico_t = "⚠️"
+            t_txt = f"CRÍTICO ({dias_rest} días restantes)"
+        else:
+            ico_t = "✅"
+            t_txt = f"OK ({dias_rest} días restantes)"
+        lineas.append(f"❄️ <b>Termo N₂:</b> {ico_t} <b>{t_txt}</b> | Próx: {termo['proxima_recarga']}")
+    else:
+        lineas.append("❄️ <b>Termo N₂:</b> <i>Sin recargas registradas</i> (use <code>/recarga_n2</code>)")
+
+    # Stock de pajuelas
+    aviso_crit = f" ⚠️ ({len(criticas)} en stock bajo)" if criticas else ""
+    lineas.append(f"🧪 <b>Banco de Pajuelas:</b> <b>{total_pajuelas}</b> unidades ({n_toros} reproductores){aviso_crit}")
+
+    # KPIs de concepción
+    if kpis and kpis["total_evaluados"] > 0:
+        sc_txt = f"{kpis['servicios_por_concepcion']:.2f}" if kpis["servicios_por_concepcion"] else "N/D"
+        lineas.append(f"🎯 <b>Tasa Concepción:</b> <b>{kpis['tasa_concepcion']:.1f}%</b> | <b>S/C:</b> {sc_txt}")
+    else:
+        lineas.append("🎯 <b>Tasa Concepción:</b> <i>Sin diagnósticos suficientes</i>")
+
+    lineas.append("────────────────────────────────────────")
+    lineas.append("💡 <i>Seleccione una opción o use los comandos rápidos:</i>")
+    lineas.append("• <code>/pajuela_stock</code> — Ver inventario detallado de pajuelas")
+    lineas.append("• <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt;</code> — Añadir pajuelas")
+    lineas.append("• <code>/termo</code> — Ver nivel y recargas de nitrógeno")
+    lineas.append("• <code>/recarga_n2</code> — Registrar recarga de nitrógeno")
+    lineas.append("• <code>palpé la 47 confirmada preñada 60 días</code> — Registrar diagnóstico")
+
+    return "\n".join(lineas)
+
+
+def formatear_stock_pajuelas(db: Database) -> str:
+    """Formatea la lista completa de inventario de pajuelas en el termo criogénico."""
+    pajuelas = db.listar_pajuelas()
+    if not pajuelas:
+        return (
+            "🧪 <b>INVENTARIO DE PAJUELAS (TERMO CRIOGÉNICO)</b>\n"
+            "────────────────────────────────────────\n"
+            "⚠️ <i>No hay pajuelas registradas en el inventario.</i>\n\n"
+            "💡 <b>Para registrar ingreso de pajuelas:</b>\n"
+            "• Use el comando: <code>/pajuela_add 502 10 Brahman C1 35000</code>\n"
+            "  (Formato: <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>)"
+        )
+
+    total_unidades = sum(p["cantidad"] for p in pajuelas)
+    criticos = sum(1 for p in pajuelas if p["cantidad"] <= 2)
+
+    lineas = [
+        "🧪 <b>INVENTARIO DE PAJUELAS — TERMO CRIOGÉNICO</b>",
+        f"📊 <b>Total:</b> <b>{total_unidades} pajuelas</b> ({len(pajuelas)} toros/lotes)",
+        "────────────────────────────────────────",
+    ]
+
+    for p in pajuelas:
+        toro = _esc(p["codigo_toro"])
+        cant = p["cantidad"]
+        raza = f" · {_esc(p['raza'])}" if p["raza"] else ""
+        can = f" [Canastilla {_esc(p['canastilla'])}]" if p["canastilla"] else ""
+        costo = f" · ${_fmt_es_co(p['costo'])}" if p["costo"] else ""
+        aviso = " ⚠️ <b>[BAJO]</b>" if cant <= 2 else ""
+
+        lineas.append(f"• 🐂 <b>{toro}</b>{raza}: <b>{cant} unid.</b>{can}{costo}{aviso}")
+
+    if criticos > 0:
+        lineas.append("────────────────────────────────────────")
+        lineas.append(f"⚠️ <i>Atención: {criticos} reproductor(es) tienen 2 o menos pajuelas disponibles.</i>")
+
+    lineas.append("\n💡 <i>Para agregar stock use: <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code></i>")
+    return "\n".join(lineas)
+
+
+def formatear_estado_termo(db: Database, hoy: Optional[date] = None) -> str:
+    """Formatea el estado actual del termo criogénico y el historial de recargas."""
+    if hoy is None:
+        hoy = date.today()
+
+    termo = db.ultimo_estado_termo(hoy)
+    recargas = db.listar_recargas_nitrogeno(limit=5)
+
+    if not termo:
+        return (
+            "❄️ <b>TERMO CRIOGÉNICO & NITRÓGENO LÍQUIDO</b>\n"
+            "────────────────────────────────────────\n"
+            "⚠️ <i>No hay recargas de nitrógeno registradas en el sistema.</i>\n\n"
+            "💡 <b>Para registrar una recarga:</b>\n"
+            "• Use: <code>/recarga_n2</code> (registra hoy con intervalo estándar de 21 días)\n"
+            "• O especifique: <code>/recarga_n2 2026-08-31 28</code>"
+        )
+
+    dias_rest = termo["dias_restantes"]
+    if dias_rest < 0:
+        ico = "🚨"
+        nivel = f"<b>VENCIDO</b> (atraso de {abs(dias_rest)} días)"
+    elif dias_rest <= 5:
+        ico = "⚠️"
+        nivel = f"<b>CRÍTICO</b> ({dias_rest} días restantes)"
+    else:
+        ico = "✅"
+        nivel = f"<b>ÓPTIMO</b> ({dias_rest} días restantes)"
+
+    lineas = [
+        "❄️ <b>ESTADO DEL TERMO CRIOGÉNICO (N₂ LÍQUIDO)</b>",
+        "────────────────────────────────────────",
+        f"• Estado del tanque: {ico} {nivel}",
+        f"• Última recarga: <b>{termo['fecha_recarga']}</b> (hace {termo['dias_desde_recarga']} días)",
+        f"• Próxima recarga programada: <b>{termo['proxima_recarga']}</b>",
+        f"• Intervalo de seguridad: cada {termo['dias_intervalo']} días",
+        "────────────────────────────────────────",
+    ]
+
+    if recargas:
+        lineas.append("📜 <b>Últimas Recargas:</b>")
+        for r in recargas:
+            lineas.append(f"• {r['fecha_recarga']} (Intervalo: {r['dias_intervalo']}d → Próx: {r['proxima_recarga']})")
+        lineas.append("")
+
+    lineas.append("💡 <i>Para registrar una nueva recarga use: <code>/recarga_n2 [fecha] [dias]</code></i>")
+    return "\n".join(lineas)
+
+
+def formatear_kpis_reproduccion(db: Database) -> str:
+    """Formatea el reporte detallado de tasa de concepción y S/C."""
+    kpis = db.kpis_reproductivos_concepcion()
+    if not kpis or (kpis["total_servicios"] == 0 and kpis["total_evaluados"] == 0):
+        return (
+            "🎯 <b>KPIs REPRODUCTIVOS & CONCEPCIÓN</b>\n"
+            "────────────────────────────────────────\n"
+            "⚠️ <i>No hay suficientes servicios o diagnósticos registrados para calcular indicadores.</i>"
+        )
+
+    sc_str = f"{kpis['servicios_por_concepcion']:.2f}" if kpis["servicios_por_concepcion"] else "N/D"
+    lineas = [
+        "🎯 <b>KPIs REPRODUCTIVOS & TASA DE CONCEPCIÓN</b>",
+        "────────────────────────────────────────",
+        f"• Servicios totales registrados: <b>{kpis['total_servicios']}</b>",
+        f"• Servicios evaluados con diagnóstico: <b>{kpis['total_evaluados']}</b>",
+        f"• Vacas confirmadas preñadas: <b>{kpis['total_prenadas']}</b>",
+        f"• Vacías / servicios fallidos: <b>{kpis['total_vacias']}</b>",
+        f"• 🎯 <b>Tasa de Concepción: {kpis['tasa_concepcion']:.1f}%</b>",
+        f"• 🐂 <b>Servicios por Concepción (S/C): {sc_str}</b> (Meta ideal: ≤ 1.7)",
+        "────────────────────────────────────────",
+    ]
+
+    if kpis.get("por_toro") and len(kpis["por_toro"]) > 0:
+        lineas.append("🏆 <b>Ranking de Fertilidad por Reproductor / Pajuela:</b>")
+        for t in kpis["por_toro"][:10]:
+            sc_t = f"{t['sc']:.2f}" if t['sc'] else "N/D"
+            lineas.append(
+                f"• <b>{_esc(t['toro'])}</b>: <b>{t['tasa_concepcion']:.1f}%</b> concepción "
+                f"({t['prenadas']}/{t['evaluados']} preñadas) | S/C: {sc_t}"
+            )
+
+    return "\n".join(lineas)
+
+
+def formatear_diagnosticos_recientes(db: Database) -> str:
+    """Formatea la lista de diagnósticos de gestación recientes."""
+    diags = db.listar_diagnosticos(limit=15)
+    if not diags:
+        return (
+            "🩺 <b>DIAGNÓSTICOS DE GESTACIÓN / PALPACIONES</b>\n"
+            "────────────────────────────────────────\n"
+            "⚠️ <i>No hay diagnósticos de gestación registrados aún.</i>\n\n"
+            "💡 <b>Para registrar diagnósticos en lenguaje natural:</b>\n"
+            "• <code>palpé la 47 confirmada preñada 60 días</code>\n"
+            "• <code>la 12 vacía</code>\n"
+            "• <code>diagnóstico de gestación vaca 105 preñada 90 días</code>"
+        )
+
+    lineas = [
+        f"🩺 <b>ÚLTIMOS {len(diags)} DIAGNÓSTICOS DE GESTACIÓN</b>",
+        "────────────────────────────────────────",
+    ]
+
+    for d in diags:
+        tag = _esc(d["tag"])
+        nom = f" ({_esc(d['nombre'])})" if d["nombre"] else ""
+        res = (d["resultado"] or "").upper()
+        ico = "🤰" if res == "PREÑADA" else "⭕"
+        dias = f" · <b>{d['dias_gestacion']}d gestación</b>" if d["dias_gestacion"] else ""
+        resp = f" (Por: {_esc(d['responsable'])})" if d["responsable"] else ""
+
+        lineas.append(f"• <b>{d['fecha']}</b> — <b>{tag}</b>{nom}: {ico} <b>{res}</b>{dias}{resp}")
+
+    lineas.append("────────────────────────────────────────")
+    lineas.append("💡 <i>Para registrar: <code>palpé la 47 confirmada preñada 60 días</code> o <code>la 12 vacía</code></i>")
+    return "\n".join(lineas)
+
