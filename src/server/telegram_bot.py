@@ -166,6 +166,63 @@ def construir_application(
         crear_teclado_trabajador,
     )
 
+    async def _enviar_texto_seguro(
+        target,
+        texto: str,
+        parse_mode: Optional[str] = None,
+        reply_markup: Optional[InlineKeyboardMarkup] = None,
+        limite: int = 4000,
+    ) -> None:
+        """Envía un mensaje dividiéndolo limpiamente en bloques <= 4000 caracteres si excede el límite de Telegram."""
+        if not texto:
+            return
+        if len(texto) <= limite:
+            try:
+                if hasattr(target, "reply_text"):
+                    await target.reply_text(texto, parse_mode=parse_mode, reply_markup=reply_markup)
+                elif hasattr(target, "message") and target.message:
+                    await target.message.reply_text(texto, parse_mode=parse_mode, reply_markup=reply_markup)
+                return
+            except Exception as exc:
+                if parse_mode == "HTML" and "parse" in str(exc).lower():
+                    logger.warning("Fallo al enviar mensaje HTML, reintentando como texto plano: %s", exc)
+                    if hasattr(target, "reply_text"):
+                        await target.reply_text(texto, reply_markup=reply_markup)
+                    elif hasattr(target, "message") and target.message:
+                        await target.message.reply_text(texto, reply_markup=reply_markup)
+                    return
+                raise
+
+        partes: list[str] = []
+        bloque_actual = []
+        longitud_actual = 0
+        for linea in texto.split("\n"):
+            if longitud_actual + len(linea) + 1 > limite and bloque_actual:
+                partes.append("\n".join(bloque_actual))
+                bloque_actual = [linea]
+                longitud_actual = len(linea)
+            else:
+                bloque_actual.append(linea)
+                longitud_actual += len(linea) + 1
+        if bloque_actual:
+            partes.append("\n".join(bloque_actual))
+
+        for i, parte in enumerate(partes):
+            mk = reply_markup if i == len(partes) - 1 else None
+            try:
+                if hasattr(target, "reply_text"):
+                    await target.reply_text(parte, parse_mode=parse_mode, reply_markup=mk)
+                elif hasattr(target, "message") and target.message:
+                    await target.message.reply_text(parte, parse_mode=parse_mode, reply_markup=mk)
+            except Exception as exc:
+                if parse_mode == "HTML" and "parse" in str(exc).lower():
+                    if hasattr(target, "reply_text"):
+                        await target.reply_text(parte, reply_markup=mk)
+                    elif hasattr(target, "message") and target.message:
+                        await target.message.reply_text(parte, reply_markup=mk)
+                else:
+                    raise
+
     async def cmd_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -177,7 +234,7 @@ def construir_application(
             rol = auth.rol_de(user_id)
             texto_menu = texto_menu_principal(rol)
             teclado = crear_teclado_principal(rol)
-            await update.message.reply_text(texto_menu, parse_mode="HTML", reply_markup=teclado)
+            await _enviar_texto_seguro(update.message, texto_menu, parse_mode="HTML", reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_start_menu: %s", e, exc_info=True)
             if update.message:
@@ -194,7 +251,7 @@ def construir_application(
             rol = auth.rol_de(user_id)
             texto_ayuda = formatear_ayuda(rol)
             teclado = InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Abrir Menú", callback_data="menu:principal")]])
-            await update.message.reply_text(texto_ayuda, parse_mode="HTML", reply_markup=teclado)
+            await _enviar_texto_seguro(update.message, texto_ayuda, parse_mode="HTML", reply_markup=teclado)
         except Exception as e:
             logger.error("Error en cmd_ayuda_completa: %s", e, exc_info=True)
             if update.message:
@@ -510,7 +567,7 @@ def construir_application(
                 return
             grupos = db.detectar_duplicados_geneticos()
             msg = formatear_duplicados_geneticos(grupos)
-            await update.message.reply_text(msg, parse_mode="HTML")
+            await _enviar_texto_seguro(update.message, msg, parse_mode="HTML")
         except Exception as e:
             logger.error("Error en cmd_duplicados: %s", e, exc_info=True)
             if update.message:
@@ -526,7 +583,7 @@ def construir_application(
                 return
             filas = db.ultimos_registros(15)
             msg = formatear_ultimos_registros(filas, auth=auth)
-            await update.message.reply_text(msg, parse_mode="HTML")
+            await _enviar_texto_seguro(update.message, msg, parse_mode="HTML")
         except Exception as e:
             logger.error("Error en cmd_ultimos: %s", e, exc_info=True)
             if update.message:
@@ -1237,7 +1294,7 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado. Solo OWNER puede ver los logs.")
                 return
             msg = obtener_ultimos_logs(log_file)
-            await update.message.reply_text(msg)
+            await _enviar_texto_seguro(update.message, msg)
         except Exception as e:
             logger.error("Error en cmd_logs: %s", e, exc_info=True)
             if update.message:

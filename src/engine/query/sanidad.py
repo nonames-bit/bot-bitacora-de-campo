@@ -42,7 +42,11 @@ class SanidadQueryMixin:
     def _en_retiro(self) -> str:
         hoy = self.hoy
         tratamientos = self.db.query(
-            "SELECT * FROM tratamientos WHERE dias_retiro_leche > 0 OR dias_retiro_carne > 0"
+            """
+            SELECT t.* FROM tratamientos t
+            JOIN animales a ON a.id_animal = t.animal_id
+            WHERE a.estado = 'ACTIVO' AND (t.dias_retiro_leche > 0 OR t.dias_retiro_carne > 0)
+            """
         )
         bloqueados = []
         for t in tratamientos:

@@ -213,7 +213,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **240 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **402 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -351,7 +351,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Centro de Guía de Consultas & Chat** (`/guia`, `/preguntar`): Hub categorizado con ejemplos de preguntas sobre animales, potreros, leche/reproducción, sanidad y dictado por voz/fotos.
     - Guía de ayuda enriquecida con ejemplos de dictado por voz y notas de campo.
   - [x] **Manual Integral de Uso y Operación** ([`docs/MANUAL_DE_USO.md`](docs/MANUAL_DE_USO.md)): Guía completa de extremo a extremo para el dueño, administradores y personal de corral.
-- [x] Suite de pruebas con pytest: **271 pruebas en verde** (100% pasando)
+- [x] **Auditoría Técnica y Hardening de Concurrencia & Robustez**:
+  - [x] Modo WAL en SQLite (`PRAGMA journal_mode=WAL`), `PRAGMA busy_timeout=10000`, `foreign_keys=ON` y `check_same_thread=False` para evitar bloqueos por concurrencia entre Telegram, el vigilante de copias y respaldos.
+  - [x] Creación de índices en `SCHEMA_SQL` para acelerar consultas de inventario, partos, servicios, pesajes y traslados.
+  - [x] Escapado seguro de entidades HTML (`_esc`) y chunking automático de mensajes extensos (`_enviar_texto_seguro` en Telegram).
+  - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
+- [x] Suite de pruebas con pytest: **402 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua
 - [ ] Calibración de parámetros y retroalimentación de uso en campo.

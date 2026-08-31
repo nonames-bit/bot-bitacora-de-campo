@@ -108,7 +108,14 @@ class ReproduccionQueryMixin:
 
     def _palpacion_pendiente(self) -> str:
         hoy = self.hoy
-        servicios = self.db.query("SELECT * FROM servicios WHERE fecha IS NOT NULL ORDER BY fecha")
+        servicios = self.db.query(
+            """
+            SELECT s.* FROM servicios s
+            JOIN animales a ON a.id_animal = s.vaca_id
+            WHERE a.estado = 'ACTIVO' AND s.fecha IS NOT NULL
+            ORDER BY s.fecha
+            """
+        )
         pendientes = []
         for s in servicios:
             palp = fecha_palpacion(s["fecha"])

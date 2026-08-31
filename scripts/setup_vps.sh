@@ -7,8 +7,9 @@ set -e
 echo "=== [1/7] Actualizando repositorios del sistema ==="
 sudo apt-get update -y
 
-echo "=== [2/7] Instalando paquetes base de Python y utilidades ==="
-sudo apt-get install -y python3 python3-venv python3-pip ufw
+echo "=== [2/7] Instalando paquetes base de Python, audio, OCR y utilidades ==="
+sudo apt-get install -y python3 python3-venv python3-pip ufw ffmpeg sqlite3 tesseract-ocr tesseract-ocr-spa
+
 
 echo "=== [3/7] Configurando cortafuegos (UFW) para permitir OpenSSH ==="
 sudo ufw allow OpenSSH || true

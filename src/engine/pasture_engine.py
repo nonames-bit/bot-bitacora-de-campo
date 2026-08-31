@@ -11,7 +11,7 @@ from __future__ import annotations
 M2_POR_HA = 10_000.0
 UGG_KG = 450.0
 CONSUMO_MS_UGG = 12.0  # kg MS / UGG / día
-PCT_MS_TROPICAL = 0.22  # pasto tropical ~22% de materia seca
+PCT_MS_TROPICAL = 22.0  # pasto tropical ~22% de materia seca (%MS)
 
 
 def kg_mv_ha(aforo_kg_m2: float) -> float:

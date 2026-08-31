@@ -124,26 +124,7 @@ def crear_teclado_medicamentos() -> InlineKeyboardMarkup:
 
 def crear_teclado_buscar_animal(db: Database) -> InlineKeyboardMarkup:
     try:
-        ultimos_recientes = db.query(
-            """
-            SELECT DISTINCT a.tag FROM (
-                SELECT animal_id, fecha FROM pesajes WHERE animal_id IS NOT NULL
-                UNION ALL
-                SELECT vaca_id AS animal_id, fecha FROM partos WHERE vaca_id IS NOT NULL
-                UNION ALL
-                SELECT vaca_id AS animal_id, fecha FROM servicios WHERE vaca_id IS NOT NULL
-                UNION ALL
-                SELECT vaca_id AS animal_id, fecha FROM celos WHERE vaca_id IS NOT NULL
-                UNION ALL
-                SELECT animal_id, fecha FROM tratamientos WHERE animal_id IS NOT NULL
-                UNION ALL
-                SELECT animal_id, fecha FROM traslados WHERE animal_id IS NOT NULL
-            ) ev
-            JOIN animales a ON a.id_animal = ev.animal_id
-            WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
-            ORDER BY ev.fecha DESC LIMIT 4
-            """
-        )
+        ultimos_recientes = db.ultimas_consultas_animal(limite=4)
     except Exception:
         ultimos_recientes = []
     keyboard = [

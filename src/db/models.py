@@ -164,13 +164,31 @@ CREATE TABLE IF NOT EXISTS import_sg_historial (
     nuevos INTEGER,
     duplicados INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS consultas_animal (
+    animal_id INTEGER PRIMARY KEY,
+    ultima_fecha TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
+CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
+CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
+CREATE INDEX IF NOT EXISTS idx_partos_vaca_fecha ON partos(vaca_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_partos_cria ON partos(id_cria);
+CREATE INDEX IF NOT EXISTS idx_servicios_vaca_fecha ON servicios(vaca_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_celos_vaca_fecha ON celos(vaca_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_tratamientos_animal_fecha ON tratamientos(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_traslados_animal_fecha ON traslados(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
-    "produccion_leche", "alertas", "fotos", "import_sg_historial",
+    "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
 ]
 
 

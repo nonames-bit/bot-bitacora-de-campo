@@ -25,6 +25,13 @@ from .auth import Auth
 # ---------------------------------------------------------------------- #
 # Lógica pura / formateadores independientes del SDK
 # ---------------------------------------------------------------------- #
+def _esc(val: object) -> str:
+    """Escapa de forma segura caracteres especiales (&, <, >) para plantillas HTML de Telegram."""
+    if val is None:
+        return ""
+    return html.escape(str(val))
+
+
 def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = None) -> str:
     """Genera la vista de control de peso, ganancia diaria (GMD) y curva ponderal de un animal."""
     if hoy is None:
@@ -532,8 +539,9 @@ def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
         SELECT t.*, a.tag, a.nombre
         FROM tratamientos t
         JOIN animales a ON a.id_animal = t.animal_id
-        WHERE (t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
-           OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?)
+        WHERE a.estado = 'ACTIVO'
+          AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+               OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
         ORDER BY t.fecha DESC
         """,
         (hoy_iso, hoy_iso),
@@ -966,9 +974,13 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     n_trat_7d = int(r_trat["n"]) if r_trat else 0
 
     filas_retiro = db.query(
-        "SELECT DISTINCT animal_id FROM tratamientos "
-        "WHERE (fecha_fin_retiro_leche IS NOT NULL AND fecha_fin_retiro_leche >= ?) "
-        "   OR (fecha_fin_retiro_carne IS NOT NULL AND fecha_fin_retiro_carne >= ?)",
+        """
+        SELECT DISTINCT t.animal_id FROM tratamientos t
+        JOIN animales a ON a.id_animal = t.animal_id
+        WHERE a.estado = 'ACTIVO'
+          AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+               OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
+        """,
         (fecha_hoy, fecha_hoy),
     )
     n_en_retiro = len(filas_retiro)
@@ -1791,8 +1803,9 @@ def formatear_panel_medicamentos(db: Database) -> str:
         FROM tratamientos t
         LEFT JOIN animales a ON a.id_animal = t.animal_id
         LEFT JOIN potreros p ON p.id = a.potrero_id
-        WHERE (t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
-           OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?)
+        WHERE a.estado = 'ACTIVO'
+          AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+               OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
         ORDER BY t.fecha DESC
         """,
         (hoy_iso, hoy_iso),

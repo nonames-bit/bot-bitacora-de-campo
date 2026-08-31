@@ -13,10 +13,14 @@ def test_kg_mv_ha():
 
 def test_kg_ms_ha():
     assert kg_ms_ha(5000.0, 22.0) == pytest.approx(1100.0)
+    # Probar con el valor por defecto de pasto tropical (22.0%)
+    assert kg_ms_ha(5000.0) == pytest.approx(1100.0)
 
 
 def test_kg_ms_disponibles():
     assert kg_ms_disponibles(0.5, 10.0, 22.0) == pytest.approx(11000.0)
+    # Probar con el valor por defecto
+    assert kg_ms_disponibles(0.5, 10.0) == pytest.approx(11000.0)
 
 
 def test_capacidad_carga_ugg():

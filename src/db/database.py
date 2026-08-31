@@ -24,8 +24,19 @@ class Database:
 
     def __init__(self, path: str = ":memory:"):
         self.path = path
-        self.conn = sqlite3.connect(path)
+        self.conn = sqlite3.connect(path, check_same_thread=False, timeout=10.0)
         self.conn.row_factory = sqlite3.Row
+        if path != ":memory:":
+            try:
+                self.conn.execute("PRAGMA journal_mode = WAL;")
+                self.conn.execute("PRAGMA busy_timeout = 10000;")
+                self.conn.execute("PRAGMA synchronous = NORMAL;")
+            except Exception:
+                pass
+        try:
+            self.conn.execute("PRAGMA foreign_keys = ON;")
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida y utilidades de bajo nivel
@@ -450,6 +461,32 @@ class Database:
             return []
         return self.query(
             "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha", (aid,)
+        )
+
+    def registrar_consulta_animal(self, animal_tag_or_id, hoy=None) -> None:
+        """Marca ``animal_tag_or_id`` como consultado ahora (para el panel de
+        últimas consultas). No crea el animal si no existe; una consulta a un
+        tag inexistente simplemente no deja rastro."""
+        aid = self.resolve_animal(animal_tag_or_id, crear=False)
+        if aid is None:
+            return
+        momento = iso(hoy) if hoy is not None else self._ahora()
+        self.conn.execute(
+            "INSERT OR REPLACE INTO consultas_animal (animal_id, ultima_fecha) VALUES (?, ?)",
+            (aid, momento),
+        )
+        self.conn.commit()
+
+    def ultimas_consultas_animal(self, limite: int = 4) -> list[sqlite3.Row]:
+        """Últimos animales activos consultados, más reciente primero."""
+        return self.query(
+            """
+            SELECT a.tag, c.ultima_fecha FROM consultas_animal c
+            JOIN animales a ON a.id_animal = c.animal_id
+            WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
+            ORDER BY c.ultima_fecha DESC LIMIT ?
+            """,
+            (limite,),
         )
 
     def registrar_alerta(self, animal_tag, tipo_alerta, fecha_programada=None,
