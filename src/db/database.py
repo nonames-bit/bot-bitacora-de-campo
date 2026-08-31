@@ -430,9 +430,30 @@ class Database:
             "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
         )
 
+    def registrar_recordatorio(self, mensaje: str, fecha_programada=None, hora=None, creado_por=None) -> int:
+        return self.insert("recordatorios_programados", dict(
+            mensaje=mensaje, fecha_programada=iso(fecha_programada) if fecha_programada else None,
+            hora=hora, creado_por=creado_por, estado="PENDIENTE", creado_en=self._ahora(),
+        ))
+
+    def listar_recordatorios_pendientes(self, fecha=None) -> list:
+        if fecha is not None:
+            return self.query(
+                "SELECT * FROM recordatorios_programados WHERE estado='PENDIENTE' AND fecha_programada = ? ORDER BY hora, id", (iso(fecha),)
+            )
+        return self.query("SELECT * FROM recordatorios_programados WHERE estado='PENDIENTE' ORDER BY fecha_programada, hora, id")
+
+    def marcar_enviado(self, rid: int) -> bool:
+        cur = self.conn.execute("UPDATE recordatorios_programados SET estado='ENVIADO' WHERE id = ?", (rid,))
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def registrar_leche(self, animal_tag, fecha=None, litros=None,
                         notas=None, registrado_por=None) -> int:
-        animal_id = self.resolve_animal(animal_tag, crear=True, sexo="Hembra")
+        if animal_tag is None:
+            animal_id = None
+        else:
+            animal_id = self.resolve_animal(animal_tag, crear=True, sexo="Hembra")
         f = iso(fecha)
         # Mismo animal + misma fecha + mismos litros: nota reenviada, no dos
         # controles de leche reales idénticos el mismo día (el control es
