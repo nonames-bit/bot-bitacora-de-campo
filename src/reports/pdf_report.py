@@ -9,10 +9,14 @@ import os
 from datetime import date, timedelta
 from typing import Any, Optional
 
-# Paleta institucional GANADERÍA JA (verde pasto oscuro + acento tierra).
+# Paleta institucional GANADERÍA JA (verde pasto oscuro + acentos armónicos).
 _COLOR_MARCA = "#2F5233"
 _COLOR_MARCA_CLARA = "#E7EFE8"
 _COLOR_MARCA_ZEBRA = "#F3F7F3"
+_COLOR_TIERRA = "#8D6E63"
+_COLOR_GRIS = "#78909C"
+_COLOR_VERDE = "#2e7d32"
+_COLOR_ROJO = "#c62828"
 
 
 # --------------------------------------------------------------------------- #
@@ -253,7 +257,9 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
 
     from ..engine.charts import (
         generar_grafico_categorias,
+        generar_grafico_estado_reproductivo_hato,
         generar_grafico_evolucion_rebano,
+        generar_grafico_ocupacion_potreros,
         graficos_disponibles,
     )
 
@@ -294,6 +300,10 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
         "SeccionReporte", parent=base["Heading2"], fontName="Helvetica-Bold",
         fontSize=12, textColor=colors.HexColor(_COLOR_MARCA),
         spaceBefore=10, spaceAfter=4,
+    )
+    estilo_subseccion_grafico = ParagraphStyle(
+        "SubseccionGrafico", parent=base["Normal"], fontName="Helvetica-Bold",
+        fontSize=8.5, textColor=colors.HexColor(_COLOR_MARCA), spaceAfter=2,
     )
     estilo_normal = ParagraphStyle(
         "NormalReporte", parent=base["Normal"], fontName="Helvetica",
@@ -408,26 +418,57 @@ def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> 
     tmp_charts_dir = None
     if graficos_disponibles():
         tmp_charts_dir = tempfile.mkdtemp(prefix="bitacora_reporte_charts_")
+        candidatos = [
+            ("Distribución del Hato", lambda: generar_grafico_categorias(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
+            ("Evolución del Rebaño (6m)", lambda: generar_grafico_evolucion_rebano(db, meses=6, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
+            ("Ocupación de Potreros (Voisin)", lambda: generar_grafico_ocupacion_potreros(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
+            ("Estado Reproductivo", lambda: generar_grafico_estado_reproductivo_hato(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
+        ]
         graficos_embebidos = []
-        try:
-            ruta_cat = generar_grafico_categorias(db, output_dir=tmp_charts_dir, hoy=fecha_hoy)
-            if ruta_cat:
-                graficos_embebidos.append(("Distribución del Hato", ruta_cat, 82))
-        except Exception:
-            pass
-        try:
-            ruta_evo = generar_grafico_evolucion_rebano(db, meses=6, output_dir=tmp_charts_dir, hoy=fecha_hoy)
-            if ruta_evo:
-                graficos_embebidos.append(("Evolución del Rebaño (6 meses)", ruta_evo, 170))
-        except Exception:
-            pass
+        for tit_cand, fn_cand in candidatos:
+            if len(graficos_embebidos) >= 4:
+                break
+            try:
+                ruta_cand = fn_cand()
+                if ruta_cand and os.path.exists(ruta_cand):
+                    graficos_embebidos.append((tit_cand, ruta_cand))
+            except Exception:
+                pass
 
         if graficos_embebidos:
-            story.append(Paragraph("Gráficos", estilo_seccion))
-            for titulo_g, ruta_g, ancho_g in graficos_embebidos:
-                story.append(Paragraph(titulo_g, estilo_normal))
-                story.append(_imagen_ajustada(ruta_g, ancho_g))
-                story.append(Spacer(1, 6))
+            story.append(Paragraph("Gráficos de gestión", estilo_seccion))
+            if len(graficos_embebidos) == 1:
+                story.append(Paragraph(graficos_embebidos[0][0], estilo_subseccion_grafico))
+                story.append(_imagen_ajustada(graficos_embebidos[0][1], 165))
+                story.append(Spacer(1, 4))
+            else:
+                filas_tabla_graficos = []
+                for i in range(0, len(graficos_embebidos), 2):
+                    par = graficos_embebidos[i : i + 2]
+                    celda_izq = [
+                        Paragraph(par[0][0], estilo_subseccion_grafico),
+                        _imagen_ajustada(par[0][1], 80),
+                    ]
+                    if len(par) > 1:
+                        celda_der = [
+                            Paragraph(par[1][0], estilo_subseccion_grafico),
+                            _imagen_ajustada(par[1][1], 80),
+                        ]
+                    else:
+                        celda_der = ""
+                    filas_tabla_graficos.append([celda_izq, celda_der])
+
+                tabla_g = Table(filas_tabla_graficos, colWidths=[85 * mm, 85 * mm])
+                tabla_g.setStyle(TableStyle([
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ]))
+                story.append(tabla_g)
+                story.append(Spacer(1, 4))
 
     # Tablas por evento.
     for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
