@@ -402,6 +402,53 @@ def test_historial_leche_devuelve_ordenado_por_fecha(db):
 
 
 # ---------------------------------------------------------------------------
+# Últimas consultas de animales (panel de botones "consultas recientes")
+# ---------------------------------------------------------------------------
+def test_ultimas_consultas_animal_orden_mas_reciente_primero(db):
+    db.registrar_animal("A048", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("A088", sexo="Hembra", estado="ACTIVO")
+    db.registrar_consulta_animal("A048", hoy="2026-08-01")
+    db.registrar_consulta_animal("A088", hoy="2026-08-02")
+    recientes = db.ultimas_consultas_animal(limite=4)
+    assert [r["tag"] for r in recientes] == ["A088", "A048"]
+
+
+def test_registrar_consulta_animal_re_consultado_sube_al_frente(db):
+    db.registrar_animal("A048", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("A088", sexo="Hembra", estado="ACTIVO")
+    db.registrar_consulta_animal("A048", hoy="2026-08-01")
+    db.registrar_consulta_animal("A088", hoy="2026-08-02")
+    # Se vuelve a consultar A048 más tarde: debe pasar al frente sin duplicarse.
+    db.registrar_consulta_animal("A048", hoy="2026-08-03")
+    recientes = db.ultimas_consultas_animal(limite=4)
+    assert [r["tag"] for r in recientes] == ["A048", "A088"]
+    assert db.count("consultas_animal") == 2
+
+
+def test_ultimas_consultas_animal_respeta_limite(db):
+    for i in range(6):
+        tag = f"A{i:03d}"
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO")
+        db.registrar_consulta_animal(tag, hoy=f"2026-08-{i + 1:02d}")
+    recientes = db.ultimas_consultas_animal(limite=4)
+    assert [r["tag"] for r in recientes] == ["A005", "A004", "A003", "A002"]
+
+
+def test_ultimas_consultas_animal_excluye_historico(db):
+    db.registrar_animal("A048", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("A088", sexo="Hembra", estado="HISTORICO")
+    db.registrar_consulta_animal("A048", hoy="2026-08-01")
+    db.registrar_consulta_animal("A088", hoy="2026-08-02")
+    recientes = db.ultimas_consultas_animal(limite=4)
+    assert [r["tag"] for r in recientes] == ["A048"]
+
+
+def test_registrar_consulta_animal_tag_inexistente_no_deja_rastro(db):
+    db.registrar_consulta_animal("NOEXISTE9999")
+    assert db.count("consultas_animal") == 0
+
+
+# ---------------------------------------------------------------------------
 # Registro de importaciones de Software Ganadero (¿está usando el backup de
 # hoy?)
 # ---------------------------------------------------------------------------

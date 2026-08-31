@@ -295,6 +295,10 @@ def construir_application(
                     if m_tag:
                         tag = m_tag.group(1).strip()
                 if tag:
+                    try:
+                        db.registrar_consulta_animal(tag)
+                    except Exception:
+                        pass
                     foto_path = buscar_foto_animal(db, tag, media_dir=media_dir)
                     teclado = crear_teclado_animal(tag)
                     if foto_path and os.path.exists(foto_path):
@@ -711,6 +715,11 @@ def construir_application(
             if not tag:
                 await update.message.reply_text("Uso: /consulta <tag> o /historial <tag> (ej. /consulta N069)")
                 return
+
+            try:
+                db.registrar_consulta_animal(tag)
+            except Exception:
+                pass
 
             msg = formatear_historial(db, tag)
             teclado = crear_teclado_animal(tag)
@@ -2096,6 +2105,10 @@ def construir_application(
             elif data.startswith("animal:resumen:") or data.startswith("ficha:"):
                 tag = data.split(":", 2)[-1].strip()
                 await query.answer()
+                try:
+                    db.registrar_consulta_animal(tag)
+                except Exception:
+                    pass
                 msg = formatear_historial(db, tag)
                 if query.message:
                     try:
