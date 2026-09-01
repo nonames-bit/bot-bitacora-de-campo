@@ -20,6 +20,7 @@ PALPACION_DIAS = 60
 SECADO_ANTES_PART = 60
 DIAS_ABIERTOS_META = 110
 IEP_META_DIAS = 400
+INTERVALO_RECARGA_N2_DIAS = 21
 
 
 def fecha_estimada_parto(fecha_servicio) -> date | None:
@@ -68,6 +69,63 @@ def programar_inseminacion(fecha_celo, am_pm=None) -> dict:
     return {"fecha": to_date(fecha_celo), "franja": "tarde"}
 
 
+def calcular_proxima_recarga_n2(fecha_ultima_recarga, intervalo_dias: int = INTERVALO_RECARGA_N2_DIAS) -> date | None:
+    """Calcula la fecha de la próxima recarga de nitrógeno líquido para el termo criogénico."""
+    return add_days(fecha_ultima_recarga, int(intervalo_dias))
+
+
+def calcular_alerta_nitrogeno(
+    fecha_ultima_recarga,
+    intervalo_dias: int = INTERVALO_RECARGA_N2_DIAS,
+    hoy: date | None = None,
+    umbral_alerta: int = 3,
+) -> dict:
+    """Evalúa el estado de evaporación del nitrógeno líquido en el termo.
+
+    Avisa si faltan <= umbral_alerta días (default 3 días) para vencer los 21-30 días
+    desde la última recarga registrada.
+    """
+    f_rec = to_date(fecha_ultima_recarga)
+    if not f_rec:
+        return {
+            "fecha_recarga": None,
+            "proxima_recarga": None,
+            "dias_intervalo": intervalo_dias,
+            "dias_desde_recarga": 0,
+            "dias_restantes": 0,
+            "alerta": False,
+            "vencido": False,
+            "mensaje": "Sin registro de recarga de nitrógeno",
+        }
+
+    fecha_ref = to_date(hoy) or date.today()
+    prox = add_days(f_rec, int(intervalo_dias))
+    dias_desde = (fecha_ref - f_rec).days
+    dias_restantes = (prox - fecha_ref).days if prox else 0
+    alerta = dias_restantes <= umbral_alerta
+    vencido = dias_restantes < 0
+
+    if vencido:
+        msg = f"Nitrógeno VENCIDO hace {abs(dias_restantes)} días"
+    elif dias_restantes == 0:
+        msg = "Nitrógeno recargar HOY"
+    elif dias_restantes == 1:
+        msg = "Nitrógeno recargar en 1 día"
+    else:
+        msg = f"Nitrógeno recargar en {dias_restantes} días"
+
+    return {
+        "fecha_recarga": iso(f_rec),
+        "proxima_recarga": iso(prox),
+        "dias_intervalo": int(intervalo_dias),
+        "dias_desde_recarga": dias_desde,
+        "dias_restantes": dias_restantes,
+        "alerta": alerta,
+        "vencido": vencido,
+        "mensaje": msg,
+    }
+
+
 class ReproductiveEngine:
     """Contenedor de los cálculos reproductivos (métodos estáticos)."""
 
@@ -94,6 +152,14 @@ class ReproductiveEngine:
     @staticmethod
     def iep_proyectado(dias_abiertos_valor):
         return iep_proyectado(dias_abiertos_valor)
+
+    @staticmethod
+    def proxima_recarga_n2(fecha_ultima_recarga, intervalo_dias: int = INTERVALO_RECARGA_N2_DIAS):
+        return calcular_proxima_recarga_n2(fecha_ultima_recarga, intervalo_dias)
+
+    @staticmethod
+    def alerta_nitrogeno(fecha_ultima_recarga, intervalo_dias: int = INTERVALO_RECARGA_N2_DIAS, hoy: date | None = None, umbral_alerta: int = 3):
+        return calcular_alerta_nitrogeno(fecha_ultima_recarga, intervalo_dias, hoy, umbral_alerta)
 
     @staticmethod
     def programar(fecha_servicio) -> dict:

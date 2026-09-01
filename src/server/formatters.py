@@ -2103,6 +2103,21 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
         lineas.extend(tareas_vet)
         lineas.append("")
 
+    # 5. ❄️ Alerta de Nitrógeno Líquido (Termo Criogénico)
+    termo = db.ultimo_estado_termo(hoy)
+    if termo and termo["dias_restantes"] <= 3:
+        d_rest = termo["dias_restantes"]
+        if d_rest < 0:
+            alerta_n2_txt = f"🚨 <b>Nitrógeno VENCIDO hace {abs(d_rest)} días</b> (última recarga: {termo['fecha_recarga']})"
+        elif d_rest == 0:
+            alerta_n2_txt = "⚠️ <b>Nitrógeno recargar HOY</b> (vence hoy)"
+        elif d_rest == 1:
+            alerta_n2_txt = "⚠️ <b>Nitrógeno recargar en 1 día</b>"
+        else:
+            alerta_n2_txt = f"⚠️ <b>Nitrógeno recargar en {d_rest} días</b>"
+        lineas.append("❄️ <b>ALERTA DE TERMO CRIOGÉNICO (N₂):</b>")
+        lineas.append(f"• {alerta_n2_txt} (Próxima recarga programada: {termo['proxima_recarga']})\n")
+
     lineas.append("────────────────────────────────────────")
     lineas.append("💡 <i>¡Excelente y productiva jornada para todo el equipo de campo!</i>")
 
@@ -2136,7 +2151,7 @@ def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> st
         if dias_rest < 0:
             ico_t = "🚨"
             t_txt = f"VENCIDO ({abs(dias_rest)} días de atraso)"
-        elif dias_rest <= 5:
+        elif dias_rest <= 3:
             ico_t = "⚠️"
             t_txt = f"CRÍTICO ({dias_rest} días restantes)"
         else:
@@ -2230,7 +2245,7 @@ def formatear_estado_termo(db: Database, hoy: Optional[date] = None) -> str:
     if dias_rest < 0:
         ico = "🚨"
         nivel = f"<b>VENCIDO</b> (atraso de {abs(dias_rest)} días)"
-    elif dias_rest <= 5:
+    elif dias_rest <= 3:
         ico = "⚠️"
         nivel = f"<b>CRÍTICO</b> ({dias_rest} días restantes)"
     else:

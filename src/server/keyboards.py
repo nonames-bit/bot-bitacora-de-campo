@@ -481,3 +481,22 @@ def crear_teclado_reproduccion_detalle() -> InlineKeyboardMarkup:
     ]
     return InlineKeyboardMarkup(keyboard)
 
+
+def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> InlineKeyboardMarkup:
+    """Teclado interactivo para confirmar o descartar la carga de stock de pajuelas detectadas por OCR."""
+    toro_param = str(toro).replace(":", "_").strip()
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                f"✅ Confirmar Carga (+{cantidad} {toro})",
+                callback_data=f"factura_pajuela:confirmar:{toro_param}:{cantidad}",
+            ),
+            InlineKeyboardButton(
+                "❌ Descartar",
+                callback_data="factura_pajuela:descartar",
+            ),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+

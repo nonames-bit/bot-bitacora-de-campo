@@ -165,6 +165,7 @@ def construir_application(
         crear_teclado_animal_detalle,
         crear_teclado_ayuda_menu,
         crear_teclado_buscar_animal,
+        crear_teclado_confirmar_factura_pajuelas,
         crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
         crear_teclado_grafico_detalle,
@@ -416,11 +417,13 @@ def construir_application(
             ocr_text = ""
             ocr_tags = []
             ocr_med = None
+            factura_info = None
             try:
                 img_info = extract_image_info(dest_path)
                 ocr_text = img_info.ocr_text or img_info.texto_detectado or ""
                 ocr_tags = img_info.tags
                 ocr_med = img_info.medicamento
+                factura_info = getattr(img_info, "factura_pajuelas", None)
                 if not tag and ocr_tags:
                     tag = ocr_tags[0]
             except Exception:
@@ -438,6 +441,34 @@ def construir_application(
 
             # Construir texto consolidado para NLU
             texto_consolidado = f"{caption} {ocr_text}".strip() if caption else ocr_text
+
+            # Si no se extrajo del media_handler, intentar parsear factura desde texto consolidado
+            if not factura_info or not getattr(factura_info, "es_factura", False):
+                try:
+                    from ..ocr.factura_parser import parse_factura_pajuelas
+                    factura_info = parse_factura_pajuelas(texto_consolidado)
+                except Exception:
+                    pass
+
+            # Si OCR detectó factura de pajuelas, responder con propuesta y botones
+            if factura_info and getattr(factura_info, "es_factura", False) and factura_info.toro and factura_info.cantidad:
+                tot_txt = f" (Total: {factura_info.total_raw})" if factura_info.total_raw else ""
+                nit_txt = f" · NIT: {factura_info.nit}" if factura_info.nit else ""
+                msg_fac = (
+                    f"🧾 <b>Factura de Pajuelas Detectada</b>{nit_txt}\n\n"
+                    f"Detecté compra de {factura_info.cantidad} pajuelas toro {factura_info.toro}, ¿confirmar?{tot_txt}\n\n"
+                    f"💡 <i>Presione 'Confirmar Carga' para ingresar las unidades al inventario criogénico.</i>"
+                )
+                teclado_fac = crear_teclado_confirmar_factura_pajuelas(
+                    toro=factura_info.toro,
+                    cantidad=factura_info.cantidad,
+                )
+                await update.message.reply_text(
+                    msg_fac,
+                    parse_mode="HTML",
+                    reply_markup=teclado_fac,
+                )
+                return
 
             # Mensajes de detección OCR para feedback al usuario
             ocr_feedback = []
@@ -2747,6 +2778,43 @@ def construir_application(
                         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_faq)
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_faq)
+
+            elif data.startswith("factura_pajuela:"):
+                await query.answer()
+                partes = data.split(":")
+                accion = partes[1] if len(partes) > 1 else ""
+                if accion == "confirmar" and len(partes) >= 4:
+                    toro_code = partes[2]
+                    try:
+                        cant_paj = int(partes[3])
+                    except ValueError:
+                        cant_paj = 1
+
+                    db.registrar_pajuela(
+                        codigo_toro=toro_code,
+                        cantidad=cant_paj,
+                    )
+                    paj_info = db.obtener_pajuela(toro_code)
+                    stock_actual = paj_info["cantidad"] if paj_info else cant_paj
+
+                    msg_confirmado = (
+                        f"✅ <b>Stock de Pajuelas Actualizado</b>\n\n"
+                        f"Se cargaron <b>+{cant_paj} pajuelas</b> del toro <b>{_esc(toro_code)}</b> al termo criogénico.\n"
+                        f"• Stock actual de {toro_code}: <b>{stock_actual} unidades</b>.\n\n"
+                        f"💡 <i>Use <code>/pajuela_stock</code> para ver el banco completo.</i>"
+                    )
+                    if query.message:
+                        await query.message.edit_text(
+                            msg_confirmado,
+                            parse_mode="HTML",
+                            reply_markup=crear_teclado_reproduccion_detalle(),
+                        )
+                elif accion == "descartar":
+                    if query.message:
+                        await query.message.edit_text(
+                            "❌ <i>Carga de pajuelas descartada. No se modificó el inventario.</i>",
+                            parse_mode="HTML",
+                        )
 
             elif data == "cmd:ayuda":
                 await query.answer()

@@ -1350,5 +1350,33 @@ def test_potreros_ocupados_y_sobreocupacion(db):
     assert "Sobreocupación" in resp2
 
 
+def test_consulta_notas_animal(db):
+    """Verifica que se puedan consultar notas y observaciones de un animal específico."""
+    db.registrar_animal("47", nombre="MARGARITA", notas="Comprada en subasta, arete mellizo")
+    db.registrar_parto(vaca_tag="47", fecha="2026-05-01", notas="Parto normal asistido por mayordomo")
+    db.registrar_celo(vaca_tag="47", fecha="2026-06-15", am_pm="AM", notas="Celo fuerte y quieta")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿qué notas hay de la vaca 47?")
+
+    assert "NOTAS & OBSERVACIONES DE 47" in resp
+    assert "Comprada en subasta" in resp
+    assert "Parto normal asistido" in resp
+    assert "Celo fuerte" in resp
+
+
+def test_consulta_ultimas_notas_campo(db):
+    """Verifica que se puedan consultar las últimas notas registradas en toda la bitácora."""
+    db.registrar_animal("12", notas="Ternera nacida pequeña")
+    db.registrar_parto(vaca_tag="12", fecha="2026-08-10", notas="Cría macho pesó 35 kg")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("¿cuáles son las últimas notas de campo?")
+
+    assert "ÚLTIMAS NOTAS & OBSERVACIONES DE CAMPO" in resp
+    assert "Cría macho pesó 35 kg" in resp
+
+
+
 
 

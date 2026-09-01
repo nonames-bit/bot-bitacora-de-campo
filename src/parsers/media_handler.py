@@ -40,6 +40,7 @@ class ImageInfo:
     frascos: list[str] = field(default_factory=list)
     medicamento: Optional[dict] = None
     ocr_text: str = ""
+    factura_pajuelas: Optional[object] = None
 
 
 def _read_sidecar(path: str) -> Optional[str]:
@@ -175,6 +176,7 @@ def extract_image_info(image_path: str,
     sidecar = _read_sidecar(image_path)
     if sidecar is not None:
         info = ImageInfo(ocr_text=sidecar)
+        from ..ocr.factura_parser import parse_factura_pajuelas
         from ..ocr.ocr_engine import detect_medicamento, detect_tags
         for line in sidecar.splitlines():
             line_s = line.strip()
@@ -195,9 +197,13 @@ def extract_image_info(image_path: str,
             info.medicamento = med
             if med["producto"] not in info.frascos:
                 info.frascos.append(med["producto"])
+        fac = parse_factura_pajuelas(sidecar)
+        if fac and fac.es_factura:
+            info.factura_pajuelas = fac
         return info
 
     # Intentar OCR local con OCREngine
+    from ..ocr.factura_parser import parse_factura_pajuelas
     from ..ocr.ocr_engine import OCREngine
     engine = OCREngine()
     if engine.is_available():
@@ -212,6 +218,9 @@ def extract_image_info(image_path: str,
             if med and med.get("producto"):
                 info.medicamento = med
                 info.frascos.append(med["producto"])
+            fac = parse_factura_pajuelas(texto_ocr)
+            if fac and fac.es_factura:
+                info.factura_pajuelas = fac
             return info
         return ImageInfo()
 

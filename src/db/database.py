@@ -974,7 +974,7 @@ class Database:
         prox = to_date(row["proxima_recarga"]) or (add_days(f_rec, row["dias_intervalo"]) if f_rec else None)
         dias_desde = (fecha_ref - f_rec).days if f_rec else 0
         dias_restantes = (prox - fecha_ref).days if prox else 0
-        alerta_critica = dias_restantes <= 5
+        alerta_critica = dias_restantes <= 3
 
         return {
             "id": row["id"],
@@ -1029,6 +1029,49 @@ class Database:
                 "n": g["n"],
             })
         return grupos
+
+    def ultimas_notas_campo(self, limite: int = 15) -> list[dict]:
+        """Recupera las últimas notas u observaciones de campo no vacías de todas las tablas."""
+        filas = self.query(
+            """
+            SELECT * FROM (
+                SELECT 'Ficha Animal' AS tipo, a.tag AS tag, a.fecha_nacimiento AS fecha, a.notas AS nota, a.id_animal AS id
+                FROM animales a WHERE a.notas IS NOT NULL AND TRIM(a.notas) != ''
+                UNION ALL
+                SELECT 'Parto' AS tipo, a.tag AS tag, p.fecha AS fecha, p.notas AS nota, p.id AS id
+                FROM partos p LEFT JOIN animales a ON a.id_animal = p.vaca_id
+                WHERE p.notas IS NOT NULL AND TRIM(p.notas) != ''
+                UNION ALL
+                SELECT 'Muerte' AS tipo, a.tag AS tag, m.fecha AS fecha, COALESCE(m.notas, m.causa_presunta) AS nota, m.id AS id
+                FROM muertes m LEFT JOIN animales a ON a.id_animal = m.animal_id
+                WHERE (m.notas IS NOT NULL AND TRIM(m.notas) != '') OR (m.causa_presunta IS NOT NULL AND TRIM(m.causa_presunta) != '')
+                UNION ALL
+                SELECT 'Celo' AS tipo, a.tag AS tag, c.fecha AS fecha, c.notas AS nota, c.id AS id
+                FROM celos c LEFT JOIN animales a ON a.id_animal = c.vaca_id
+                WHERE c.notas IS NOT NULL AND TRIM(c.notas) != ''
+                UNION ALL
+                SELECT 'Tratamiento' AS tipo, a.tag AS tag, t.fecha AS fecha, t.diagnostico AS nota, t.id AS id
+                FROM tratamientos t LEFT JOIN animales a ON a.id_animal = t.animal_id
+                WHERE t.diagnostico IS NOT NULL AND TRIM(t.diagnostico) != ''
+                UNION ALL
+                SELECT 'Movimiento' AS tipo, a.tag AS tag, mo.fecha AS fecha, mo.notas AS nota, mo.id AS id
+                FROM movimientos mo LEFT JOIN animales a ON a.id_animal = mo.animal_id
+                WHERE mo.notas IS NOT NULL AND TRIM(mo.notas) != ''
+                UNION ALL
+                SELECT 'Leche' AS tipo, a.tag AS tag, pl.fecha AS fecha, pl.notas AS nota, pl.id AS id
+                FROM produccion_leche pl LEFT JOIN animales a ON a.id_animal = pl.animal_id
+                WHERE pl.notas IS NOT NULL AND TRIM(pl.notas) != ''
+                UNION ALL
+                SELECT 'Foto' AS tipo, COALESCE(f.tag, a.tag) AS tag, f.fecha AS fecha, COALESCE(f.caption, f.notas) AS nota, f.id AS id
+                FROM fotos f LEFT JOIN animales a ON a.id_animal = f.animal_id
+                WHERE (f.caption IS NOT NULL AND TRIM(f.caption) != '') OR (f.notas IS NOT NULL AND TRIM(f.notas) != '')
+            )
+            ORDER BY fecha DESC, id DESC
+            LIMIT ?
+            """,
+            (limite,),
+        )
+        return [dict(f) for f in filas]
 
     def ultimos_registros(self, limite: int = 15) -> list[sqlite3.Row]:
         """Últimos eventos registrados en cualquiera de las tablas de

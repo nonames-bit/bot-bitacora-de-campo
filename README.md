@@ -366,7 +366,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] Suite de pruebas con pytest: **402 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua
-- [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar y comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`.
+- [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
 - [ ] Calibración de parámetros y retroalimentación de uso en campo.
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

@@ -260,6 +260,17 @@ class QueryEngine(
         if tag and re.search(r"\b(?:madre|padre|mama|papa|genealogia|familia|hijos?|hijas?|crias?)\b", t):
             return self._genealogia(tag)
 
+        # 5b. Notas, Observaciones y Apuntes de Campo
+        if re.search(r"\b(?:notas?|observaci[oó]n|observaciones|apuntes?|comentarios?)\b", t):
+            palabras_genericas = {"campo", "finca", "general", "generales", "hoy", "ayer", "semana", "mes", "notas", "observacion", "observaciones"}
+            tag_es_generico = bool(tag and tag.lower() in palabras_genericas)
+            if re.search(r"\b(?:ultim[ao]s?|recientes?|de\s+campo|finca|todas|general|generales)\b", t) or tag_es_generico or not tag:
+                if not tag or tag_es_generico or not tag_con_digito:
+                    return self._ultimas_notas_campo()
+            if tag and not tag_es_generico:
+                return self._notas_animal(tag)
+            return self._ultimas_notas_campo()
+
         # 6. Ficha zootécnica
         if re.search(r"\b(?:historial|ficha|hoja de vida|consulta|info|informacion|datos|buscar|ver)\b", t) and tag:
             return self._historial(tag)

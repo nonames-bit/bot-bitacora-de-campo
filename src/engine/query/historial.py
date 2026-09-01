@@ -224,6 +224,8 @@ class HistorialQueryMixin:
             header.append(
                 "⚠️ <i>Histórico: no hace parte del hato activo. Se conserva solo por genealogía.</i>"
             )
+        if animal["notas"] and str(animal["notas"]).strip():
+            header.append(f"📝 <b>Observaciones:</b> {animal['notas'].strip()}")
         header.extend([
             f"🧬 <b>Reproductivo:</b> {estado_reprod}",
             "───────────────────",
@@ -364,3 +366,112 @@ class HistorialQueryMixin:
         bloques.append("\n".join(fotos_sec))
 
         return "\n\n".join(bloques)
+
+    def _notas_animal(self, tag) -> str:
+        """Devuelve todas las notas, apuntes u observaciones registradas para un animal."""
+        if not tag:
+            return "¿De cuál animal desea consultar las notas? (ej. '¿qué notas hay de la 47?')"
+        aid = self.db.resolve_animal(tag)
+        if aid is None:
+            return f"No hay registros para la {tag}."
+        animal = self.db.get_animal(aid)
+        if not animal:
+            return f"No hay registros para la {tag}."
+
+        tag_str = animal["tag"] or str(tag)
+        nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+
+        notas_lista = []
+        if animal["notas"] and str(animal["notas"]).strip():
+            notas_lista.append(f"• 🐮 <b>Ficha General:</b> {animal['notas'].strip()}")
+
+        # Partos
+        partos_notas = self.db.query(
+            "SELECT fecha, notas, sexo_cria FROM partos WHERE vaca_id = ? AND notas IS NOT NULL AND TRIM(notas) != '' ORDER BY fecha DESC",
+            (aid,),
+        )
+        for p in partos_notas:
+            fec = p["fecha"] or "S/F"
+            cria_s = f" [Cría {p['sexo_cria']}]" if p["sexo_cria"] else ""
+            notas_lista.append(f"• 🍼 <b>Parto ({fec}){cria_s}:</b> {p['notas'].strip()}")
+
+        # Muertes
+        muertes_notas = self.db.query(
+            "SELECT fecha, notas, causa_presunta FROM muertes WHERE animal_id = ? AND ((notas IS NOT NULL AND TRIM(notas) != '') OR (causa_presunta IS NOT NULL AND TRIM(causa_presunta) != '')) ORDER BY fecha DESC",
+            (aid,),
+        )
+        for m in muertes_notas:
+            fec = m["fecha"] or "S/F"
+            det = m["notas"] or m["causa_presunta"]
+            if det and det.strip():
+                notas_lista.append(f"• 💀 <b>Muerte ({fec}):</b> {det.strip()}")
+
+        # Celos
+        celos_notas = self.db.query(
+            "SELECT fecha, notas, am_pm FROM celos WHERE vaca_id = ? AND notas IS NOT NULL AND TRIM(notas) != '' ORDER BY fecha DESC",
+            (aid,),
+        )
+        for c in celos_notas:
+            fec = c["fecha"] or "S/F"
+            turno = f" [{c['am_pm']}]" if c["am_pm"] else ""
+            notas_lista.append(f"• 🔥 <b>Celo ({fec}){turno}:</b> {c['notas'].strip()}")
+
+        # Tratamientos / Diagnósticos
+        trat_notas = self.db.query(
+            "SELECT fecha, producto, diagnostico FROM tratamientos WHERE animal_id = ? AND diagnostico IS NOT NULL AND TRIM(diagnostico) != '' ORDER BY fecha DESC",
+            (aid,),
+        )
+        for t in trat_notas:
+            fec = t["fecha"] or "S/F"
+            prod_info = f" ({t['producto']})" if t["producto"] else ""
+            notas_lista.append(f"• 💉 <b>Tratamiento ({fec}):</b> {t['diagnostico'].strip()}{prod_info}")
+
+        # Movimientos
+        mov_notas = self.db.query(
+            "SELECT fecha, tipo_movimiento, notas FROM movimientos WHERE animal_id = ? AND notas IS NOT NULL AND TRIM(notas) != '' ORDER BY fecha DESC",
+            (aid,),
+        )
+        for mov in mov_notas:
+            fec = mov["fecha"] or "S/F"
+            tipo_m = mov["tipo_movimiento"] or "Movimiento"
+            notas_lista.append(f"• 📥 <b>{tipo_m} ({fec}):</b> {mov['notas'].strip()}")
+
+        # Control Leche
+        leche_notas = self.db.query(
+            "SELECT fecha, litros, notas FROM produccion_leche WHERE animal_id = ? AND notas IS NOT NULL AND TRIM(notas) != '' ORDER BY fecha DESC",
+            (aid,),
+        )
+        for l in leche_notas:
+            fec = l["fecha"] or "S/F"
+            l_info = f" [{l['litros']}L]" if l["litros"] is not None else ""
+            notas_lista.append(f"• 🥛 <b>Control Leche ({fec}){l_info}:</b> {l['notas'].strip()}")
+
+        # Fotos
+        fotos_notas = self.db.query(
+            "SELECT fecha, caption, notas FROM fotos WHERE (animal_id = ? OR tag = ?) AND ((caption IS NOT NULL AND TRIM(caption) != '') OR (notas IS NOT NULL AND TRIM(notas) != '')) ORDER BY fecha DESC",
+            (aid, tag_str),
+        )
+        for f in fotos_notas:
+            fec = f["fecha"] or "S/F"
+            txt = f["caption"] or f["notas"]
+            if txt and txt.strip():
+                notas_lista.append(f"• 📷 <b>Foto ({fec}):</b> {txt.strip()}")
+
+        if not notas_lista:
+            return f"📝 No hay notas u observaciones registradas para la <b>{tag_str}{nom_txt}</b>."
+
+        header = f"📝 <b>NOTAS & OBSERVACIONES DE {tag_str}{nom_txt}</b>\n────────────────────────────────────────\n"
+        return header + "\n".join(notas_lista)
+
+    def _ultimas_notas_campo(self, limite: int = 10) -> str:
+        """Devuelve las últimas notas y observaciones registradas en la bitácora."""
+        filas = self.db.ultimas_notas_campo(limite=limite)
+        if not filas:
+            return "📝 No hay notas u observaciones recientes en la bitácora."
+        lineas = ["📝 <b>ÚLTIMAS NOTAS & OBSERVACIONES DE CAMPO</b>", "────────────────────────────────────────"]
+        for r in filas:
+            fec = r["fecha"] or "S/F"
+            tag = f"[{r['tag']}] " if r.get("tag") else ""
+            lineas.append(f"• [{fec}] {tag}<b>{r['tipo']}:</b> {r['nota']}")
+        return "\n".join(lineas)
+

@@ -114,6 +114,12 @@ Usted no necesita memorizar comandos difíciles. Puede hacerle preguntas directa
   - *«¿cuál fue la ganancia diaria de la 12?»*
   - ➡️ El bot le muestra el último peso y los gramos ganados por día (GMD).
 
+- **Notas y Observaciones de Campo:**
+  - *«¿qué notas hay de la vaca 47?»*
+  - *«¿cuáles son las observaciones de patricia?»*
+  - *«¿últimas notas de campo de la finca?»*
+  - ➡️ El bot le muestra todos los apuntes, comentarios de partos, celos, compras, tratamientos y fotos del animal o de la finca.
+
 ---
 
 ## 4. El Despacho Matutino de las 05:30 AM (`/despacho`) 🌅

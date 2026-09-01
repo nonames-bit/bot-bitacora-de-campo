@@ -373,3 +373,8 @@ class OCREngine:
     def detect_medicamento(self, text: str) -> dict:
         """Detecta medicamentos y principios activos en texto."""
         return detect_medicamento(text)
+
+    def parse_factura(self, text_or_image: str):
+        """Parsea y extrae datos de compra de pajuelas desde factura."""
+        from .factura_parser import parse_factura_pajuelas
+        return parse_factura_pajuelas(text_or_image)
