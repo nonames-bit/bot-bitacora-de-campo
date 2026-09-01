@@ -63,6 +63,8 @@ from .formatters import (
     formatear_alertas_panel,
     formatear_animales,
     formatear_ayuda,
+    formatear_balance_forrajero_panel,
+    formatear_clima_panel,
     formatear_despacho_matutino,
     formatear_diagnosticos_recientes,
     formatear_duplicados_geneticos,
@@ -165,6 +167,8 @@ def construir_application(
         crear_teclado_animal_detalle,
         crear_teclado_ayuda_menu,
         crear_teclado_buscar_animal,
+        crear_teclado_clima,
+        crear_teclado_clima_detalle,
         crear_teclado_confirmar_factura_pajuelas,
         crear_teclado_despacho_matutino,
         crear_teclado_ejemplos,
@@ -442,33 +446,15 @@ def construir_application(
             # Construir texto consolidado para NLU
             texto_consolidado = f"{caption} {ocr_text}".strip() if caption else ocr_text
 
-            # Si no se extrajo del media_handler, intentar parsear factura desde texto consolidado
+            # Si no se extrajo del media_handler o no es_factura, intentar parsear factura desde texto consolidado
             if not factura_info or not getattr(factura_info, "es_factura", False):
                 try:
                     from ..ocr.factura_parser import parse_factura_pajuelas
-                    factura_info = parse_factura_pajuelas(texto_consolidado)
+                    parsed_fac = parse_factura_pajuelas(texto_consolidado)
+                    if parsed_fac and (parsed_fac.es_factura or parsed_fac.propuesta_mensaje):
+                        factura_info = parsed_fac
                 except Exception:
                     pass
-
-            # Si OCR detectó factura de pajuelas, responder con propuesta y botones
-            if factura_info and getattr(factura_info, "es_factura", False) and factura_info.toro and factura_info.cantidad:
-                tot_txt = f" (Total: {factura_info.total_raw})" if factura_info.total_raw else ""
-                nit_txt = f" · NIT: {factura_info.nit}" if factura_info.nit else ""
-                msg_fac = (
-                    f"🧾 <b>Factura de Pajuelas Detectada</b>{nit_txt}\n\n"
-                    f"Detecté compra de {factura_info.cantidad} pajuelas toro {factura_info.toro}, ¿confirmar?{tot_txt}\n\n"
-                    f"💡 <i>Presione 'Confirmar Carga' para ingresar las unidades al inventario criogénico.</i>"
-                )
-                teclado_fac = crear_teclado_confirmar_factura_pajuelas(
-                    toro=factura_info.toro,
-                    cantidad=factura_info.cantidad,
-                )
-                await update.message.reply_text(
-                    msg_fac,
-                    parse_mode="HTML",
-                    reply_markup=teclado_fac,
-                )
-                return
 
             # Mensajes de detección OCR para feedback al usuario
             ocr_feedback = []
@@ -484,19 +470,44 @@ def construir_application(
                     detalles_med.append(f"lote {ocr_med['lote']}")
                 ocr_feedback.append(f"💊 OCR detectó medicamento: {', '.join(detalles_med)}")
 
+            # Chequeo de factura de pajuelas y propuesta
+            tiene_propuesta_factura = False
+            teclado_fac = None
+            if factura_info and getattr(factura_info, "propuesta_mensaje", None):
+                ocr_feedback.append(f"📄 Factura detectada: {factura_info.propuesta_mensaje}")
+                if factura_info.toro and factura_info.cantidad:
+                    tiene_propuesta_factura = True
+                    teclado_fac = crear_teclado_confirmar_factura_pajuelas(
+                        toro=factura_info.toro,
+                        cantidad=factura_info.cantidad,
+                    )
+            elif ocr_text:
+                tiene_numeros = bool(re.search(r"\d", ocr_text))
+                tiene_simbolo_o_nit = bool(re.search(r"(\$|nit|cop)", ocr_text, re.IGNORECASE))
+                if tiene_numeros and tiene_simbolo_o_nit:
+                    ocr_feedback.append(
+                        "📄 Parece factura pero no detecté pajuelas. Intenta con mejor luz o escribe /pajuela_add manual"
+                    )
+
             str_feedback = ("\n" + "\n".join(ocr_feedback)) if ocr_feedback else ""
 
             # Si el caption o OCR contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
             if texto_consolidado and nlu.clasificar(texto_consolidado) is not None:
                 bot_engine = Bot(db)
                 resp_evento = bot_engine.procesar_texto(texto_consolidado, user_id=user_id)
-                await update.message.reply_text(
-                    f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
-                )
+                msg_resp = f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
             elif tag:
-                await update.message.reply_text(f"📷 Foto guardada y vinculada a la {tag}.{str_feedback}")
+                msg_resp = f"📷 Foto guardada y vinculada a la {tag}.{str_feedback}"
             else:
-                await update.message.reply_text(f"📷 Foto recibida y guardada en la bitácora.{str_feedback}")
+                msg_resp = f"📷 Foto recibida y guardada en la bitácora.{str_feedback}"
+
+            if tiene_propuesta_factura and teclado_fac:
+                await update.message.reply_text(
+                    msg_resp,
+                    reply_markup=teclado_fac,
+                )
+            else:
+                await update.message.reply_text(msg_resp)
         except Exception as e:
             logger.error("Error en handle_photo: %s", e, exc_info=True)
             if update.message:
@@ -647,6 +658,56 @@ def construir_application(
             )
         except Exception as e:
             logger.error("Error en cmd_alertas: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_sos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Alerta de emergencia: avisa de inmediato al OWNER/ADMIN, para
+        cuando alguien está en el potrero con una urgencia y necesita que
+        el mensaje llegue rápido a un responsable, no solo quedar anotado."""
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            texto = " ".join(context.args).strip() if context.args else ""
+            if not texto:
+                await update.message.reply_text(
+                    "🆘 Uso: /sos <qué pasó>\n"
+                    "Ej. /sos vaca A035 con torzón, necesito ayuda urgente\n\n"
+                    "Esto avisa de inmediato al Dueño/Administrador por Telegram."
+                )
+                return
+
+            quien = update.effective_user.full_name or f"Usuario {user_id}"
+            rol = auth.rol_de(user_id) or "?"
+            mensaje_push = f"🆘 <b>SOS de {html.escape(quien)}</b> ({rol})\n\n{html.escape(texto)}"
+
+            enviados = 0
+            for u in auth.listar_usuarios():
+                u_id = u.get("user_id")
+                u_rol = u.get("rol")
+                if u_id and u_rol in ("OWNER", "ADMIN") and u_id != user_id:
+                    try:
+                        await context.bot.send_message(chat_id=u_id, text=mensaje_push, parse_mode="HTML")
+                        enviados += 1
+                    except Exception as eu:
+                        logger.warning("No se pudo enviar SOS a usuario %s: %s", u_id, eu)
+
+            logger.info("SOS de %s (%s, rol=%s): %s", quien, user_id, rol, texto)
+            if enviados:
+                await update.message.reply_text(
+                    f"🆘 Alerta enviada a {enviados} responsable(s). Si es una emergencia que no puede esperar, llama también por teléfono."
+                )
+            else:
+                await update.message.reply_text(
+                    "⚠️ No se pudo avisar a nadie por Telegram (sin Dueño/Administrador alcanzable). "
+                    "Llama por teléfono si es urgente."
+                )
+        except Exception as e:
+            logger.error("Error en cmd_sos: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -866,6 +927,96 @@ def construir_application(
             logger.error("Error en cmd_kpi_reprod: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_clima(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_clima_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_clima()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_clima: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_lluvia(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+
+            args = context.args or []
+            if not args:
+                await update.message.reply_text(
+                    "🌧️ <b>Uso del comando /lluvia:</b>\n\n"
+                    "• <code>/lluvia 35</code> (registra 35 mm de lluvia hoy)\n"
+                    "• <code>/lluvia 28 sector bajo</code> (con sector o lote)\n"
+                    "• <code>/lluvia 42 2026-08-30</code> (con fecha específica)",
+                    parse_mode="HTML",
+                )
+                return
+
+            try:
+                mm_val = float(args[0].replace(",", "."))
+            except ValueError:
+                await update.message.reply_text("❌ Valor de lluvia inválido. Ingrese un número en mm (ej. <code>/lluvia 35</code>).", parse_mode="HTML")
+                return
+
+            fecha_val = None
+            sector_val = None
+            if len(args) > 1:
+                resto = " ".join(args[1:])
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", args[1]):
+                    fecha_val = args[1]
+                    if len(args) > 2:
+                        sector_val = " ".join(args[2:])
+                else:
+                    sector_val = resto
+
+            db.registrar_pluviometria(
+                mm_lluvia=mm_val,
+                fecha=fecha_val,
+                estacion_o_sector=sector_val,
+                registrado_por=user_id,
+            )
+            msg = formatear_clima_panel(db)
+            sec_txt = f" en <b>{html.escape(sector_val)}</b>" if sector_val else ""
+            await update.message.reply_text(
+                f"✅ <b>Lluvia registrada: {mm_val} mm</b>{sec_txt}\n\n" + msg,
+                parse_mode="HTML",
+                reply_markup=crear_teclado_clima(),
+            )
+        except Exception as e:
+            logger.error("Error en cmd_lluvia: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_balance_forrajero(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_balance_forrajero_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_clima()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_balance_forrajero: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
 
     async def cmd_duplicados(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
@@ -1885,6 +2036,15 @@ def construir_application(
                 if query.message:
                     await query.message.reply_text("⏰ Envía: /programar YYYY-MM-DD HH:MM mensaje\nEj: /programar 2026-09-01 08:00 Rotar potrero Bajo")
 
+            elif data == "cmd:sos":
+                await query.answer()
+                if query.message:
+                    await query.message.reply_text(
+                        "🆘 Envía: /sos <qué pasó>\n"
+                        "Ej: /sos vaca A035 con torzón, necesito ayuda urgente\n\n"
+                        "Esto avisa de inmediato al Dueño/Administrador por Telegram."
+                    )
+
             elif data == "cmd:alertas":
                 await query.answer()
                 if not auth.es_autorizado(user_id):
@@ -2194,6 +2354,10 @@ def construir_application(
                         InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
                     ],
                     [
+                        InlineKeyboardButton("🌧️ Lluvias & Clima", callback_data="cmd:clima"),
+                        InlineKeyboardButton("🌾 Balance Forrajero", callback_data="cmd:balance_forrajero"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                     ],
                 ])
@@ -2202,6 +2366,26 @@ def construir_application(
                         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_p)
+
+            elif data == "cmd:clima":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_clima_panel(db)
+                if query.message:
+                    await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_clima())
+
+            elif data == "cmd:balance_forrajero":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_balance_forrajero_panel(db)
+                if query.message:
+                    await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_clima())
 
             elif data == "cmd:potreros_sg":
                 await query.answer()
@@ -2779,42 +2963,54 @@ def construir_application(
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_faq)
 
-            elif data.startswith("factura_pajuela:"):
+            elif data.startswith("factura_pajuela:") or data.startswith("cmd:confirmar_factura"):
                 await query.answer()
                 partes = data.split(":")
-                accion = partes[1] if len(partes) > 1 else ""
-                if accion == "confirmar" and len(partes) >= 4:
-                    toro_code = partes[2]
-                    try:
-                        cant_paj = int(partes[3])
-                    except ValueError:
-                        cant_paj = 1
-
-                    db.registrar_pajuela(
-                        codigo_toro=toro_code,
-                        cantidad=cant_paj,
-                    )
-                    paj_info = db.obtener_pajuela(toro_code)
-                    stock_actual = paj_info["cantidad"] if paj_info else cant_paj
-
-                    msg_confirmado = (
-                        f"✅ <b>Stock de Pajuelas Actualizado</b>\n\n"
-                        f"Se cargaron <b>+{cant_paj} pajuelas</b> del toro <b>{_esc(toro_code)}</b> al termo criogénico.\n"
-                        f"• Stock actual de {toro_code}: <b>{stock_actual} unidades</b>.\n\n"
-                        f"💡 <i>Use <code>/pajuela_stock</code> para ver el banco completo.</i>"
-                    )
-                    if query.message:
-                        await query.message.edit_text(
-                            msg_confirmado,
-                            parse_mode="HTML",
-                            reply_markup=crear_teclado_reproduccion_detalle(),
-                        )
-                elif accion == "descartar":
+                if "descartar" in data:
                     if query.message:
                         await query.message.edit_text(
                             "❌ <i>Carga de pajuelas descartada. No se modificó el inventario.</i>",
                             parse_mode="HTML",
                         )
+                else:
+                    toro_code = ""
+                    cant_paj = 1
+                    if data.startswith("cmd:confirmar_factura:") and len(partes) >= 4:
+                        toro_code = partes[2]
+                        try:
+                            cant_paj = int(partes[3])
+                        except ValueError:
+                            cant_paj = 1
+                    elif data.startswith("factura_pajuela:confirmar:") and len(partes) >= 4:
+                        toro_code = partes[2]
+                        try:
+                            cant_paj = int(partes[3])
+                        except ValueError:
+                            cant_paj = 1
+                    elif len(partes) >= 3 and partes[-1].isdigit():
+                        toro_code = partes[-2]
+                        cant_paj = int(partes[-1])
+
+                    if toro_code:
+                        db.registrar_pajuela(
+                            codigo_toro=toro_code,
+                            cantidad=cant_paj,
+                        )
+                        paj_info = db.obtener_pajuela(toro_code)
+                        stock_actual = paj_info["cantidad"] if paj_info else cant_paj
+
+                        msg_confirmado = (
+                            f"✅ <b>Stock de Pajuelas Actualizado</b>\n\n"
+                            f"Se cargaron <b>+{cant_paj} pajuelas</b> del toro <b>{html.escape(str(toro_code))}</b> al termo criogénico.\n"
+                            f"• Stock actual de {toro_code}: <b>{stock_actual} unidades</b>.\n\n"
+                            f"💡 <i>Use <code>/pajuela_stock</code> para ver el banco completo.</i>"
+                        )
+                        if query.message:
+                            await query.message.edit_text(
+                                msg_confirmado,
+                                parse_mode="HTML",
+                                reply_markup=crear_teclado_reproduccion_detalle(),
+                            )
 
             elif data == "cmd:ayuda":
                 await query.answer()
@@ -2843,6 +3039,7 @@ def construir_application(
     app.add_handler(CommandHandler(["leche", "leche_total", "produccion"], cmd_leche))
     app.add_handler(CommandHandler(["programar", "recordatorio", "programar_recordatorio"], cmd_programar))
     app.add_handler(CommandHandler("alertas", cmd_alertas))
+    app.add_handler(CommandHandler("sos", cmd_sos))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
     app.add_handler(CommandHandler(["reproduccion", "reprod", "reproduccion_menu"], cmd_reprod_menu))
@@ -2852,6 +3049,9 @@ def construir_application(
     app.add_handler(CommandHandler(["recarga_n2", "recarga_nitrogeno"], cmd_recarga_n2))
     app.add_handler(CommandHandler(["diagnosticos", "palpaciones"], cmd_diagnosticos))
     app.add_handler(CommandHandler(["kpi_reprod", "concepcion", "tasa_concepcion"], cmd_kpi_reprod))
+    app.add_handler(CommandHandler(["clima", "lluvias", "pluviometro"], cmd_clima))
+    app.add_handler(CommandHandler(["lluvia", "precipitacion"], cmd_lluvia))
+    app.add_handler(CommandHandler(["balance_forrajero", "balance_ms", "balance_pasto"], cmd_balance_forrajero))
     app.add_handler(CommandHandler(["duplicados", "duplicados_geneticos"], cmd_duplicados))
     app.add_handler(CommandHandler(["ultimos", "ultimos_registros"], cmd_ultimos))
     app.add_handler(CommandHandler("deshacer", cmd_deshacer))

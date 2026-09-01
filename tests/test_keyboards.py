@@ -248,6 +248,12 @@ def test_teclado_trabajador_sin_sistema():
     assert "cmd:usuarios" not in callbacks
 
 
+def test_teclado_trabajador_tiene_boton_sos():
+    teclado = crear_teclado_trabajador()
+    callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
+    assert "cmd:sos" in callbacks
+
+
 def test_teclado_trabajador_compacto_agrupa_ayuda():
     teclado = crear_teclado_trabajador()
     callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]

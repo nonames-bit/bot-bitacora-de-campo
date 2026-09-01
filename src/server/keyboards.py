@@ -92,6 +92,9 @@ def crear_teclado_trabajador() -> InlineKeyboardMarkup:
             InlineKeyboardButton("📷 Galería de Fotos", callback_data="cmd:fotos"),
         ],
         [
+            InlineKeyboardButton("🆘 SOS / Emergencia", callback_data="cmd:sos"),
+        ],
+        [
             InlineKeyboardButton("❓ Ayuda & Guías", callback_data="cmd:ayuda_menu"),
         ],
     ]
@@ -488,15 +491,46 @@ def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> Inline
     keyboard = [
         [
             InlineKeyboardButton(
-                f"✅ Confirmar Carga (+{cantidad} {toro})",
-                callback_data=f"factura_pajuela:confirmar:{toro_param}:{cantidad}",
+                f"✅ Cargar {cantidad} pajuelas {toro}",
+                callback_data=f"cmd:confirmar_factura:{toro_param}:{cantidad}",
             ),
             InlineKeyboardButton(
                 "❌ Descartar",
-                callback_data="factura_pajuela:descartar",
+                callback_data="cmd:confirmar_factura:descartar",
             ),
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_clima() -> InlineKeyboardMarkup:
+    """Menú de gestión climática, pluviometría y balance forrajero (Fase 6.2)."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🌾 Balance Forrajero (MS)", callback_data="cmd:balance_forrajero"),
+            InlineKeyboardButton("🌧️ Reporte Pluviométrico", callback_data="cmd:clima"),
+        ],
+        [
+            InlineKeyboardButton("🌱 Aforo Potreros", callback_data="panel_grafico:aforo"),
+            InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
+        ],
+        [
+            InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_clima_detalle() -> InlineKeyboardMarkup:
+    """Teclado compacto para sub-vistas del módulo de clima y balance forrajero."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🌧️ Volver a Clima", callback_data="cmd:clima"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 
 

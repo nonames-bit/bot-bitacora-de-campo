@@ -209,6 +209,9 @@ Al consultar cualquier animal (escribiendo su número ej. `47`, `/consulta N069`
 | `/preguntas`, `/faq` | **Consultas Rápidas de Campo**: Botones táctiles de preguntas frecuentes en 1 toque. | `/preguntas`, `/faq` |
 | `/potreros` | Muestra la **matriz de existencias por potrero de Software Ganadero** o potreros listos. | `/potreros`, `/potreros sg` |
 | `/ocupacion` o `/rotacion` | Muestra los **días de ocupación y rotación Voisin** de potreros ocupados y en reposo. | `/ocupacion`, `/rotacion` |
+| `/clima`, `/lluvias`, `/pluviometro` | **Reporte Pluviométrico & Clima IDEAM**: Acumulado de lluvias (7d, 30d, año), estación agroclimática y ajuste forrajero. | `/clima`, `/lluvias` |
+| `/lluvia <mm> [sector]` | **Registro Rápido de Lluvia**: Anota los milímetros (mm) de precipitación del pluviómetro. | `/lluvia 35`, `/lluvia 28 sector bajo` |
+| `/balance_forrajero`, `/balance_ms` | **Balance Forrajero & Oferta de Materia Seca (MS)**: Oferta diaria sostenible vs demanda del hato ($2.8\%$ PV $\times$ UGG). | `/balance_forrajero`, `/balance_ms` |
 | `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |
 | `/status`, `/tablero`, `/finca` | **Tablero Zootécnico Ejecutivo**: Novedades de la semana, alertas próximas y pasturas. | `/status`, `/tablero`, `/finca` |
 | `/sistema`, `/servidor`, `/vps` | **Tablero Técnico del Servidor**: Recursos VPS, RAM, disco SSD, SQLite y estado de APIs. | `/sistema`, `/servidor` |

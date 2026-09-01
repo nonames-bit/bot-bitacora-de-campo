@@ -72,6 +72,13 @@ INTENTOS: list[tuple[str, list[str]]] = [
     ("condicion_corporal", [
         r"\bcondici[oó]n\s+corporal\b", r"\bpuntaje\s+corporal\b",
     ]),
+    ("pluviometria", [
+        r"\bllovi[oó]\b", r"\blluvia[s]?\b", r"\bpluvi[oó]metr[oa]\b",
+        r"\bprecipitaci[oó]n\b", r"\baguacero\b", r"\b\d+\s*mm\b",
+    ]),
+    ("aforo", [
+        r"\baforo\b", r"\bafor[eé]\b", r"\bkg/m2\b", r"\bkg\s+mv/m2\b",
+    ]),
     ("movimiento", [
         r"\bentraron\b", r"\bentr[oó]\b", r"\bsalieron\b", r"\bsali[oó]\b",
         r"\bcompr[aeoó]\b", r"\bcomprad[oa]s?\b", r"\bcomprad[oa]\b", r"\bventa\b",
@@ -567,6 +574,41 @@ def extraer_responsable(texto: str) -> Optional[str]:
     return None
 
 
+def extraer_mm_lluvia(texto: str) -> Optional[float]:
+    """Extrae la cantidad de lluvia en milímetros (mm)."""
+    t = normalizar(texto)
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:mm|mil[ií]metros)\b", t)
+    if m:
+        return _f(m.group(1))
+    m2 = re.search(r"\b(?:llovi[oó]|lluvia|pluvi[oó]metro|marc[oó]|cayeron|registr[oó])\s+(\d+(?:[.,]\d+)?)\b", t)
+    if m2:
+        return _f(m2.group(1))
+    return None
+
+
+def extraer_sector_lluvia(texto: str) -> Optional[str]:
+    """Extrae el sector, lote o estación pluviométrica si se menciona."""
+    t = normalizar(texto)
+    m = re.search(r"\b(?:en|sector|estacion|corral|finca|potrero)\s+([a-z0-9\-_]+)\b", t)
+    if m:
+        val = m.group(1).upper()
+        if val.lower() not in PALABRAS_NO_TAG and val.lower() not in ("hoy", "ayer", "mm", "lluvia"):
+            return val
+    return None
+
+
+def extraer_aforo_kg_m2(texto: str) -> Optional[float]:
+    """Extrae el aforo de pasto en kg/m² o kg MV/m²."""
+    t = normalizar(texto)
+    m = re.search(r"(\d+(?:[.,]\d+)?)\s*(?:kg/m2|kg\s*m2|kg\s*metro|kg/metro|kg\s*mv/m2)\b", t)
+    if m:
+        return _f(m.group(1))
+    m2 = re.search(r"\b(?:aforo|afor[eé]|dio|peso|pesaje\s+pasto)\s+(\d+(?:[.,]\d+)?)\b", t)
+    if m2:
+        return _f(m2.group(1))
+    return None
+
+
 def _f(s: str) -> float:
     return float(s.replace(",", "."))
 
@@ -601,4 +643,13 @@ class NLUEngine:
     @staticmethod
     def extraer_dias_gestacion(texto):
         return extraer_dias_gestacion(texto)
+
+    @staticmethod
+    def extraer_mm_lluvia(texto):
+        return extraer_mm_lluvia(texto)
+
+    @staticmethod
+    def extraer_aforo_kg_m2(texto):
+        return extraer_aforo_kg_m2(texto)
+
 

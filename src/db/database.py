@@ -19,7 +19,8 @@ class Database:
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
         "traslados", "pesajes", "movimientos", "condicion_corporal",
-        "produccion_leche", "diagnosticos_gestacion",
+        "produccion_leche", "diagnosticos_gestacion", "pluviometria",
+        "aforos_historico",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -537,6 +538,137 @@ class Database:
             fecha_programada=iso(fecha_programada), estado=estado,
             descripcion=descripcion,
         ))
+
+    # ------------------------------------------------------------------ #
+    # Pluviometría y Aforos Históricos (Fase 6.2)
+    # ------------------------------------------------------------------ #
+    def registrar_pluviometria(self, mm_lluvia: float, fecha=None,
+                               estacion_o_sector: Optional[str] = None,
+                               observaciones: Optional[str] = None,
+                               registrado_por: Optional[int] = None) -> int:
+        """Registra una medición pluviométrica (precipitación en mm)."""
+        f = iso(fecha) or date.today().isoformat()
+        return self.insert("pluviometria", dict(
+            fecha=f,
+            mm_lluvia=float(mm_lluvia),
+            estacion_o_sector=estacion_o_sector.strip() if estacion_o_sector else None,
+            observaciones=observaciones.strip() if observaciones else None,
+            creado_en=self._ahora(),
+            registrado_por=registrado_por,
+        ))
+
+    def obtener_pluviometria(self, limite: int = 30) -> list[sqlite3.Row]:
+        """Obtiene las mediciones de lluvia más recientes."""
+        return self.query(
+            "SELECT * FROM pluviometria ORDER BY fecha DESC, id DESC LIMIT ?",
+            (limite,),
+        )
+
+    def acumulado_lluvia(self, desde: Optional[str] = None, hasta: Optional[str] = None,
+                         dias: Optional[int] = None, hoy: Optional[date] = None) -> float:
+        """Calcula los mm totales de lluvia acumulada en un rango o últimos N días."""
+        ref = hoy or date.today()
+        if dias is not None:
+            f_desde = iso(add_days(ref, -dias))
+            f_hasta = iso(ref)
+        else:
+            f_desde = iso(desde) or "0001-01-01"
+            f_hasta = iso(hasta) or iso(ref)
+
+        row = self.query_one(
+            "SELECT SUM(mm_lluvia) AS total_mm FROM pluviometria WHERE fecha >= ? AND fecha <= ?",
+            (f_desde, f_hasta),
+        )
+        if row and row["total_mm"] is not None:
+            return float(row["total_mm"])
+        return 0.0
+
+    def resumen_pluviometrico(self, hoy: Optional[date] = None) -> dict:
+        """Calcula métricas clave de lluvia: hoy, últimos 7 días, 30 días, mes actual y clasificación estacional."""
+        ref = hoy or date.today()
+        f_hoy = iso(ref)
+        primer_dia_mes = date(ref.year, ref.month, 1)
+
+        lluvia_hoy = self.acumulado_lluvia(desde=f_hoy, hasta=f_hoy, hoy=ref)
+        lluvia_7d = self.acumulado_lluvia(dias=7, hoy=ref)
+        lluvia_30d = self.acumulado_lluvia(dias=30, hoy=ref)
+        lluvia_mes = self.acumulado_lluvia(desde=iso(primer_dia_mes), hasta=f_hoy, hoy=ref)
+        lluvia_anio = self.acumulado_lluvia(desde=f"{ref.year}-01-01", hasta=f_hoy, hoy=ref)
+
+        # Clasificación estacional según precipitación mensual (30 días)
+        if lluvia_30d >= 150.0:
+            estacion = "ÉPOCA DE LLUVIAS (Alta Oferta)"
+            factor_crecimiento = 1.2
+            icono = "🌧️"
+        elif lluvia_30d >= 50.0:
+            estacion = "TRANSICIÓN (Oferta Moderada)"
+            factor_crecimiento = 0.85
+            icono = "⛅"
+        else:
+            estacion = "ÉPOCA SECA / VERANO (Oferta Restringida)"
+            factor_crecimiento = 0.5
+            icono = "☀️"
+
+        return {
+            "hoy_mm": lluvia_hoy,
+            "ultimos_7d_mm": lluvia_7d,
+            "ultimos_30d_mm": lluvia_30d,
+            "mes_actual_mm": lluvia_mes,
+            "anio_actual_mm": lluvia_anio,
+            "estacion": estacion,
+            "factor_crecimiento": factor_crecimiento,
+            "icono": icono,
+        }
+
+    def registrar_aforo(self, potrero_id_o_nom, aforo_kg_m2: float, fecha=None,
+                        pct_ms: float = 22.0, observaciones: Optional[str] = None,
+                        registrado_por: Optional[int] = None) -> int:
+        """Registra un muestreo de aforo en la tabla histórica y actualiza el potrero."""
+        pot_id = None
+        if isinstance(potrero_id_o_nom, int):
+            pot_id = potrero_id_o_nom
+        else:
+            pot_row = self.query_one(
+                "SELECT id FROM potreros WHERE nombre = ? OR UPPER(nombre) = UPPER(?) OR codigo = ? LIMIT 1",
+                (str(potrero_id_o_nom), str(potrero_id_o_nom), str(potrero_id_o_nom)),
+            )
+            if pot_row:
+                pot_id = pot_row["id"]
+            else:
+                pot_id = self.registrar_potrero(nombre=str(potrero_id_o_nom))
+
+        f = iso(fecha) or date.today().isoformat()
+        aforo_val = float(aforo_kg_m2)
+        pct_val = float(pct_ms) if pct_ms else 22.0
+
+        # Actualiza el aforo vigente en la tabla potreros
+        self.execute("UPDATE potreros SET aforo_kg_m2 = ? WHERE id = ?", (aforo_val, pot_id))
+
+        return self.insert("aforos_historico", dict(
+            potrero_id=pot_id,
+            fecha=f,
+            aforo_kg_m2=aforo_val,
+            pct_ms=pct_val,
+            observaciones=observaciones.strip() if observaciones else None,
+            creado_en=self._ahora(),
+            registrado_por=registrado_por,
+        ))
+
+    def obtener_aforos(self, potrero_id: Optional[int] = None, limite: int = 20) -> list[sqlite3.Row]:
+        """Obtiene el historial de aforos registrados."""
+        if potrero_id:
+            return self.query(
+                "SELECT a.*, p.nombre AS potrero_nombre FROM aforos_historico a "
+                "JOIN potreros p ON p.id = a.potrero_id "
+                "WHERE a.potrero_id = ? ORDER BY a.fecha DESC, a.id DESC LIMIT ?",
+                (potrero_id, limite),
+            )
+        return self.query(
+            "SELECT a.*, p.nombre AS potrero_nombre FROM aforos_historico a "
+            "JOIN potreros p ON p.id = a.potrero_id "
+            "ORDER BY a.fecha DESC, a.id DESC LIMIT ?",
+            (limite,),
+        )
 
     def registrar_foto(self, ruta: str, animal_tag=None, fecha=None,
                        caption=None, user_id=None, notas=None, ocr_text=None) -> int:
@@ -1149,12 +1281,12 @@ class Database:
         que /deshacer muestre qué se va a borrar antes de confirmar."""
         if tabla not in self.TABLAS_EVENTOS:
             return None
-        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else "animal_id"
+        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else ("animal_id" if tabla not in ("pluviometria", "aforos_historico") else None)
         fila = self.query_one(f"SELECT * FROM {tabla} WHERE id = ?", (id_registro,))
         if fila is None:
             return None
-        animal = self.get_animal(fila[fk_animal]) if fila[fk_animal] is not None else None
-        tag = animal["tag"] if animal else "?"
+        animal = self.get_animal(fila[fk_animal]) if fk_animal and fila[fk_animal] is not None else None
+        tag = animal["tag"] if animal else ("-" if tabla in ("pluviometria", "aforos_historico") else "?")
         resumenes = {
             "partos": lambda f: f"Parto de {tag} — cría {f['sexo_cria'] or '?'}",
             "muertes": lambda f: f"Muerte de {tag}" + (f" — {f['causa_presunta']}" if f["causa_presunta"] else ""),
@@ -1167,6 +1299,8 @@ class Database:
             "condicion_corporal": lambda f: f"Condición corporal de {tag}" + (f" — {f['valor']}" if f["valor"] is not None else ""),
             "produccion_leche": lambda f: f"Producción de leche de {tag}" + (f" — {f['litros']}L" if f["litros"] is not None else ""),
             "diagnosticos_gestacion": lambda f: f"Diagnóstico de gestación de {tag}: {f['resultado'] or '?'}" + (f" ({f['dias_gestacion']}d)" if f["dias_gestacion"] else ""),
+            "pluviometria": lambda f: f"Pluviometría: {f['mm_lluvia']}mm" + (f" ({f['estacion_o_sector']})" if f["estacion_o_sector"] else ""),
+            "aforos_historico": lambda f: f"Aforo potrero #{f['potrero_id']}: {f['aforo_kg_m2']} kg/m²",
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,

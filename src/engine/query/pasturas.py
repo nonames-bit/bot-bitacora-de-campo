@@ -483,3 +483,96 @@ class PasturasQueryMixin:
             return f"{resumen_base}{detalle_cat}"
 
         return resumen_base
+
+    def _consulta_lluvias(self, periodo: Optional[str] = None) -> str:
+        """Devuelve el reporte pluviométrico de la finca y su impacto en pasturas."""
+        from ...integrations.ideam_clima import ClimaIDEAM
+        res = self.db.resumen_pluviometrico(hoy=self.hoy)
+        info_clima = ClimaIDEAM.clasificar_estacionalidad(res["ultimos_30d_mm"])
+
+        lineas = [
+            "🌧️ <b>REPORTE PLUVIOMÉTRICO & CLIMA (IDEAM)</b>",
+            f"📅 <b>Fecha de Referencia:</b> {self.hoy.isoformat()}",
+            "────────────────────────────────────────",
+            f"• <b>Lluvia Hoy:</b> <b>{res['hoy_mm']:.1f} mm</b>",
+            f"• <b>Últimos 7 días:</b> <b>{res['ultimos_7d_mm']:.1f} mm</b>",
+            f"• <b>Últimos 30 días (Mes móvil):</b> <b>{res['ultimos_30d_mm']:.1f} mm</b>",
+            f"• <b>Mes en curso:</b> <b>{res['mes_actual_mm']:.1f} mm</b>",
+            f"• <b>Acumulado Anual ({self.hoy.year}):</b> <b>{res['anio_actual_mm']:.1f} mm</b>",
+            "────────────────────────────────────────",
+            f"{info_clima['icono']} <b>Estado Estacional:</b> <b>{info_clima['estacion']}</b>",
+            f"🌿 <b>Factor Crecimiento Forrajero:</b> <b>{info_clima['factor_clima']}x</b>",
+            f"⏳ <b>Tiempo de Reposo Óptimo Voisin:</b> <b>{info_clima['dias_reposo_sugeridos']} días</b>",
+            f"💡 <b>Recomendación:</b> <i>{info_clima['recomendacion']}</i>",
+        ]
+        return "\n".join(lineas)
+
+    def _balance_forrajero_estacional(self) -> str:
+        """Calcula el balance forrajero de Materia Seca (MS) oferta vs demanda del hato."""
+        from ...engine.pasture_engine import PastureEngine
+
+        res_lluvia = self.db.resumen_pluviometrico(hoy=self.hoy)
+        mm_30d = res_lluvia["ultimos_30d_mm"]
+        f_clima = res_lluvia["factor_crecimiento"]
+
+        # 1. Calcular inventario activo y demanda en UGG
+        # Regla fundamental: estado = 'ACTIVO'
+        animales_activos = self.db.query("SELECT id_animal, sexo, fecha_nacimiento FROM animales WHERE estado = 'ACTIVO'")
+        total_animales = len(animales_activos)
+        if total_animales == 0:
+            return "⚖️ No hay animales activos registrados para calcular la demanda forrajera."
+
+        total_ugg = 0.0
+        for a in animales_activos:
+            ult_p = self.db.query_one("SELECT peso_kg FROM pesajes WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (a["id_animal"],))
+            if ult_p and ult_p["peso_kg"]:
+                total_ugg += PastureEngine.ugg_de_peso(ult_p["peso_kg"])
+            else:
+                es_h = str(a["sexo"] or "").lower().startswith("h")
+                fn = to_date(a["fecha_nacimiento"])
+                ed = (self.hoy - fn).days if fn else 1000
+                if ed < 365:
+                    total_ugg += 0.35  # Cría 160 kg
+                elif ed < 730:
+                    total_ugg += 0.65  # Levante 290 kg
+                else:
+                    total_ugg += 1.00 if es_h else 1.30  # Vaca 450 kg / Toro 585 kg
+
+        demanda_diaria_ms = total_ugg * 12.6  # 12.6 kg MS/UGG/día (2.8% PV)
+
+        # 2. Oferta total de potreros
+        potreros = self.db.query("SELECT * FROM potreros WHERE area_has IS NOT NULL AND area_has > 0")
+        total_has = sum(float(p["area_has"] or 0) for p in potreros)
+        oferta_neta_ms_total = 0.0
+        for p in potreros:
+            aforo = float(p["aforo_kg_m2"] or 1.2)
+            has = float(p["area_has"] or 0)
+            oferta_neta_ms_total += PastureEngine.kg_ms_disponibles(aforo, has) * f_clima
+
+        if total_has == 0:
+            total_has = 50.0  # Finca estándar si no hay áreas cargadas
+            oferta_neta_ms_total = PastureEngine.kg_ms_disponibles(1.2, total_has) * f_clima
+
+        balance = PastureEngine.balance_forrajero(oferta_neta_ms_total, demanda_diaria_ms, dias_rotacion=33)
+        carga_actual = round(total_ugg / total_has, 2) if total_has > 0 else 0.0
+        carga_sostenible = PastureEngine.capacidad_carga_dinamica_ha(1.2, dias_rotacion=33, mm_lluvia_30d=mm_30d)
+
+        lineas = [
+            "⚖️ <b>BALANCE FORRAJERO & MATERIA SECA (MS)</b>",
+            f"🌧️ <b>Lluvia (30 días):</b> {mm_30d:.1f} mm · <b>Ajuste Clima:</b> {f_clima:.2f}x",
+            "────────────────────────────────────────",
+            f"🐮 <b>Hato Activo:</b> <b>{total_animales} animales</b> (<b>{total_ugg:.1f} UGG</b>)",
+            f"🌱 <b>Área Total Pasturas:</b> <b>{total_has:.1f} ha</b>",
+            f"• <b>Carga Actual:</b> <b>{carga_actual} UGG/ha</b>",
+            f"• <b>Carga Sostenible sugerida:</b> <b>{carga_sostenible} UGG/ha</b>",
+            "────────────────────────────────────────",
+            f"📥 <b>Demanda Diaria Hato (2.8% PV):</b> <b>{balance['demanda_diaria_kg_ms']} kg MS/día</b>",
+            f"🌾 <b>Oferta Diaria Sostenible:</b> <b>{balance['oferta_diaria_kg_ms']} kg MS/día</b>",
+            f"📊 <b>Balance Neto Diario:</b> <b>{'+' if balance['balance_diario_kg_ms'] > 0 else ''}{balance['balance_diario_kg_ms']} kg MS/día</b>",
+            f"📈 <b>Índice de Suficiencia:</b> <b>{balance['indice_suficiencia_pct']}%</b>",
+            "────────────────────────────────────────",
+            f"{balance['icono']} <b>Diagnóstico:</b> <b>{balance['estado']}</b>",
+            f"💡 <b>Recomendación:</b> <i>{balance['recomendacion']}</i>",
+        ]
+        return "\n".join(lineas)
+

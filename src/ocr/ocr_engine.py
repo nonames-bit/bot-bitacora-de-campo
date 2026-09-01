@@ -289,8 +289,24 @@ class OCREngine:
         """Detecta y retorna el nombre del backend OCR disponible o None."""
         # 1. Pytesseract + Pillow
         try:
-            import pytesseract  # noqa: F401
+            import shutil
+            import pytesseract
             from PIL import Image  # noqa: F401
+
+            # Si el comando tesseract no está en PATH estándar, buscar en rutas conocidas
+            cmd_actual = getattr(pytesseract.pytesseract, "tesseract_cmd", "tesseract")
+            if not shutil.which(cmd_actual) and not (os.path.exists(cmd_actual) and os.path.isfile(cmd_actual)):
+                rutas_candidatas = [
+                    "/usr/bin/tesseract",
+                    "/usr/local/bin/tesseract",
+                    "/bin/tesseract",
+                    r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+                    r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+                ]
+                for r in rutas_candidatas:
+                    if os.path.exists(r) and os.path.isfile(r):
+                        pytesseract.pytesseract.tesseract_cmd = r
+                        break
             return "pytesseract"
         except ImportError:
             pass

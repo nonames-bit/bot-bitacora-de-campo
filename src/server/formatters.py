@@ -1325,7 +1325,11 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "3️⃣ <b>Comandos Rápidos:</b>\n"
             "• <code>/menu</code> — Abrir el menú táctil de botones\n"
             "• <code>/guia</code> — Guía de preguntas al chat\n"
-            "• <code>/medicamentos</code> — Ver qué vacas están en retiro de leche/carne\n\n"
+            "• <code>/medicamentos</code> — Ver qué vacas están en retiro de leche/carne\n"
+            "• <code>/sos [qué pasó]</code> — Emergencia: avisa de inmediato al Dueño/Administrador\n\n"
+            "📶 <b>¿Sin señal en el potrero?</b>\n"
+            "Escribe o graba la nota igual — Telegram la guarda en tu celular y la envía sola "
+            "apenas recuperes cobertura, no hace falta reintentar.\n\n"
             "🏠 <i>Toca /menu para ver las opciones táctiles.</i>"
         )
     return "⛔ No autorizado."
@@ -2339,4 +2343,111 @@ def formatear_diagnosticos_recientes(db: Database) -> str:
     lineas.append("────────────────────────────────────────")
     lineas.append("💡 <i>Para registrar: <code>palpé la 47 confirmada preñada 60 días</code> o <code>la 12 vacía</code></i>")
     return "\n".join(lineas)
+
+
+def formatear_clima_panel(db: Database, hoy: Optional[date] = None) -> str:
+    """Genera el panel interactivo de pluviometría, lluvias y clima IDEAM."""
+    ref = hoy or date.today()
+    from ..integrations.ideam_clima import ClimaIDEAM
+    res = db.resumen_pluviometrico(hoy=ref)
+    info = ClimaIDEAM.clasificar_estacionalidad(res["ultimos_30d_mm"])
+    hist = db.obtener_pluviometria(limite=5)
+
+    lineas = [
+        "🌧️ <b>PLUVIOMETRÍA & CLIMA AGROPECUARIO (IDEAM)</b>",
+        f"📅 <b>Fecha:</b> {ref.isoformat()}",
+        "────────────────────────────────────────",
+        f"• <b>Lluvia Hoy:</b> <b>{res['hoy_mm']:.1f} mm</b>",
+        f"• <b>Últimos 7 días:</b> <b>{res['ultimos_7d_mm']:.1f} mm</b>",
+        f"• <b>Últimos 30 días (Mes móvil):</b> <b>{res['ultimos_30d_mm']:.1f} mm</b>",
+        f"• <b>Mes actual en curso:</b> <b>{res['mes_actual_mm']:.1f} mm</b>",
+        f"• <b>Acumulado Anual ({ref.year}):</b> <b>{res['anio_actual_mm']:.1f} mm</b>",
+        "────────────────────────────────────────",
+        f"{info['icono']} <b>Temporada Actual:</b> <b>{info['estacion']}</b>",
+        f"🌿 <b>Factor Rebrote Forrajero:</b> <b>{info['factor_clima']}x</b>",
+        f"⏳ <b>Descanso Sugerido Voisin:</b> <b>{info['dias_reposo_sugeridos']} días</b>",
+        f"💡 <b>Manejo Zootécnico:</b> <i>{info['recomendacion']}</i>",
+    ]
+
+    if hist:
+        lineas.append("\n📋 <b>Últimos Registros Pluviométricos:</b>")
+        for h in hist:
+            sec = f" ({_esc(h['estacion_o_sector'])})" if h['estacion_o_sector'] else ""
+            lineas.append(f"• [{h['fecha']}] <b>{h['mm_lluvia']:.1f} mm</b>{sec}")
+
+    lineas.append("\n💡 <i>Para anotar lluvia: <code>llovió 35 mm hoy</code> o <code>/lluvia 25</code></i>")
+    return "\n".join(lineas)
+
+
+def formatear_balance_forrajero_panel(db: Database, hoy: Optional[date] = None) -> str:
+    """Genera el panel zootécnico de balance forrajero y oferta de materia seca (MS)."""
+    ref = hoy or date.today()
+    from ..engine.pasture_engine import PastureEngine
+
+    res_lluvia = db.resumen_pluviometrico(hoy=ref)
+    mm_30d = res_lluvia["ultimos_30d_mm"]
+    f_clima = res_lluvia["factor_crecimiento"]
+
+    # 1. Hato Activo y Demanda
+    # Regla Fundamental de Inventario: estado = 'ACTIVO'
+    animales_activos = db.query("SELECT id_animal, sexo, fecha_nacimiento FROM animales WHERE estado = 'ACTIVO'")
+    total_animales = len(animales_activos)
+    if total_animales == 0:
+        return "⚖️ No hay animales activos registrados para calcular el balance forrajero."
+
+    total_ugg = 0.0
+    for a in animales_activos:
+        ult_p = db.query_one("SELECT peso_kg FROM pesajes WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (a["id_animal"],))
+        if ult_p and ult_p["peso_kg"]:
+            total_ugg += PastureEngine.ugg_de_peso(ult_p["peso_kg"])
+        else:
+            es_h = str(a["sexo"] or "").lower().startswith("h")
+            fn = to_date(a["fecha_nacimiento"])
+            ed = (ref - fn).days if fn else 1000
+            if ed < 365:
+                total_ugg += 0.35
+            elif ed < 730:
+                total_ugg += 0.65
+            else:
+                total_ugg += 1.00 if es_h else 1.30
+
+    demanda_ms = total_ugg * 12.6
+
+    # 2. Oferta de Potreros
+    potreros = db.query("SELECT * FROM potreros WHERE area_has IS NOT NULL AND area_has > 0")
+    total_has = sum(float(p["area_has"] or 0) for p in potreros)
+    oferta_neta_total = 0.0
+    for p in potreros:
+        aforo = float(p["aforo_kg_m2"] or 1.2)
+        has = float(p["area_has"] or 0)
+        oferta_neta_total += PastureEngine.kg_ms_disponibles(aforo, has) * f_clima
+
+    if total_has == 0:
+        total_has = 50.0
+        oferta_neta_total = PastureEngine.kg_ms_disponibles(1.2, total_has) * f_clima
+
+    bal = PastureEngine.balance_forrajero(oferta_neta_total, demanda_ms, dias_rotacion=33)
+    carga_act = round(total_ugg / total_has, 2) if total_has > 0 else 0.0
+    carga_sug = PastureEngine.capacidad_carga_dinamica_ha(1.2, dias_rotacion=33, mm_lluvia_30d=mm_30d)
+
+    signo = "+" if bal["balance_diario_kg_ms"] > 0 else ""
+    lineas = [
+        "🌾 <b>BALANCE FORRAJERO & MATERIA SECA (MS)</b>",
+        f"🌧️ <b>Lluvia (30d):</b> {mm_30d:.1f} mm · <b>Ajuste Clima:</b> {f_clima:.2f}x",
+        "────────────────────────────────────────",
+        f"🐮 <b>Inventario Activo:</b> <b>{total_animales} animales</b> (<b>{total_ugg:.1f} UGG</b>)",
+        f"🌱 <b>Superficie Pasturas:</b> <b>{total_has:.1f} hectáreas</b>",
+        f"• <b>Carga Animal Actual:</b> <b>{carga_act} UGG/ha</b>",
+        f"• <b>Carga Sostenible Sugerida:</b> <b>{carga_sug} UGG/ha</b>",
+        "────────────────────────────────────────",
+        f"📥 <b>Demanda Diaria Hato (2.8% PV):</b> <b>{bal['demanda_diaria_kg_ms']:.1f} kg MS/día</b>",
+        f"🌾 <b>Oferta Diaria Sostenible:</b> <b>{bal['oferta_diaria_kg_ms']:.1f} kg MS/día</b>",
+        f"⚖️ <b>Balance Diario Neto:</b> <b>{signo}{bal['balance_diario_kg_ms']:.1f} kg MS/día</b>",
+        f"📈 <b>Índice de Suficiencia:</b> <b>{bal['indice_suficiencia_pct']:.1f}%</b>",
+        "────────────────────────────────────────",
+        f"{bal['icono']} <b>Diagnóstico:</b> <b>{bal['estado']}</b>",
+        f"💡 <b>Recomendación:</b> <i>{bal['recomendacion']}</i>",
+    ]
+    return "\n".join(lineas)
+
 

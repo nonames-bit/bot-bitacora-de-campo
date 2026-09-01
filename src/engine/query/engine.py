@@ -289,6 +289,15 @@ class QueryEngine(
         if re.search(r"\bcondici[oó]n\s+corporal\b|\bpuntaje\s+corporal\b", t):
             return self._condicion_corporal(tag)
 
+        # 7c. Pluviometría, Clima y Balance Forrajero (Fase 6.2)
+        if re.search(r"\b(?:balance\s+forrajero|balance\s+de\s+pasto|balance\s+materia\s+seca|oferta\s+vs\s+demanda|demanda\s+forrajera|suficiencia\s+forrajera)\b", t) or (
+            re.search(r"\bbalance\b", t) and re.search(r"\b(?:pasto|pasturas?|forraj|materia\s+seca|ms)\b", t)
+        ):
+            return self._balance_forrajero_estacional()
+
+        if re.search(r"\b(?:lluvia|lluvias|pluvi[oó]metr|cuant[oa]\s+llovi[oó]|precipitaci[oó]n|clima\s+ideam|reporte\s+de\s+lluvias?|acumulado\s+de\s+lluvia)\b", t) and not tag_con_digito:
+            return self._consulta_lluvias()
+
         # Ocupación por lote (ej. "días de pastoreo del lote 1")
         if re.search(r"\blote\s+([a-z0-9]+)", t) and re.search(r"\bdias\b|\bpastoreo\b|\bocupaci[oó]n\b|\bdonde\b", t):
             m = re.search(r"\blote\s+([a-z0-9]+)", t)

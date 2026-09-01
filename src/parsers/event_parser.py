@@ -134,6 +134,10 @@ class EventParser:
             return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
         if intento == "leche" and ev.datos.get("litros") is None:
             return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
+        if intento == "pluviometria" and ev.datos.get("mm_lluvia") is None:
+            return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
+        if intento == "aforo" and ev.datos.get("aforo_kg_m2") is None:
+            return ParsedEvent(tipo="consulta", texto=texto, fecha=fecha)
 
         return ev
 
@@ -227,3 +231,13 @@ class EventParser:
         ev.datos["tipo_movimiento"] = tipo
         ev.datos["cantidad"] = nlu.extraer_cantidad(t)
         ev.datos["procedencia_destino"] = "Subasta" if re.search(r"\bsubasta\b", t) else None
+
+    def _parse_pluviometria(self, ev: ParsedEvent, t: str) -> None:
+        ev.datos["mm_lluvia"] = nlu.extraer_mm_lluvia(t)
+        ev.datos["estacion_o_sector"] = nlu.extraer_sector_lluvia(t)
+
+    def _parse_aforo(self, ev: ParsedEvent, t: str) -> None:
+        ev.datos["aforo_kg_m2"] = nlu.extraer_aforo_kg_m2(t)
+        potreros = nlu.extraer_potreros(t)
+        ev.datos["potrero"] = potreros[0] if potreros else None
+

@@ -211,6 +211,27 @@ CREATE TABLE IF NOT EXISTS termo_nitrogeno (
     creado_en TEXT
 );
 
+CREATE TABLE IF NOT EXISTS pluviometria (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    mm_lluvia REAL NOT NULL,
+    estacion_o_sector TEXT,
+    observaciones TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS aforos_historico (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    potrero_id INTEGER NOT NULL,
+    fecha TEXT NOT NULL,
+    aforo_kg_m2 REAL NOT NULL,
+    pct_ms REAL DEFAULT 22.0,
+    observaciones TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
 CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
@@ -227,6 +248,8 @@ CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha_estado ON recordatorios_progr
 CREATE INDEX IF NOT EXISTS idx_diagnosticos_vaca_fecha ON diagnosticos_gestacion(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro);
 CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
+CREATE INDEX IF NOT EXISTS idx_pluviometria_fecha ON pluviometria(fecha);
+CREATE INDEX IF NOT EXISTS idx_aforos_potrero_fecha ON aforos_historico(potrero_id, fecha);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -235,7 +258,7 @@ TABLAS = [
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
-    "termo_nitrogeno",
+    "termo_nitrogeno", "pluviometria", "aforos_historico",
 ]
 
 
@@ -421,5 +444,29 @@ class TermoNitrogeno:
     dias_intervalo: int = 21
     creado_en: Optional[str] = None
     id: Optional[int] = None
+
+
+@dataclass
+class Pluviometria:
+    fecha: str = ""
+    mm_lluvia: float = 0.0
+    estacion_o_sector: Optional[str] = None
+    observaciones: Optional[str] = None
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class AforoHistorico:
+    potrero_id: int = 0
+    fecha: str = ""
+    aforo_kg_m2: float = 0.0
+    pct_ms: float = 22.0
+    observaciones: Optional[str] = None
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
+
 
 

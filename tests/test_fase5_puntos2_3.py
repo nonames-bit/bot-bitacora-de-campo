@@ -172,10 +172,10 @@ def test_teclado_y_confirmacion_factura_pajuela(db: Database):
     assert len(teclado.inline_keyboard) == 1
     btn_confirmar, btn_descartar = teclado.inline_keyboard[0]
 
-    assert "Confirmar Carga (+20 GYR-502)" in btn_confirmar.text
-    assert btn_confirmar.callback_data == "factura_pajuela:confirmar:GYR-502:20"
+    assert "Cargar 20 pajuelas GYR-502" in btn_confirmar.text
+    assert btn_confirmar.callback_data == "cmd:confirmar_factura:GYR-502:20"
     assert "Descartar" in btn_descartar.text
-    assert btn_descartar.callback_data == "factura_pajuela:descartar"
+    assert btn_descartar.callback_data == "cmd:confirmar_factura:descartar"
 
     # 2. Carga en base de datos simulando el callback
     db.registrar_pajuela(codigo_toro="GYR-502", cantidad=20)
@@ -187,3 +187,49 @@ def test_teclado_y_confirmacion_factura_pajuela(db: Database):
     db.registrar_pajuela(codigo_toro="GYR-502", cantidad=10)
     paj_actualizado = db.obtener_pajuela("GYR-502")
     assert paj_actualizado["cantidad"] == 30
+
+
+def test_foto_factura_simulada_y_parser_relajado(tmp_path):
+    """Verifica el flujo con foto simulada de factura, parser relajado y números con puntos."""
+    # 1. Caso sin palabra 'factura' pero con cantidad y toro (ej. '5 pajuelas JA283')
+    info1 = parse_factura_pajuelas("5 pajuelas JA283")
+    assert info1.es_factura is True
+    assert info1.toro == "JA283"
+    assert info1.cantidad == 5
+    assert "Detecté compra de 5 pajuelas toro JA283, ¿confirmar?" in info1.propuesta_mensaje
+
+    # 2. Caso con números con puntos/decimales y código con punto
+    info2 = parse_factura_pajuelas("Cant: 5.0 pajuelas toro JA.283 total $250.000")
+    assert info2.es_factura is True
+    assert info2.toro == "JA.283"
+    assert info2.cantidad == 5
+    assert info2.total == 250000.0
+
+    # 3. Caso factura sin pajuelas específicas pero con NIT y Total
+    info3 = parse_factura_pajuelas("NIT 900.123.456-7 Total $300.000")
+    assert info3.es_factura is True
+    assert info3.nit == "900.123.456-7"
+    assert info3.total == 300000.0
+    assert info3.propuesta_mensaje == ""
+
+    # 4. Foto de factura simulada con sidecar
+    foto_fac = tmp_path / "factura_ja283.jpg"
+    foto_fac.write_bytes(b"\xff\xd8\xff\xe0" + b"\x00" * 20)
+    (tmp_path / "factura_ja283.jpg.txt").write_text(
+        "DISTRIBUIDORA SEMEN\nNIT 900.555.444-1\n5 pajuelas JA283\nTotal $250.000",
+        encoding="utf-8",
+    )
+
+    img_info = extract_image_info(str(foto_fac))
+    assert img_info.factura_pajuelas is not None
+    fac = img_info.factura_pajuelas
+    assert fac.es_factura is True
+    assert fac.toro == "JA283"
+    assert fac.cantidad == 5
+    assert "Detecté compra de 5 pajuelas toro JA283, ¿confirmar?" in fac.propuesta_mensaje
+
+    # Teclado generado para la foto
+    teclado = crear_teclado_confirmar_factura_pajuelas(toro=fac.toro, cantidad=fac.cantidad)
+    btn_confirmar = teclado.inline_keyboard[0][0]
+    assert btn_confirmar.text == "✅ Cargar 5 pajuelas JA283"
+    assert btn_confirmar.callback_data == "cmd:confirmar_factura:JA283:5"

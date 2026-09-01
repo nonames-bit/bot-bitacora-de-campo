@@ -736,6 +736,19 @@ def test_comando_renombrar_animal_registrado():
     assert 'CommandHandler("renombrar_animal", cmd_renombrar_animal)' in content
 
 
+def test_comando_sos_registrado_y_avisa_owner_admin():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler("sos", cmd_sos)' in content
+    assert 'u_rol in ("OWNER", "ADMIN")' in content
+
+
+def test_ayuda_trabajador_menciona_sos_y_resiliencia_sin_senal():
+    ayuda_trabajador = formatear_ayuda("TRABAJADOR")
+    assert "/sos" in ayuda_trabajador
+    assert "Sin señal" in ayuda_trabajador
+
+
 def test_tablero_finca_enlaza_graficos_no_servidor():
     # El Tablero de la Finca (zootécnico) ya no atajo directo a Servidor &
     # Sistema (mezclaba salud del hato con salud del servidor); en su lugar

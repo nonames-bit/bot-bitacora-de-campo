@@ -198,7 +198,7 @@ def extract_image_info(image_path: str,
             if med["producto"] not in info.frascos:
                 info.frascos.append(med["producto"])
         fac = parse_factura_pajuelas(sidecar)
-        if fac and fac.es_factura:
+        if fac and (fac.es_factura or fac.propuesta_mensaje):
             info.factura_pajuelas = fac
         return info
 
@@ -219,7 +219,7 @@ def extract_image_info(image_path: str,
                 info.medicamento = med
                 info.frascos.append(med["producto"])
             fac = parse_factura_pajuelas(texto_ocr)
-            if fac and fac.es_factura:
+            if fac and (fac.es_factura or fac.propuesta_mensaje):
                 info.factura_pajuelas = fac
             return info
         return ImageInfo()

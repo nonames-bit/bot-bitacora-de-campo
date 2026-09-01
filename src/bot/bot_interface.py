@@ -182,6 +182,18 @@ class Bot:
                 procedencia_destino=d.get("procedencia_destino"), notas=notas,
                 registrado_por=user_id,
             )
+        elif ev.tipo == "pluviometria":
+            self.db.registrar_pluviometria(
+                mm_lluvia=d.get("mm_lluvia", 0.0), fecha=ev.fecha,
+                estacion_o_sector=d.get("estacion_o_sector"),
+                registrado_por=user_id,
+            )
+        elif ev.tipo == "aforo":
+            self.db.registrar_aforo(
+                potrero_id_o_nom=d.get("potrero") or 1,
+                aforo_kg_m2=d.get("aforo_kg_m2", 0.0), fecha=ev.fecha,
+                registrado_por=user_id,
+            )
 
     def _calcular_gmd(self, tag, fecha, peso) -> Optional[float]:
         if not tag or peso is None:
@@ -271,4 +283,10 @@ class Bot:
             return f"Registrado traslado (lote {d.get('lote') or '?'})."
         if ev.tipo == "movimiento":
             return f"Registrado movimiento ({d.get('tipo_movimiento', '')})."
+        if ev.tipo == "pluviometria":
+            sector = f" en {d['estacion_o_sector']}" if d.get("estacion_o_sector") else ""
+            return f"🌧️ Registrada lluvia: {d.get('mm_lluvia')} mm{sector} el {ev.fecha}."
+        if ev.tipo == "aforo":
+            pot = f" en potrero {d['potrero']}" if d.get("potrero") else ""
+            return f"🌿 Registrado aforo de pasto: {d.get('aforo_kg_m2')} kg/m²{pot} el {ev.fecha}."
         return "Evento registrado."
