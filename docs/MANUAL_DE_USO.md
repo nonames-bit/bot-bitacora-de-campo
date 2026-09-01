@@ -405,6 +405,9 @@ Para backups pesados (con fotos históricas):
 | `/preguntas`, `/faq` | Todos | Preguntas rápidas frecuentes de campo en 1 toque. |
 | `/potreros` | Todos | Matriz SG de potreros y animales por pradera. |
 | `/ocupacion` | Todos | Días de ocupación y descanso según Leyes de Voisin. |
+| `/clima`, `/lluvias` | Todos | Reporte Pluviométrico & Clima IDEAM con acumulados y ajuste forrajero. |
+| `/lluvia <mm> [sec]` | Todos | Registro rápido de milímetros de precipitación (ej. `/lluvia 35 sector bajo`). |
+| `/balance_forrajero` | Todos | Balance forrajero de Materia Seca (MS): oferta diaria vs demanda hato (2.8% PV). |
 | `/status`, `/tablero` | Admin / Owner | Tablero zootécnico general de la finca y novedades semanales. |
 | `/poblacion` | Admin / Owner | Pirámide de edades y brackets demográficos de SG. |
 | `/genetica` | Admin / Owner | Composición racial y cruces del hato. |

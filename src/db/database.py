@@ -239,6 +239,12 @@ class Database:
             dias_ocupacion=dias_ocupacion,
         ))
 
+    def get_potrero(self, potrero_id) -> Optional[sqlite3.Row]:
+        if potrero_id is None:
+            return None
+        return self.query_one("SELECT * FROM potreros WHERE id = ?", (potrero_id,))
+
+
     def registrar_parto(self, vaca_tag, fecha=None, sexo_cria=None,
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
                         notas=None, registrado_por=None) -> int:
@@ -653,6 +659,9 @@ class Database:
             creado_en=self._ahora(),
             registrado_por=registrado_por,
         ))
+
+    def get_potrero(self, potrero_id: int):
+        return self.query_one("SELECT * FROM potreros WHERE id = ?", (potrero_id,))
 
     def obtener_aforos(self, potrero_id: Optional[int] = None, limite: int = 20) -> list[sqlite3.Row]:
         """Obtiene el historial de aforos registrados."""

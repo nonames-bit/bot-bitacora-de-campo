@@ -65,19 +65,19 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\blitros?\s+de\s+leche\b", r"\bleche\b.*\blitros?\b", r"\blitros?\b.*\bleche\b",
         r"\bordeñ[eoó]", r"\bproducci[oó]n\s+de\s+leche\b", r"\bcontrol\s+lechero\b",
     ]),
+    ("aforo", [
+        r"\baforo\b", r"\bafor[eé]\b", r"\bkg/m2\b", r"\bkg\s+mv/m2\b",
+    ]),
+    ("pluviometria", [
+        r"\bllovi[oó]\b", r"\blluvia[s]?\b", r"\bpluvi[oó]metr[oa]\b",
+        r"\bprecipitaci[oó]n\b", r"\baguacero\b", r"\b\d+\s*mm\b",
+    ]),
     ("pesaje", [
         r"\bpesaje\b", r"\bpes[oó]\b", r"\bpeso\s+\d",
         r"\d+\s*(?:kg|kilos|kilogramos)\b", r"\bkilogramos\b", r"\bkilos\b",
     ]),
     ("condicion_corporal", [
         r"\bcondici[oó]n\s+corporal\b", r"\bpuntaje\s+corporal\b",
-    ]),
-    ("pluviometria", [
-        r"\bllovi[oó]\b", r"\blluvia[s]?\b", r"\bpluvi[oó]metr[oa]\b",
-        r"\bprecipitaci[oó]n\b", r"\baguacero\b", r"\b\d+\s*mm\b",
-    ]),
-    ("aforo", [
-        r"\baforo\b", r"\bafor[eé]\b", r"\bkg/m2\b", r"\bkg\s+mv/m2\b",
     ]),
     ("movimiento", [
         r"\bentraron\b", r"\bentr[oó]\b", r"\bsalieron\b", r"\bsali[oó]\b",
@@ -161,8 +161,8 @@ def es_consulta(texto: str) -> bool:
         tag_encontrado = extraer_tag(t)
         if not tag_encontrado or not any(c.isdigit() for c in tag_encontrado):
             return True
-    # Potrero como consulta (ej. "potrero olegario 1" o "olegario 1" si no es evento de traslado)
-    if re.search(r"\bpotrero", t) and clasificar(t) != "traslado":
+    # Potrero como consulta (ej. "potrero olegario 1" o "olegario 1" si no es evento de traslado o aforo)
+    if re.search(r"\bpotrero", t) and clasificar(t) not in ("traslado", "aforo"):
         return True
     # Si contiene un tag con dígitos y no es un evento reconocido (ej. 'N069' o 'vaca 47')
     tag = extraer_tag(t)
@@ -586,15 +586,27 @@ def extraer_mm_lluvia(texto: str) -> Optional[float]:
     return None
 
 
+PALABRAS_NO_SECTOR = {
+    "hoy", "ayer", "mm", "lluvia", "lluvias", "pluviometro", "milimetros",
+    "sector", "estacion", "en", "de", "del", "el", "la", "los", "las", "un", "una",
+}
+
+
 def extraer_sector_lluvia(texto: str) -> Optional[str]:
     """Extrae el sector, lote o estación pluviométrica si se menciona."""
     t = normalizar(texto)
-    m = re.search(r"\b(?:en|sector|estacion|corral|finca|potrero)\s+([a-z0-9\-_]+)\b", t)
+    m = re.search(r"\b(?:en\s+el\s+sector|en\s+sector|en\s+la\s+estacion|en\s+estacion|en\s+el\s+potrero|en\s+potrero|sector|estacion|corral|finca|potrero)\s+([a-z0-9\-_]+)\b", t)
     if m:
         val = m.group(1).upper()
-        if val.lower() not in PALABRAS_NO_TAG and val.lower() not in ("hoy", "ayer", "mm", "lluvia"):
+        if val.lower() not in PALABRAS_NO_SECTOR:
+            return val
+    m2 = re.search(r"\b(?:en)\s+([a-z0-9\-_]+)\b", t)
+    if m2:
+        val = m2.group(1).upper()
+        if val.lower() not in PALABRAS_NO_SECTOR:
             return val
     return None
+
 
 
 def extraer_aforo_kg_m2(texto: str) -> Optional[float]:

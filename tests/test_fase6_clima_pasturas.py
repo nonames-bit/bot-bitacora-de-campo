@@ -162,10 +162,10 @@ def test_nlu_parsing_pluviometria_y_aforo(db: Database):
 
     # Procesar con Bot interface
     bot = Bot(db, hoy=date(2026, 8, 31))
-    resp_lluvia = bot.procesar_mensaje("llovió 28 mm hoy")
+    resp_lluvia = bot.procesar_texto("llovió 28 mm hoy")
     assert "Registrada lluvia: 28.0 mm" in resp_lluvia
 
-    resp_aforo = bot.procesar_mensaje("aforo potrero bajo dio 1.5 kg/m2")
+    resp_aforo = bot.procesar_texto("aforo potrero bajo dio 1.5 kg/m2")
     assert "Registrado aforo de pasto: 1.5 kg/m²" in resp_aforo
 
 
