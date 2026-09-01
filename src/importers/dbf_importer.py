@@ -22,6 +22,7 @@ from ..utils import iso, to_date
 DBF_REQUERIDOS = [
     "hoja.dbf", "partos.dbf", "celos.dbf", "iamn.dbf",
     "pesos.dbf", "potrero.dbf", "traslado.dbf", "causas.dbf",
+    "tactos.dbf", "leche.dbf",
 ]
 
 # Marcas de campo de Visual FoxPro.
@@ -364,6 +365,34 @@ def import_partos(db: Database, records) -> dict:
                     "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha IS NULL AND id_cria = ? LIMIT 1",
                     (vaca_id, id_cria),
                 )
+            if not existe and fec is not None:
+                # Una vaca no puede parir dos veces el mismo día: si ya hay un
+                # parto de esa vaca en esa fecha sin cría vinculada (ej. se
+                # anotó en el bot antes de ponerle la chapeta definitiva), es
+                # el mismo evento -- se completa con la cría en vez de crear
+                # un parto nuevo. Si hay más de un huérfano ese día (ambiguo,
+                # p. ej. mellizos sin cría todavía) no se arriesga a adivinar.
+                huerfanos = db.query(
+                    "SELECT id FROM partos WHERE vaca_id = ? AND fecha = ? AND id_cria IS NULL",
+                    (vaca_id, fec),
+                )
+                if len(huerfanos) == 1:
+                    parto_id = huerfanos[0]["id"]
+                    db.execute(
+                        "UPDATE animales SET madre_id = COALESCE(madre_id, ?) WHERE id_animal = ?",
+                        (vaca_id, id_cria),
+                    )
+                    db.execute(
+                        """
+                        UPDATE partos SET id_cria = ?,
+                            sexo_cria = COALESCE(sexo_cria, ?),
+                            peso_nacimiento = COALESCE(peso_nacimiento, ?)
+                        WHERE id = ?
+                        """,
+                        (id_cria, sexo_cria, peso, parto_id),
+                    )
+                    duplicados += 1
+                    continue
         else:
             if fec is not None:
                 existe = db.query_one(
@@ -535,6 +564,98 @@ def import_pesajes(db: Database, records) -> dict:
     return {"nuevos": nuevos, "duplicados": duplicados}
 
 
+def import_tactos(db: Database, records) -> dict:
+    """Siembra diagnósticos de gestación (tactos/palpaciones) deduplicando
+    por vaca_id + fecha + resultado. Campo ESTADO de SG: 'P' preñada,
+    'N' vacía/negativa, 'R' repite (vuelve a servicio) -- ambas últimas se
+    tratan como vacía para el módulo de reproducción. PRENEZ es la fecha
+    estimada de concepción cuando ESTADO='P'; de ahí se calculan los días
+    de gestación al momento del tacto."""
+    nuevos = 0
+    duplicados = 0
+    for r in records:
+        tag = (r.get("CODANI") or "").strip()
+        if not tag:
+            continue
+        fec = iso(r.get("FECHA"))
+        if fec is None:
+            continue
+
+        estado_raw = (r.get("ESTADO") or "").strip().upper()
+        if estado_raw == "P":
+            resultado = "PREÑADA"
+        elif estado_raw in ("N", "R"):
+            resultado = "VACIA"
+        else:
+            continue  # estado desconocido/vacío: no hay diagnóstico real que sembrar
+
+        dias_gestacion = None
+        if resultado == "PREÑADA":
+            d_fecha = to_date(r.get("FECHA"))
+            d_prenez = to_date(r.get("PRENEZ"))
+            if d_fecha and d_prenez and (d_fecha - d_prenez).days > 0:
+                dias_gestacion = (d_fecha - d_prenez).days
+
+        aid = _get_or_create_animal(db, tag)
+        if aid is None:
+            continue
+
+        existe = db.query_one(
+            "SELECT 1 FROM diagnosticos_gestacion WHERE vaca_id = ? AND fecha = ? AND resultado = ? LIMIT 1",
+            (aid, fec, resultado),
+        )
+        if existe:
+            duplicados += 1
+            continue
+
+        db.registrar_diagnostico(
+            vaca_tag=tag, fecha=r.get("FECHA"), resultado=resultado,
+            dias_gestacion=dias_gestacion,
+        )
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
+
+
+def import_leche(db: Database, records) -> dict:
+    """Siembra controles de producción de leche deduplicando por
+    animal_id + fecha + litros. SG guarda el control en AM/PM (kg del
+    ordeño de la mañana/tarde); litros del control = AM + PM."""
+    nuevos = 0
+    duplicados = 0
+    for r in records:
+        tag = (r.get("CODANI") or "").strip()
+        if not tag:
+            continue
+        fec = iso(r.get("FECHA"))
+        if fec is None:
+            continue
+
+        am = r.get("AM") or 0
+        pm = r.get("PM") or 0
+        try:
+            litros = float(am) + float(pm)
+        except (TypeError, ValueError):
+            continue
+        if litros <= 0:
+            continue  # fila administrativa de SG sin muestra real ese día
+
+        aid = _get_or_create_animal(db, tag)
+        if aid is None:
+            continue
+
+        existe = db.query_one(
+            "SELECT 1 FROM produccion_leche WHERE animal_id = ? AND fecha = ? AND litros = ? LIMIT 1",
+            (aid, fec, litros),
+        )
+        if existe:
+            duplicados += 1
+            continue
+
+        db.registrar_leche(animal_tag=tag, fecha=r.get("FECHA"), litros=litros)
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
+
+
 def import_traslados(db: Database, records) -> dict:
     """Siembra traslados deduplicando por animal_id + fecha (+ potrero_destino)."""
     nuevos = 0
@@ -692,6 +813,10 @@ def import_dbfs(
         conteos["servicios"] = import_servicios(db, lectores["iamn.dbf"].records())
     if "pesos.dbf" in lectores:
         conteos["pesajes"] = import_pesajes(db, lectores["pesos.dbf"].records())
+    if "tactos.dbf" in lectores:
+        conteos["diagnosticos_gestacion"] = import_tactos(db, lectores["tactos.dbf"].records())
+    if "leche.dbf" in lectores:
+        conteos["produccion_leche"] = import_leche(db, lectores["leche.dbf"].records())
     if "traslado.dbf" in lectores:
         conteos["traslados"] = import_traslados(db, lectores["traslado.dbf"].records())
 

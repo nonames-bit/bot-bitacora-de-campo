@@ -6,8 +6,8 @@ import pytest
 
 from src.importers.dbf_importer import (
     DBFReader, import_animales, import_causas, import_celos, import_dbfs,
-    import_fotos, import_partos, import_pesajes, import_potreros, import_servicios,
-    import_traslados, import_zip,
+    import_fotos, import_leche, import_partos, import_pesajes, import_potreros,
+    import_servicios, import_tactos, import_traslados, import_zip,
 )
 
 
@@ -176,6 +176,45 @@ def test_import_partos_mismo_dia_con_y_sin_cria_no_colisionan(db):
     assert res3 == {"nuevos": 0, "duplicados": 2}
 
 
+def test_import_partos_completa_cria_de_parto_huerfano(db):
+    """El bot registra el parto sin cría (aún no tiene chapeta); cuando SG
+    trae el mismo parto ya con cría, se completa el registro existente en
+    vez de duplicarlo -- una vaca no puede parir dos veces el mismo día."""
+    db.registrar_animal(tag="A090", sexo="Hembra")
+    id_parto_bot = db.registrar_parto(vaca_tag="A090", fecha="2026-08-01", sexo_cria="Hembra")
+    assert db.count("partos") == 1
+
+    res = import_partos(db, [
+        {"CODANI": "A090", "FECHA": "2026-08-01", "CRIA": "H",
+         "ABORTO": "", "PESNAC": 32.0, "HIJO": "A090-6", "DETALLE": ""},
+    ])
+    assert res == {"nuevos": 0, "duplicados": 1}
+    assert db.count("partos") == 1
+
+    parto = db.query_one("SELECT * FROM partos WHERE id = ?", (id_parto_bot,))
+    assert parto["peso_nacimiento"] == 32.0
+    cria = db.get_animal("A090-6")
+    assert cria is not None
+    assert cria["madre_id"] == db.animal_id("A090")
+
+
+def test_import_partos_no_completa_si_hay_ambiguedad_de_huerfanos(db):
+    """Si hay más de un parto huérfano (sin cría) de la misma vaca el mismo
+    día -- caso raro pero posible con datos sucios -- no arriesga a
+    completar el equivocado: crea el parto nuevo con cría."""
+    db.registrar_animal(tag="A090", sexo="Hembra")
+    db.registrar_parto(vaca_tag="A090", fecha="2026-08-01", notas="huerfano 1")
+    db.registrar_parto(vaca_tag="A090", fecha="2026-08-01", notas="huerfano 2")
+    assert db.count("partos") == 2
+
+    res = import_partos(db, [
+        {"CODANI": "A090", "FECHA": "2026-08-01", "CRIA": "H",
+         "ABORTO": "", "PESNAC": 32.0, "HIJO": "A090-6", "DETALLE": ""},
+    ])
+    assert res == {"nuevos": 1, "duplicados": 0}
+    assert db.count("partos") == 3
+
+
 def test_import_animales_preserva_madre_padre_existentes(db):
     db.registrar_animal(tag="100", sexo="Hembra")
     db.registrar_animal(tag="200", sexo="Macho")
@@ -235,6 +274,60 @@ def test_import_traslados(db):
     assert res == {"nuevos": 1, "duplicados": 0}
     tr = db.query_one("SELECT * FROM traslados")
     assert tr["lote"] == "2"
+
+
+def test_import_tactos_prenada_calcula_dias_gestacion(db):
+    res = import_tactos(db, [
+        {"CODANI": "47", "FECHA": "2026-08-27", "ESTADO": "P",
+         "PRENEZ": "2026-07-17", "DETALLE": ""},
+    ])
+    assert res == {"nuevos": 1, "duplicados": 0}
+    diag = db.query_one("SELECT * FROM diagnosticos_gestacion")
+    assert diag["resultado"] == "PREÑADA"
+    assert diag["dias_gestacion"] == 41
+
+
+def test_import_tactos_negativa_y_repite_son_vacia(db):
+    res = import_tactos(db, [
+        {"CODANI": "47", "FECHA": "2026-08-01", "ESTADO": "N", "PRENEZ": None, "DETALLE": ""},
+        {"CODANI": "48", "FECHA": "2026-08-01", "ESTADO": "R", "PRENEZ": None, "DETALLE": ""},
+    ])
+    assert res == {"nuevos": 2, "duplicados": 0}
+    resultados = {d["resultado"] for d in db.query("SELECT resultado FROM diagnosticos_gestacion")}
+    assert resultados == {"VACIA"}
+
+
+def test_import_tactos_es_idempotente(db):
+    r = [{"CODANI": "47", "FECHA": "2026-08-27", "ESTADO": "P", "PRENEZ": "2026-07-17", "DETALLE": ""}]
+    import_tactos(db, r)
+    res2 = import_tactos(db, r)
+    assert res2 == {"nuevos": 0, "duplicados": 1}
+    assert db.count("diagnosticos_gestacion") == 1
+
+
+def test_import_leche_suma_am_pm(db):
+    res = import_leche(db, [
+        {"CODANI": "47", "FECHA": "2026-08-01", "AM": 6.0, "PM": 4.5},
+    ])
+    assert res == {"nuevos": 1, "duplicados": 0}
+    control = db.query_one("SELECT * FROM produccion_leche")
+    assert control["litros"] == 10.5
+
+
+def test_import_leche_ignora_filas_sin_muestra(db):
+    res = import_leche(db, [
+        {"CODANI": "47", "FECHA": "2026-08-01", "AM": 0.0, "PM": 0.0},
+    ])
+    assert res == {"nuevos": 0, "duplicados": 0}
+    assert db.count("produccion_leche") == 0
+
+
+def test_import_leche_es_idempotente(db):
+    r = [{"CODANI": "47", "FECHA": "2026-08-01", "AM": 6.0, "PM": 0.0}]
+    import_leche(db, r)
+    res2 = import_leche(db, r)
+    assert res2 == {"nuevos": 0, "duplicados": 1}
+    assert db.count("produccion_leche") == 1
 
 
 def test_import_doble_deduplicacion_completa(db):
@@ -336,10 +429,24 @@ def test_import_zip_real(db):
     assert "animales" in conteos
     assert conteos["animales"]["nuevos"] > 0
 
+    conteo_partos_p1 = db.count("partos")
+    conteo_diag_p1 = db.count("diagnosticos_gestacion")
+    conteo_leche_p1 = db.count("produccion_leche")
+
     # Segunda pasada sobre el mismo archivo zip: cero nuevos
     conteos2 = import_zip(db, zip_path)
     assert conteos2["animales"]["nuevos"] == 0
     assert conteos2["animales"]["duplicados"] > 0
+
+    # tactos.dbf / leche.dbf (si el zip los trae) también deben quedar
+    # estables en la segunda pasada -- ninguna fila nueva, todo duplicado.
+    if "diagnosticos_gestacion" in conteos2:
+        assert conteos2["diagnosticos_gestacion"]["nuevos"] == 0
+    if "produccion_leche" in conteos2:
+        assert conteos2["produccion_leche"]["nuevos"] == 0
+    assert db.count("partos") == conteo_partos_p1
+    assert db.count("diagnosticos_gestacion") == conteo_diag_p1
+    assert db.count("produccion_leche") == conteo_leche_p1
 
 
 def test_import_zip_registra_en_import_sg_historial(db):
