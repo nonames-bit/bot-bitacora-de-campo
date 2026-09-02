@@ -14,7 +14,9 @@ Este documento formaliza la hoja de ruta estratégica para las **Fases 4 a 8** d
 
 ## 🚀 Desglose Detallado por Fase
 
-### 🌅 FASE 4: El Despacho Matutino
+### 🌅 FASE 4: El Despacho Matutino — ✅ IMPLEMENTADA
+> ✅ **Estado:** Implementada en producción. Despacho matutino 05:30 AM (`src/server/telegram_bot.py` + `scripts/enviar_despacho.py`), tabla `recordatorios_programados`, comandos `/programar` y `/leche`, inseminaciones AM-PM por regla AM→tarde / PM→mañana, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60 y alertas de celo perdido integradas en el Despacho.
+
 Automatización proactiva de rutinas operativas diarias enviadas a primera hora para orientar el trabajo en potrero y establo.
 - **Briefing 5:30 AM programado:** Generación y despacho automático de resumen de prioridades del día al personal y administración.
 - **Inseminaciones AM-PM:** Notificación estricta de vacas con celo detectado (celo en la mañana $\rightarrow$ servicio en la tarde; celo en la tarde $\rightarrow$ servicio en la mañana siguiente).

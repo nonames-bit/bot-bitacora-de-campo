@@ -214,7 +214,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **402 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **510 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -363,7 +363,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Creación de índices en `SCHEMA_SQL` (incluyendo `idx_recordatorios_fecha_estado`) para acelerar consultas de inventario, partos, servicios, pesajes y traslados.
   - [x] Escapado seguro de entidades HTML (`_esc`) y chunking automático de mensajes extensos (`_enviar_texto_seguro` en Telegram).
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
-- [x] Suite de pruebas con pytest: **402 pruebas en verde** (100% pasando)
+- [x] Suite de pruebas con pytest: **510 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
@@ -376,10 +376,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Visión artificial avanzada (`src/vision/arete_detector.py`): CLAHE, filtros bilaterales, clasificación (Paleta vs Botón) y corrección de ambigüedades OCR (`O`$\leftrightarrow$`0`, `I`$\leftrightarrow$`1`, `G`$\leftrightarrow$`6`, `S`$\leftrightarrow$`5`, `B`$\leftrightarrow$`8`).
   - Monitoreo satelital multiespectral Sentinel-2 L2A (`src/gis/sentinel_ndvi.py`): cálculo de índice verde NDVI, aforo satelital (kg MV/m²), biomasa (kg MS/ha), ajuste dinámico de carga animal y alertas de sobrepastoreo/reposo.
   - Tabla SQLite `monitoreo_satelital_ndvi`, comandos `/ndvi`, `/satelite`, `/indice_verde` y botón táctil `[ 🛰️ Satélite NDVI ]`.
-- [x] Suite de pruebas con pytest: **503 pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest: **510 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
-- [ ] **Fase 4 — El Despacho Matutino**: Briefing 5:30 AM con inseminaciones AM-PM, Voisin día 3 y listo ≥30d, palpación/eco día 35/60, celo perdido >50d y alertas push ≥4d.
+> ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [ ] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada**: Simulador cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, partos distócicos y abortos.
 - [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
 - [ ] **Fase 7 — PWA Oficina + Corral Offline**: Dashboard web ejecutivo, fichas QR en PDF por lote, identificación arete foto/RFID barro y modo offline lite con cola + SOS.
