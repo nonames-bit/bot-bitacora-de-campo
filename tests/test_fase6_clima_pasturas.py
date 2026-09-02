@@ -13,13 +13,10 @@ from src.bot.bot_interface import Bot
 from src.db.database import Database
 from src.engine.pasture_engine import (
     CONSUMO_MS_UGG,
-    PCT_CONSUMO_PV,
-    PastureEngine,
     balance_forrajero_calculo,
     capacidad_carga_dinamica_ha,
     consumo_diario_ms,
     factor_ajuste_clima,
-    kg_ms_disponibles,
     ugg_de_peso,
 )
 from src.engine.query_engine import QueryEngine

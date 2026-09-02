@@ -16,7 +16,6 @@ from PIL import Image
 from src.db.database import Database
 from src.engine.query_engine import QueryEngine
 from src.gis.sentinel_ndvi import (
-    SentinelNDVI,
     ajustar_capacidad_carga_con_ndvi,
     calcular_ndvi,
     clasificar_ndvi,
@@ -27,7 +26,6 @@ from src.parsers.media_handler import extract_image_info
 from src.server.formatters import formatear_ndvi_panel
 from src.server.keyboards import crear_teclado_clima, crear_teclado_ndvi
 from src.vision.arete_detector import (
-    AreteDetector,
     clasificar_tipo_arete,
     corregir_caracteres_confusos,
     detectar_arete_avanzado,

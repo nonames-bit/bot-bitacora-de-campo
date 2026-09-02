@@ -660,9 +660,6 @@ class Database:
             registrado_por=registrado_por,
         ))
 
-    def get_potrero(self, potrero_id: int):
-        return self.query_one("SELECT * FROM potreros WHERE id = ?", (potrero_id,))
-
     def obtener_aforos(self, potrero_id: Optional[int] = None, limite: int = 20) -> list[sqlite3.Row]:
         """Obtiene el historial de aforos registrados."""
         if potrero_id:

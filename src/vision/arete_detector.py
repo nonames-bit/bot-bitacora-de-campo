@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from typing import Optional, Tuple
+from typing import Optional
 
 logger = logging.getLogger("bitacora.vision.arete")
 
@@ -124,7 +124,6 @@ def mejorar_imagen_para_ocr(image_path: str, output_path: Optional[str] = None) 
     # 1. Intentar OpenCV (alta precisión morfológica)
     try:
         import cv2
-        import numpy as np
 
         img = cv2.imread(image_path)
         if img is not None:
@@ -153,7 +152,7 @@ def mejorar_imagen_para_ocr(image_path: str, output_path: Optional[str] = None) 
 
     # 2. Fallback con PIL (Pillow)
     try:
-        from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+        from PIL import Image, ImageEnhance, ImageOps
 
         with Image.open(image_path) as img:
             # Escala de grises

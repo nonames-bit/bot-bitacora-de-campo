@@ -887,7 +887,7 @@ def construir_application(
             )
             msg = formatear_estado_termo(db)
             await update.message.reply_text(
-                f"✅ <b>Recarga de Nitrógeno Registrada</b>\n\n" + msg,
+                "✅ <b>Recarga de Nitrógeno Registrada</b>\n\n" + msg,
                 parse_mode="HTML",
                 reply_markup=crear_teclado_reproduccion_detalle(),
             )

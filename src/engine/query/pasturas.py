@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import html
 import re
+from typing import Optional
 
 from ...utils import normalizar, to_date
 from .helpers import (

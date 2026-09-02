@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import re
+from typing import Optional
 
 from ...utils import add_days, iso, to_date
 from ..reproductive_engine import fecha_palpacion, fecha_secado
