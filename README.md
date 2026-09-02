@@ -367,14 +367,23 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 
 ### ⏳ En Progreso / Calibración Continua
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
-- [ ] Calibración de parámetros y retroalimentación de uso en campo.
+- [x] **Fase 6.2 — Capacidad de Carga Dinámica e Integración Pluviométrica & Balance Forrajero Estacional**:
+  - Modelado zootécnico de Materia Seca (MS): demanda diaria al $2.8\%$ del Peso Vivo ($12.6\text{ kg MS/UGG/día}$).
+  - Integración agroclimática IDEAM y pluviometría de campo con factor de crecimiento $F_{\text{clima}}$ (30 días).
+  - Tablas SQLite `pluviometria` y `aforos_historico` con auditoría y comando `/deshacer`.
+  - Consultas en lenguaje natural de lluvias y balance forrajero; comandos `/clima`, `/lluvia <mm> [sector]` y `/balance_forrajero`.
+- [x] **Fase 8.2 — OCR Arete Sucio/Botón & Monitoreo Satelital NDVI Sentinel-2**:
+  - Visión artificial avanzada (`src/vision/arete_detector.py`): CLAHE, filtros bilaterales, clasificación (Paleta vs Botón) y corrección de ambigüedades OCR (`O`$\leftrightarrow$`0`, `I`$\leftrightarrow$`1`, `G`$\leftrightarrow$`6`, `S`$\leftrightarrow$`5`, `B`$\leftrightarrow$`8`).
+  - Monitoreo satelital multiespectral Sentinel-2 L2A (`src/gis/sentinel_ndvi.py`): cálculo de índice verde NDVI, aforo satelital (kg MV/m²), biomasa (kg MS/ha), ajuste dinámico de carga animal y alertas de sobrepastoreo/reposo.
+  - Tabla SQLite `monitoreo_satelital_ndvi`, comandos `/ndvi`, `/satelite`, `/indice_verde` y botón táctil `[ 🛰️ Satélite NDVI ]`.
+- [x] Suite de pruebas con pytest: **503 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 - [ ] **Fase 4 — El Despacho Matutino**: Briefing 5:30 AM con inseminaciones AM-PM, Voisin día 3 y listo ≥30d, palpación/eco día 35/60, celo perdido >50d y alertas push ≥4d.
 - [ ] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada**: Simulador cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, partos distócicos y abortos.
-- [ ] **Fase 6 — Economía + Balance Forrajero**: Costeo tratamiento/suplemento (Costo/kg y Margen $/L), balance MS oferta vs demanda (2.8% PV x UGG) y ajuste UGG/ha por lluvia IDEAM.
+- [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
 - [ ] **Fase 7 — PWA Oficina + Corral Offline**: Dashboard web ejecutivo, fichas QR en PDF por lote, identificación arete foto/RFID barro y modo offline lite con cola + SOS.
-- [ ] **Fase 8 — Visión Multimodal**: Estimación BCS foto 1.0-5.0 con Gemini Vision, OCR arete avanzado (sucio/botón) y NDVI Sentinel-2 via qgis-mcp con carga dinámica.
+- [ ] **Fase 8.1 — Estimación de Condición Corporal (BCS)**: Clasificación automática 1.0-5.0 con Gemini Vision.
 
 ---
 

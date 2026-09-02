@@ -408,6 +408,7 @@ Para backups pesados (con fotos históricas):
 | `/clima`, `/lluvias` | Todos | Reporte Pluviométrico & Clima IDEAM con acumulados y ajuste forrajero. |
 | `/lluvia <mm> [sec]` | Todos | Registro rápido de milímetros de precipitación (ej. `/lluvia 35 sector bajo`). |
 | `/balance_forrajero` | Todos | Balance forrajero de Materia Seca (MS): oferta diaria vs demanda hato (2.8% PV). |
+| `/ndvi`, `/satelite` | Todos | Monitoreo satelital Sentinel-2 (NDVI), aforo satelital y vigor de potreros. |
 | `/status`, `/tablero` | Admin / Owner | Tablero zootécnico general de la finca y novedades semanales. |
 | `/poblacion` | Admin / Owner | Pirámide de edades y brackets demográficos de SG. |
 | `/genetica` | Admin / Owner | Composición racial y cruces del hato. |

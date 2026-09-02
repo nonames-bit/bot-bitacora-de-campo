@@ -212,6 +212,7 @@ Al consultar cualquier animal (escribiendo su número ej. `47`, `/consulta N069`
 | `/clima`, `/lluvias`, `/pluviometro` | **Reporte Pluviométrico & Clima IDEAM**: Acumulado de lluvias (7d, 30d, año), estación agroclimática y ajuste forrajero. | `/clima`, `/lluvias` |
 | `/lluvia <mm> [sector]` | **Registro Rápido de Lluvia**: Anota los milímetros (mm) de precipitación del pluviómetro. | `/lluvia 35`, `/lluvia 28 sector bajo` |
 | `/balance_forrajero`, `/balance_ms` | **Balance Forrajero & Oferta de Materia Seca (MS)**: Oferta diaria sostenible vs demanda del hato ($2.8\%$ PV $\times$ UGG). | `/balance_forrajero`, `/balance_ms` |
+| `/ndvi`, `/satelite`, `/indice_verde` | **Monitoreo Satelital de Pasturas (Sentinel-2)**: Ranking de potreros por índice verde (NDVI), aforo satelital y alertas de sobrepastoreo. | `/ndvi`, `/satelite` |
 | `/animales` | Resumen del inventario actual (hembras, machos, total activos). | `/animales` |
 | `/status`, `/tablero`, `/finca` | **Tablero Zootécnico Ejecutivo**: Novedades de la semana, alertas próximas y pasturas. | `/status`, `/tablero`, `/finca` |
 | `/sistema`, `/servidor`, `/vps` | **Tablero Técnico del Servidor**: Recursos VPS, RAM, disco SSD, SQLite y estado de APIs. | `/sistema`, `/servidor` |

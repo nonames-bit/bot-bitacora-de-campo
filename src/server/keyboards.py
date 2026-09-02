@@ -511,11 +511,14 @@ def crear_teclado_clima() -> InlineKeyboardMarkup:
             InlineKeyboardButton("🌧️ Reporte Pluviométrico", callback_data="cmd:clima"),
         ],
         [
+            InlineKeyboardButton("🛰️ Satélite NDVI", callback_data="cmd:ndvi"),
             InlineKeyboardButton("🌱 Aforo Potreros", callback_data="panel_grafico:aforo"),
-            InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
         ],
         [
-            InlineKeyboardButton("🌿 Potreros & Pasturas", callback_data="cmd:potreros"),
+            InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
+            InlineKeyboardButton("🌿 Potreros SG", callback_data="cmd:potreros"),
+        ],
+        [
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ],
     ]
@@ -531,6 +534,22 @@ def crear_teclado_clima_detalle() -> InlineKeyboardMarkup:
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_ndvi() -> InlineKeyboardMarkup:
+    """Teclado interactivo para el panel satelital NDVI Sentinel-2 (Fase 8.2)."""
+    keyboard = [
+        [
+            InlineKeyboardButton("🌾 Balance Forrajero", callback_data="cmd:balance_forrajero"),
+            InlineKeyboardButton("🌧️ Reporte Pluviométrico", callback_data="cmd:clima"),
+        ],
+        [
+            InlineKeyboardButton("🌿 Matriz Potreros", callback_data="cmd:potreros"),
+            InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
 
 
 

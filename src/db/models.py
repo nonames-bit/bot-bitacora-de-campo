@@ -232,6 +232,21 @@ CREATE TABLE IF NOT EXISTS aforos_historico (
     registrado_por INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS monitoreo_satelital_ndvi (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    potrero_id INTEGER NOT NULL,
+    fecha TEXT NOT NULL,
+    ndvi_promedio REAL NOT NULL,
+    ndvi_min REAL,
+    ndvi_max REAL,
+    biomasa_estimada_kg_ha REAL,
+    aforo_estimado_kg_m2 REAL,
+    cobertura_nubes_pct REAL DEFAULT 0.0,
+    fuente TEXT DEFAULT 'Sentinel-2 L2A',
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
 CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
@@ -250,6 +265,7 @@ CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro)
 CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
 CREATE INDEX IF NOT EXISTS idx_pluviometria_fecha ON pluviometria(fecha);
 CREATE INDEX IF NOT EXISTS idx_aforos_potrero_fecha ON aforos_historico(potrero_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_ndvi_potrero_fecha ON monitoreo_satelital_ndvi(potrero_id, fecha);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -258,7 +274,7 @@ TABLAS = [
     "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
-    "termo_nitrogeno", "pluviometria", "aforos_historico",
+    "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
 ]
 
 
@@ -467,6 +483,23 @@ class AforoHistorico:
     creado_en: Optional[str] = None
     registrado_por: Optional[int] = None
     id: Optional[int] = None
+
+
+@dataclass
+class MonitoreoSatelitalNDVI:
+    potrero_id: int = 0
+    fecha: str = ""
+    ndvi_promedio: float = 0.0
+    ndvi_min: Optional[float] = None
+    ndvi_max: Optional[float] = None
+    biomasa_estimada_kg_ha: Optional[float] = None
+    aforo_estimado_kg_m2: Optional[float] = None
+    cobertura_nubes_pct: float = 0.0
+    fuente: str = "Sentinel-2 L2A"
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
+
 
 
 

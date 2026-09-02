@@ -289,7 +289,10 @@ class QueryEngine(
         if re.search(r"\bcondici[oó]n\s+corporal\b|\bpuntaje\s+corporal\b", t):
             return self._condicion_corporal(tag)
 
-        # 7c. Pluviometría, Clima y Balance Forrajero (Fase 6.2)
+        # 7c. Pluviometría, Clima y Balance Forrajero (Fase 6.2) & NDVI Satelital (Fase 8.2)
+        if re.search(r"\b(?:ndvi|sat[eé]lite|satelital|sentinel|indice\s+verde|vigor\s+forrajero|monitoreo\s+satelital)\b", t):
+            return self._consulta_ndvi_satelital()
+
         if re.search(r"\b(?:balance\s+forrajero|balance\s+de\s+pasto|balance\s+materia\s+seca|oferta\s+vs\s+demanda|demanda\s+forrajera|suficiencia\s+forrajera)\b", t) or (
             re.search(r"\bbalance\b", t) and re.search(r"\b(?:pasto|pasturas?|forraj|materia\s+seca|ms)\b", t)
         ):

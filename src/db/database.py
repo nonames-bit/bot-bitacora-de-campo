@@ -20,7 +20,7 @@ class Database:
         "partos", "muertes", "servicios", "celos", "tratamientos",
         "traslados", "pesajes", "movimientos", "condicion_corporal",
         "produccion_leche", "diagnosticos_gestacion", "pluviometria",
-        "aforos_historico",
+        "aforos_historico", "monitoreo_satelital_ndvi",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -679,6 +679,136 @@ class Database:
             (limite,),
         )
 
+    def registrar_lectura_ndvi(
+        self,
+        potrero_id_o_nom,
+        ndvi_promedio: float,
+        fecha: Optional[str] = None,
+        ndvi_min: Optional[float] = None,
+        ndvi_max: Optional[float] = None,
+        biomasa_estimada_kg_ha: Optional[float] = None,
+        aforo_estimado_kg_m2: Optional[float] = None,
+        cobertura_nubes_pct: float = 0.0,
+        fuente: str = "Sentinel-2 L2A",
+        registrado_por: Optional[int] = None,
+    ) -> int:
+        """Registra una lectura satelital NDVI para un potrero."""
+        pot_id = self.resolve_potrero(potrero_id_o_nom) if potrero_id_o_nom else None
+        if not pot_id:
+            # Buscar por id directo
+            try:
+                pot_id = int(potrero_id_o_nom)
+            except (TypeError, ValueError):
+                pot_id = self.registrar_potrero(nombre=str(potrero_id_o_nom))
+
+        fecha_iso = iso(fecha) or date.today().isoformat()
+        return self.insert("monitoreo_satelital_ndvi", dict(
+            potrero_id=pot_id,
+            fecha=fecha_iso,
+            ndvi_promedio=float(ndvi_promedio),
+            ndvi_min=float(ndvi_min) if ndvi_min is not None else None,
+            ndvi_max=float(ndvi_max) if ndvi_max is not None else None,
+            biomasa_estimada_kg_ha=float(biomasa_estimada_kg_ha) if biomasa_estimada_kg_ha is not None else None,
+            aforo_estimado_kg_m2=float(aforo_estimado_kg_m2) if aforo_estimado_kg_m2 is not None else None,
+            cobertura_nubes_pct=float(cobertura_nubes_pct),
+            fuente=fuente,
+            registrado_por=registrado_por,
+        ))
+
+    def obtener_ndvi_reciente(self, potrero_id: Optional[int] = None, limite: int = 20) -> list[sqlite3.Row]:
+        """Obtiene las lecturas satelitales NDVI más recientes."""
+        if potrero_id:
+            return self.query(
+                "SELECT n.*, p.nombre AS potrero_nombre, p.area_has "
+                "FROM monitoreo_satelital_ndvi n "
+                "JOIN potreros p ON p.id = n.potrero_id "
+                "WHERE n.potrero_id = ? ORDER BY n.fecha DESC, n.id DESC LIMIT ?",
+                (potrero_id, limite),
+            )
+        return self.query(
+            "SELECT n.*, p.nombre AS potrero_nombre, p.area_has "
+            "FROM monitoreo_satelital_ndvi n "
+            "JOIN potreros p ON p.id = n.potrero_id "
+            "ORDER BY n.fecha DESC, n.id DESC LIMIT ?",
+            (limite,),
+        )
+
+    def resumen_ndvi_finca(self) -> dict:
+        """Calcula el estado satelital consolidado de los potreros de la finca."""
+        from ..gis.sentinel_ndvi import clasificar_ndvi, estimar_aforo_kg_m2_desde_ndvi, estimar_biomasa_ms_ha
+
+        # Obtener la última lectura de cada potrero
+        query = (
+            "SELECT p.id AS potrero_id, p.nombre AS potrero_nombre, p.area_has, "
+            "p.dias_ocupacion, p.dias_reposo, "
+            "n.fecha, n.ndvi_promedio, n.biomasa_estimada_kg_ha, n.aforo_estimado_kg_m2, "
+            "n.cobertura_nubes_pct, n.fuente "
+            "FROM potreros p "
+            "LEFT JOIN monitoreo_satelital_ndvi n ON n.id = ("
+            "  SELECT id FROM monitoreo_satelital_ndvi "
+            "  WHERE potrero_id = p.id ORDER BY fecha DESC, id DESC LIMIT 1"
+            ") ORDER BY p.id ASC"
+        )
+        filas = self.query(query)
+        if not filas:
+            return {"potreros": [], "promedio_ndvi": 0.0, "categoria": "SIN DATOS"}
+
+        potreros_res = []
+        suma_ndvi = 0.0
+        con_datos = 0
+
+        for f in filas:
+            ndvi_val = f["ndvi_promedio"]
+            if ndvi_val is None:
+                # Simular o inferir a partir de ocupación/reposo
+                d_ocup = f["dias_ocupacion"] or 0
+                d_rep = f["dias_reposo"] or 0
+                if d_ocup > 3:
+                    ndvi_val = max(0.32, 0.48 - (d_ocup * 0.025))
+                elif d_rep > 25:
+                    ndvi_val = min(0.80, 0.55 + (d_rep * 0.006))
+                else:
+                    ndvi_val = 0.56
+
+            cls_info = clasificar_ndvi(ndvi_val)
+            aforo = f["aforo_estimado_kg_m2"] or estimar_aforo_kg_m2_desde_ndvi(ndvi_val)
+            biomasa = f["biomasa_estimada_kg_ha"] or estimar_biomasa_ms_ha(ndvi_val)
+
+            potreros_res.append({
+                "potrero_id": f["potrero_id"],
+                "potrero_nombre": f["potrero_nombre"] or f"Potrero {f['potrero_id']}",
+                "area_has": f["area_has"] or 0.0,
+                "fecha": f["fecha"] or date.today().isoformat(),
+                "ndvi": round(ndvi_val, 3),
+                "categoria": cls_info["categoria"],
+                "emoji": cls_info["emoji"],
+                "descripcion": cls_info["descripcion"],
+                "alerta": cls_info["alerta"],
+                "aforo_kg_m2": round(aforo, 2),
+                "biomasa_ms_ha": round(biomasa, 1),
+                "fuente": f["fuente"] or "Sentinel-2 L2A",
+            })
+            suma_ndvi += ndvi_val
+            con_datos += 1
+
+        promedio = round(suma_ndvi / con_datos, 3) if con_datos > 0 else 0.0
+        cls_finca = clasificar_ndvi(promedio)
+
+        # Ordenar potreros por vigor (mayor NDVI a menor NDVI)
+        potreros_ordenados = sorted(potreros_res, key=lambda x: x["ndvi"], reverse=True)
+
+        return {
+            "potreros": potreros_res,
+            "ranking": potreros_ordenados,
+            "promedio_ndvi": promedio,
+            "categoria_finca": cls_finca["categoria"],
+            "emoji_finca": cls_finca["emoji"],
+            "descripcion_finca": cls_finca["descripcion"],
+            "total_potreros": len(potreros_res),
+            "alertas_sobrepastoreo": [p for p in potreros_res if p["alerta"]],
+        }
+
+
     def registrar_foto(self, ruta: str, animal_tag=None, fecha=None,
                        caption=None, user_id=None, notas=None, ocr_text=None) -> int:
         tag_str = str(animal_tag).strip() if animal_tag else None
@@ -1290,12 +1420,12 @@ class Database:
         que /deshacer muestre qué se va a borrar antes de confirmar."""
         if tabla not in self.TABLAS_EVENTOS:
             return None
-        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else ("animal_id" if tabla not in ("pluviometria", "aforos_historico") else None)
+        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else ("animal_id" if tabla not in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi") else None)
         fila = self.query_one(f"SELECT * FROM {tabla} WHERE id = ?", (id_registro,))
         if fila is None:
             return None
         animal = self.get_animal(fila[fk_animal]) if fk_animal and fila[fk_animal] is not None else None
-        tag = animal["tag"] if animal else ("-" if tabla in ("pluviometria", "aforos_historico") else "?")
+        tag = animal["tag"] if animal else ("-" if tabla in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi") else "?")
         resumenes = {
             "partos": lambda f: f"Parto de {tag} — cría {f['sexo_cria'] or '?'}",
             "muertes": lambda f: f"Muerte de {tag}" + (f" — {f['causa_presunta']}" if f["causa_presunta"] else ""),
@@ -1310,6 +1440,7 @@ class Database:
             "diagnosticos_gestacion": lambda f: f"Diagnóstico de gestación de {tag}: {f['resultado'] or '?'}" + (f" ({f['dias_gestacion']}d)" if f["dias_gestacion"] else ""),
             "pluviometria": lambda f: f"Pluviometría: {f['mm_lluvia']}mm" + (f" ({f['estacion_o_sector']})" if f["estacion_o_sector"] else ""),
             "aforos_historico": lambda f: f"Aforo potrero #{f['potrero_id']}: {f['aforo_kg_m2']} kg/m²",
+            "monitoreo_satelital_ndvi": lambda f: f"Lectura satelital potrero #{f['potrero_id']}: NDVI {f['ndvi_promedio']}",
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,

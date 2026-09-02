@@ -2451,3 +2451,39 @@ def formatear_balance_forrajero_panel(db: Database, hoy: Optional[date] = None) 
     return "\n".join(lineas)
 
 
+def formatear_ndvi_panel(db, limite: int = 10) -> str:
+    """Genera el panel interactivo de telemetría satelital NDVI (Sentinel-2)."""
+    res_ndvi = db.resumen_ndvi_finca()
+    potreros = res_ndvi.get("potreros", [])
+    if not potreros:
+        return "🛰️ <b>MONITOREO SATELITAL NDVI (SENTINEL-2)</b>\n\nNo hay potreros registrados para monitoreo satelital."
+
+    lineas = [
+        "🛰️ <b>MONITOREO SATELITAL DE PASTURAS (SENTINEL-2)</b>",
+        f"📊 <b>Índice Verde Promedio:</b> <b>{res_ndvi['promedio_ndvi']:.3f}</b> {res_ndvi['emoji_finca']}",
+        f"🌿 <b>Estado General:</b> <b>{res_ndvi['categoria_finca']}</b>",
+        f"ℹ️ <i>{res_ndvi['descripcion_finca']}</i>",
+        "────────────────────────────────────────",
+        "🌱 <b>POTREROS ORDENADOS POR VIGOR FORRAJERO:</b>",
+    ]
+
+    for p in res_ndvi.get("ranking", [])[:limite]:
+        alerta_str = " ⚠️ <i>(Estrés/Sobrepastoreo)</i>" if p["alerta"] else ""
+        lineas.append(
+            f"• {p['emoji']} <b>{p['potrero_nombre']}</b> ({p['area_has']} ha) — <b>NDVI: {p['ndvi']:.3f}</b>\n"
+            f"   └ <i>Aforo satelital:</i> {p['aforo_kg_m2']} kg/m² · <i>Biomasa:</i> {p['biomasa_ms_ha']} kg MS/ha{alerta_str}"
+        )
+
+    alertas = res_ndvi.get("alertas_sobrepastoreo", [])
+    if alertas:
+        lineas.append("────────────────────────────────────────")
+        lineas.append(f"⚠️ <b>ALERTA DE DESCANSO OBLIGATORIO ({len(alertas)} potreros):</b>")
+        for a in alertas:
+            lineas.append(f"• 🔴 <b>{a['potrero_nombre']}</b>: NDVI {a['ndvi']:.3f} ({a['categoria']})")
+
+    lineas.append("────────────────────────────────────────")
+    lineas.append("💡 <i>Imágenes Sentinel-2 L2A corregidas atmosféricamente (10m resolución).</i>")
+    return "\n".join(lineas)
+
+
+

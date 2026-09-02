@@ -202,17 +202,28 @@ def extract_image_info(image_path: str,
             info.factura_pajuelas = fac
         return info
 
-    # Intentar OCR local con OCREngine
+    # Intentar OCR local con OCREngine y visión avanzada de aretes
     from ..ocr.factura_parser import parse_factura_pajuelas
     from ..ocr.ocr_engine import OCREngine
+    from ..vision.arete_detector import detectar_arete_avanzado
     engine = OCREngine()
     if engine.is_available():
         texto_ocr = engine.extract_text(image_path)
-        if texto_ocr:
+        tags_encontrados = engine.detect_tags(texto_ocr) if texto_ocr else []
+
+        # Si no se encontraron tags o la imagen es un arete difícil, usar visión avanzada
+        if not tags_encontrados and os.path.isfile(image_path):
+            vis_res = detectar_arete_avanzado(image_path)
+            if vis_res.get("tag"):
+                tags_encontrados = [vis_res["tag"]]
+                if not texto_ocr:
+                    texto_ocr = vis_res.get("texto_bruto", "")
+
+        if texto_ocr or tags_encontrados:
             info = ImageInfo(
                 ocr_text=texto_ocr,
                 texto_detectado=texto_ocr,
-                tags=engine.detect_tags(texto_ocr),
+                tags=tags_encontrados,
             )
             med = engine.detect_medicamento(texto_ocr)
             if med and med.get("producto"):

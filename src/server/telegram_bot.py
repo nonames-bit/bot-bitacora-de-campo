@@ -77,6 +77,7 @@ from .formatters import (
     formatear_instrucciones_importar,
     formatear_kpis_reproduccion,
     formatear_leche_animal_tab,
+    formatear_ndvi_panel,
     formatear_panel_buscar_animal_texto,
     formatear_panel_medicamentos,
     formatear_panel_preguntas_rapidas_texto,
@@ -176,6 +177,7 @@ def construir_application(
         crear_teclado_graficos,
         crear_teclado_guia_chat,
         crear_teclado_medicamentos,
+        crear_teclado_ndvi,
         crear_teclado_poblacion,
         crear_teclado_poblacion_detalle,
         crear_teclado_preguntas_rapidas,
@@ -1016,6 +1018,24 @@ def construir_application(
             logger.error("Error en cmd_balance_forrajero: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_ndvi(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            msg = formatear_ndvi_panel(db)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_ndvi()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_ndvi: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
 
 
     async def cmd_duplicados(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2387,6 +2407,16 @@ def construir_application(
                 if query.message:
                     await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_clima())
 
+            elif data == "cmd:ndvi":
+                await query.answer()
+                if not auth.es_autorizado(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                msg = formatear_ndvi_panel(db)
+                if query.message:
+                    await query.message.reply_text(msg, parse_mode="HTML", reply_markup=crear_teclado_ndvi())
+
             elif data == "cmd:potreros_sg":
                 await query.answer()
                 if not auth.puede_administrar(user_id):
@@ -3052,6 +3082,7 @@ def construir_application(
     app.add_handler(CommandHandler(["clima", "lluvias", "pluviometro"], cmd_clima))
     app.add_handler(CommandHandler(["lluvia", "precipitacion"], cmd_lluvia))
     app.add_handler(CommandHandler(["balance_forrajero", "balance_ms", "balance_pasto"], cmd_balance_forrajero))
+    app.add_handler(CommandHandler(["ndvi", "satelite", "indice_verde", "satelital"], cmd_ndvi))
     app.add_handler(CommandHandler(["duplicados", "duplicados_geneticos"], cmd_duplicados))
     app.add_handler(CommandHandler(["ultimos", "ultimos_registros"], cmd_ultimos))
     app.add_handler(CommandHandler("deshacer", cmd_deshacer))

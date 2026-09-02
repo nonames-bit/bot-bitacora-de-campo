@@ -35,6 +35,11 @@ class FacturaPajuelasInfo:
     proveedor: Optional[str] = None
     texto_extraido: str = ""
     propuesta_mensaje: str = ""
+    codigos: list = None
+
+    def __post_init__(self):
+        if self.codigos is None:
+            self.codigos = []
 
 
 def _parse_monto(val_str: str) -> Optional[float]:
@@ -296,8 +301,68 @@ def parse_factura_pajuelas(text_or_image: str) -> FacturaPajuelasInfo:
         or (indicios_factura and (toro is not None or cantidad is not None or total_val is not None))
     )
 
+    # Fallback para facturas de GENETICA SELECTA sin palabra "pajuelas" pero con códigos 7BS852 etc.
+    codigos = []
+    if es_factura and (toro is None or cantidad is None):
+        # códigos tipo 7BS852, 7H10721, 7JE1190
+        posibles_codigos = re.findall(r"\b7[A-Z]{1,3}\d{2,5}\b", texto)
+        # filtrar NITROGENO y duplicados
+        for c in posibles_codigos:
+            if c.upper() != "NITROGENO" and c not in codigos:
+                codigos.append(c)
+        if codigos:
+            if toro is None:
+                toro = codigos[0]
+            if cantidad is None:
+                # sumar CANTIDAD de cada línea que contiene un código
+                total_cant = 0
+                for line in texto.splitlines():
+                    for cod in codigos:
+                        if cod in line:
+                            # cantidad es el número pequeño antes de $ precio (ej 5 $71,200)
+                            m_cant = re.search(r"\b(\d{1,3})\b\s+\$\s*\d", line)
+                            if not m_cant:
+                                m_cant = re.search(r"\b(\d{1,2})\b(?=\s+\$)", line)
+                            if m_cant:
+                                try:
+                                    total_cant += int(m_cant.group(1))
+                                except:
+                                    pass
+                            break
+                # fallback: si no se pudo parsear cantidades, suma por regex simple de números aislados 5,10 en líneas con código
+                if total_cant == 0:
+                    # extrae todos los números de cantidad en líneas con código (ej 5,10)
+                    for line in texto.splitlines():
+                        if any(c in line for c in codigos):
+                            nums = re.findall(r"\b(\d{1,2})\b", line)
+                            # el último número pequeño antes del precio suele ser cantidad (5,10)
+                            for n in reversed(nums):
+                                if 1 <= int(n) <= 99:
+                                    total_cant += int(n)
+                                    break
+                if total_cant > 0:
+                    cantidad = total_cant
+        # también si solo hay un código, ya tenemos toro y cantidad
+
+    # si hay múltiples códigos, propuesta resume
     propuesta = ""
-    if toro and cantidad:
+    if codigos and len(codigos) > 1:
+        # resumen tipo "7BS852 x5, 7H10721 x10..."
+        # extraer cantidades por código para propuesta
+        detalle = []
+        for cod in codigos[:2]:
+            # buscar cantidad en línea de ese código
+            for line in texto.splitlines():
+                if cod in line:
+                    m = re.search(r"\b(\d{1,3})\b\s+\$", line)
+                    if m:
+                        detalle.append(f"{cod} x{m.group(1)}")
+                    else:
+                        detalle.append(cod)
+                    break
+        detalle_str = ", ".join(detalle) + ("..." if len(codigos) > 2 else "")
+        propuesta = f"Detecté {len(codigos)} códigos de pajuelas ({detalle_str}) ¿cargar al termo?"
+    elif toro and cantidad:
         propuesta = f"Detecté compra de {cantidad} pajuelas toro {toro}, ¿confirmar?"
     elif cantidad:
         propuesta = f"Detecté compra de {cantidad} pajuelas, ¿confirmar?"
@@ -314,4 +379,5 @@ def parse_factura_pajuelas(text_or_image: str) -> FacturaPajuelasInfo:
         proveedor=proveedor,
         texto_extraido=texto,
         propuesta_mensaje=propuesta,
+        codigos=codigos,
     )
