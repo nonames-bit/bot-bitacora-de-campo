@@ -613,18 +613,21 @@ class Database:
         lluvia_mes = self.acumulado_lluvia(desde=iso(primer_dia_mes), hasta=f_hoy, hoy=ref)
         lluvia_anio = self.acumulado_lluvia(desde=f"{ref.year}-01-01", hasta=f_hoy, hoy=ref)
 
-        # Clasificación estacional según precipitación mensual (30 días)
+        # Clasificación estacional según precipitación mensual (30 días). El factor de
+        # crecimiento usa la misma fórmula continua que ClimaIDEAM.clasificar_estacionalidad()
+        # (factor_ajuste_clima), para que /clima y /balance_forrajero nunca muestren un
+        # ajuste climático distinto para la misma lluvia — antes esta tabla tenía sus
+        # propios 3 valores fijos (1.2/0.85/0.5) independientes de esa fórmula.
+        from ..engine.pasture_engine import factor_ajuste_clima
+        factor_crecimiento = round(factor_ajuste_clima(lluvia_30d), 2)
         if lluvia_30d >= 150.0:
             estacion = "ÉPOCA DE LLUVIAS (Alta Oferta)"
-            factor_crecimiento = 1.2
             icono = "🌧️"
         elif lluvia_30d >= 50.0:
             estacion = "TRANSICIÓN (Oferta Moderada)"
-            factor_crecimiento = 0.85
             icono = "⛅"
         else:
             estacion = "ÉPOCA SECA / VERANO (Oferta Restringida)"
-            factor_crecimiento = 0.5
             icono = "☀️"
 
         # Estimado satelital de referencia (Fase D, CHIRPS vía Earth Engine). CHIRPS

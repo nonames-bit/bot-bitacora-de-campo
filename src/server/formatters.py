@@ -2362,6 +2362,13 @@ def formatear_clima_panel(db: Database, hoy: Optional[date] = None) -> str:
         f"• <b>Últimos 30 días (Mes móvil):</b> <b>{res['ultimos_30d_mm']:.1f} mm</b>",
         f"• <b>Mes actual en curso:</b> <b>{res['mes_actual_mm']:.1f} mm</b>",
         f"• <b>Acumulado Anual ({ref.year}):</b> <b>{res['anio_actual_mm']:.1f} mm</b>",
+    ]
+    if res.get("satelital_mm") is not None:
+        lineas.append(
+            f"🛰️ <b>Estimado Satelital (CHIRPS, {res['satelital_dias']}d hasta {res['satelital_fecha']}):</b> "
+            f"<b>{res['satelital_mm']:.1f} mm</b> · registrado: {res['ultimos_30d_mm']:.1f} mm"
+        )
+    lineas += [
         "────────────────────────────────────────",
         f"{info['icono']} <b>Temporada Actual:</b> <b>{info['estacion']}</b>",
         f"🌿 <b>Factor Rebrote Forrajero:</b> <b>{info['factor_clima']}x</b>",
