@@ -370,8 +370,9 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
 - [x] **Fase 6.2 — Capacidad de Carga Dinámica e Integración Pluviométrica & Balance Forrajero Estacional**:
   - Modelado zootécnico de Materia Seca (MS): demanda diaria al $2.8\%$ del Peso Vivo ($12.6\text{ kg MS/UGG/día}$).
-  - Integración agroclimática IDEAM y pluviometría de campo con factor de crecimiento $F_{\text{clima}}$ (30 días).
-  - Tablas SQLite `pluviometria` y `aforos_historico` con auditoría y comando `/deshacer`.
+  - Integración agroclimática IDEAM (referencia histórica mensual) y pluviometría de campo con factor de crecimiento $F_{\text{clima}}$ (30 días).
+  - Lluvia satelital real de contraste (CHIRPS vía Google Earth Engine, Fase D del plan geoespacial) junto al registro manual en `/clima` — no reemplaza el pluviómetro físico.
+  - Tablas SQLite `pluviometria`, `aforos_historico` y `monitoreo_satelital_lluvia` con auditoría y comando `/deshacer`.
   - Consultas en lenguaje natural de lluvias y balance forrajero; comandos `/clima`, `/lluvia <mm> [sector]` y `/balance_forrajero`.
 - [x] **Fase 8.2 — OCR Arete Sucio/Botón & Monitoreo Satelital NDVI Sentinel-2 (real)**:
   - Visión artificial avanzada (`src/vision/arete_detector.py`): CLAHE, filtros bilaterales, clasificación (Paleta vs Botón) y corrección de ambigüedades OCR (`O`$\leftrightarrow$`0`, `I`$\leftrightarrow$`1`, `G`$\leftrightarrow$`6`, `S`$\leftrightarrow$`5`, `B`$\leftrightarrow$`8`).

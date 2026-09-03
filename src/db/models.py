@@ -269,6 +269,18 @@ CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
 CREATE INDEX IF NOT EXISTS idx_pluviometria_fecha ON pluviometria(fecha);
 CREATE INDEX IF NOT EXISTS idx_aforos_potrero_fecha ON aforos_historico(potrero_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_ndvi_potrero_fecha ON monitoreo_satelital_ndvi(potrero_id, fecha);
+
+CREATE TABLE IF NOT EXISTS monitoreo_satelital_lluvia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    dias_acumulados INTEGER NOT NULL DEFAULT 30,
+    mm_estimado REAL NOT NULL,
+    fuente TEXT DEFAULT 'CHIRPS (UCSB-CHG, vía Google Earth Engine)',
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_lluvia_satelital_fecha ON monitoreo_satelital_lluvia(fecha);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -278,6 +290,7 @@ TABLAS = [
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
+    "monitoreo_satelital_lluvia",
 ]
 
 

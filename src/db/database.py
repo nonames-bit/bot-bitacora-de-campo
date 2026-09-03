@@ -20,7 +20,7 @@ class Database:
         "partos", "muertes", "servicios", "celos", "tratamientos",
         "traslados", "pesajes", "movimientos", "condicion_corporal",
         "produccion_leche", "diagnosticos_gestacion", "pluviometria",
-        "aforos_historico", "monitoreo_satelital_ndvi",
+        "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -627,6 +627,25 @@ class Database:
             factor_crecimiento = 0.5
             icono = "☀️"
 
+        # Estimado satelital de referencia (Fase D, CHIRPS vía Earth Engine). CHIRPS
+        # tiene su propia latencia (~30-45 días) así que `fecha` (el fin de la ventana
+        # de 30 días que cubre el dato) siempre está semanas atrás por diseño — eso
+        # NO significa que el dato esté obsoleto. Lo que sí indica obsolescencia es que
+        # el job semanal (`creado_en`) lleve mucho sin correr, por eso se compara contra
+        # esa marca de tiempo y no contra `fecha`.
+        satelital_mm = satelital_dias = satelital_fecha = satelital_fuente = None
+        satelital = self.ultima_lectura_lluvia_satelital()
+        if satelital:
+            creado_en = satelital["creado_en"]
+            # `creado_en` es un timestamp ISO completo ("...T17:39:07"); to_date()
+            # solo reconoce fechas puras, por eso se recorta a los primeros 10 caracteres.
+            fecha_job = to_date(creado_en[:10] if creado_en else None) or to_date(satelital["fecha"])
+            if fecha_job and (ref - fecha_job).days <= 10:
+                satelital_mm = satelital["mm_estimado"]
+                satelital_dias = satelital["dias_acumulados"]
+                satelital_fecha = satelital["fecha"]
+                satelital_fuente = satelital["fuente"]
+
         return {
             "hoy_mm": lluvia_hoy,
             "ultimos_7d_mm": lluvia_7d,
@@ -636,6 +655,10 @@ class Database:
             "estacion": estacion,
             "factor_crecimiento": factor_crecimiento,
             "icono": icono,
+            "satelital_mm": satelital_mm,
+            "satelital_dias": satelital_dias,
+            "satelital_fecha": satelital_fecha,
+            "satelital_fuente": satelital_fuente,
         }
 
     def registrar_aforo(self, potrero_id_o_nom, aforo_kg_m2: float, fecha=None,
@@ -686,6 +709,31 @@ class Database:
             "JOIN potreros p ON p.id = a.potrero_id "
             "ORDER BY a.fecha DESC, a.id DESC LIMIT ?",
             (limite,),
+        )
+
+    def registrar_lectura_lluvia_satelital(
+        self,
+        mm_estimado: float,
+        fecha: Optional[str] = None,
+        dias_acumulados: int = 30,
+        fuente: str = "CHIRPS (UCSB-CHG, vía Google Earth Engine)",
+        registrado_por: Optional[int] = None,
+    ) -> int:
+        """Registra una estimación satelital de lluvia acumulada a nivel de finca."""
+        fecha_iso = iso(fecha) or date.today().isoformat()
+        return self.insert("monitoreo_satelital_lluvia", dict(
+            fecha=fecha_iso,
+            dias_acumulados=int(dias_acumulados),
+            mm_estimado=float(mm_estimado),
+            fuente=fuente,
+            creado_en=self._ahora(),
+            registrado_por=registrado_por,
+        ))
+
+    def ultima_lectura_lluvia_satelital(self) -> Optional[sqlite3.Row]:
+        """Devuelve la lectura satelital de lluvia más reciente, si existe."""
+        return self.query_one(
+            "SELECT * FROM monitoreo_satelital_lluvia ORDER BY fecha DESC, id DESC LIMIT 1"
         )
 
     def registrar_lectura_ndvi(
@@ -1429,12 +1477,12 @@ class Database:
         que /deshacer muestre qué se va a borrar antes de confirmar."""
         if tabla not in self.TABLAS_EVENTOS:
             return None
-        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else ("animal_id" if tabla not in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi") else None)
+        fk_animal = "vaca_id" if tabla in ("partos", "servicios", "celos", "diagnosticos_gestacion") else ("animal_id" if tabla not in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia") else None)
         fila = self.query_one(f"SELECT * FROM {tabla} WHERE id = ?", (id_registro,))
         if fila is None:
             return None
         animal = self.get_animal(fila[fk_animal]) if fk_animal and fila[fk_animal] is not None else None
-        tag = animal["tag"] if animal else ("-" if tabla in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi") else "?")
+        tag = animal["tag"] if animal else ("-" if tabla in ("pluviometria", "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia") else "?")
         resumenes = {
             "partos": lambda f: f"Parto de {tag} — cría {f['sexo_cria'] or '?'}",
             "muertes": lambda f: f"Muerte de {tag}" + (f" — {f['causa_presunta']}" if f["causa_presunta"] else ""),
@@ -1450,6 +1498,7 @@ class Database:
             "pluviometria": lambda f: f"Pluviometría: {f['mm_lluvia']}mm" + (f" ({f['estacion_o_sector']})" if f["estacion_o_sector"] else ""),
             "aforos_historico": lambda f: f"Aforo potrero #{f['potrero_id']}: {f['aforo_kg_m2']} kg/m²",
             "monitoreo_satelital_ndvi": lambda f: f"Lectura satelital potrero #{f['potrero_id']}: NDVI {f['ndvi_promedio']}",
+            "monitoreo_satelital_lluvia": lambda f: f"Lluvia satelital estimada: {f['mm_estimado']}mm ({f['dias_acumulados']}d, {f['fuente']})",
         }
         return {
             "tabla": tabla, "id": id_registro, "tag": tag,

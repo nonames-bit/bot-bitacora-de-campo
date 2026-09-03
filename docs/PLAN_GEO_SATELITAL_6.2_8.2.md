@@ -104,6 +104,56 @@ Valores verificados contra `sqlite3` directo, coinciden exactamente.
   - **Verificado en producción local** (`data/bitacora.db`, 2026-09-03): los 20 potreros reales (`A01-A04`/`B01-B02`/`C01-C14`) recibieron NDVI real de la imagen Sentinel-2 del `2026-08-25` (una del `2026-08-27`), rango 0.538-0.672 (categoría ÓPTIMO/REPOSO), y `/ndvi` ya los muestra con `fuente = "Sentinel-2 L2A (Copernicus, vía Google Earth Engine)"` en vez de la simulación.
   - Tests: `tests/test_earth_engine_ndvi.py` (7 casos), con `ee` completamente mockeado — no requieren red ni credenciales para correr en CI.
   - **Nota pendiente sin resolver, detectada de paso (no es de esta fase):** al revisar `/ndvi` en vivo aparecieron potreros duplicados con el mismo nombre pero distinto `id` — uno con código numérico legado (`13`, `17`, sin `geom_wkt_4326`, cae a la simulación) y otro con código real `A/B/C` (con geometría, dato real). Ej.: `CARRETERA VERSALLES` (id 13, sin geom) vs `CARRETERA VERSALLES` (id 31, código `C02`, con geom). Es el mismo problema de duplicados ya documentado en la sección 3.5 de este plan; sigue **fuera de alcance** — no se fusiona/borra sin instrucción explícita del usuario.
-- [ ] Fase D — Lluvia satelital de referencia (opcional, mismo pipeline de Earth Engine vía CHIRPS/GPM, ya con la autenticación de la Fase C lista para reutilizar).
+- [x] **Fase D — Lluvia satelital de referencia** (completada 2026-09-03): pipeline
+  `src/gis/earth_engine_lluvia.py::estimar_lluvia_finca()`, usando **CHIRPS**
+  (`UCSB-CHG/CHIRPS/DAILY`, banda `precipitation`, resolución ~5.5 km) en vez de GPM/IMERG —
+  banda diaria única, agregación simple (`.sum()` sobre la ventana), sin la complejidad de
+  sumar decenas de imágenes semi-horarias. Reutiliza `inicializar_ee()` de
+  `earth_engine_ndvi.py`, sin credenciales nuevas.
+  - **Hallazgo de la prueba en vivo (análogo al de nubosidad de la Fase C):** a diferencia
+    de Sentinel-2, la colección `UCSB-CHG/CHIRPS/DAILY` en Earth Engine tiene una latencia
+    real de **~30-45 días** — al probar el 2026-09-03, la imagen más reciente disponible en
+    el catálogo era del **2026-07-31**, no de la semana anterior. Asumir que la ventana de
+    30 días termina "hoy" da colección vacía casi siempre. Se resolvió con
+    `_fecha_mas_reciente_disponible()`: busca hacia atrás (ventana de 75 días) la fecha real
+    más reciente con dato disponible, y la ventana de acumulación de lluvia termina ahí, no
+    en la fecha de corrida del job.
+  - Esto implica que `fecha` en `monitoreo_satelital_lluvia` (el fin de la ventana de 30
+    días que cubre el dato) **siempre** va a estar semanas atrás de la fecha real del job —
+    es esperado, no un bug. Por eso el chequeo de "dato obsoleto" en
+    `Database.resumen_pluviometrico()` compara contra `creado_en` (cuándo corrió el job),
+    no contra `fecha` (qué período cubre el dato CHIRPS).
+  - Como la resolución de CHIRPS no distingue microclima entre sectores de una sola finca
+    (~243 ha caben holgadamente en un solo píxel de ~5.5 km), el AOI es un único
+    punto-buffer (radio 2750 m, la mitad de la resolución nativa) centrado en el centroide
+    **promedio** de los 20 potreros reales con `geom_wkt_4326` — no se calcula por potrero
+    ni se construye la unión de los 20 polígonos.
+  - Se guarda en la nueva tabla `monitoreo_satelital_lluvia` (`fecha`, `dias_acumulados`,
+    `mm_estimado`, `fuente`, `creado_en`), vía `Database.registrar_lectura_lluvia_satelital()`.
+    Se añadió a `TABLAS_EVENTOS`/`/deshacer` igual que `monitoreo_satelital_ndvi`.
+  - `Database.resumen_pluviometrico()` expone `satelital_mm`/`satelital_dias`/
+    `satelital_fecha` solo si el job corrió en los últimos ≤10 días (vía `creado_en`); es un
+    campo aditivo, no rompe a los llamadores existentes.
+  - `/clima` (`src/engine/query/pasturas.py::_consulta_lluvias`) muestra una línea
+    adicional "🛰️ Estimado Satelital (CHIRPS, 30d hasta {fecha}): X mm · registrado: Y mm"
+    cuando hay dato satelital reciente, junto al registro manual real (que sigue siendo la
+    fuente de verdad para el balance forrajero — este dato es solo de contraste). La fecha
+    mostrada es explícita para que no se confunda con "los últimos 30 días desde hoy".
+  - Job semanal `scripts/actualizar_lluvia_satelital.py` (mismo patrón que
+    `actualizar_ndvi_satelital.py`): calcula el centroide promedio con
+    `SELECT AVG(centroide_lat), AVG(centroide_lon) FROM potreros WHERE geom_wkt_4326 IS NOT NULL`,
+    consulta CHIRPS y persiste el resultado. Cron documentado en
+    `docs/DESPLIEGUE_DIGITALOCEAN.md`.
+  - **Verificado en producción local** (`data/bitacora.db`, 2026-09-03): 272.1 mm en los 30
+    días terminando el 2026-07-31 para el centroide de la finca (3.40237, -74.08822);
+    `/clima` ya muestra la línea del estimado satelital.
+  - 4 tests con `ee` completamente mockeado (`tests/test_earth_engine_lluvia.py`): usa la
+    fecha más reciente disponible (no "hoy"), ventana sin cobertura CHIRPS en absoluto →
+    `None`, redondeo, y manejo de error de Earth Engine. Suite completa: 523/523 en verde.
+  - **Pendiente de este cierre:** desplegar al VPS (push + pull + reinicio del servicio +
+    agregar la línea de cron + correr el job una vez a mano), con el mismo cuidado de backup
+    previo que se usó al desplegar la Fase C.
+
+Con esto el plan geoespacial (Fases A–D) queda **completo**.
 
 **Nota honesta ya corregida:** el `README.md` describía la Fase 8.2 como si el NDVI ya fuera real cuando en realidad era simulado. Con la Fase C completada, la redacción del README se actualizó para reflejar el estado real (NDVI real vía Earth Engine + simulación de respaldo cuando no hay imagen disponible).

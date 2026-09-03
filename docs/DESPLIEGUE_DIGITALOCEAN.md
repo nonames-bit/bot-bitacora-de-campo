@@ -379,6 +379,50 @@ Agregue esta línea (corre todos los lunes a las 6:00 AM):
 
 ---
 
+## 🌧️ Lluvia satelital de referencia (Fase D del plan geoespacial)
+
+El comando `/clima` muestra, junto al registro real de `/lluvia`, un estimado
+satelital de contraste calculado con **CHIRPS** (`UCSB-CHG/CHIRPS/DAILY`) vía
+el mismo Earth Engine que la Fase C — **no requiere credenciales nuevas**,
+reutiliza las variables `GEE_*` ya configuradas arriba. El dato no reemplaza
+el pluviómetro físico: la resolución de CHIRPS (~5.5 km) no distingue
+microclima entre sectores de una sola finca, así que es un único valor a
+nivel de finca completa, no por potrero.
+
+### 1. Probar el job manualmente
+
+```bash
+cd /root/bitacora
+source .venv/bin/activate
+set -a; source .env; set +a
+python scripts/actualizar_lluvia_satelital.py
+```
+
+Debe ver `✅ Lluvia estimada guardada: X mm en los últimos 30 días (referencia
+AAAA-MM-DD)`. **Ojo:** esa fecha de referencia normalmente va a estar
+**semanas atrás** de la fecha de hoy — a diferencia de Sentinel-2, CHIRPS
+tiene una latencia real de ~30-45 días en el catálogo de Earth Engine, así
+que el job siempre busca hacia atrás la fecha más reciente con dato
+disponible. No es un error ni un job desactualizado; es el comportamiento
+esperado del dataset. Si sale `⚠️ sin cobertura CHIRPS en absoluto`, ahí sí
+revise que el centroide de la finca (`potreros.centroide_lat/lon`) esté
+dentro del área de cobertura de CHIRPS (50°S-50°N).
+
+### 2. Programar el job semanal en cron
+
+```bash
+crontab -e
+```
+
+Agregue esta línea (corre todos los lunes a las 6:05 AM, 5 minutos después
+del job de NDVI para no chocar cuotas de Earth Engine):
+
+```
+5 6 * * 1 cd /root/bitacora && /root/bitacora/.venv/bin/python scripts/actualizar_lluvia_satelital.py >> /root/bitacora/bot.log 2>&1
+```
+
+---
+
 ## 🔄 Rutina de sincronización semanal/mensual (Fase 1.1)
 
 Cuando usted cargó en el Software Ganadero SG los eventos que reportaron los
