@@ -55,6 +55,13 @@ src/server/users.json
 .env.local
 *.local
 
+# Claves de cuentas de servicio (Google Earth Engine, etc.)
+secrets/
+*serviceaccount*.json
+*service-account*.json
+*earthengine*.json
+*earth-engine*.json
+
 # Backup real de Software Ganadero (datos de produccion, fuera del control de versiones)
 docs/*.Zip
 

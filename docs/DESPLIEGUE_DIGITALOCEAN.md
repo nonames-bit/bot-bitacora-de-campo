@@ -313,6 +313,72 @@ algo falla. El plan recomendado cuesta alrededor de **$1/mes**.
 
 ---
 
+## 🛰️ NDVI satelital real (Fase C del plan geoespacial)
+
+El comando `/ndvi` lee el índice de vegetación real de cada potrero desde la
+tabla `monitoreo_satelital_ndvi`, calculado por Google Earth Engine sobre
+Sentinel-2 (ver `docs/PLAN_GEO_SATELITAL_6.2_8.2.md`). Esa tabla no se llena
+sola: hay que correr `scripts/actualizar_ndvi_satelital.py` — un job liviano
+(no requiere GPU ni procesa imágenes localmente, todo el cálculo ocurre en los
+servidores de Earth Engine) que conviene programar **una vez por semana** (el
+revisita de Sentinel-2 es cada ~5 días, y en época de lluvias puede tardar más
+en aparecer una imagen despejada).
+
+### 1. Subir la clave de la cuenta de servicio al VPS (una sola vez)
+
+La clave `.json` de Earth Engine **nunca se sube al repositorio git**. Se sube
+directo al servidor por `scp`, a una ruta fuera del proyecto:
+
+```bash
+# Desde su PC (Windows PowerShell), reemplace la ruta local y la IP del droplet:
+scp "C:\Users\Owner\Documents\secrets\finca-mesetas-ndvi-XXXXXXXX.json" root@SU_IP_DEL_DROPLET:/root/secrets/ndvi-key.json
+```
+
+### 2. Configurar las variables en `.env`
+
+En el servidor, edite `/root/bitacora/.env` y agregue (o descomente) estas
+tres líneas con sus valores reales:
+
+```bash
+GEE_SERVICE_ACCOUNT_EMAIL=ndvi-bot-bitacora@SU_PROJECT_ID.iam.gserviceaccount.com
+GEE_SERVICE_ACCOUNT_KEY_PATH=/root/secrets/ndvi-key.json
+GEE_PROJECT_ID=SU_PROJECT_ID
+```
+
+### 3. Probar el job manualmente
+
+```bash
+cd /root/bitacora
+source .venv/bin/activate
+set -a; source .env; set +a
+python scripts/actualizar_ndvi_satelital.py
+```
+
+Debe ver una línea `✅` por cada potrero con `geom_wkt_4326` (los 20 códigos
+`A01-A04`/`B01-B02`/`C01-C14` de la Fase B). Si un potrero sale con
+`⚠️ sin imagen Sentinel-2 reciente`, no es un error — simplemente no hubo
+todavía una imagen suficientemente despejada sobre ese potrero en la ventana
+de búsqueda; se resuelve solo en la próxima corrida semanal.
+
+### 4. Programar el job semanal en cron
+
+```bash
+crontab -e
+```
+
+Agregue esta línea (corre todos los lunes a las 6:00 AM):
+
+```
+0 6 * * 1 cd /root/bitacora && /root/bitacora/.venv/bin/python scripts/actualizar_ndvi_satelital.py >> /root/bitacora/bot.log 2>&1
+```
+
+> ⚠️ El cron no carga `.env` automáticamente como sí hace `source`. Si el
+> script falla solo desde cron (pero funciona a mano), envuelva la línea en un
+> script `.sh` que haga `set -a; source /root/bitacora/.env; set +a` antes de
+> llamar a `python`, igual que en el paso 3.
+
+---
+
 ## 🔄 Rutina de sincronización semanal/mensual (Fase 1.1)
 
 Cuando usted cargó en el Software Ganadero SG los eventos que reportaron los

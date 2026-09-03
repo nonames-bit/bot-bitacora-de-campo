@@ -214,7 +214,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **510 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **519 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -364,7 +364,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Escapado seguro de entidades HTML (`_esc`) y chunking automático de mensajes extensos (`_enviar_texto_seguro` en Telegram).
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
   - [x] **Seguimiento auditoría 2026-08-30 (H-10..H-12 y recomendaciones)**: file-lock atómico (`threading.Lock` + `tempfile` + `os.replace`) en `auth.py`; backoff adaptativo por longitud de nota en la cascada LLM (`try_multiagent_parse` con `timeout=None`); validación Zip Slip + zip-bomb (`_validar_zip_seguro`, límite 1 GB total / 512 MB por entrada) en `dbf_importer.py`; `watchdog` documentado como extra opcional; test de concurrencia WAL (`tests/test_concurrencia_wal.py`); y lista blanca canónica de `tipo_evento` para la salida de la Capa 2 LLM con log de rechazos (`TIPOS_EVENTO_LLM_VALIDOS`).
-- [x] Suite de pruebas con pytest: **510 pruebas en verde** (100% pasando)
+- [x] Suite de pruebas con pytest: **519 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
@@ -373,11 +373,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Integración agroclimática IDEAM y pluviometría de campo con factor de crecimiento $F_{\text{clima}}$ (30 días).
   - Tablas SQLite `pluviometria` y `aforos_historico` con auditoría y comando `/deshacer`.
   - Consultas en lenguaje natural de lluvias y balance forrajero; comandos `/clima`, `/lluvia <mm> [sector]` y `/balance_forrajero`.
-- [x] **Fase 8.2 — OCR Arete Sucio/Botón & Monitoreo Satelital NDVI Sentinel-2**:
+- [x] **Fase 8.2 — OCR Arete Sucio/Botón & Monitoreo Satelital NDVI Sentinel-2 (real)**:
   - Visión artificial avanzada (`src/vision/arete_detector.py`): CLAHE, filtros bilaterales, clasificación (Paleta vs Botón) y corrección de ambigüedades OCR (`O`$\leftrightarrow$`0`, `I`$\leftrightarrow$`1`, `G`$\leftrightarrow$`6`, `S`$\leftrightarrow$`5`, `B`$\leftrightarrow$`8`).
-  - Monitoreo satelital multiespectral Sentinel-2 L2A (`src/gis/sentinel_ndvi.py`): cálculo de índice verde NDVI, aforo satelital (kg MV/m²), biomasa (kg MS/ha), ajuste dinámico de carga animal y alertas de sobrepastoreo/reposo.
+  - Fórmulas NDVI, aforo satelital (kg MV/m²), biomasa (kg MS/ha) y ajuste dinámico de carga animal (`src/gis/sentinel_ndvi.py`).
+  - **NDVI real vía Google Earth Engine** (`src/gis/earth_engine_ndvi.py`): consulta Sentinel-2 L2A (`COPERNICUS/S2_SR_HARMONIZED`) sobre el polígono real de cada potrero (`potreros.geom_wkt_4326`), con filtrado de nubes píxel a píxel (banda SCL) sobre el propio potrero — más confiable que el metadato de nubosidad de la escena completa para potreros pequeños en clima tropical. Job semanal `scripts/actualizar_ndvi_satelital.py` (ver `docs/DESPLIEGUE_DIGITALOCEAN.md`). Cuando un potrero aún no tiene lectura real (sin `geom_wkt_4326` o sin imagen despejada reciente), `/ndvi` cae a una estimación heurística de respaldo basada en días de ocupación/reposo — ver detalle en `docs/PLAN_GEO_SATELITAL_6.2_8.2.md`.
   - Tabla SQLite `monitoreo_satelital_ndvi`, comandos `/ndvi`, `/satelite`, `/indice_verde` y botón táctil `[ 🛰️ Satélite NDVI ]`.
-- [x] Suite de pruebas con pytest: **510 pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest: **519 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
@@ -385,7 +386,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
 - [ ] **Fase 7 — PWA Oficina + Corral Offline**: Dashboard web ejecutivo, fichas QR en PDF por lote, identificación arete foto/RFID barro y modo offline lite con cola + SOS.
 - [ ] **Fase 8.1 — Estimación de Condición Corporal (BCS)**: Clasificación automática 1.0-5.0 con Gemini Vision.
-- [ ] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): la integración IDEAM y el NDVI Sentinel-2 eran simulados/sin datos reales; ya se importaron área real y polígonos georreferenciados (WGS84) de los 20 potreros desde el proyecto QGIS de la finca (`potreros.geom_wkt_4326`/`centroide_lat`/`centroide_lon`); falta el pipeline de NDVI real vía Google Earth Engine (Fase C, pendiente de credenciales) y lluvia satelital de referencia (Fase D).
+- [ ] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): la integración IDEAM sigue siendo una heurística sobre la lluvia registrada a mano (`/lluvia`). Ya completado: área real + polígonos georreferenciados (WGS84) de los 20 potreros desde el proyecto QGIS de la finca (Fase A+B, `potreros.geom_wkt_4326`/`centroide_lat`/`centroide_lon`) y **NDVI real vía Google Earth Engine** (Fase C, `src/gis/earth_engine_ndvi.py` + job semanal `scripts/actualizar_ndvi_satelital.py`). Pendiente: lluvia satelital de referencia CHIRPS (Fase D, opcional).
 
 ---
 
