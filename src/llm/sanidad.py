@@ -5,7 +5,7 @@ from datetime import date
 from typing import Optional
 
 from ..parsers import nlp_engine as nlu
-from ..parsers.event_parser import ParsedEvent
+from ..parsers.event_parser import ParsedEvent, es_tipo_evento_llm_valido
 from ..utils import iso, parse_fecha, to_date
 from .gemini_client import GeminiClient
 from .normalizacion import normalizar_tag
@@ -59,7 +59,10 @@ def parse(
     eventos: list[ParsedEvent] = []
     for item in eventos_raw:
         tipo = item.get("tipo")
-        if tipo not in ("tratamiento", "muerte"):
+        # Defensa anti prompt-injection (P6): un tipo fuera de la lista blanca
+        # central se descarta (el helper registra el warning de rechazo) y el
+        # agente solo acepta los tipos de su propio dominio.
+        if not es_tipo_evento_llm_valido(tipo) or tipo not in ("tratamiento", "muerte"):
             continue
 
         tag = normalizar_tag(item.get("animal_tag"))

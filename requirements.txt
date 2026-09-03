@@ -11,3 +11,6 @@ Pillow>=10.0.0
 # pytesseract>=0.3.10
 # easyocr>=1.7.0
 
+# Vigilante de copias en tiempo real (opcional; sin él, copias_watcher usa polling 60s):
+# watchdog>=4.0
+

@@ -4,11 +4,20 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
+import threading
 from typing import Any, Optional
 
 logger = logging.getLogger("bitacora.auth")
 
 ROLES_VALIDOS = {"OWNER", "ADMIN", "TRABAJADOR"}
+
+# Candado de módulo que serializa toda mutación + persistencia de users.json.
+# python-telegram-bot atiende los handlers en hilos (dos /agregar_usuario a la
+# vez pueden llegar concurrentes) y sin candado la reescritura del JSON tiene
+# una carrera que puede corromper el archivo. No se usa fcntl: no existe en
+# Windows (la escritura atómica con os.replace sí es segura en ambos SO).
+_LOCK = threading.Lock()
 
 
 class Auth:
@@ -21,9 +30,18 @@ class Auth:
 
     def cargar(self) -> None:
         """Carga la lista de usuarios desde el archivo JSON. Si no existe, crea uno vacío."""
+        with _LOCK:
+            self._cargar_sin_lock()
+
+    def _cargar_sin_lock(self) -> None:
+        """Lee users.json asumiendo el candado de módulo ya adquirido.
+
+        Si el archivo no existe lo crea vacío con escritura atómica (el
+        ``guardar()`` inicial de la carga queda así también bajo el lock).
+        """
         if not os.path.exists(self.users_file):
             self.usuarios = []
-            self.guardar()
+            self._guardar_sin_lock()
             return
 
         try:
@@ -45,13 +63,37 @@ class Auth:
         self.usuarios = datos
 
     def guardar(self) -> None:
-        """Persiste la lista actual de usuarios en el archivo JSON."""
+        """Persiste la lista actual de usuarios en el archivo JSON (bajo candado)."""
+        with _LOCK:
+            self._guardar_sin_lock()
+
+    def _guardar_sin_lock(self) -> None:
+        """Escritura atómica de users.json asumiendo el candado ya adquirido.
+
+        Escribe primero a un temporal en el MISMO directorio y luego lo
+        renombra con ``os.replace`` (atómico en Windows y POSIX): un lector
+        concurrente nunca ve un archivo a medio escribir y dos escritores no
+        pueden corromper el JSON. Si algo falla, el temporal se borra.
+        """
         dir_padre = os.path.dirname(os.path.abspath(self.users_file))
         if dir_padre and not os.path.exists(dir_padre):
             os.makedirs(dir_padre, exist_ok=True)
 
-        with open(self.users_file, "w", encoding="utf-8") as f:
-            json.dump(self.usuarios, f, indent=2, ensure_ascii=False)
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=dir_padre or ".", delete=False, mode="w", encoding="utf-8"
+            ) as f:
+                json.dump(self.usuarios, f, indent=2, ensure_ascii=False)
+                tmp_path = f.name
+            os.replace(tmp_path, self.users_file)
+            tmp_path = None
+        finally:
+            if tmp_path is not None and os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
     def es_autorizado(self, user_id: int) -> bool:
         """Verifica si el usuario está registrado en el sistema."""
@@ -114,61 +156,66 @@ class Auth:
 
     def agregar_usuario(self, user_id: int, nombre: str, rol: str) -> None:
         """Agrega o actualiza un usuario y persiste los cambios."""
-        try:
-            uid = int(user_id)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"user_id inválido: {user_id}") from e
+        # Mutación + persistencia como una sola unidad crítica bajo el candado
+        # de módulo (ver _LOCK): evita perder actualizaciones entre hilos.
+        with _LOCK:
+            try:
+                uid = int(user_id)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"user_id inválido: {user_id}") from e
 
-        rol_norm = str(rol).strip().upper()
-        if rol_norm not in ROLES_VALIDOS:
-            raise ValueError(
-                f"Rol inválido: '{rol}'. Roles permitidos: {', '.join(sorted(ROLES_VALIDOS))}"
-            )
+            rol_norm = str(rol).strip().upper()
+            if rol_norm not in ROLES_VALIDOS:
+                raise ValueError(
+                    f"Rol inválido: '{rol}'. Roles permitidos: {', '.join(sorted(ROLES_VALIDOS))}"
+                )
 
-        nombre_norm = str(nombre).strip() if nombre else f"Usuario_{uid}"
+            nombre_norm = str(nombre).strip() if nombre else f"Usuario_{uid}"
 
-        for u in self.usuarios:
-            if u.get("user_id") == uid:
-                u["nombre"] = nombre_norm
-                u["rol"] = rol_norm
-                self.guardar()
-                logger.info("Usuario actualizado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
-                return
+            for u in self.usuarios:
+                if u.get("user_id") == uid:
+                    u["nombre"] = nombre_norm
+                    u["rol"] = rol_norm
+                    self._guardar_sin_lock()
+                    logger.info("Usuario actualizado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
+                    return
 
-        self.usuarios.append({
-            "user_id": uid,
-            "nombre": nombre_norm,
-            "rol": rol_norm,
-        })
-        self.guardar()
-        logger.info("Usuario agregado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
+            self.usuarios.append({
+                "user_id": uid,
+                "nombre": nombre_norm,
+                "rol": rol_norm,
+            })
+            self._guardar_sin_lock()
+            logger.info("Usuario agregado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
 
     def quitar_usuario(self, user_id: int) -> None:
         """Elimina un usuario del sistema si no es el último OWNER."""
-        try:
-            uid = int(user_id)
-        except (ValueError, TypeError) as e:
-            raise ValueError(f"user_id inválido: {user_id}") from e
+        # Mutación + persistencia bajo el candado de módulo (ver _LOCK).
+        with _LOCK:
+            try:
+                uid = int(user_id)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"user_id inválido: {user_id}") from e
 
-        usuario = None
-        for u in self.usuarios:
-            if u.get("user_id") == uid:
-                usuario = u
-                break
+            usuario = None
+            for u in self.usuarios:
+                if u.get("user_id") == uid:
+                    usuario = u
+                    break
 
-        if usuario is None:
-            logger.warning("Intento de quitar usuario inexistente: user_id=%s", uid)
-            raise ValueError(f"El usuario con ID {uid} no existe.")
+            if usuario is None:
+                logger.warning("Intento de quitar usuario inexistente: user_id=%s", uid)
+                raise ValueError(f"El usuario con ID {uid} no existe.")
 
-        if str(usuario.get("rol", "")).strip().upper() == "OWNER":
-            owners = [u for u in self.usuarios if str(u.get("rol", "")).strip().upper() == "OWNER"]
-            if len(owners) <= 1:
-                logger.warning("Intento de eliminar al último OWNER: user_id=%s", uid)
-                raise ValueError("No se puede eliminar al único OWNER registrado en el sistema.")
+            if str(usuario.get("rol", "")).strip().upper() == "OWNER":
+                owners = [u for u in self.usuarios if str(u.get("rol", "")).strip().upper() == "OWNER"]
+                if len(owners) <= 1:
+                    logger.warning("Intento de eliminar al último OWNER: user_id=%s", uid)
+                    raise ValueError("No se puede eliminar al único OWNER registrado en el sistema.")
 
-        self.usuarios = [u for u in self.usuarios if u.get("user_id") != uid]
-        self.guardar()
-        logger.info("Usuario eliminado: user_id=%s", uid)
+            self.usuarios = [u for u in self.usuarios if u.get("user_id") != uid]
+            self._guardar_sin_lock()
+            logger.info("Usuario eliminado: user_id=%s", uid)
 
     def listar_usuarios(self) -> list[dict[str, Any]]:
         """Devuelve una copia de la lista de usuarios."""

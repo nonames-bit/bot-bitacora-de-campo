@@ -363,6 +363,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Creación de índices en `SCHEMA_SQL` (incluyendo `idx_recordatorios_fecha_estado`) para acelerar consultas de inventario, partos, servicios, pesajes y traslados.
   - [x] Escapado seguro de entidades HTML (`_esc`) y chunking automático de mensajes extensos (`_enviar_texto_seguro` en Telegram).
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
+  - [x] **Seguimiento auditoría 2026-08-30 (H-10..H-12 y recomendaciones)**: file-lock atómico (`threading.Lock` + `tempfile` + `os.replace`) en `auth.py`; backoff adaptativo por longitud de nota en la cascada LLM (`try_multiagent_parse` con `timeout=None`); validación Zip Slip + zip-bomb (`_validar_zip_seguro`, límite 1 GB total / 512 MB por entrada) en `dbf_importer.py`; `watchdog` documentado como extra opcional; test de concurrencia WAL (`tests/test_concurrencia_wal.py`); y lista blanca canónica de `tipo_evento` para la salida de la Capa 2 LLM con log de rechazos (`TIPOS_EVENTO_LLM_VALIDOS`).
 - [x] Suite de pruebas con pytest: **510 pruebas en verde** (100% pasando)
 
 ### ⏳ En Progreso / Calibración Continua

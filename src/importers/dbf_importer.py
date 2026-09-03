@@ -44,6 +44,72 @@ TIPO_A_ESTADO = {
     "O": "OTRO",
 }
 
+# ---------------------------------------------------------------------------
+# Seguridad de Zips: Zip Slip + zip-bomb (H-12)
+# ---------------------------------------------------------------------------
+# Límites de descompresión validados ANTES de leer cualquier entrada de un
+# zip. Calibrados contra los backups reales ``docs/Datos20260823.Zip`` y
+# ``docs/Datos20260826.Zip`` (ambos pesan ~80 MB comprimidos y, al ser
+# mayormente fotografías JPEG que ya no comprimen, su contenido descomprimido
+# queda holgadamente por debajo del tope total de 1 GB, con margen de sobra
+# para backups legítimos futuros con más fotos o más histórico).
+LIMITE_DESCOMPRIMIDO_TOTAL = 1_000_000_000  # 1 GB por zip
+LIMITE_DESCOMPRIMIDO_POR_ARCHIVO = 512 * 1024 * 1024  # 512 MB por entrada
+
+
+def _validar_zip_seguro(
+    zf: zipfile.ZipFile,
+    limite_total_descomprimido: int = LIMITE_DESCOMPRIMIDO_TOTAL,
+    limite_por_archivo: int = LIMITE_DESCOMPRIMIDO_POR_ARCHIVO,
+) -> None:
+    """Rechaza un zip inseguro (Zip Slip o zip-bomb) sin leer ninguna entrada.
+
+    Recorre ``zf.infolist()`` y para cada miembro que NO es directorio valida:
+    (a) ``os.path.normpath(name)`` no empieza por ``..`` ni contiene ``..``
+        como componente de path (ataque Zip Slip clásico);
+    (b) el nombre no es una ruta absoluta (ni POSIX ``/`` ni drive Windows
+        ``C:\\``/``C:/``);
+    (c) el nombre normalizado no escapa del directorio de trabajo actual;
+    (d) el tamaño descomprimido declarado de cada miembro y la suma acumulada
+        de todos los miembros no exceden los límites (zip-bomb).
+
+    Ante cualquier violación lanza ``ValueError`` con un mensaje claro.
+    """
+    total_descomprimido = 0
+    for info in zf.infolist():
+        if info.is_dir():
+            continue
+        nombre = info.filename or ""
+        nombre_posix = nombre.replace("\\", "/")
+
+        # (b) Ruta absoluta POSIX ("/etc/passwd") o con drive Windows ("C:...").
+        if nombre.startswith(("/", "\\")) or (
+            len(nombre) >= 2 and nombre[0].isalpha() and nombre[1] == ":"
+        ):
+            raise ValueError(f"Zip inseguro: entrada peligrosa '{nombre}' rechazada")
+
+        # (a) '..' como componente de path (../, a/../../etc).
+        if ".." in nombre_posix.split("/"):
+            raise ValueError(f"Zip inseguro: entrada peligrosa '{nombre}' rechazada")
+
+        # (c) El nombre normalizado no debe escapar del directorio de trabajo.
+        normalizado = os.path.normpath(nombre_posix).replace("\\", "/")
+        if normalizado == ".." or normalizado.startswith("../"):
+            raise ValueError(f"Zip inseguro: entrada peligrosa '{nombre}' rechazada")
+
+        # (d) Límite de tamaño descomprimido por archivo y total (zip-bomb).
+        if info.file_size > limite_por_archivo:
+            raise ValueError(
+                f"Zip inseguro: entrada '{nombre}' demasiado grande "
+                f"({info.file_size} bytes descomprimidos)"
+            )
+        total_descomprimido += info.file_size
+        if total_descomprimido > limite_total_descomprimido:
+            raise ValueError(
+                f"Zip demasiado grande: {total_descomprimido} bytes descomprimidos "
+                f"superan el límite de {limite_total_descomprimido}"
+            )
+
 
 def _estado_desde_tipo(tipo, codpot=None) -> str:
     """Deriva el estado del animal desde el campo TIPO de SG (strip + upper)."""
@@ -731,6 +797,8 @@ def import_fotos(
     if isinstance(fotos_source, bytes):
         try:
             with zipfile.ZipFile(io.BytesIO(fotos_source)) as zf:
+                # Seguridad (H-12): rechazar Zip Slip / zip-bomb antes de leer nada.
+                _validar_zip_seguro(zf)
                 for name in zf.namelist():
                     if not name.endswith("/") and not os.path.basename(name).startswith("._"):
                         ext = os.path.splitext(name)[1].lower()
@@ -739,6 +807,8 @@ def import_fotos(
         except Exception:
             return {"nuevos": 0, "duplicados": 0}
     elif isinstance(fotos_source, zipfile.ZipFile):
+        # Seguridad (H-12): validar el zip de fotos antes de iterar sus entradas.
+        _validar_zip_seguro(fotos_source)
         for name in fotos_source.namelist():
             if not name.endswith("/") and not os.path.basename(name).startswith("._"):
                 ext = os.path.splitext(name)[1].lower()
@@ -846,12 +916,16 @@ def import_zip(db: Database, zip_path: str, media_dir: str = "media") -> dict:
     """Lee ``Datos20260823.Zip`` (con ``Dbf.zip`` y opcionalmente ``Fotos.Zip`` internos) y siembra la DB."""
     fotos_raw = None
     with zipfile.ZipFile(zip_path) as outer:
+        # Seguridad (H-12): validar el zip externo antes de leer cualquier entrada.
+        _validar_zip_seguro(outer)
         names = outer.namelist()
         names_lower = {os.path.basename(n).lower(): n for n in names}
 
         if "dbf.zip" in names_lower:
             dbf_zip_name = names_lower["dbf.zip"]
             with zipfile.ZipFile(outer.open(dbf_zip_name)) as inner:
+                # Seguridad (H-12): el zip interno (Dbf.zip) también se valida.
+                _validar_zip_seguro(inner)
                 inner_names_lower = {os.path.basename(n).lower(): n for n in inner.namelist()}
                 dbf_data = {}
                 for req in DBF_REQUERIDOS:

@@ -5,6 +5,7 @@ estructurado y normalizado, listo para persistir en SQLite.
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -12,6 +13,8 @@ from typing import Optional, Union
 
 from ..utils import iso, normalizar, parse_fecha
 from . import nlp_engine as nlu
+
+logger = logging.getLogger("bitacora.parsers.event_parser")
 
 
 @dataclass
@@ -25,6 +28,43 @@ class ParsedEvent:
 
     def get(self, clave, default=None):
         return self.datos.get(clave, default)
+
+
+# --------------------------------------------------------------------------- #
+# Lista blanca de tipos de evento de la Capa 2 (LLM) — defensa anti
+# prompt-injection (P6)
+# --------------------------------------------------------------------------- #
+# Conjunto canónico de ``tipo`` que los agentes de dominio LLM de la Capa 2
+# (``src/llm/reproduccion.py``, ``sanidad.py`` y ``manejo.py``) pueden
+# producir legítimamente a partir de una nota de campo. Corresponde a los 8
+# eventos zootécnicos soportados por el bot más el diagnóstico de gestación:
+#
+#   reproducción:  parto, servicio, celo, diagnostico_gestacion
+#   sanidad:       tratamiento, muerte
+#   manejo:        pesaje, traslado, movimiento
+#
+# NO incluye tipos que solo emite la Capa 1 (regex) o el router de consultas
+# ('consulta', 'desconocido', 'leche', 'condicion_corporal', 'pluviometria',
+# 'aforo'), porque esos no llegan construidos desde la salida JSON del LLM.
+TIPOS_EVENTO_LLM_VALIDOS = frozenset({
+    "parto", "servicio", "celo", "diagnostico_gestacion",
+    "tratamiento", "muerte",
+    "pesaje", "traslado", "movimiento",
+})
+
+
+def es_tipo_evento_llm_valido(tipo: Optional[str]) -> bool:
+    """Valida un ``tipo`` devuelto por la Capa 2 contra la lista blanca.
+
+    Si el tipo no está en :data:`TIPOS_EVENTO_LLM_VALIDOS` registra un
+    ``logger.warning`` ("Evento LLM rechazado por whitelist: tipo=...") y
+    devuelve ``False`` para que el llamador descarte el evento en vez de
+    aceptarlo a ciegas (mitiga inyección de tipos inventados vía prompt).
+    """
+    if tipo in TIPOS_EVENTO_LLM_VALIDOS:
+        return True
+    logger.warning("Evento LLM rechazado por whitelist: tipo=%s", tipo)
+    return False
 
 
 # Palabras que marcan una cría muerta / aborto.

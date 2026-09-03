@@ -45,17 +45,23 @@ _PROVIDERS_BARATOS = [
 ]
 
 
-def try_hybrid_parse(texto, hoy=None, timeout=30.0):
+def try_hybrid_parse(texto, hoy=None, timeout=None):
     """Prueba proveedores baratos/gratuitos primero; Gemini y NVIDIA al final.
 
     Orden: OpenRouter -> CheaperInference -> OpenCode Go -> NVIDIA -> Gemini.
     Cada proveedor sin API key configurada se salta sin llamada de red.
+
+    ``timeout=None`` (default) deja 30 s a los proveedores baratos/gratuitos y
+    hace que Gemini use su backoff adaptativo según la longitud del texto (ver
+    ``orchestrator.try_multiagent_parse``, P2/H-11). Un ``timeout`` explícito
+    se propaga igual a todas las etapas.
     """
-    # 1-3. Proveedores OpenAI-compatible baratos/gratuitos
+    # 1-3. Proveedores OpenAI-compatible baratos/gratuitos (30s por defecto)
+    t_baratos = 30.0 if timeout is None else timeout
     for provider, env_prefix in _PROVIDERS_BARATOS:
         try:
             from .generic_client import GenericOpenAIClient as _Client, try_generic_parse as _try
-            client = _Client(provider=provider, env_prefix=env_prefix, timeout=timeout)
+            client = _Client(provider=provider, env_prefix=env_prefix, timeout=t_baratos)
             res = _try(client, texto, hoy=hoy)
             if res is not None:
                 return res
@@ -64,12 +70,12 @@ def try_hybrid_parse(texto, hoy=None, timeout=30.0):
     # 4. NVIDIA (gratuito)
     try:
         from .nvidia_client import try_llm_parse as _nvidia
-        res = _nvidia(texto, hoy=hoy, timeout=timeout)
+        res = _nvidia(texto, hoy=hoy, timeout=t_baratos)
         if res is not None:
             return res
     except Exception:
         pass
-    # 5. Gemini (de pago) — último recurso
+    # 5. Gemini (de pago) — último recurso; timeout None = backoff adaptativo
     try:
         from .orchestrator import try_multiagent_parse as _gemini
         res = _gemini(texto, hoy=hoy, timeout=timeout)

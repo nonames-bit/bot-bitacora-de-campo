@@ -45,14 +45,25 @@ def _ejecutar_dominios(
 def try_multiagent_parse(
     texto: str,
     hoy: Optional[date] = None,
-    timeout: float = 30.0,
+    timeout: Optional[float] = None,
 ) -> Optional[Union[ParsedEvent, list[ParsedEvent]]]:
     """Punto de entrada público de la Capa 2 multi-agente.
 
     Devuelve ``ParsedEvent`` si hay exactamente 1 evento, ``list[ParsedEvent]``
     si hay >=2, o ``None`` si el LLM no está disponible o no pudo interpretar
     nada (en cuyo caso el llamador debe caer a la Capa 1 de regex).
+
+    Timeout ADAPTATIVO (P2/H-11): si el llamador no pasa uno explícito se
+    deriva de la longitud del texto para no hacer esperar 30 s fijos a las
+    notas cortas ni expirar prematuramente las transcripciones largas en
+    redes lentas (2G). Heurística lineal acotada:
+    ``timeout = max(15.0, min(60.0, 10.0 + len(texto) * 0.05))``
+    -> notas de ~15-20 s; una transcripción de ~1000 caracteres ya alcanza
+    el techo de 60 s.
     """
+    if timeout is None:
+        # Backoff según longitud de la nota (heurística documentada arriba).
+        timeout = max(15.0, min(60.0, 10.0 + len(texto) * 0.05))
     client = GeminiClient(timeout=timeout)
     if not client.is_available():
         return None
