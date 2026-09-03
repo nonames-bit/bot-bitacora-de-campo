@@ -51,6 +51,18 @@ class Database:
                 self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
         except Exception:
             pass
+        # Geometria real (WGS84) de potreros, importada desde el proyecto QGIS
+        # de la finca (ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md, Fase B).
+        try:
+            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(potreros)").fetchall()]
+            if "geom_wkt_4326" not in cols:
+                self.conn.execute("ALTER TABLE potreros ADD COLUMN geom_wkt_4326 TEXT")
+            if "centroide_lat" not in cols:
+                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lat REAL")
+            if "centroide_lon" not in cols:
+                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lon REAL")
+        except Exception:
+            pass
         # Columnas de auditoría (quién y cuándo registró cada evento) para
         # poder listar y deshacer registros equivocados (comando /deshacer).
         # Las tablas creadas antes de esta migración no tenían estas columnas.

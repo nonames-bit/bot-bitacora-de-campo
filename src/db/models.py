@@ -19,7 +19,10 @@ CREATE TABLE IF NOT EXISTS potreros (
     fecha_entrada TEXT,
     fecha_salida TEXT,
     dias_reposo INTEGER,
-    dias_ocupacion INTEGER
+    dias_ocupacion INTEGER,
+    geom_wkt_4326 TEXT,
+    centroide_lat REAL,
+    centroide_lon REAL
 );
 
 CREATE TABLE IF NOT EXISTS animales (

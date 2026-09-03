@@ -385,6 +385,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 - [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
 - [ ] **Fase 7 — PWA Oficina + Corral Offline**: Dashboard web ejecutivo, fichas QR en PDF por lote, identificación arete foto/RFID barro y modo offline lite con cola + SOS.
 - [ ] **Fase 8.1 — Estimación de Condición Corporal (BCS)**: Clasificación automática 1.0-5.0 con Gemini Vision.
+- [ ] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): la integración IDEAM y el NDVI Sentinel-2 eran simulados/sin datos reales; ya se importaron área real y polígonos georreferenciados (WGS84) de los 20 potreros desde el proyecto QGIS de la finca (`potreros.geom_wkt_4326`/`centroide_lat`/`centroide_lon`); falta el pipeline de NDVI real vía Google Earth Engine (Fase C, pendiente de credenciales) y lluvia satelital de referencia (Fase D).
 
 ---
 
