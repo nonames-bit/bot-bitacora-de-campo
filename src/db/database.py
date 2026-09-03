@@ -794,7 +794,17 @@ class Database:
         )
 
     def resumen_ndvi_finca(self) -> dict:
-        """Calcula el estado satelital consolidado de los potreros de la finca."""
+        """Calcula el estado satelital consolidado de los potreros de la finca.
+
+        Solo incluye potreros con geometría real (`geom_wkt_4326`, Fase B del
+        plan geoespacial) — un potrero sin ubicación fija no puede tener NDVI
+        satelital real ni de contraste. Esto excluye de paso los códigos
+        legacy (numéricos/L/G) que son artefactos de una importación anterior
+        y no potreros actuales de la finca (confirmado por el usuario contra
+        el reporte nativo de Software Ganadero SG, ver
+        docs/PLAN_GEO_SATELITAL_6.2_8.2.md sección 3.5) — antes aparecían acá
+        con una simulación idéntica y engañosa.
+        """
         from ..gis.sentinel_ndvi import clasificar_ndvi, estimar_aforo_kg_m2_desde_ndvi, estimar_biomasa_ms_ha
 
         # Obtener la última lectura de cada potrero
@@ -807,7 +817,8 @@ class Database:
             "LEFT JOIN monitoreo_satelital_ndvi n ON n.id = ("
             "  SELECT id FROM monitoreo_satelital_ndvi "
             "  WHERE potrero_id = p.id ORDER BY fecha DESC, id DESC LIMIT 1"
-            ") ORDER BY p.id ASC"
+            ") WHERE p.geom_wkt_4326 IS NOT NULL "
+            "ORDER BY p.id ASC"
         )
         filas = self.query(query)
         if not filas:

@@ -33,6 +33,17 @@ from src.vision.arete_detector import (
 )
 
 
+_WKT_TEST = "POLYGON((-74.07 3.39, -74.06 3.39, -74.06 3.40, -74.07 3.40, -74.07 3.39))"
+
+
+def _marcar_geom_real(db: Database, potrero_id: int) -> None:
+    """Simula que el potrero ya pasó por la Fase B (geometría real, ver
+    docs/PLAN_GEO_SATELITAL_6.2_8.2.md) — requisito para aparecer en el
+    monitoreo satelital desde que se excluyeron los potreros legacy sin
+    ubicación fija de `resumen_ndvi_finca()`."""
+    db.execute("UPDATE potreros SET geom_wkt_4326 = ? WHERE id = ?", (_WKT_TEST, potrero_id))
+
+
 def test_vision_arete_detector_correcciones():
     """Valida la corrección de caracteres ambiguos en aretes de ganado."""
     # 1. Prefijo + O confundida con cero
@@ -125,6 +136,7 @@ def test_sentinel_ndvi_formulas_biofisicas():
 def test_database_ndvi_persistencia_y_deshacer(db: Database):
     """Valida la persistencia SQLite de lecturas satelitales y soporte /deshacer."""
     pot_id = db.registrar_potrero(nombre="Potrero La Esperanza", area_has=12.5)
+    _marcar_geom_real(db, pot_id)
 
     # 1. Registrar lectura satelital
     id_ndvi = db.registrar_lectura_ndvi(
@@ -164,6 +176,8 @@ def test_query_engine_consultas_ndvi(db: Database):
     """Valida el enrutamiento y respuestas de lenguaje natural sobre monitoreo satelital."""
     pot1 = db.registrar_potrero(nombre="Potrero Sabana 1", area_has=15.0, dias_reposo=30)
     pot2 = db.registrar_potrero(nombre="Potrero Bajo Inundable", area_has=8.0, dias_ocupacion=6)
+    _marcar_geom_real(db, pot1)
+    _marcar_geom_real(db, pot2)
 
     db.registrar_lectura_ndvi(potrero_id_o_nom=pot1, ndvi_promedio=0.74, fecha="2026-08-31")
     db.registrar_lectura_ndvi(potrero_id_o_nom=pot2, ndvi_promedio=0.31, fecha="2026-08-31")
@@ -185,6 +199,7 @@ def test_query_engine_consultas_ndvi(db: Database):
 def test_telegram_formatters_y_teclados_ndvi(db: Database):
     """Valida los formateadores HTML del panel satelital y los teclados táctiles."""
     pot_id = db.registrar_potrero(nombre="Potrero Alto", area_has=10.0)
+    _marcar_geom_real(db, pot_id)
     db.registrar_lectura_ndvi(potrero_id_o_nom=pot_id, ndvi_promedio=0.68, fecha="2026-08-31")
 
     # Formateador
