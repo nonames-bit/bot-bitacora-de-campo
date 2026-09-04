@@ -82,7 +82,16 @@ _PALETA = [
 # Semáforo unificado consistente (Voisin, GMD, rankings y carga animal)
 _COLOR_VERDE = "#2e7d32"
 _COLOR_AMARILLO = "#f9a825"
+_COLOR_NARANJA = "#ef6c00"
 _COLOR_ROJO = "#c62828"
+
+# Colores por categoría NDVI (mapa de potreros), ver src/gis/sentinel_ndvi.py::clasificar_ndvi
+_COLOR_POR_CATEGORIA_NDVI = {
+    "EXCELENTE": _COLOR_VERDE,
+    "ÓPTIMO / REPOSO": _COLOR_AMARILLO,
+    "ESTRÉS / BAJA BIOMASA": _COLOR_NARANJA,
+    "CRÍTICO / SUELO DESNUDO": _COLOR_ROJO,
+}
 
 _COLOR_LINEA = "#2F5233"
 _COLOR_PROMEDIO = "#9e9e9e"
@@ -970,6 +979,94 @@ def generar_grafico_ocupacion_potreros(db, output_dir: str = "data/reportes",
     ax.legend(loc="lower right", fontsize=8)
 
     return _guardar(fig, output_dir, f"grafico_ocupacion_potreros_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+
+
+def generar_mapa_potreros(db, output_dir: str = "data/reportes",
+                          hoy: Optional[date] = None, dpi: int = 130) -> Optional[str]:
+    """Mapa de los potreros reales (Fase B del plan geoespacial: los que
+    tienen `geom_wkt_4326`), coloreados por categoría NDVI satelital
+    (verde/amarillo/naranja/rojo) y etiquetados con el número de animales
+    activos y los días de ocupación (o de reposo si está vacío).
+
+    No incluye los códigos legacy sin geometría real (ver
+    docs/PLAN_GEO_SATELITAL_6.2_8.2.md sección 3.5) por la misma razón que
+    ya se excluyen de `Database.resumen_ndvi_finca()`: no tienen una
+    ubicación fija que dibujar."""
+    if not _MATPLOTLIB_OK:
+        return None
+    import math
+    from matplotlib.patches import Polygon
+    from shapely import wkt as shapely_wkt
+
+    hoy = hoy or date.today()
+    potreros = db.query(
+        "SELECT id, nombre, area_has, geom_wkt_4326, centroide_lat, centroide_lon, "
+        "dias_ocupacion, dias_reposo FROM potreros WHERE geom_wkt_4326 IS NOT NULL"
+    )
+    if not potreros:
+        return None
+
+    ndvi_por_potrero = {p["potrero_id"]: p for p in db.resumen_ndvi_finca().get("potreros", [])}
+    animales_por_potrero = {
+        r["potrero_id"]: r["n"] for r in db.query(
+            "SELECT potrero_id, COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO' "
+            "AND potrero_id IS NOT NULL GROUP BY potrero_id"
+        )
+    }
+
+    lats = [float(p["centroide_lat"]) for p in potreros if p["centroide_lat"] is not None]
+    lat_promedio = sum(lats) / len(lats) if lats else 0.0
+
+    fig, ax = plt.subplots(figsize=(9, 8), dpi=dpi)
+    categorias_presentes: set[str] = set()
+
+    for p in potreros:
+        try:
+            poligono = shapely_wkt.loads(p["geom_wkt_4326"])
+            coords = list(poligono.exterior.coords)
+        except Exception:
+            continue
+
+        ndvi_info = ndvi_por_potrero.get(p["id"])
+        categoria = ndvi_info["categoria"] if ndvi_info else "ÓPTIMO / REPOSO"
+        categorias_presentes.add(categoria)
+        color = _COLOR_POR_CATEGORIA_NDVI.get(categoria, _COLOR_GRIS)
+
+        ax.add_patch(Polygon(coords, closed=True, facecolor=color, edgecolor="white",
+                             linewidth=1.0, alpha=0.85))
+
+        n_animales = animales_por_potrero.get(p["id"], 0)
+        if n_animales > 0:
+            dias_txt = f"{p['dias_ocupacion']}d" if p["dias_ocupacion"] is not None else "ocupado"
+        else:
+            dias_txt = f"{p['dias_reposo']}d" if p["dias_reposo"] is not None else "vacío"
+
+        lat = p["centroide_lat"]
+        lon = p["centroide_lon"]
+        if lat is not None and lon is not None:
+            etiqueta = f"{p['nombre']}\n{n_animales}u · {dias_txt}"
+            ax.annotate(etiqueta, (lon, lat), ha="center", va="center", fontsize=5.3,
+                       fontweight="bold", color="#1a1a1a", linespacing=1.15, zorder=6,
+                       bbox=dict(boxstyle="round,pad=0.15", facecolor="white", alpha=0.65, linewidth=0))
+
+    # Corrección de aspecto: a esta latitud, 1° de longitud recorre menos
+    # distancia real que 1° de latitud (factor cos(lat)) -- sin esto el mapa
+    # se ve visualmente achatado/estirado.
+    if lat_promedio:
+        ax.set_aspect(1.0 / math.cos(math.radians(lat_promedio)))
+    ax.autoscale_view()
+    ax.set_xlabel("Longitud")
+    ax.set_ylabel("Latitud")
+    _titulo_y_subtitulo(fig, ax, "Mapa de Potreros (NDVI + Ocupación)",
+                        f"{len(potreros)} potrero(s) con ubicación real · vigor forrajero satelital")
+    ax.grid(True, alpha=0.25, linewidth=0.5)
+
+    orden_categorias = ["EXCELENTE", "ÓPTIMO / REPOSO", "ESTRÉS / BAJA BIOMASA", "CRÍTICO / SUELO DESNUDO"]
+    presentes_ordenadas = [c for c in orden_categorias if c in categorias_presentes]
+    parches = [plt.Rectangle((0, 0), 1, 1, color=_COLOR_POR_CATEGORIA_NDVI[c]) for c in presentes_ordenadas]
+    ax.legend(parches, presentes_ordenadas, loc="upper right", fontsize=7.5, title="Vigor NDVI", title_fontsize=8)
+
+    return _guardar(fig, output_dir, f"mapa_potreros_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
 
 
 def _hembra_prenada_estimado(db, aid: int) -> bool:

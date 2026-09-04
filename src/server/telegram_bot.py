@@ -34,6 +34,7 @@ from ..engine.charts import (
     generar_grafico_ranking_vacas_leche,
     generar_grafico_rendimiento_padre,
     generar_grafico_waterfall_inventario,
+    generar_mapa_potreros,
     graficos_disponibles,
 )
 from ..engine.query_engine import (
@@ -133,6 +134,7 @@ GRAFICOS_PANEL = {
     "ranking_leche": (generar_grafico_ranking_vacas_leche, "🏆 Ranking de Vacas por Producción"),
     "reproductivo_hato": (generar_grafico_estado_reproductivo_hato, "🧬 Estado Reproductivo del Hato"),
     "carga_animal": (generar_grafico_carga_animal_potrero, "🐄 Carga Animal por Potrero (UGG/ha)"),
+    "mapa_potreros": (generar_mapa_potreros, "🗺️ Mapa de Potreros (NDVI + Ocupación)"),
 }
 
 

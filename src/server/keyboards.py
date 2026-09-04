@@ -360,6 +360,9 @@ def crear_teclado_graficos() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🐄 Carga Animal (UGG/ha)", callback_data="panel_grafico:carga_animal"),
         ],
+        [
+            InlineKeyboardButton("🗺️ Mapa de Potreros", callback_data="panel_grafico:mapa_potreros"),
+        ],
         # --- Categoría 4: LECHE ---
         [
             InlineKeyboardButton("─── 🥛 LECHE ───", callback_data="noop:leche"),
@@ -517,6 +520,9 @@ def crear_teclado_clima() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
             InlineKeyboardButton("🌿 Potreros SG", callback_data="cmd:potreros"),
+        ],
+        [
+            InlineKeyboardButton("🗺️ Mapa de Potreros", callback_data="panel_grafico:mapa_potreros"),
         ],
         [
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
