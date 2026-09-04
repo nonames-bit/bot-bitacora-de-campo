@@ -423,6 +423,43 @@ del job de NDVI para no chocar cuotas de Earth Engine):
 
 ---
 
+## 🖥️ Dashboard PWA de oficina (Fase 7 Etapa D)
+
+El dashboard web ejecutivo (`src/pwa/app.py`, Flask) corre como servicio
+aparte del bot de Telegram — comparten la misma base SQLite (WAL), pero son
+dos procesos independientes. Estado desplegado (2026-09-04):
+
+- **Dirección pública:** `https://ganaderiaja.duckdns.org` (dominio gratuito
+  de [DuckDNS](https://www.duckdns.org) apuntando a la IP del droplet;
+  cuenta y subdominio los administra el usuario, no el bot).
+- **Login:** `PWA_PASSWORD` en `/root/bitacora/.env` (fail-closed — sin esa
+  variable, la PWA no sirve nada). Cámbiela y reinicie con
+  `systemctl restart bitacora-pwa` si hace falta.
+- **Servicio systemd** `bitacora-pwa` (mismo patrón que `bitacora-bot`):
+  ```bash
+  systemctl status bitacora-pwa    # ver estado
+  systemctl restart bitacora-pwa   # aplicar cambios de código o .env
+  journalctl -u bitacora-pwa -f    # logs en vivo
+  ```
+  Unidad en `/etc/systemd/system/bitacora-pwa.service`, ejecuta
+  `python src/pwa/app.py` con `PWA_HOST=0.0.0.0`, `PWA_PORT=8080`,
+  `Restart=always`.
+- **Nginx como proxy + HTTPS** (`/etc/nginx/sites-available/bitacora-pwa`):
+  Nginx escucha 80/443 y reenvía a `127.0.0.1:8080`. Certificado real vía
+  **Let's Encrypt/certbot**, con renovación automática ya programada (no
+  requiere acción manual). Para renovar a mano si hiciera falta:
+  `certbot renew`.
+- **Firewall (`ufw`)**: activo, permite solo `22` (SSH), `80` y `443`. El
+  puerto `8080` (HTTP plano de Flask) queda **bloqueado desde afuera** —
+  solo Nginx (que corre en el mismo servidor) puede hablarle por
+  `127.0.0.1`. Si se necesita depurar el puerto 8080 directo, usar un túnel
+  SSH (`ssh -L 8080:localhost:8080 root@206.189.188.183`) en vez de abrirlo
+  en el firewall.
+- **Si el droplet cambia de IP** (recreación, migración): actualizar el
+  registro de IP en duckdns.org — el dominio no se actualiza solo.
+
+---
+
 ## 🔄 Rutina de sincronización semanal/mensual (Fase 1.1)
 
 Cuando usted cargó en el Software Ganadero SG los eventos que reportaron los
