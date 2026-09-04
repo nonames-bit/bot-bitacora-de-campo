@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import socket
 import sys
+import time
 
 # Fix Windows cp1252: consola sin UTF-8 rompía los print() del banner
 # (UnicodeEncodeError) antes de que Flask arrancara. No requiere acción
@@ -90,6 +92,13 @@ DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join("data", "bitacora.db"))
 USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join("src", "server", "users.json"))
 MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
 REPORTES_DIR_DEFAULT = os.path.join("data", "reportes")
+# Los gráficos (matplotlib) no cambian minuto a minuto -- el NDVI se
+# actualiza semanal, los datos del hato a lo sumo varían unas pocas veces
+# al día. Cachear 10 min evita regenerar la misma imagen si dos personas
+# abren la misma pestaña casi al tiempo (el servidor Flask de desarrollo
+# es de un solo hilo: sin esto, la segunda petición esperaría a que la
+# primera termine de renderizar en vez de servir algo instantáneo).
+CACHE_GRAFICOS_SEGUNDOS = int(os.getenv("PWA_CACHE_GRAFICOS_SEGUNDOS", "600"))
 # Host/puerto configurables por entorno (iniciar_pwa.sh ya usa PWA_PORT).
 # Default 0.0.0.0/8080: accesible desde celular/otra PC de la misma red.
 PWA_HOST_DEFAULT = os.getenv("PWA_HOST", "0.0.0.0")
@@ -638,15 +647,30 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/grafico/<tipo>")
     def api_grafico(tipo):
+        generadores = _generadores_graficos_pwa()
+        generador = generadores.get(tipo)
+        if generador is None:
+            abort(404)
+
+        # Caché por tipo (independiente del nombre de archivo que use cada
+        # generador internamente): si ya hay una copia servida hace menos
+        # de CACHE_GRAFICOS_SEGUNDOS, se devuelve sin volver a renderizar.
+        cache_path = os.path.join(REPORTES_DIR_DEFAULT, f"_pwa_cache_{tipo}.png")
+        try:
+            fresco = (
+                os.path.isfile(cache_path)
+                and (time.time() - os.path.getmtime(cache_path)) < CACHE_GRAFICOS_SEGUNDOS
+            )
+        except Exception:
+            fresco = False
+        if fresco:
+            return send_file(os.path.abspath(cache_path), mimetype="image/png")
+
         try:
             from ..engine.charts import graficos_disponibles
         except ImportError:  # ejecución directa: python src/pwa/app.py
             from src.engine.charts import graficos_disponibles  # type: ignore
 
-        generadores = _generadores_graficos_pwa()
-        generador = generadores.get(tipo)
-        if generador is None:
-            abort(404)
         if not graficos_disponibles():
             abort(404)
         db_graf = _db(db_path)
@@ -656,7 +680,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             db_graf.close()
         if not ruta or not os.path.isfile(ruta):
             abort(404)
-        return send_file(os.path.abspath(ruta), mimetype="image/png")
+        try:
+            shutil.copyfile(ruta, cache_path)
+        except Exception:
+            cache_path = ruta  # si falla la copia, se sirve igual el original
+        return send_file(os.path.abspath(cache_path), mimetype="image/png")
 
     @app.get("/media/<path:rel>")
     def media(rel):

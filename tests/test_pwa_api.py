@@ -161,6 +161,37 @@ def test_api_grafico_tipo_no_whitelisteado_devuelve_404(client):
     assert r.status_code == 404
 
 
+def test_api_grafico_usa_cache_en_la_segunda_llamada(client, monkeypatch, tmp_path):
+    """Dentro de la ventana de caché, la segunda petición no debe volver a
+    invocar al generador (matplotlib) — evita regenerar la misma imagen si
+    dos personas abren la misma pestaña casi al tiempo."""
+    import src.pwa.app as pwa_app
+
+    # Directorio de reportes aislado: REPORTES_DIR_DEFAULT apunta a la
+    # carpeta real del repo (data/reportes), que puede tener una caché
+    # fresca de usos previos (manuales o de otros tests) y falsear el conteo.
+    monkeypatch.setattr(pwa_app, "REPORTES_DIR_DEFAULT", str(tmp_path / "reportes"))
+
+    llamadas = {"n": 0}
+    generadores_originales = pwa_app._generadores_graficos_pwa()
+    original = generadores_originales["mapa_potreros"]
+
+    def _contador(*a, **k):
+        llamadas["n"] += 1
+        return original(*a, **k)
+
+    monkeypatch.setattr(
+        pwa_app, "_generadores_graficos_pwa",
+        lambda: {**generadores_originales, "mapa_potreros": _contador},
+    )
+
+    r1 = client.get("/api/grafico/mapa_potreros")
+    r2 = client.get("/api/grafico/mapa_potreros")
+    if r1.status_code == 200:
+        assert r2.status_code == 200
+        assert llamadas["n"] == 1  # la segunda vino de la caché, no regeneró
+
+
 def test_media_sirve_archivo_y_bloquea_path_traversal(db_file, tmp_path):
     media_dir = tmp_path / "media_test"
     media_dir.mkdir()
