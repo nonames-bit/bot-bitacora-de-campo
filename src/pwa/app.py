@@ -28,6 +28,8 @@ try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
+import hmac
+import secrets
 from datetime import date, timedelta
 from typing import Any, Optional
 
@@ -40,7 +42,8 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
     from src.db.database import Database  # type: ignore
 
 try:
-    from flask import Flask, jsonify, render_template, request  # type: ignore
+    from flask import (Flask, abort, jsonify, redirect, render_template,  # type: ignore
+                       request, send_file, send_from_directory, session)
 
     _FLASK_OK = True
 except Exception:  # Flask no instalado: no romper el bot
@@ -53,14 +56,40 @@ except Exception:  # Flask no instalado: no romper el bot
     def render_template(*a, **k):  # type: ignore
         return ""
 
+    def redirect(*a, **k):  # type: ignore
+        return ""
+
+    def send_file(*a, **k):  # type: ignore
+        return ""
+
+    def send_from_directory(*a, **k):  # type: ignore
+        return ""
+
+    def abort(*a, **k):  # type: ignore
+        raise RuntimeError("Flask no instalado")
+
     request = None  # type: ignore
+    session = None  # type: ignore
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Raíz del repo (…/src/pwa → …): para resolver data/bitacora.db aunque se
 # invoque desde otro cwd y para mensajes de error accionables.
 RAIZ_PROYECTO = os.path.dirname(os.path.dirname(BASE_DIR))
+
+# Cargar .env igual que el resto del bot (telegram_bot.py, copias_watcher.py)
+# — sin esto, PWA_PASSWORD/PWA_PORT/BITACORA_DB solo se podían fijar como
+# variable de entorno real del sistema, nunca desde el .env del proyecto.
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(RAIZ_PROYECTO, ".env"))
+except Exception:
+    pass
+
 DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join("data", "bitacora.db"))
 USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join("src", "server", "users.json"))
+MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
+REPORTES_DIR_DEFAULT = os.path.join("data", "reportes")
 # Host/puerto configurables por entorno (iniciar_pwa.sh ya usa PWA_PORT).
 # Default 0.0.0.0/8080: accesible desde celular/otra PC de la misma red.
 PWA_HOST_DEFAULT = os.getenv("PWA_HOST", "0.0.0.0")
@@ -68,6 +97,38 @@ try:
     PUERTO = int(os.getenv("PWA_PORT", "8080"))
 except ValueError:
     PUERTO = 8080
+
+# Autenticación (cierra el hueco de acceso libre: antes cualquiera que
+# llegara al puerto veía todos los datos de la finca sin login). Obligatoria
+# por diseño: si no está configurada, la app se sirve pero deniega todo con
+# un mensaje claro en vez de quedar abierta por defecto ("fail closed").
+PWA_PASSWORD = os.getenv("PWA_PASSWORD", "")
+# Clave de firma de la cookie de sesión (Flask/itsdangerous, sin dependencia
+# nueva). Si no se configura por entorno, se genera una vez y se guarda en
+# disco (fuera del repo) para que la sesión no se invalide en cada reinicio.
+_SECRET_KEY_FILE = os.path.join("data", ".pwa_secret_key")
+
+
+def _obtener_secret_key() -> str:
+    env_key = os.getenv("PWA_SECRET_KEY", "").strip()
+    if env_key:
+        return env_key
+    try:
+        if os.path.isfile(_SECRET_KEY_FILE):
+            with open(_SECRET_KEY_FILE, encoding="utf-8") as f:
+                clave = f.read().strip()
+            if clave:
+                return clave
+    except Exception:
+        pass
+    clave = secrets.token_hex(32)
+    try:
+        os.makedirs(os.path.dirname(_SECRET_KEY_FILE) or ".", exist_ok=True)
+        with open(_SECRET_KEY_FILE, "w", encoding="utf-8") as f:
+            f.write(clave)
+    except Exception:
+        pass  # sin disco escribible: la sesión no sobrevive un reinicio, pero sigue firmada
+    return clave
 
 
 def _resolver_db_existente(db_path: str) -> Optional[str]:
@@ -143,8 +204,42 @@ def _db(db_path: str) -> Database:
     return Database(db_path)
 
 
+# Whitelist de gráficos servibles por /api/grafico/<tipo> — mismo patrón de
+# seguridad que GRAFICOS_PANEL en telegram_bot.py: nunca se ejecuta un
+# nombre de función arbitrario, solo estas claves fijas. Import perezoso
+# (dentro de la función) para no exigir matplotlib si la PWA no lo usa.
+def _generadores_graficos_pwa():
+    try:
+        from ..engine import charts
+    except ImportError:  # ejecución directa: python src/pwa/app.py
+        from src.engine import charts  # type: ignore
+
+    return {
+        "mapa_potreros": charts.generar_mapa_potreros,
+        "ocupacion": charts.generar_grafico_ocupacion_potreros,
+        "aforo": charts.generar_grafico_aforo_potreros,
+        "carga_animal": charts.generar_grafico_carga_animal_potrero,
+        "evolucion": charts.generar_grafico_evolucion_rebano,
+        "categorias": charts.generar_grafico_categorias,
+        "leche_total": charts.generar_grafico_leche_total_hato,
+        "eficiencia_lechera": charts.generar_grafico_eficiencia_lechera,
+        "reproductivo_hato": charts.generar_grafico_estado_reproductivo_hato,
+    }
+
+
 def _filas_dict(filas) -> list[dict]:
     return [dict(r) for r in (filas or [])]
+
+
+def _ruta_relativa_media(ruta: str, media_dir: str = MEDIA_DIR_DEFAULT) -> str:
+    """`fotos.ruta` en la BD ya incluye el prefijo del directorio de media
+    (ej. `media/5953-2.jpg`, ver telegram_bot.py/dbf_importer.py) — esto lo
+    recorta para no duplicarlo al armar la URL `/media/<rel>`."""
+    r = str(ruta or "").replace("\\", "/").lstrip("/")
+    prefijo = media_dir.replace("\\", "/").strip("/") + "/"
+    if r.startswith(prefijo):
+        return r[len(prefijo):]
+    return os.path.basename(r)
 
 
 # ------------------------------------------------------------------ #
@@ -222,13 +317,18 @@ def datos_repro(db_path: str = DB_PATH_DEFAULT) -> dict:
     db = _db(db_path)
     try:
         hoy = date.today()
+        hoy_iso_repro = hoy.isoformat()
         lim = (hoy + timedelta(days=30)).isoformat()
         try:
+            # "FEP ≤30d" = próximos partos, ventana hacia adelante desde hoy.
+            # Faltaba el límite inferior: sin él, traía las 30 fechas MÁS
+            # ANTIGUAS de toda la tabla (años atrás) en vez de las próximas.
             fep = _filas_dict(db.query(
                 """SELECT a.tag, s.fecha, s.tipo_servicio, s.toro_pajilla, s.fep_calculada
                    FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id
                    WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL
-                   AND s.fep_calculada <= ? ORDER BY s.fep_calculada LIMIT 30""", (lim,)))
+                   AND s.fep_calculada >= ? AND s.fep_calculada <= ?
+                   ORDER BY s.fep_calculada LIMIT 30""", (hoy_iso_repro, lim)))
         except Exception:
             fep = []
         try:
@@ -305,9 +405,16 @@ def datos_pasturas(db_path: str = DB_PATH_DEFAULT) -> dict:
     db = _db(db_path)
     try:
         try:
+            # Solo potreros con geometría real (Fase B del plan geoespacial)
+            # — mismo criterio que Database.resumen_ndvi_finca(): los
+            # códigos legacy (numéricos/L/G) no son potreros reales/actuales
+            # de la finca (confirmado por el usuario contra el reporte
+            # nativo de Software Ganadero SG) y no deben listarse como si
+            # fueran potreros activos.
             potreros = _filas_dict(db.query(
                 "SELECT id, nombre, codigo, area_has, dias_ocupacion, dias_reposo, "
-                "fecha_entrada, fecha_salida FROM potreros ORDER BY nombre"))
+                "fecha_entrada, fecha_salida FROM potreros "
+                "WHERE geom_wkt_4326 IS NOT NULL ORDER BY nombre"))
         except Exception:
             potreros = []
         for p in potreros:
@@ -395,7 +502,11 @@ def datos_ficha(tag: str, db_path: str = DB_PATH_DEFAULT) -> dict:
             base["tratamientos"] = []
         try:
             fotos = db.fotos_de(aid, limit=3)
-            base["fotos"] = [{"fecha": f["fecha"], "caption": f["caption"]} for f in fotos]
+            base["fotos"] = [
+                {"fecha": f["fecha"], "caption": f["caption"],
+                 "url": f"/media/{_ruta_relativa_media(f['ruta'])}" if f["ruta"] else None}
+                for f in fotos
+            ]
         except Exception:
             base["fotos"] = []
         return base
@@ -409,18 +520,72 @@ def datos_ficha(tag: str, db_path: str = DB_PATH_DEFAULT) -> dict:
 # ------------------------------------------------------------------ #
 # App Flask (solo se construye si Flask está instalado)
 # ------------------------------------------------------------------ #
-def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAULT):
-    """Construye la app Flask. Devuelve None si Flask no está instalado."""
+def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAULT,
+             password: Optional[str] = None):
+    """Construye la app Flask. Devuelve None si Flask no está instalado.
+
+    `password`: para tests/uso programático; si no se pasa, se lee de
+    `PWA_PASSWORD` (variable de entorno) al momento de crear la app.
+    """
     if not _FLASK_OK:
         return None
     app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
                 static_folder=os.path.join(BASE_DIR, "static"))
+    app.secret_key = _obtener_secret_key()
+    clave_esperada = password if password is not None else PWA_PASSWORD
+
+    # Rutas que no requieren sesión iniciada (nombres de endpoint de Flask,
+    # es decir el nombre de la función de vista, no la URL).
+    _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest"}
 
     def _rol_actual() -> Optional[str]:
-        if request is None:
+        if session is None:
             return None
-        uid = (request.args.get("user_id") or request.headers.get("X-User-Id") or "").strip()
+        uid = session.get("user_id")
         return _rol_de(uid, users_file) if uid else None
+
+    @app.before_request
+    def _requerir_login():
+        if request is None or request.endpoint in _RUTAS_PUBLICAS:
+            return None
+        if session.get("autenticado"):
+            return None
+        if request.path.startswith("/api/") or request.path.startswith("/media/"):
+            return jsonify({"error": "No autenticado. Inicie sesión en /login."}), 401
+        return redirect("/login")
+
+    @app.get("/login")
+    def login_form():
+        if not clave_esperada:
+            return (
+                "⚠️ PWA_PASSWORD no está configurada en el entorno (.env). "
+                "El dashboard permanece bloqueado hasta que se configure una "
+                "contraseña — no se sirve sin autenticación.",
+                503,
+            )
+        return render_template("login.html", error=request.args.get("error"))
+
+    @app.post("/login")
+    def login_submit():
+        if not clave_esperada:
+            return (
+                "⚠️ PWA_PASSWORD no está configurada en el entorno (.env).",
+                503,
+            )
+        intento = (request.form.get("password") or "").strip()
+        # Comparación en tiempo constante: evita filtrar la contraseña por
+        # cuánto tarda la respuesta (timing attack), aunque el riesgo real
+        # aquí es bajo (red local), es una buena práctica sin costo.
+        if intento and hmac.compare_digest(intento, clave_esperada):
+            session["autenticado"] = True
+            session["user_id"] = (request.form.get("user_id") or "").strip() or None
+            return redirect("/")
+        return redirect("/login?error=1")
+
+    @app.get("/logout")
+    def logout():
+        session.clear()
+        return redirect("/login")
 
     @app.get("/")
     def index():
@@ -471,6 +636,34 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.get("/api/grafico/<tipo>")
+    def api_grafico(tipo):
+        try:
+            from ..engine.charts import graficos_disponibles
+        except ImportError:  # ejecución directa: python src/pwa/app.py
+            from src.engine.charts import graficos_disponibles  # type: ignore
+
+        generadores = _generadores_graficos_pwa()
+        generador = generadores.get(tipo)
+        if generador is None:
+            abort(404)
+        if not graficos_disponibles():
+            abort(404)
+        db_graf = _db(db_path)
+        try:
+            ruta = generador(db_graf, output_dir=REPORTES_DIR_DEFAULT)
+        finally:
+            db_graf.close()
+        if not ruta or not os.path.isfile(ruta):
+            abort(404)
+        return send_file(os.path.abspath(ruta), mimetype="image/png")
+
+    @app.get("/media/<path:rel>")
+    def media(rel):
+        # send_from_directory ya previene path traversal (rechaza "..").
+        media_root = os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
+        return send_from_directory(media_root, rel)
+
     return app
 
 
@@ -519,6 +712,9 @@ if __name__ == "__main__":  # pragma: no cover
         print("   Y restaure con:  bash scripts/importar_backup.sh /tmp/<copia>.zip", flush=True)
         raise SystemExit(1)
     print(f"ℹ️  DB: {_db_real} | Host: {_host} | Puerto: {_puerto}", flush=True)
+    if not PWA_PASSWORD:
+        print("⚠️  PWA_PASSWORD no está configurada en .env — el dashboard quedará", flush=True)
+        print("   bloqueado (sin login) hasta que la defina. Vea .env.example.", flush=True)
     _app = crear_app(_db_arg)
     if _app is None:
         print("❌ No se pudo crear la app Flask (Flask no disponible).", flush=True)

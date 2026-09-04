@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingresar · Bitácora JA</title>
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body{display:flex;min-height:100vh;align-items:center;justify-content:center;padding-bottom:0}
+.card{width:100%;max-width:320px;padding:28px 24px}
+h1{font-size:18px;color:var(--verde-marca);margin:0 0 4px}
+p.sub{color:#666;font-size:13px;margin:0 0 18px}
+label{display:block;font-size:13px;margin:12px 0 4px;color:#444}
+.card input{width:100%}
+.card button{width:100%;margin-top:18px;border:0;border-radius:8px;background:var(--verde-marca);color:#fff;font-size:15px;cursor:pointer}
+.error{color:var(--rojo);font-size:13px;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🐮 GANADERÍA JA</h1>
+  <p class="sub">Tablero ejecutivo — acceso restringido</p>
+  <form method="post" action="/login">
+    <label for="password">Contraseña</label>
+    <input type="password" id="password" name="password" autofocus required>
+    <label for="user_id">Su ID de Telegram (opcional, solo para identificarlo)</label>
+    <input type="text" id="user_id" name="user_id" placeholder="ej. 111111111" inputmode="numeric">
+    <button type="submit">Ingresar</button>
+  </form>
+  {% if error %}<p class="error">❌ Contraseña incorrecta.</p>{% endif %}
+</div>
+</body>
+</html>

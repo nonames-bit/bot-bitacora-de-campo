@@ -1,0 +1,130 @@
+/* Estilo compartido del Dashboard PWA Bitácora JA — paleta de marca igual
+   a los gráficos/PDF del bot (src/engine/charts.py, src/reports/qr_fichas.py).
+   Mobile-first: la barra de navegación se vuelve fija abajo en pantallas
+   angostas (patrón de app nativa), las tablas anchas scrollean en su propio
+   contenedor en vez de romper el layout. */
+
+:root {
+  --verde-marca: #2F5233;
+  --verde-claro: #66BB6A;
+  --tierra: #8D6E63;
+  --gris: #78909C;
+  --rojo: #EF5350;
+  --arena: #D4A373;
+  --fondo: #f3f7f3;
+  --texto: #222;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  margin: 0;
+  background: var(--fondo);
+  color: var(--texto);
+  padding-bottom: 76px; /* espacio para el nav fijo abajo en móvil */
+}
+
+header {
+  background: var(--verde-marca);
+  color: #fff;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+header a { color: #fff; }
+header b { font-size: 15px; }
+header .salir { font-size: 13px; opacity: 0.9; white-space: nowrap; }
+
+nav {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #E7EFE8;
+}
+nav button {
+  border: 1px solid var(--verde-marca);
+  background: #fff;
+  color: var(--verde-marca);
+  border-radius: 8px;
+  padding: 8px 12px;
+  min-height: 40px;
+  cursor: pointer;
+  font-size: 13.5px;
+}
+nav button.act { background: var(--verde-marca); color: #fff; }
+
+main { padding: 16px; max-width: 1000px; margin: auto; }
+
+.card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.10);
+}
+.card h3 { margin-top: 0; color: var(--verde-marca); }
+.card h4 { color: var(--tierra); margin-bottom: 6px; }
+
+.tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+td, th { border: 1px solid #ddd; padding: 6px 8px; text-align: left; white-space: nowrap; }
+
+input, select {
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid #999;
+  font-size: 15px; /* >=15px evita el zoom automático de iOS al enfocar */
+  min-height: 40px;
+}
+button { min-height: 40px; }
+
+.grafico-wrap { margin: 10px 0; text-align: center; }
+.grafico-wrap img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+}
+
+.fotos-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.fotos-wrap img {
+  width: 96px; height: 96px; object-fit: cover;
+  border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+}
+
+.semaforo { font-size: 16px; }
+
+/* --- Navegación tipo app nativa en pantallas de teléfono --- */
+@media (max-width: 640px) {
+  main { padding: 10px; }
+  header b { font-size: 14px; }
+  nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    justify-content: space-around;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    background: #fff;
+    border-top: 1px solid #ddd;
+    box-shadow: 0 -1px 6px rgba(0,0,0,.08);
+  }
+  nav button {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 6px 2px;
+    font-size: 11px;
+    border-radius: 8px;
+    border-color: transparent;
+    background: transparent;
+    color: #444;
+  }
+  nav button.act { background: #E7EFE8; color: var(--verde-marca); border-color: var(--verde-marca); }
+  td, th { font-size: 12.5px; padding: 5px 6px; }
+}

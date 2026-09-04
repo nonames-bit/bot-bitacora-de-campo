@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Arranca el Dashboard PWA (Fase 7 Etapa D) en segundo plano en Windows.
 .DESCRIPTION
@@ -68,16 +68,18 @@ try {
     try { $tcp.Close() } catch {}
 } catch {}
 
+$LogErr = Join-Path $Raiz "data\pwa.err.log"
 Write-Host "Iniciando PWA Bitácora JA en segundo plano (puerto $Puerto, DB=$($env:BITACORA_DB))..." -ForegroundColor Cyan
 $proc = Start-Process -FilePath "python" -ArgumentList "src/pwa/app.py" `
     -WorkingDirectory $Raiz -WindowStyle Hidden `
-    -RedirectStandardOutput $Log -RedirectStandardError $Log -PassThru
+    -RedirectStandardOutput $Log -RedirectStandardError $LogErr -PassThru
 $proc.Id | Out-File -FilePath $PidFile -Encoding utf8 -Force
 
 Start-Sleep -Seconds 3
 if ($proc.HasExited) {
     Write-Host "[ERROR] La PWA no arrancó. Revise el log: $Log" -ForegroundColor Red
-    Get-Content $Log -Tail 20
+    Get-Content $Log -Tail 20 -ErrorAction SilentlyContinue
+    Get-Content $LogErr -Tail 20 -ErrorAction SilentlyContinue
     exit 3
 }
 
