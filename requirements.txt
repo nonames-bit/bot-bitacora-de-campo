@@ -17,3 +17,7 @@ earthengine-api>=1.0.0
 # Vigilante de copias en tiempo real (opcional; sin él, copias_watcher usa polling 60s):
 # watchdog>=4.0
 
+# Fase 7 A (QR fichas) + D (Dashboard PWA VPS):
+Flask>=3.0
+qrcode[pil]>=7.4
+

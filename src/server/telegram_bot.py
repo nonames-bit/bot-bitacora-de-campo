@@ -1491,6 +1491,46 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error al generar el reporte: {e}")
 
+    async def cmd_qr(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Fase 7 Etapa A: /qr <potrero|lote> genera el PDF A4 de fichas QR (solo ACTIVO)."""
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.puede_administrar(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            arg = " ".join(context.args).strip() if context.args else ""
+            if not arg:
+                await update.message.reply_text(
+                    "🖨️ Uso: /qr &lt;potrero|lote&gt;\nEj: /qr Guayabal",
+                    parse_mode="HTML",
+                )
+                return
+            # Import perezoso para no exigir reportlab/qrcode si no se usa /qr.
+            from ..reports.qr_fichas import generar_fichas_lote, listar_animales_lote
+
+            total = len(listar_animales_lote(db, arg))
+            if total == 0:
+                await update.message.reply_text(
+                    f"⚠️ Sin animales ACTIVOS para '{arg}' (revisa potrero o lote)."
+                )
+                return
+            os.makedirs(reportes_dir, exist_ok=True)
+            seguro = re.sub(r"[^A-Za-z0-9_-]+", "_", arg) or "lote"
+            ruta = os.path.join(reportes_dir, f"fichas_qr_{seguro}_{date.today().isoformat()}.pdf")
+            generar_fichas_lote(db, arg, salida=ruta, media_dir=media_dir)
+            with open(ruta, "rb") as f:
+                contenido = f.read()
+            await update.message.reply_document(
+                document=contenido, filename=os.path.basename(ruta),
+                caption=f"🖨️ Fichas QR · {arg} · {total} animales ACTIVOS",
+            )
+        except Exception as e:
+            logger.error("Error en cmd_qr: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error al generar fichas QR: {e}")
+
     async def cmd_fotos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -2574,6 +2614,18 @@ def construir_application(
                     if query.message:
                         await query.message.reply_text(f"❌ Error al generar reporte: {erep}")
 
+            elif data == "cmd:qr":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                if query.message:
+                    await query.message.reply_text(
+                        "🖨️ <b>Fichas QR por lote</b>\nUsa: /qr &lt;potrero|lote&gt;  (ej. /qr Guayabal)",
+                        parse_mode="HTML",
+                    )
+
             elif data == "cmd:graficos":
                 await query.answer()
                 if query.message:
@@ -3103,6 +3155,7 @@ def construir_application(
     app.add_handler(CommandHandler(["sistema", "servidor", "vps"], cmd_sistema))
     app.add_handler(CommandHandler("usuarios", cmd_usuarios))
     app.add_handler(CommandHandler("reporte", cmd_reporte))
+    app.add_handler(CommandHandler("qr", cmd_qr))
     app.add_handler(CommandHandler("exportar", cmd_exportar))
     app.add_handler(CommandHandler("importar", cmd_importar))
     app.add_handler(CommandHandler("confirmar_importar", cmd_confirmar_importar))

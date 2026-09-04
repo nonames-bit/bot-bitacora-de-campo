@@ -139,6 +139,7 @@ def crear_teclado_sistema_menu(rol: Optional[str] = None) -> InlineKeyboardMarku
             InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
         ],
         [
+            InlineKeyboardButton("🖨️ Fichas QR", callback_data="cmd:qr"),
             InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
         ],
     ]

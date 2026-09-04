@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bitácora JA · Dashboard</title>
+<link rel="manifest" href="/manifest.json">
+<style>
+body{font-family:system-ui,Arial,sans-serif;margin:0;background:#f3f7f3;color:#222}
+header{background:#2F5233;color:#fff;padding:12px 16px}
+nav{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px;background:#E7EFE8}
+nav button{border:1px solid #2F5233;background:#fff;border-radius:6px;padding:6px 10px;cursor:pointer}
+nav button.act{background:#2F5233;color:#fff}
+main{padding:16px;max-width:960px;margin:auto}
+.card{background:#fff;border-radius:8px;padding:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{border:1px solid #ddd;padding:4px 6px;text-align:left}
+input,select{padding:6px;border-radius:6px;border:1px solid #999}
+</style>
+</head>
+<body>
+<header><b>🐮 GANADERÍA JA · Tablero ejecutivo (online)</b></header>
+<nav>
+<button data-v="tablero" class="act">Tablero finca</button>
+<button data-v="repro">Reproducción</button>
+<button data-v="sanidad">Sanidad</button>
+<button data-v="pasturas">Pasturas</button>
+<button data-v="leche">Leche</button>
+<button data-v="ficha">Ficha animal</button>
+</nav>
+<main>
+<div class="card"><label>Potrero: <input id="f-potrero" placeholder="ej. Guayabal"></label>
+<label>Tag: <input id="f-tag" placeholder="ej. 47"></label>
+<button id="btn-cargar">Cargar</button></div>
+<div id="vista" class="card">Cargando…</div>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
