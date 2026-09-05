@@ -24,6 +24,7 @@ class Database:
         "traslados", "pesajes", "movimientos", "condicion_corporal",
         "produccion_leche", "diagnosticos_gestacion", "pluviometria",
         "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia",
+        "rondas_campo",
     )
 
     def __init__(self, path: str = ":memory:"):
@@ -457,6 +458,14 @@ class Database:
             animal_id=animal_id, fecha=f, peso_kg=peso_kg,
             gmd_calculada=gmd_calculada, evento=evento,
             creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+    def registrar_produccion_leche(self, fecha=None, litros=0.0, animal_tag=None,
+                                   notas=None, registrado_por=None) -> int:
+        f = iso(fecha) or date.today().isoformat()
+        aid = self.resolve_animal(animal_tag) if animal_tag else None
+        return self.insert("produccion_leche", dict(
+            animal_id=aid, fecha=f, litros=float(litros or 0.0), notas=notas,
         ))
 
     def registrar_movimiento(self, animal_tag, fecha=None, tipo_movimiento=None,
@@ -1667,3 +1676,146 @@ class Database:
         )
         self.conn.commit()
         return cur.rowcount
+
+    # ------------------------------------------------------------------ #
+    # Geolocalización GPS y Rondas de Inspección de Potrero
+    # ------------------------------------------------------------------ #
+    def detectar_potrero_gps(self, lat: float, lon: float) -> Optional[dict[str, Any]]:
+        """Determina en qué potrero está ubicado un punto GPS (lat, lon).
+        
+        Evalúa primero pertenencia estricta en el polígono WGS84 (geom_wkt_4326).
+        Si cae fuera por margen de precisión GPS (ej. cerca/saladero al borde),
+        calcula distancia al potrero más cercano con un umbral de hasta 150m.
+        """
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+        except (ValueError, TypeError):
+            return None
+
+        potreros = self.query(
+            "SELECT id, nombre, codigo, geom_wkt_4326, centroide_lat, centroide_lon, area_has "
+            "FROM potreros WHERE geom_wkt_4326 IS NOT NULL"
+        )
+        if not potreros:
+            return None
+
+        # Intento con shapely (geometría exacta)
+        try:
+            from shapely import wkt as shapely_wkt
+            from shapely.geometry import Point
+
+            pt = Point(lon_f, lat_f)  # WKT usa (x=lon, y=lat)
+            candidato_cercano = None
+            dist_min_grados = float("inf")
+
+            for p in potreros:
+                dp = dict(p)
+                wkt_str = dp.get("geom_wkt_4326")
+                if not wkt_str:
+                    continue
+                try:
+                    poly = shapely_wkt.loads(wkt_str)
+                    if poly.contains(pt):
+                        return {
+                            "id": dp["id"],
+                            "nombre": dp.get("nombre") or dp.get("codigo") or f"Potrero {dp['id']}",
+                            "codigo": dp.get("codigo"),
+                            "area_has": dp.get("area_has"),
+                            "distancia_m": 0.0,
+                            "dentro": True,
+                        }
+                    d = poly.distance(pt)
+                    if d < dist_min_grados:
+                        dist_min_grados = d
+                        candidato_cercano = dp
+                except Exception:
+                    continue
+
+            # 1 grado aprox 111.000 metros en el ecuador
+            dist_metros = dist_min_grados * 111320.0
+            if candidato_cercano and dist_metros <= 150.0:
+                return {
+                    "id": candidato_cercano["id"],
+                    "nombre": candidato_cercano.get("nombre") or candidato_cercano.get("codigo") or f"Potrero {candidato_cercano['id']}",
+                    "codigo": candidato_cercano.get("codigo"),
+                    "area_has": candidato_cercano.get("area_has"),
+                    "distancia_m": round(dist_metros, 1),
+                    "dentro": False,
+                }
+        except Exception as e:
+            logger.warning("Fallo al evaluar WKT con shapely en detectar_potrero_gps: %s", e)
+
+        # Fallback euclidiano con centroides si shapely falla
+        candidato = None
+        min_dist_m = float("inf")
+        for p in potreros:
+            dp = dict(p)
+            clat = dp.get("centroide_lat")
+            clon = dp.get("centroide_lon")
+            if clat is None or clon is None:
+                continue
+            d_grados = ((lat_f - float(clat)) ** 2 + (lon_f - float(clon)) ** 2) ** 0.5
+            d_m = d_grados * 111320.0
+            if d_m < min_dist_m:
+                min_dist_m = d_m
+                candidato = dp
+
+        if candidato and min_dist_m <= 300.0:
+            return {
+                "id": candidato["id"],
+                "nombre": candidato.get("nombre") or candidato.get("codigo") or f"Potrero {candidato['id']}",
+                "codigo": candidato["codigo"],
+                "area_has": candidato["area_has"],
+                "distancia_m": round(min_dist_m, 1),
+                "dentro": min_dist_m <= 60.0,
+            }
+        return None
+
+    def registrar_ronda_campo(self, user_id: Optional[int] = None,
+                              usuario_nombre: Optional[str] = None,
+                              fecha: Optional[str] = None,
+                              hora: Optional[str] = None,
+                              lat: Optional[float] = None,
+                              lon: Optional[float] = None,
+                              potrero_id: Optional[int] = None,
+                              potrero_nombre: Optional[str] = None,
+                              punto_control: Optional[str] = None,
+                              notas: Optional[str] = None) -> int:
+        """Registra un punto de verificación o recorrido GPS en campo."""
+        f = iso(fecha) or date.today().isoformat()
+        h = hora or datetime.now().strftime("%H:%M:%S")
+        
+        # Si no se pasó potrero pero hay coordenadas, intentar autodetectar
+        if potrero_id is None and lat is not None and lon is not None:
+            det = self.detectar_potrero_gps(float(lat), float(lon))
+            if det:
+                potrero_id = det["id"]
+                if not potrero_nombre:
+                    potrero_nombre = det["nombre"]
+
+        return self.insert("rondas_campo", {
+            "user_id": user_id,
+            "usuario_nombre": usuario_nombre,
+            "fecha": f,
+            "hora": h,
+            "lat": float(lat) if lat is not None else 0.0,
+            "lon": float(lon) if lon is not None else 0.0,
+            "potrero_id": potrero_id,
+            "potrero_nombre": potrero_nombre,
+            "punto_control": punto_control or "recorrido",
+            "notas": notas,
+            "creado_en": self._ahora(),
+        })
+
+    def listar_rondas_campo(self, fecha: Optional[str] = None, limite: int = 50) -> list[sqlite3.Row]:
+        """Consulta las últimas rondas o revisiones de potrero."""
+        if fecha:
+            return self.query(
+                "SELECT * FROM rondas_campo WHERE fecha = ? ORDER BY hora DESC, id DESC LIMIT ?",
+                (iso(fecha), limite)
+            )
+        return self.query(
+            "SELECT * FROM rondas_campo ORDER BY fecha DESC, hora DESC, id DESC LIMIT ?",
+            (limite,)
+        )

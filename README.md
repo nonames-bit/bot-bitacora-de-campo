@@ -385,13 +385,19 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Fórmulas NDVI, aforo satelital (kg MV/m²), biomasa (kg MS/ha) y ajuste dinámico de carga animal (`src/gis/sentinel_ndvi.py`).
   - **NDVI real vía Google Earth Engine** (`src/gis/earth_engine_ndvi.py`): consulta Sentinel-2 L2A (`COPERNICUS/S2_SR_HARMONIZED`) sobre el polígono real de cada potrero (`potreros.geom_wkt_4326`), con filtrado de nubes píxel a píxel (banda SCL) sobre el propio potrero — más confiable que el metadato de nubosidad de la escena completa para potreros pequeños en clima tropical. Job semanal `scripts/actualizar_ndvi_satelital.py` (ver `docs/DESPLIEGUE_DIGITALOCEAN.md`). Cuando un potrero aún no tiene lectura real (sin `geom_wkt_4326` o sin imagen despejada reciente), `/ndvi` cae a una estimación heurística de respaldo basada en días de ocupación/reposo — ver detalle en `docs/PLAN_GEO_SATELITAL_6.2_8.2.md`.
   - Tabla SQLite `monitoreo_satelital_ndvi`, comandos `/ndvi`, `/satelite`, `/indice_verde` y botón táctil `[ 🛰️ Satélite NDVI ]`.
-- [x] Suite de pruebas con pytest: **551 pruebas en verde** (100% pasando).
+- [x] **Fase 7 — PWA Oficina + Corral Offline (Completa 2026-09-05)**:
+  - **Cola de Escritura Offline Real** con `IndexedDB` (`POST /api/sync`) y sincronización automática/manual.
+  - **Modo "Manga de Corral"**: Pesaje continuo de animales con cálculo instantáneo de GMD (g/día) en pantalla, historial en vivo de pesajes, tratamientos masivos en lote por potrero, y conector Web Bluetooth (`navigator.bluetooth`) para básculas y bastones RFID BLE.
+  - **Geolocalización GPS & Auditoría de Rondas**: Detección automática del potrero actual sobre polígonos WGS84 de la finca (`potreros.geom_wkt_4326`), registro georreferenciado de visitas a saladeros, bebederos, cercas y recorridos de inspección con exportación directa a CSV.
+  - **Autenticación por PIN & 3 Roles RBAC**: Login por PIN de 4 dígitos individual con permisos estrictos (`TRABAJADOR` para captura en campo, `ADMIN` para gestión zootécnica y reportes PDF/Excel, y `OWNER` con acceso exclusivo a panel de métricas VPS, SQLite WAL y visor de logs en vivo).
+  - **Inteligencia & Voz**: Asistente zootécnico en lenguaje natural (`QueryEngine`) integrado en la PWA y dictado por voz directo (`MediaRecorder` + Whisper) para procesamiento de notas sin teclear.
+  - **Tema "☀️ Sol de Campo"**: Modo de alto contraste en blanco y negro puro para legibilidad bajo sol directo en potrero.
+- [x] Suite de pruebas con pytest: **565 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [ ] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada**: Simulador cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, partos distócicos y abortos.
 - [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
-- [~] **Fase 7 — PWA Oficina + Corral Offline (parcial 2026-09-05)**: ✅ A (QR) + D (dashboard 10 vistas) + B-lite (SW offline solo lectura) implementadas; pendiente B completa (cola de escritura + sync + SOS) y C (identificación RFID/OCR corral). Ver `docs/PLAN_FASE7_PWA.md`.
 - [ ] **Fase 8.1 — Estimación de Condición Corporal (BCS)**: Clasificación automática 1.0-5.0 con Gemini Vision.
 - [ ] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): la integración IDEAM sigue siendo una heurística sobre la lluvia registrada a mano (`/lluvia`). Ya completado: área real + polígonos georreferenciados (WGS84) de los 20 potreros desde el proyecto QGIS de la finca (Fase A+B, `potreros.geom_wkt_4326`/`centroide_lat`/`centroide_lon`) y **NDVI real vía Google Earth Engine** (Fase C, `src/gis/earth_engine_ndvi.py` + job semanal `scripts/actualizar_ndvi_satelital.py`). Pendiente: lluvia satelital de referencia CHIRPS (Fase D, opcional).
 

@@ -154,7 +154,39 @@ class Auth:
         """Verifica si el usuario tiene rol ADMIN (administrador)."""
         return self.rol_de(user_id) == "ADMIN"
 
-    def agregar_usuario(self, user_id: int, nombre: str, rol: str) -> None:
+    def autenticar_pin(self, pin: str) -> Optional[dict[str, Any]]:
+        """Busca un usuario por su PIN numérico y devuelve sus datos normalizados si coincide."""
+        if not pin:
+            return None
+        pin_limpio = str(pin).strip()
+        for u in self.usuarios:
+            pin_u = str(u.get("pin", "")).strip()
+            if pin_u and pin_u == pin_limpio:
+                return {
+                    "user_id": u.get("user_id"),
+                    "nombre": u.get("nombre", ""),
+                    "rol": str(u.get("rol", "")).strip().upper(),
+                }
+        return None
+
+    def asignar_pin(self, user_id: int, pin: str) -> None:
+        """Asigna o actualiza el PIN de acceso de un usuario."""
+        with _LOCK:
+            try:
+                uid = int(user_id)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"user_id inválido: {user_id}") from e
+
+            pin_limpio = str(pin).strip()
+            for u in self.usuarios:
+                if u.get("user_id") == uid:
+                    u["pin"] = pin_limpio
+                    self._guardar_sin_lock()
+                    logger.info("PIN actualizado para user_id=%s", uid)
+                    return
+            raise ValueError(f"El usuario con ID {uid} no existe.")
+
+    def agregar_usuario(self, user_id: int, nombre: str, rol: str, pin: Optional[str] = None) -> None:
         """Agrega o actualiza un usuario y persiste los cambios."""
         # Mutación + persistencia como una sola unidad crítica bajo el candado
         # de módulo (ver _LOCK): evita perder actualizaciones entre hilos.
@@ -171,20 +203,26 @@ class Auth:
                 )
 
             nombre_norm = str(nombre).strip() if nombre else f"Usuario_{uid}"
+            pin_norm = str(pin).strip() if pin else None
 
             for u in self.usuarios:
                 if u.get("user_id") == uid:
                     u["nombre"] = nombre_norm
                     u["rol"] = rol_norm
+                    if pin_norm is not None:
+                        u["pin"] = pin_norm
                     self._guardar_sin_lock()
                     logger.info("Usuario actualizado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
                     return
 
-            self.usuarios.append({
+            nuevo = {
                 "user_id": uid,
                 "nombre": nombre_norm,
                 "rol": rol_norm,
-            })
+            }
+            if pin_norm:
+                nuevo["pin"] = pin_norm
+            self.usuarios.append(nuevo)
             self._guardar_sin_lock()
             logger.info("Usuario agregado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
 

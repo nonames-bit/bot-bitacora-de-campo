@@ -98,7 +98,8 @@
   /* ---------- Vistas principales ---------- */
   function renderTablero(d) {
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var h = "<h3>" + icon("grid") + "Tablero finca" + pot + "</h3>";
+    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:5px 12px; margin-top:-4px;'>📄 Reporte PDF</a>";
+    var h = "<h3>" + icon("grid") + "Tablero finca" + pot + pdfBtn + "</h3>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
       + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
@@ -257,7 +258,8 @@
   }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var h = "<h3>" + icon("cow") + "Inventario y Población</h3>" + erroresHtml(d);
+    var expBtn = "<button type='button' class='tema-btn' onclick='window.__exportarInventario()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>📥 Exportar CSV</button>";
+    var h = "<h3>" + icon("cow") + "Inventario y Población" + expBtn + "</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
       + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
@@ -344,7 +346,8 @@
     return h;
   }
   function renderAgenda(d) {
-    var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + erroresHtml(d);
+    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>📄 Reporte PDF</a>";
+    var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días" + pdfBtn + "</h3>" + erroresHtml(d);
     var evs = d.eventos || [];
     var urgencia = function (f) {
       if (f.faltan_dias == null) return "gris";
@@ -364,7 +367,8 @@
     }
     var ret = d.retiros || [];
     if (ret.length) {
-      h += "<h4>" + icon("alert") + "Retiros sanitarios activos</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
+      var expRetBtn = "<button type='button' class='tema-btn' onclick='window.__exportarRetiros()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>📥 Exportar Retiros CSV</button>";
+      h += "<h4>" + icon("alert") + "Retiros sanitarios activos" + expRetBtn + "</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       ret.forEach(function (r) {
         function c(f, df) {
           if (!f) return "<td>—</td>";
@@ -376,6 +380,1123 @@
       h += "</table></div>";
     }
     return h;
+  }
+
+  /* ---------- Modo Manga de Corral (Pesajes, Tratamientos Masivos, BLE) ---------- */
+  var _sesionManga = [];
+  function renderManga() {
+    var h = "<h3>" + icon("scale") + "Manga de Corral — Pesajes y Lotes</h3>";
+    h += "<div class='manga-tabs'>"
+      + "<button type='button' class='manga-tab-btn act' data-mtab='pesaje'>⚖️ Pesaje Rápido & GMD</button>"
+      + "<button type='button' class='manga-tab-btn' data-mtab='lote'>💉 Tratamiento en Lote</button>"
+      + "<button type='button' class='manga-tab-btn' data-mtab='ble'>📶 Báscula / RFID BLE</button>"
+      + "</div>";
+
+    // Panel 1: Pesaje Rápido
+    h += "<div id='manga-panel-pesaje'>";
+    h += "<div class='manga-pesaje-box'>"
+      + "<label style='font-size:13px; font-weight:600;'>Arete / Tag:</label>"
+      + "<input id='manga-tag' class='manga-input-grande' placeholder='ej. 47' autocomplete='off' list='dl-tags' autofocus style='margin-bottom:12px;'>"
+      + "<label style='font-size:13px; font-weight:600;'>Peso Actual (kg):</label>"
+      + "<input id='manga-peso' type='number' step='0.5' class='manga-input-grande' placeholder='0.0' style='color:var(--verde-marca); font-size:38px; margin-bottom:12px;'>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;'>"
+      + "<div style='flex:1; min-width:130px;'><label style='font-size:12px;'>Condición Corporal:</label>"
+      + "<select id='manga-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+      + "<option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0 (Gorda)</option></select></div>"
+      + "<div style='flex:1; min-width:130px;'><label style='font-size:12px;'>Evento:</label>"
+      + "<select id='manga-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+      + "<option value='PESAJE'>Control Periódico</option><option value='DESTETE'>Destete</option><option value='ENTRADA'>Entrada / Compra</option><option value='VENTA'>Venta / Salida</option></select></div>"
+      + "</div>"
+      + "<button type='button' id='btn-manga-guardar-peso' class='btn-guardar-manga'>💾 Guardar Pesaje (Enter)</button>"
+      + "</div>";
+
+    h += "<div id='manga-resultado-kpi' style='display:none;' class='manga-pesaje-box'></div>";
+
+    h += "<h4>" + icon("chartBar") + "Historial de esta Sesión en Manga</h4>";
+    h += "<div id='manga-historial-wrap'>" + renderTablaSesionManga() + "</div>";
+    h += "</div>";
+
+    // Panel 2: Tratamiento en Lote
+    h += "<div id='manga-panel-lote' style='display:none;'>";
+    h += "<div class='card' style='margin-bottom:14px;'>"
+      + "<h4>" + icon("syringe") + "Aplicación Masiva de Tratamiento por Potrero / Lote</h4>"
+      + "<p class='aviso'>Aplica automáticamente el tratamiento y los tiempos de retiro a todos los animales activos del potrero seleccionado.</p>"
+      + "<div style='display:flex; flex-direction:column; gap:10px; margin-top:12px;'>"
+      + "<label>Potrero a tratar: <input id='manga-lote-potrero' placeholder='ej. Guayabal' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>O aretes individuales (opcional, separados por coma): <input id='manga-lote-tags' placeholder='ej. 47, JA26-6, 88' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>Tipo de tratamiento: <select id='manga-lote-tipo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Desparasitante'>Desparasitante</option><option value='Vacuna'>Vacuna</option><option value='Vitaminas'>Vitaminas / Mineralizante</option><option value='Antibiótico'>Antibiótico</option><option value='Otro'>Otro</option></select></label>"
+      + "<label>Fármaco / Producto: <input id='manga-lote-producto' placeholder='Nombre comercial (ej. Ivermectina 1%, Albendazol)' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+      + "<div style='flex:1; min-width:140px;'><label>Dosis: <input id='manga-lote-dosis' placeholder='ej. 1 ml / 50kg' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+      + "<div style='flex:1; min-width:140px;'><label>Vía: <select id='manga-lote-via' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='SC'>Subcutánea (SC)</option><option value='IM'>Intramuscular (IM)</option><option value='Oral'>Oral</option><option value='Pour-on'>Pour-on / Tópico</option><option value='IV'>Intravenosa (IV)</option></select></label></div>"
+      + "</div>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+      + "<div style='flex:1; min-width:140px;'><label>Retiro Leche (días): <input type='number' id='manga-lote-ret-leche' value='0' min='0' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+      + "<div style='flex:1; min-width:140px;'><label>Retiro Carne (días): <input type='number' id='manga-lote-ret-carne' value='0' min='0' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+      + "</div>"
+      + "<label>Diagnóstico / Motivo: <input id='manga-lote-diag' placeholder='ej. Control preventivo parásitos época seca' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<button type='button' id='btn-manga-guardar-lote' class='btn-guardar-manga' style='margin-top:10px; background:#1F6C9F;'>💉 Aplicar Tratamiento en Lote</button>"
+      + "</div>"
+      + "</div>";
+    h += "</div>";
+
+    // Panel 3: BLE
+    h += "<div id='manga-panel-ble' style='display:none;'>";
+    h += "<div class='gps-box'>"
+      + "<h4>" + icon("alert") + "Conexión Web Bluetooth a Báscula / RFID</h4>"
+      + "<p class='aviso'>Permite recibir el peso o arete leído automáticamente desde básculas electrónicas (Tru-Test, Gallagher) o bastones RFID (Allflex) por Bluetooth BLE sin teclear.</p>"
+      + "<button type='button' id='btn-manga-ble-conectar' class='btn-guardar-manga' style='max-width:320px; margin:14px auto;'>📶 Conectar Dispositivo BLE</button>"
+      + "<div id='manga-ble-estado' class='aviso' style='margin-top:14px;'>Estado: Desconectado.</div>"
+      + "</div>";
+    h += "</div>";
+
+    return h;
+  }
+
+  function renderTablaSesionManga() {
+    if (!_sesionManga || !_sesionManga.length) {
+      return vacio("Aún no se han registrado pesajes en esta sesión de manga.");
+    }
+    var h = "<div class='tabla-scroll'><table><tr><th>Hora</th><th>Tag</th><th>Peso (kg)</th><th>GMD</th><th>Estado</th></tr>";
+    _sesionManga.forEach(function (f) {
+      var chipGmd = f.gmd != null && !isNaN(f.gmd)
+        ? "<span class='chip " + (Number(f.gmd) >= 600 ? "verde" : Number(f.gmd) > 0 ? "ambar" : "rojo") + "'>" + (Number(f.gmd) > 0 ? "+" : "") + Number(f.gmd).toFixed(0) + " g/d</span>"
+        : (f.gmd || "—");
+      h += "<tr><td>" + esc(f.hora) + "</td><td><b>" + esc(f.tag) + "</b></td><td><b>" + esc(f.peso) + " kg</b></td><td>" + chipGmd + "</td><td>" + esc(f.estado) + "</td></tr>";
+    });
+    h += "</table></div>";
+    return h;
+  }
+
+  function bindManga() {
+    var tabs = qa(".manga-tab-btn");
+    tabs.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        tabs.forEach(function (b) { b.classList.remove("act"); });
+        btn.classList.add("act");
+        var mtab = btn.getAttribute("data-mtab");
+        var pPesaje = document.getElementById("manga-panel-pesaje");
+        var pLote = document.getElementById("manga-panel-lote");
+        var pBle = document.getElementById("manga-panel-ble");
+        if (pPesaje) pPesaje.style.display = mtab === "pesaje" ? "block" : "none";
+        if (pLote) pLote.style.display = mtab === "lote" ? "block" : "none";
+        if (pBle) pBle.style.display = mtab === "ble" ? "block" : "none";
+        if (mtab === "pesaje") {
+          var inp = document.getElementById("manga-tag");
+          if (inp) inp.focus();
+        }
+      });
+    });
+
+    var inpTag = document.getElementById("manga-tag");
+    var inpPeso = document.getElementById("manga-peso");
+    var btnGuardar = document.getElementById("btn-manga-guardar-peso");
+    if (inpTag && inpPeso) {
+      inpTag.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          inpPeso.focus();
+        }
+      });
+      inpPeso.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (btnGuardar) btnGuardar.click();
+        }
+      });
+    }
+
+    if (btnGuardar) {
+      btnGuardar.addEventListener("click", function () {
+        var tag = (inpTag && inpTag.value || "").trim();
+        var pesoStr = (inpPeso && inpPeso.value || "").trim();
+        var cc = (q("#manga-cc") && q("#manga-cc").value) || null;
+        var evento = (q("#manga-evento") && q("#manga-evento").value) || "PESAJE";
+
+        if (!tag || !pesoStr) {
+          alert("Debe escribir el arete/tag y el peso en kg.");
+          return;
+        }
+        var peso = parseFloat(pesoStr);
+        if (isNaN(peso) || peso <= 0) {
+          alert("El peso debe ser un número válido mayor a 0.");
+          return;
+        }
+
+        var resBox = document.getElementById("manga-resultado-kpi");
+
+        function procesarResultadoLocal(data) {
+          var gmd = data.gmd_g_dia;
+          var chipGmd = gmd != null && !isNaN(gmd)
+            ? "<span class='chip " + (gmd >= 600 ? "verde" : gmd > 0 ? "ambar" : "rojo") + "'>" + (gmd > 0 ? "+" : "") + Number(gmd).toFixed(0) + " g/d</span>"
+            : "<span class='chip gris'>Primer pesaje</span>";
+
+          if (resBox) {
+            resBox.style.display = "block";
+            resBox.innerHTML = "<b>✅ Pesaje Registrado:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b><br>"
+              + (data.peso_anterior != null
+                ? "Anterior: <b>" + esc(data.peso_anterior) + " kg</b> (hace " + esc(data.dias_entre_pesajes) + " días) · GMD: " + chipGmd
+                : "Primer pesaje registrado para este animal.");
+          }
+
+          _sesionManga.unshift({
+            hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+            tag: tag,
+            peso: peso,
+            gmd: gmd,
+            estado: "🟢 Guardado"
+          });
+          var wrap = document.getElementById("manga-historial-wrap");
+          if (wrap) wrap.innerHTML = renderTablaSesionManga();
+
+          if (inpPeso) inpPeso.value = "";
+          if (inpTag) { inpTag.value = ""; inpTag.focus(); }
+        }
+
+        if (navigator.onLine === false) {
+          encolarOffline("pesaje", { animal_tag: tag, peso_kg: peso, evento: evento, condicion_corporal: cc }).then(function () {
+            if (resBox) {
+              resBox.style.display = "block";
+              resBox.innerHTML = "<b>💾 Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
+            }
+            _sesionManga.unshift({
+              hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+              tag: tag,
+              peso: peso,
+              gmd: "—",
+              estado: "💾 Offline"
+            });
+            var wrap = document.getElementById("manga-historial-wrap");
+            if (wrap) wrap.innerHTML = renderTablaSesionManga();
+            if (inpPeso) inpPeso.value = "";
+            if (inpTag) { inpTag.value = ""; inpTag.focus(); }
+          });
+          return;
+        }
+
+        fetch("/api/manga/pesaje", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag: tag, peso_kg: peso, evento: evento, condicion_corporal: cc })
+        }).then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        }).then(function (data) {
+          if (data.ok) procesarResultadoLocal(data);
+          else alert("Error: " + (data.error || "No se pudo registrar"));
+        }).catch(function (err) {
+          encolarOffline("pesaje", { animal_tag: tag, peso_kg: peso, evento: evento, condicion_corporal: cc }).then(function () {
+            if (resBox) {
+              resBox.style.display = "block";
+              resBox.innerHTML = "<b>💾 Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
+            }
+            _sesionManga.unshift({
+              hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
+              tag: tag,
+              peso: peso,
+              gmd: "—",
+              estado: "💾 Offline"
+            });
+            var wrap = document.getElementById("manga-historial-wrap");
+            if (wrap) wrap.innerHTML = renderTablaSesionManga();
+            if (inpPeso) inpPeso.value = "";
+            if (inpTag) { inpTag.value = ""; inpTag.focus(); }
+          });
+        });
+      });
+    }
+
+    var btnLote = document.getElementById("btn-manga-guardar-lote");
+    if (btnLote) {
+      btnLote.addEventListener("click", function () {
+        var pot = (q("#manga-lote-potrero") && q("#manga-lote-potrero").value || "").trim();
+        var tagsTxt = (q("#manga-lote-tags") && q("#manga-lote-tags").value || "").trim();
+        var prod = (q("#manga-lote-producto") && q("#manga-lote-producto").value || "").trim();
+        var tipo = (q("#manga-lote-tipo") && q("#manga-lote-tipo").value) || "Tratamiento";
+        var dosis = (q("#manga-lote-dosis") && q("#manga-lote-dosis").value) || "";
+        var via = (q("#manga-lote-via") && q("#manga-lote-via").value) || "SC";
+        var rLeche = parseInt(q("#manga-lote-ret-leche") && q("#manga-lote-ret-leche").value || 0, 10);
+        var rCarne = parseInt(q("#manga-lote-ret-carne") && q("#manga-lote-ret-carne").value || 0, 10);
+        var diag = (q("#manga-lote-diag") && q("#manga-lote-diag").value) || "";
+
+        if (!prod) { alert("Debe especificar el fármaco o producto a aplicar."); return; }
+        if (!pot && !tagsTxt) { alert("Debe indicar el potrero o la lista de tags."); return; }
+
+        var payload = {
+          producto: prod,
+          potrero: pot,
+          tipo: tipo,
+          dosis: dosis,
+          via: via,
+          dias_retiro_leche: rLeche,
+          dias_retiro_carne: rCarne,
+          diagnostico: diag
+        };
+        if (tagsTxt) {
+          payload.tags = tagsTxt.split(/[\s,;]+/).filter(Boolean);
+        }
+
+        if (!confirm("¿Desea aplicar '" + prod + "' a los animales de " + (pot ? "potrero " + pot : tagsTxt) + "?")) {
+          return;
+        }
+
+        fetch("/api/manga/tratamiento_lote", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok) {
+              alert("✅ Tratamiento aplicado a " + res.procesados + " animales con éxito.");
+              if (q("#manga-lote-producto")) q("#manga-lote-producto").value = "";
+              if (q("#manga-lote-tags")) q("#manga-lote-tags").value = "";
+              actualizarBadges();
+            } else {
+              alert("Error: " + (res.error || "No se pudo aplicar"));
+            }
+          }).catch(function (err) { alert("Error de red: " + err.message); });
+      });
+    }
+
+    var btnBle = document.getElementById("btn-manga-ble-conectar");
+    if (btnBle) {
+      btnBle.addEventListener("click", function () {
+        var estado = document.getElementById("manga-ble-estado");
+        if (!navigator.bluetooth) {
+          if (estado) estado.innerHTML = "❌ Tu navegador no soporta Web Bluetooth.<br><small>Recomendado: Chrome o Edge en Android o PC con Bluetooth activo.</small>";
+          return;
+        }
+        if (estado) estado.textContent = "🔍 Buscando báscula o bastón RFID Bluetooth...";
+        navigator.bluetooth.requestDevice({
+          acceptAllDevices: true,
+          optionalServices: ["0000181d-0000-1000-8000-00805f9b34fb", "battery_service"]
+        }).then(function (device) {
+          if (estado) estado.innerHTML = "🟢 Conectado a <b>" + esc(device.name || "Dispositivo BLE") + "</b>.<br>Listo para recibir lecturas.";
+        }).catch(function (err) {
+          if (estado) estado.textContent = "Conexión BLE cancelada o no disponible (" + err.message + ").";
+        });
+      });
+    }
+  }
+
+  /* ---------- Captura Rápida de Campo (Offline Real) ---------- */
+  var _tipoCapturaActual = "parto";
+  function renderCaptura() {
+    var tipos = [
+      { id: "parto", nom: "🐣 Parto" },
+      { id: "pesaje", nom: "⚖️ Pesaje" },
+      { id: "tratamiento", nom: "💊 Tratamiento" },
+      { id: "traslado", nom: "🚚 Traslado" },
+      { id: "celo", nom: "🎯 Celo" },
+      { id: "servicio", nom: "🧬 Servicio / IA" },
+      { id: "leche", nom: "🥛 Leche" },
+      { id: "muerte", nom: "⚠️ Muerte / Descarte" }
+    ];
+
+    var h = "<h3>" + icon("alert") + "Captura Rápida de Campo (Online / Offline)</h3>";
+    h += "<p class='aviso'>Registra eventos directamente en el potrero. Si estás sin señal, se guardarán en la cola local de tu celular y se sincronizarán al volver a la casa.</p>";
+
+    h += "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;'>";
+    tipos.forEach(function (t) {
+      var act = t.id === _tipoCapturaActual ? "act" : "";
+      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:13px;'>" + t.nom + "</button>";
+    });
+    h += "</div>";
+
+    h += "<div class='card' style='padding:16px;'>"
+      + "<form id='form-captura' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<div id='captura-campos'></div>"
+      + "<button type='submit' id='btn-guardar-captura' class='btn-guardar-manga' style='margin-top:12px;'>💾 Guardar Registro</button>"
+      + "</form>"
+      + "<div id='captura-feedback' style='margin-top:12px;'></div>"
+      + "</div>";
+
+    return h;
+  }
+
+  function camposHtmlCaptura(tipo) {
+    var hoy = new Date().toISOString().slice(0, 10);
+    var h = "<label>Fecha del evento: <input type='date' id='cap-fecha' value='" + hoy + "' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+
+    if (tipo === "parto") {
+      h += "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Sexo de la Cría: <select id='cap-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
+        + "<div style='flex:1;'><label>Estado Cría: <select id='cap-estado-cria' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
+        + "</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Observaciones / Notas: <input id='cap-notas' placeholder='Parto distócico, ternero vigoroso, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "pesaje") {
+      h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Condición Corporal (1-5): <select id='cap-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label>";
+    } else if (tipo === "tratamiento") {
+      h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Producto / Fármaco: <input id='cap-producto' placeholder='ej. Oxitetraciclina 20%' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Dosis: <input id='cap-dosis' placeholder='ej. 20 ml' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Vía: <select id='cap-via' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IM'>IM (Intramuscular)</option><option value='SC'>SC (Subcutánea)</option><option value='IV'>IV</option><option value='Oral'>Oral</option><option value='Pour-on'>Pour-on</option></select></label></div>"
+        + "</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Retiro Leche (días): <input type='number' id='cap-ret-leche' value='0' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Retiro Carne (días): <input type='number' id='cap-ret-carne' value='0' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Diagnóstico / Causa: <input id='cap-diag' placeholder='ej. Mastitis clínica cuarto anterior izquierdo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "traslado") {
+      h += "<label>Arete / Tag (o Lote): <input id='cap-tag' placeholder='ej. 47 o Todo el lote' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Potrero Origen: <input id='cap-pot-orig' placeholder='ej. Guayabal' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Potrero Destino: <input id='cap-pot-dest' placeholder='ej. Morichal' list='dl-potreros' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Motivo de rotación: <input id='cap-motivo' placeholder='Rotación Voisin, cambio de pastura, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "celo") {
+      h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Horario Celo: <select id='cap-am-pm' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='AM'>Mañana (AM) — Inseminar en la tarde</option><option value='PM'>Tarde (PM) — Inseminar en la mañana siguiente</option></select></label>"
+        + "<label>Observaciones de Celo: <input id='cap-notas' placeholder='Acepta monta, moco cristalino, bramidos' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "servicio") {
+      h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
+        + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Inseminador: <input id='cap-inseminador' placeholder='Nombre del técnico' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "leche") {
+      h += "<label>Litros Totales Ordeño: <input type='number' step='0.5' id='cap-litros' placeholder='ej. 185' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Observaciones: <input id='cap-notas' placeholder='Tanque de enfriamiento, retiro aplicado, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "muerte") {
+      h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Causa Presunta: <input id='cap-causa' placeholder='ej. Mordedura de serpiente, timpanismo, descarte vejez' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    }
+
+    return h;
+  }
+
+  function bindCaptura() {
+    var cCampos = document.getElementById("captura-campos");
+    if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+
+    qa("button[data-cap-tipo]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        qa("button[data-cap-tipo]").forEach(function (x) { x.classList.remove("act"); });
+        b.classList.add("act");
+        _tipoCapturaActual = b.getAttribute("data-cap-tipo");
+        if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+        var fTag = document.getElementById("cap-tag");
+        if (fTag) fTag.focus();
+      });
+    });
+
+    var form = document.getElementById("form-captura");
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fecha = (q("#cap-fecha") && q("#cap-fecha").value) || new Date().toISOString().slice(0, 10);
+        var payload = {};
+
+        if (_tipoCapturaActual === "parto") {
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.id_cria_tag = (q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim() || null;
+          payload.sexo_cria = (q("#cap-sexo") && q("#cap-sexo").value) || "HEMBRA";
+          payload.estado_cria = (q("#cap-estado-cria") && q("#cap-estado-cria").value) || "VIVO";
+          payload.peso_nacimiento = parseFloat(q("#cap-peso-nacer") && q("#cap-peso-nacer").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+        } else if (_tipoCapturaActual === "pesaje") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
+          payload.evento = "PESAJE";
+        } else if (_tipoCapturaActual === "tratamiento") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.producto = (q("#cap-producto") && q("#cap-producto").value || "").trim();
+          payload.dosis = (q("#cap-dosis") && q("#cap-dosis").value) || null;
+          payload.via = (q("#cap-via") && q("#cap-via").value) || "IM";
+          payload.dias_retiro_leche = parseInt(q("#cap-ret-leche") && q("#cap-ret-leche").value || 0, 10);
+          payload.dias_retiro_carne = parseInt(q("#cap-ret-carne") && q("#cap-ret-carne").value || 0, 10);
+          payload.diagnostico = (q("#cap-diag") && q("#cap-diag").value) || null;
+        } else if (_tipoCapturaActual === "traslado") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.potrero_origen = (q("#cap-pot-orig") && q("#cap-pot-orig").value) || null;
+          payload.potrero_destino = (q("#cap-pot-dest") && q("#cap-pot-dest").value || "").trim();
+          payload.motivo = (q("#cap-motivo") && q("#cap-motivo").value) || null;
+        } else if (_tipoCapturaActual === "celo") {
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.am_pm = (q("#cap-am-pm") && q("#cap-am-pm").value) || "AM";
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        } else if (_tipoCapturaActual === "servicio") {
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.tipo_servicio = (q("#cap-tipo-serv") && q("#cap-tipo-serv").value) || "IA";
+          payload.toro_pajilla = (q("#cap-toro") && q("#cap-toro").value) || null;
+          payload.inseminador = (q("#cap-inseminador") && q("#cap-inseminador").value) || null;
+        } else if (_tipoCapturaActual === "leche") {
+          payload.litros = parseFloat(q("#cap-litros") && q("#cap-litros").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        } else if (_tipoCapturaActual === "muerte") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.causa_presunta = (q("#cap-causa") && q("#cap-causa").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        }
+
+        var feed = document.getElementById("captura-feedback");
+
+        function mostrarExito(online) {
+          if (feed) {
+            feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
+              + (online ? "✅ Evento registrado en el servidor." : "💾 Evento guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+          }
+          form.reset();
+          if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+          actualizarBadges();
+        }
+
+        if (navigator.onLine === false) {
+          encolarOffline(_tipoCapturaActual, payload, fecha).then(function () {
+            mostrarExito(false);
+          });
+          return;
+        }
+
+        fetch("/api/sync", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ eventos: [{ tipo: _tipoCapturaActual, payload: payload, fecha: fecha }] })
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok && res.procesados > 0) mostrarExito(true);
+            else {
+              encolarOffline(_tipoCapturaActual, payload, fecha).then(function () { mostrarExito(false); });
+            }
+          }).catch(function () {
+            encolarOffline(_tipoCapturaActual, payload, fecha).then(function () { mostrarExito(false); });
+          });
+      });
+    }
+  }
+
+  /* ---------- GPS Potrero & Rondas de Campo ---------- */
+  var _gpsUltimaPos = null;
+  var _gpsUltimoPotrero = null;
+  var _puntoRondaSeleccionado = "saladero";
+
+  function renderGps(d) {
+    var h = "<h3>" + icon("search") + "GPS Potrero & Auditoría de Rondas</h3>"
+      + "<p class='aviso'>Verifica mediante el GPS del celular en qué potrero te encuentras y audita las visitas a saladeros, bebederos y cercas con hora exacta.</p>";
+
+    h += "<div class='gps-box'>"
+      + "<button type='button' id='btn-gps-detectar' class='btn-guardar-manga' style='max-width:320px; margin:0 auto 12px; font-size:16px;'>📍 Obtener Mi Ubicación GPS</button>"
+      + "<div id='gps-estado' style='font-size:13px; color:var(--texto-suave);'>Toque el botón para geolocalizar este teléfono.</div>"
+      + "<div id='gps-resultado-box' style='margin-top:14px; display:none;'></div>"
+      + "</div>";
+
+    h += "<div class='card' style='margin-top:14px; padding:16px;'>"
+      + "<h4>" + icon("alert") + "Registrar Punto de Ronda de Campo</h4>"
+      + "<p class='aviso' style='margin:4px 0;'>Selecciona el punto de control que estás revisando en este momento:</p>"
+      + "<div class='puntos-control-grid'>"
+      + "<button type='button' class='btn-punto act' data-punto='saladero'>🧂 Saladero</button>"
+      + "<button type='button' class='btn-punto' data-punto='bebedero'>💧 Bebedero</button>"
+      + "<button type='button' class='btn-punto' data-punto='cercas'>🪵 Cercas</button>"
+      + "<button type='button' class='btn-punto' data-punto='conteo'>🐄 Conteo</button>"
+      + "<button type='button' class='btn-punto' data-punto='recorrido'>🚶 Recorrido</button>"
+      + "</div>"
+      + "<input id='gps-ronda-notas' placeholder='Novedad (ej. falta sal mineralizada, alambre caído, todo OK)' style='width:100%; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); margin-bottom:12px;'>"
+      + "<button type='button' id='btn-gps-guardar-ronda' class='btn-guardar-manga'>📋 Registrar Parada en Ronda</button>"
+      + "<div id='gps-ronda-feedback' style='margin-top:10px;'></div>"
+      + "</div>";
+
+    var rondas = (d && d.rondas) || [];
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:20px;'>"
+      + "<h4>" + icon("calendar") + "Rondas Realizadas Hoy (" + rondas.length + ")</h4>"
+      + "<button type='button' id='btn-exportar-rondas-csv' class='tema-btn' style='font-size:12px; padding:4px 10px;'>📥 Exportar CSV</button>"
+      + "</div>";
+
+    if (!rondas.length) {
+      h += vacio("No hay rondas registradas en el día.");
+    } else {
+      h += "<div class='tabla-scroll'><table id='tabla-rondas'><tr><th>Hora</th><th>Potrero</th><th>Punto</th><th>Usuario</th><th>Notas</th></tr>";
+      rondas.forEach(function (r) {
+        h += "<tr><td><b>" + esc(r.hora || fechaCorta(r.fecha)) + "</b></td>"
+          + "<td><b>" + esc(r.potrero_nombre || "—") + "</b></td>"
+          + "<td><span class='chip verde'>" + esc(r.punto_control || "recorrido") + "</span></td>"
+          + "<td>" + esc(r.usuario_nombre || "—") + "</td>"
+          + "<td>" + esc(r.notas || "—") + "</td></tr>";
+      });
+      h += "</table></div>";
+    }
+
+    return h;
+  }
+
+  function bindGps(d) {
+    var btnDetectar = document.getElementById("btn-gps-detectar");
+    var est = document.getElementById("gps-estado");
+    var resBox = document.getElementById("gps-resultado-box");
+
+    if (btnDetectar) {
+      btnDetectar.addEventListener("click", function () {
+        if (!navigator.geolocation) {
+          if (est) est.textContent = "❌ Geolocalización no disponible en este dispositivo.";
+          return;
+        }
+        if (est) est.innerHTML = "⏳ Conectando con satélites GPS... (espere unos segundos)";
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          _gpsUltimaPos = pos;
+          var lat = pos.coords.latitude;
+          var lon = pos.coords.longitude;
+          var acc = Math.round(pos.coords.accuracy || 0);
+          if (est) est.innerHTML = "📡 Coordenadas: <b>" + lat.toFixed(6) + ", " + lon.toFixed(6) + "</b> (Precisión: ±" + acc + " m)";
+
+          fetch("/api/gps/potrero", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: lat, lon: lon })
+          }).then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (resBox) resBox.style.display = "block";
+              if (data.detectado && data.potrero) {
+                _gpsUltimoPotrero = data.potrero;
+                var anims = data.animales || [];
+                var h = "<div class='gps-potrero-tit'>🌾 " + esc(data.potrero.nombre || data.potrero.codigo) + "</div>"
+                  + "<p style='margin:4px 0; font-size:13px;'>Detectado por " + esc(data.potrero.metodo || "polígono") + " · Ocupación actual: <b>" + data.total_animales + " animales</b></p>";
+                if (anims.length) {
+                  h += "<div style='font-size:12px; color:var(--texto-suave); margin-top:6px;'>Animales en potrero: "
+                    + anims.slice(0, 15).map(function (a) { return "<b>" + esc(a.tag) + "</b>"; }).join(", ")
+                    + (anims.length > 15 ? " y " + (anims.length - 15) + " más..." : "") + "</div>";
+                }
+                if (resBox) resBox.innerHTML = h;
+              } else {
+                _gpsUltimoPotrero = null;
+                if (resBox) resBox.innerHTML = "<p class='aviso'>⚠️ " + esc(data.mensaje || "Ubicación fuera de los polígonos de la finca.") + "</p>";
+              }
+            }).catch(function (err) {
+              if (resBox) {
+                resBox.style.display = "block";
+                resBox.innerHTML = "<p class='aviso'>⚠️ Sin conexión para consultar el polígono del potrero. Coordenadas guardadas localmente.</p>";
+              }
+            });
+        }, function (err) {
+          if (est) est.innerHTML = "❌ Error GPS: " + esc(err.message) + ". Verifique que el GPS esté encendido y que el navegador tenga permiso de ubicación.";
+        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+      });
+    }
+
+    qa(".puntos-control-grid button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        qa(".puntos-control-grid button").forEach(function (x) { x.classList.remove("act"); });
+        b.classList.add("act");
+        _puntoRondaSeleccionado = b.getAttribute("data-punto") || "recorrido";
+      });
+    });
+
+    var btnRonda = document.getElementById("btn-gps-guardar-ronda");
+    if (btnRonda) {
+      btnRonda.addEventListener("click", function () {
+        var notas = (q("#gps-ronda-notas") && q("#gps-ronda-notas").value || "").trim();
+        var lat = _gpsUltimaPos ? _gpsUltimaPos.coords.latitude : null;
+        var lon = _gpsUltimaPos ? _gpsUltimaPos.coords.longitude : null;
+        var potId = _gpsUltimoPotrero ? _gpsUltimoPotrero.id : null;
+        var potNom = _gpsUltimoPotrero ? (_gpsUltimoPotrero.nombre || _gpsUltimoPotrero.codigo) : null;
+        var feed = document.getElementById("gps-ronda-feedback");
+
+        var payload = {
+          lat: lat,
+          lon: lon,
+          potrero_id: potId,
+          potrero_nombre: potNom,
+          punto_control: _puntoRondaSeleccionado,
+          notas: notas,
+          hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
+        };
+
+        if (navigator.onLine === false) {
+          encolarOffline("ronda", payload).then(function () {
+            if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Parada de ronda guardada offline. Se sincronizará al volver la señal.</div>";
+            if (q("#gps-ronda-notas")) q("#gps-ronda-notas").value = "";
+          });
+          return;
+        }
+
+        fetch("/api/gps/ronda", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok) {
+              if (feed) feed.innerHTML = "<div class='chip verde'>✅ Parada de ronda registrada con éxito.</div>";
+              if (q("#gps-ronda-notas")) q("#gps-ronda-notas").value = "";
+              setTimeout(function () { cargar(false); }, 1000);
+            } else {
+              encolarOffline("ronda", payload).then(function () {
+                if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Guardado offline (" + esc(res.error || "error") + ")</div>";
+              });
+            }
+          }).catch(function () {
+            encolarOffline("ronda", payload).then(function () {
+              if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Guardado offline en cola local.</div>";
+            });
+          });
+      });
+    }
+
+    var btnCsv = document.getElementById("btn-exportar-rondas-csv");
+    if (btnCsv) {
+      btnCsv.addEventListener("click", function () {
+        exportarTablaCSV("rondas_campo", "#tabla-rondas");
+      });
+    }
+  }
+
+  /* ---------- Sistema & Servidor VPS (Solo OWNER) ---------- */
+  function renderSistema(d) {
+    var vps = d.vps || {};
+    var db = d.db || {};
+
+    var h = "<h3>⚙️ Servidor VPS & Sistema Ganadería JA</h3>"
+      + "<p class='aviso'>Panel de control ejecutivo y métricas de infraestructura en vivo. Acceso restringido al Propietario (OWNER).</p>";
+
+    h += "<div class='kpis'>"
+      + kpi((vps.ram_pct != null ? vps.ram_pct + "%" : "—"), "RAM VPS (" + (vps.ram_used_mb || 0) + "/" + (vps.ram_total_mb || 0) + " MB)")
+      + kpi((vps.disk_pct != null ? vps.disk_pct + "%" : "—"), "Disco (" + (vps.disk_used_gb || 0) + "/" + (vps.disk_total_gb || 0) + " GB)")
+      + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base de Datos SQLite")
+      + kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo SG", "ok")
+      + "</div>";
+
+    h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
+      + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
+      + esc(d.texto || "Sin diagnóstico disponible.") + "</pre>";
+
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:20px;'>"
+      + "<h4>📜 Visor de Logs del Servidor (Últimas 80 líneas)</h4>"
+      + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:12px; padding:4px 10px;'>🔄 Refrescar Logs</button>"
+      + "</div>"
+      + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:360px; overflow-y:auto; line-height:1.4;'>Cargando logs del servidor...</pre>";
+
+    return h;
+  }
+
+  function bindSistema() {
+    function cargarLogs() {
+      var visor = document.getElementById("visor-logs");
+      if (!visor) return;
+      visor.textContent = "Cargando logs...";
+      fetch("/api/logs").then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.logs) {
+            visor.textContent = d.logs.join("\n");
+            visor.scrollTop = visor.scrollHeight;
+          } else {
+            visor.textContent = "Sin logs disponibles.";
+          }
+        }).catch(function (err) {
+          visor.textContent = "Error al obtener logs: " + err.message;
+        });
+    }
+
+    cargarLogs();
+    var btnRef = document.getElementById("btn-refrescar-logs");
+    if (btnRef) btnRef.addEventListener("click", cargarLogs);
+  }
+
+  /* ---------- Exportación a CSV con UTF-8 BOM para Excel ---------- */
+  function exportarTablaCSV(nombreArchivo, tablaSelectorOEl) {
+    var tabla = typeof tablaSelectorOEl === "string" ? document.querySelector(tablaSelectorOEl) : tablaSelectorOEl;
+    if (!tabla) {
+      alert("No se encontró ninguna tabla para exportar.");
+      return;
+    }
+    var trs = qa("tr", tabla);
+    var csv = [];
+    trs.forEach(function (tr) {
+      var celdas = qa("th, td", tr);
+      if (!celdas.length) return;
+      var fila = celdas.map(function (c) {
+        var txt = (c.innerText || c.textContent || "").replace(/"/g, '""').trim();
+        return '"' + txt + '"';
+      });
+      csv.push(fila.join(";"));
+    });
+    var contenido = "\uFEFF" + csv.join("\r\n");
+    var blob = new Blob([contenido], { type: "text/csv;charset=utf-8;" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = (nombreArchivo || "export_ganaderia_ja") + "_" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  window.__exportarInventario = function () {
+    exportarTablaCSV("inventario_ganaderia_ja", ".tabla-scroll table");
+  };
+  window.__exportarRetiros = function () {
+    exportarTablaCSV("retiros_sanitarios_ja", ".tabla-scroll table");
+  };
+
+  /* ---------- Asistente IA (Chat Natural) ---------- */
+  function setupChatModal() {
+    var btnChat = document.getElementById("btn-chat");
+    var modal = document.getElementById("modal-chat");
+    var btnCerrar = document.getElementById("btn-cerrar-chat");
+    var form = document.getElementById("form-chat");
+    var inp = document.getElementById("chat-input");
+    var hist = document.getElementById("chat-historial");
+
+    if (!btnChat || !modal) return;
+
+    btnChat.addEventListener("click", function () {
+      modal.style.display = "flex";
+      if (inp) inp.focus();
+    });
+
+    if (btnCerrar) {
+      btnCerrar.addEventListener("click", function () {
+        modal.style.display = "none";
+      });
+    }
+
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) modal.style.display = "none";
+    });
+
+    qa(".chip-sug", modal).forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var p = chip.getAttribute("data-p");
+        if (inp) inp.value = p;
+        if (form) form.dispatchEvent(new Event("submit"));
+      });
+    });
+
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var txt = (inp && inp.value || "").trim();
+        if (!txt) return;
+
+        var botPlaceholder;
+        if (hist) {
+          hist.innerHTML += "<div class='chat-msg user'>" + esc(txt) + "</div>";
+          botPlaceholder = document.createElement("div");
+          botPlaceholder.className = "chat-msg bot";
+          botPlaceholder.innerHTML = "<i>Consultando información zootécnica...</i>";
+          hist.appendChild(botPlaceholder);
+          hist.scrollTop = hist.scrollHeight;
+        }
+
+        if (inp) inp.value = "";
+
+        fetch("/api/preguntar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pregunta: txt })
+        }).then(function (r) { return r.json(); })
+          .then(function (d) {
+            var resp = d.respuesta || d.error || "Sin respuesta.";
+            var formateada = esc(resp).replace(/\n/g, "<br>");
+            if (botPlaceholder) botPlaceholder.innerHTML = formateada;
+            if (hist) hist.scrollTop = hist.scrollHeight;
+          }).catch(function (err) {
+            if (botPlaceholder) botPlaceholder.innerHTML = "❌ Error de conexión: " + esc(err.message);
+          });
+      });
+    }
+  }
+
+  /* ---------- Dictado por Voz (Whisper) ---------- */
+  var _mediaRecorder = null;
+  var _audioChunks = [];
+  function setupVozModal() {
+    var btnMic = document.getElementById("btn-mic");
+    var modal = document.getElementById("modal-voz");
+    var btnCerrar = document.getElementById("btn-cerrar-voz");
+    var btnAccion = document.getElementById("btn-voz-accion");
+    var estado = document.getElementById("voz-estado");
+    var resBox = document.getElementById("voz-resultado");
+    var onda = document.getElementById("voz-onda");
+
+    if (!btnMic || !modal) return;
+
+    function detenerGrabacion() {
+      if (_mediaRecorder && _mediaRecorder.state === "recording") {
+        try { _mediaRecorder.stop(); } catch (e) { /* noop */ }
+      }
+    }
+
+    btnMic.addEventListener("click", function () {
+      modal.style.display = "flex";
+      if (resBox) { resBox.style.display = "none"; resBox.innerHTML = ""; }
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (estado) estado.textContent = "❌ Tu navegador no soporta grabación de micrófono.";
+        if (btnAccion) btnAccion.style.display = "none";
+        return;
+      }
+      if (estado) estado.textContent = "Iniciando micrófono...";
+      if (btnAccion) { btnAccion.textContent = "⏹️ Detener y Enviar"; btnAccion.style.display = ""; }
+      if (onda) onda.style.display = "block";
+
+      _audioChunks = [];
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        _mediaRecorder = new MediaRecorder(stream);
+        _mediaRecorder.ondataavailable = function (e) {
+          if (e.data && e.data.size > 0) _audioChunks.push(e.data);
+        };
+        _mediaRecorder.onstop = function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+          if (!_audioChunks.length) {
+            if (estado) estado.textContent = "No se capturó audio.";
+            return;
+          }
+          if (estado) estado.textContent = "⏳ Transcribiendo con Whisper y procesando en el bot...";
+          if (onda) onda.style.display = "none";
+
+          var blob = new Blob(_audioChunks, { type: _mediaRecorder.mimeType || "audio/webm" });
+          var fd = new FormData();
+          fd.append("audio", blob, "nota_campo.webm");
+
+          fetch("/api/voz", { method: "POST", body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (resBox) resBox.style.display = "block";
+              if (data.ok) {
+                if (estado) estado.textContent = "✅ Nota procesada con éxito.";
+                resBox.innerHTML = "<b>Transcripción:</b> <i>\"" + esc(data.transcripcion) + "\"</i><br><br>"
+                  + "<b>Respuesta del Bot:</b><br>" + esc(data.respuesta || "Registrado.");
+                if (btnAccion) btnAccion.textContent = "🎤 Grabar Otra Nota";
+                actualizarBadges();
+              } else {
+                if (estado) estado.textContent = "⚠️ " + esc(data.error || "No se pudo procesar");
+                if (btnAccion) btnAccion.textContent = "Reintentar";
+              }
+            }).catch(function (err) {
+              if (estado) estado.textContent = "❌ Error de conexión: " + esc(err.message);
+              if (btnAccion) btnAccion.textContent = "Reintentar";
+            });
+        };
+        _mediaRecorder.start();
+        if (estado) estado.textContent = "🔴 Grabando... hable ahora con claridad.";
+      }).catch(function (err) {
+        if (estado) estado.textContent = "❌ No se pudo acceder al micrófono: " + err.message;
+        if (btnAccion) btnAccion.style.display = "none";
+      });
+    });
+
+    if (btnCerrar) {
+      btnCerrar.addEventListener("click", function () {
+        detenerGrabacion();
+        modal.style.display = "none";
+      });
+    }
+
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) {
+        detenerGrabacion();
+        modal.style.display = "none";
+      }
+    });
+
+    if (btnAccion) {
+      btnAccion.addEventListener("click", function () {
+        if (_mediaRecorder && _mediaRecorder.state === "recording") {
+          _mediaRecorder.stop();
+        } else {
+          btnMic.click();
+        }
+      });
+    }
+  }
+
+  /* ---------- Cola Offline con IndexedDB (ja_bitacora_offline) ---------- */
+  function abrirDB() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) return reject(new Error("IndexedDB no soportado"));
+      var req = window.indexedDB.open("ja_bitacora_offline", 1);
+      req.onupgradeneeded = function (e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains("outbox")) {
+          db.createObjectStore("outbox", { keyPath: "id", autoIncrement: true });
+        }
+      };
+      req.onsuccess = function (e) { resolve(e.target.result); };
+      req.onerror = function (e) { reject(e.target.error); };
+    });
+  }
+
+  function encolarOffline(tipo, payload, fecha) {
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("outbox", "readwrite");
+        var store = tx.objectStore("outbox");
+        var ev = {
+          tipo: tipo,
+          payload: payload || {},
+          fecha: fecha || new Date().toISOString().slice(0, 10),
+          id_local: "loc_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6),
+          creado_en: new Date().toISOString()
+        };
+        var req = store.add(ev);
+        req.onsuccess = function () {
+          resolve(ev);
+          actualizarContadorSync();
+        };
+        req.onerror = function (e) { reject(e.target.error); };
+      });
+    }).catch(function (err) {
+      console.warn("Fallo encolar offline:", err);
+    });
+  }
+
+  function obtenerColaOffline() {
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("outbox", "readonly");
+        var store = tx.objectStore("outbox");
+        var req = store.getAll();
+        req.onsuccess = function () { resolve(req.result || []); };
+        req.onerror = function (e) { reject(e.target.error); };
+      });
+    }).catch(function () { return []; });
+  }
+
+  function eliminarDeColaOffline(ids) {
+    if (!ids || !ids.length) return Promise.resolve();
+    return abrirDB().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction("outbox", "readwrite");
+        var store = tx.objectStore("outbox");
+        ids.forEach(function (id) { store.delete(id); });
+        tx.oncomplete = function () {
+          resolve();
+          actualizarContadorSync();
+        };
+        tx.onerror = function (e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function actualizarContadorSync() {
+    obtenerColaOffline().then(function (lista) {
+      var badge = document.getElementById("sync-count");
+      if (!badge) return;
+      var n = lista.length;
+      if (n > 0) {
+        badge.textContent = n > 99 ? "99+" : String(n);
+        badge.style.display = "";
+        badge.classList.add("on");
+      } else {
+        badge.textContent = "0";
+        badge.style.display = "none";
+        badge.classList.remove("on");
+      }
+    });
+  }
+
+  function sincronizarColaOffline(mostrarAviso) {
+    obtenerColaOffline().then(function (lista) {
+      if (!lista || !lista.length) {
+        if (mostrarAviso) alert("No hay eventos pendientes por sincronizar en la cola local.");
+        return;
+      }
+      if (navigator.onLine === false) {
+        if (mostrarAviso) alert("Sin conexión a internet. Los " + lista.length + " eventos se sincronizarán al recuperar la señal.");
+        return;
+      }
+      fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventos: lista })
+      }).then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).then(function (res) {
+        // Solo se borran de la cola local los eventos que el servidor
+        // confirmó explícitamente (ids_ok, correlacionado por id_local) --
+        // antes se borraba TODA la cola con un simple HTTP 200, aunque un
+        // evento individual hubiera fallado (ej. tag inexistente): ese
+        // evento desaparecía de la cola sin haberse guardado, una pérdida
+        // de datos de campo silenciosa (peor aún en la sincronización
+        // automática en segundo plano, sin aviso visible).
+        var okSet = {};
+        (res.ids_ok || []).forEach(function (idl) { okSet[idl] = true; });
+        var idsBorrar = lista.filter(function (x) { return okSet[x.id_local]; })
+          .map(function (x) { return x.id; });
+        var pendientes = lista.length - idsBorrar.length;
+        eliminarDeColaOffline(idsBorrar).then(function () {
+          if (mostrarAviso) {
+            var msg = "✅ Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
+            if (pendientes > 0) msg += "\n⚠️ " + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
+            if (res.errores && res.errores.length) {
+              msg += "\n⚠️ Avisos: " + res.errores.join("; ");
+            }
+            alert(msg);
+          } else if (pendientes > 0) {
+            console.warn("Sincronización en segundo plano: " + pendientes + " evento(s) siguen en cola.", res.errores);
+          }
+          actualizarBadges();
+          if (actual !== "manga" && actual !== "captura") cargar(false);
+        });
+      }).catch(function (err) {
+        if (mostrarAviso) alert("Error al sincronizar con el servidor: " + err.message);
+      });
+    });
+  }
+
+  function setupSyncOffline() {
+    var btnSync = document.getElementById("btn-sync");
+    if (btnSync) {
+      btnSync.addEventListener("click", function () {
+        sincronizarColaOffline(true);
+      });
+    }
+  }
+
+  /* ---------- Usuario y Control de Acceso (RBAC) ---------- */
+  var usuarioActual = null;
+  function cargarUsuario() {
+    fetch("/api/usuario").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (u) {
+      usuarioActual = u || {};
+      window.__usuarioActual = usuarioActual;
+      aplicarRBAC(usuarioActual);
+    }).catch(function () { /* modo seguro */ });
+  }
+
+  function aplicarRBAC(u) {
+    var badge = document.getElementById("user-badge");
+    if (badge && u.nombre) {
+      var rol = (u.rol || "INVITADO").toUpperCase();
+      badge.textContent = u.nombre + " · " + rol;
+      badge.style.display = "inline-block";
+    }
+
+    var rol = (u.rol || "").toUpperCase();
+    var btnSistema = document.getElementById("btn-nav-sistema");
+
+    if (rol === "OWNER") {
+      if (btnSistema) btnSistema.style.display = "";
+      qa("nav > button").forEach(function (b) { b.style.display = ""; });
+    } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
+      if (btnSistema) btnSistema.style.display = "none";
+      qa("nav > button").forEach(function (b) {
+        if (b.getAttribute("data-v") === "sistema") b.style.display = "none";
+        else b.style.display = "";
+      });
+    } else if (rol === "TRABAJADOR") {
+      if (btnSistema) btnSistema.style.display = "none";
+      var permitidas = ["captura", "manga", "gps", "ficha"];
+      qa("nav > button").forEach(function (b) {
+        var v = b.getAttribute("data-v");
+        if (permitidas.indexOf(v) !== -1) {
+          b.style.display = "";
+        } else {
+          b.style.display = "none";
+        }
+      });
+      if (permitidas.indexOf(actual) === -1) {
+        irAVista("captura");
+        cargar();
+      }
+    }
   }
 
   /* ---------- Ficha con pestañas ---------- */
@@ -527,7 +1648,11 @@
     sanidad:   { kpis: 0, graf: 0, tabla: 9 },
     pasturas:  { kpis: 0, graf: 3, tabla: 8 },
     leche:     { kpis: 3, graf: 2, tabla: 8 },
-    ficha:     { kpis: 0, graf: 1, tabla: 7 }
+    ficha:     { kpis: 0, graf: 1, tabla: 7 },
+    manga:     { kpis: 0, graf: 0, tabla: 4 },
+    captura:   { kpis: 0, graf: 0, tabla: 0 },
+    gps:       { kpis: 0, graf: 0, tabla: 4 },
+    sistema:   { kpis: 4, graf: 0, tabla: 0 }
   };
   function htmlSkeleton(v) {
     var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;
@@ -851,6 +1976,16 @@
   }
   function cargar(animar) {
     if (animar === undefined) animar = true;
+
+    var barraFiltros = document.getElementById("barra-filtros");
+    if (barraFiltros) {
+      if (actual === "tablero" || actual === "ficha" || actual === "inventario") {
+        barraFiltros.style.display = "";
+      } else {
+        barraFiltros.style.display = "none";
+      }
+    }
+
     if (actual === "ficha") {
       var t = (q("#f-tag") && q("#f-tag").value || "").trim();
       if (!t) {
@@ -861,6 +1996,43 @@
       abrirFicha(t, vista, true, animar);
       return;
     }
+
+    if (actual === "manga") {
+      if (vista) {
+        montarVista(vista, renderManga(), animar);
+        bindManga();
+      }
+      return;
+    }
+
+    if (actual === "captura") {
+      if (vista) {
+        montarVista(vista, renderCaptura(), animar);
+        bindCaptura();
+      }
+      return;
+    }
+
+    if (actual === "gps") {
+      skeleton(vista, "gps");
+      fetchJSON("/api/gps/rondas", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderGps(d), animar);
+        bindGps(d);
+      }, vista);
+      return;
+    }
+
+    if (actual === "sistema") {
+      skeleton(vista, "sistema");
+      fetchJSON("/api/sistema", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderSistema(d), animar);
+        bindSistema();
+      }, vista);
+      return;
+    }
+
     var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
     var url = "/api/" + actual + (pot && actual === "tablero" ? "?potrero=" + encodeURIComponent(pot) : "");
     skeleton(vista, actual);
@@ -1020,11 +2192,12 @@
     actualizarBadges();
   }, 60000);
 
-  /* ---------- Selección de Tema (3 Modos) ---------- */
+  /* ---------- Selección de Tema (4 Modos) ---------- */
   var selectTema = document.getElementById("select-tema");
   function aplicarTema(modo) {
     if (modo === "dark") document.documentElement.setAttribute("data-theme", "dark");
     else if (modo === "light") document.documentElement.setAttribute("data-theme", "light");
+    else if (modo === "sun") document.documentElement.setAttribute("data-theme", "sun");
     else document.documentElement.setAttribute("data-theme", "green");
     try { localStorage.setItem("pwa_tema", modo || "green"); } catch (e) { /* noop */ }
     if (selectTema) selectTema.value = modo || "green";
@@ -1081,11 +2254,19 @@
     var tag = document.body.getAttribute("data-tag") || "";
     abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
   } else {
+    cargarUsuario();
+    setupSyncOffline();
+    setupChatModal();
+    setupVozModal();
     crearBadgesNav();
     setupCampana();
     actualizarBadges();
-    // Primer refresco de badges al reconectar tras estar sin señal.
-    window.addEventListener("online", function () { actualizarBadges(); });
+    actualizarContadorSync();
+    // Primer refresco de badges y cola offline al reconectar tras estar sin señal.
+    window.addEventListener("online", function () {
+      actualizarBadges();
+      sincronizarColaOffline(false);
+    });
     arrancarDesdeUrl();
   }
 })();

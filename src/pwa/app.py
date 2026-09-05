@@ -1,8 +1,10 @@
-"""Backend Flask liviano del Dashboard PWA ejecutivo — Fase 7 Etapa D.
+"""Backend Flask liviano del Dashboard PWA ejecutivo — Fase 7 Etapa D+.
 
-Solo lectura: cada endpoint es un envoltorio fino sobre ``db.query`` /
-``db.query_one`` (nunca ``execute`` de escritura). Reusa RBAC de
-``users.json`` para lectura de roles. Puerto 8080.
+Empezó siendo solo lectura; desde la unificación de sincronización offline
+(``/api/sync``, ``/api/manga/*``, ``/api/gps/*``) también escribe eventos de
+campo (pesajes, tratamientos, traslados, rondas GPS...) reusando las mismas
+funciones ``registrar_*`` de ``Database`` que ya usa el bot de Telegram.
+Reusa RBAC de ``users.json`` para lectura de roles. Puerto 8080.
 
 Si Flask no está instalado el módulo se importa sin romper el bot
 (import lazy / try): ``app`` queda como stub y ``crear_app`` devuelve None.
@@ -16,6 +18,7 @@ import re
 import shutil
 import socket
 import sys
+import threading
 import time
 
 # Fix Windows cp1252: consola sin UTF-8 rompía los print() del banner
@@ -32,10 +35,20 @@ try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
+from datetime import date, datetime
 import hmac
 import mimetypes
 import secrets
 from typing import Any, Optional
+
+_RAIZ_REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _RAIZ_REPO not in sys.path:
+    sys.path.insert(0, _RAIZ_REPO)
+
+try:
+    from ..utils import iso, to_date
+except (ImportError, ValueError):
+    from src.utils import iso, to_date  # type: ignore
 
 # Flask sirve /static con mimetypes.guess_type; .woff2 no viene registrado y
 # se entregaría como application/octet-stream, que algunos navegadores
@@ -134,9 +147,9 @@ try:
 except Exception:
     pass
 
-DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join("data", "bitacora.db"))
-USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join("src", "server", "users.json"))
-MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
+DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join(RAIZ_PROYECTO, "data", "bitacora.db"))
+USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join(RAIZ_PROYECTO, "src", "server", "users.json"))
+MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", os.path.join(RAIZ_PROYECTO, "media"))
 REPORTES_DIR_DEFAULT = os.path.join(RAIZ_PROYECTO, "data", "reportes")
 # Los gráficos (matplotlib) no cambian minuto a minuto -- el NDVI se
 # actualiza semanal, los datos del hato a lo sumo varían unas pocas veces
@@ -534,7 +547,10 @@ def _identificar_foto(db: Database, foto_bytes: bytes, ext: str = ".jpg") -> dic
     import tempfile
     from datetime import datetime
 
-    from ..vision.arete_detector import detectar_arete_avanzado
+    try:
+        from ..vision.arete_detector import detectar_arete_avanzado
+    except (ImportError, ValueError):
+        from src.vision.arete_detector import detectar_arete_avanzado  # type: ignore
     ext = (ext or ".jpg").lower()
     if not ext.startswith("."):
         ext = "." + ext
@@ -617,11 +633,52 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     # es decir el nombre de la función de vista, no la URL).
     _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest", "sw_js", "offline_page"}
 
+    # Rate limit del login: el PIN individual son solo 4 dígitos (10.000
+    # combinaciones) guardado en texto plano en users.json -- sin esto
+    # cualquiera con acceso a /login (la app está expuesta a internet, no
+    # solo LAN) podría fuerza-bruta un PIN en segundos. Estado en memoria
+    # por proceso (alcanza para un solo droplet/worker); se resetea si el
+    # servicio reinicia, lo cual es aceptable para este caso de uso.
+    _login_lock = threading.Lock()
+    _login_intentos: dict[str, list[float]] = {}
+    _LOGIN_MAX_INTENTOS = 8
+    _LOGIN_VENTANA_SEG = 60.0
+
+    def _cliente_ip() -> str:
+        xff = request.headers.get("X-Forwarded-For", "")
+        if xff:
+            return xff.split(",")[0].strip()
+        return request.remote_addr or "desconocido"
+
+    def _login_bloqueado(ip: str) -> bool:
+        ahora = time.time()
+        with _login_lock:
+            vivos = [t for t in _login_intentos.get(ip, ()) if ahora - t < _LOGIN_VENTANA_SEG]
+            _login_intentos[ip] = vivos
+            return len(vivos) >= _LOGIN_MAX_INTENTOS
+
+    def _login_registrar_intento(ip: str) -> None:
+        with _login_lock:
+            _login_intentos.setdefault(ip, []).append(time.time())
+
     def _rol_actual() -> Optional[str]:
         if session is None:
             return None
+        rol_sesion = session.get("rol")
+        if rol_sesion:
+            return str(rol_sesion).strip().upper()
         uid = session.get("user_id")
         return _rol_de(uid, users_file) if uid else None
+
+    def _usuario_actual() -> dict[str, Any]:
+        if session is None:
+            return {"autenticado": False, "rol": None, "nombre": None, "user_id": None}
+        return {
+            "autenticado": bool(session.get("autenticado")),
+            "rol": _rol_actual() or "TRABAJADOR",
+            "nombre": session.get("nombre") or "Usuario",
+            "user_id": session.get("user_id"),
+        }
 
     @app.before_request
     def _requerir_login():
@@ -662,14 +719,43 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 "⚠️ PWA_PASSWORD no está configurada en el entorno (.env).",
                 503,
             )
-        intento = (request.form.get("password") or "").strip()
-        # Comparación en tiempo constante: evita filtrar la contraseña por
-        # cuánto tarda la respuesta (timing attack), aunque el riesgo real
-        # aquí es bajo (red local), es una buena práctica sin costo.
-        if intento and hmac.compare_digest(intento, clave_esperada):
+        ip = _cliente_ip()
+        if _login_bloqueado(ip):
+            return (
+                "⚠️ Demasiados intentos fallidos. Espere un minuto e intente de nuevo.",
+                429,
+            )
+        intento = (request.form.get("password") or request.form.get("pin") or "").strip()
+        uid_form = (request.form.get("user_id") or "").strip() or None
+
+        # 1. Intentar autenticar por PIN individual de users.json
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            user_auth = auth_inst.autenticar_pin(intento)
+        except Exception as e:
+            logger.warning("Fallo autenticando PIN: %s", e)
+            user_auth = None
+
+        if user_auth:
             session["autenticado"] = True
-            session["user_id"] = (request.form.get("user_id") or "").strip() or None
+            session["user_id"] = user_auth.get("user_id")
+            session["nombre"] = user_auth.get("nombre") or "Usuario"
+            session["rol"] = user_auth.get("rol") or "TRABAJADOR"
             return redirect("/")
+
+        # 2. Intentar autenticar por contraseña maestra (PWA_PASSWORD)
+        if clave_esperada and intento and hmac.compare_digest(intento, clave_esperada):
+            session["autenticado"] = True
+            session["user_id"] = uid_form
+            session["rol"] = _rol_de(uid_form, users_file) or "OWNER"
+            session["nombre"] = "Propietario" if session["rol"] == "OWNER" else "Usuario"
+            return redirect("/")
+
+        _login_registrar_intento(ip)
         return redirect("/login?error=1")
 
     @app.get("/logout")
@@ -810,6 +896,528 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             out = datos_identificar(db_path, texto=texto)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.get("/api/usuario")
+    def api_usuario():
+        return jsonify(_usuario_actual())
+
+    @app.post("/api/sync")
+    def api_sync():
+        datos = request.get_json(silent=True) or {}
+        eventos = datos.get("eventos", [])
+        if not isinstance(eventos, list):
+            return jsonify({"error": "Se esperaba una lista en 'eventos'."}), 400
+
+        db_sync = _db(db_path)
+        procesados = 0
+        errores = []
+        # IDs locales (los de la cola IndexedDB del cliente) que sí se
+        # guardaron -- el cliente solo debe borrar de su cola offline los
+        # eventos confirmados aquí. Antes se borraba TODA la cola con solo
+        # un HTTP 200 de la petición, aunque un evento individual fallara
+        # (ej. tag inexistente): el evento fallido desaparecía de la cola
+        # local sin haberse guardado en el servidor -- pérdida de datos de
+        # campo silenciosa, sobre todo durante la sincronización automática
+        # en segundo plano (sin aviso visible al usuario).
+        ids_ok = []
+        uid = session.get("user_id")
+
+        try:
+            for ev in eventos:
+                if not isinstance(ev, dict):
+                    continue
+                tipo = str(ev.get("tipo", "")).lower().strip()
+                payload = ev.get("payload") or {}
+                fecha = ev.get("fecha") or payload.get("fecha") or date.today().isoformat()
+                id_local = ev.get("id_local")
+
+                try:
+                    if tipo == "parto":
+                        db_sync.registrar_parto(
+                            vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            sexo_cria=payload.get("sexo_cria"),
+                            estado_cria=payload.get("estado_cria", "VIVO"),
+                            peso_nacimiento=payload.get("peso_nacimiento"),
+                            id_cria_tag=payload.get("id_cria_tag"),
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "pesaje":
+                        db_sync.registrar_pesaje(
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            peso_kg=payload.get("peso_kg"),
+                            gmd_calculada=payload.get("gmd"),
+                            evento=payload.get("evento") or "PESAJE",
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "tratamiento":
+                        db_sync.registrar_tratamiento(
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            producto=payload.get("producto"),
+                            principio_activo=payload.get("principio_activo"),
+                            dosis=payload.get("dosis"),
+                            via=payload.get("via"),
+                            dias_retiro_leche=int(payload.get("dias_retiro_leche") or 0),
+                            dias_retiro_carne=int(payload.get("dias_retiro_carne") or 0),
+                            diagnostico=payload.get("diagnostico"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "traslado":
+                        db_sync.registrar_traslado(
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            lote=payload.get("lote"),
+                            potrero_origen=payload.get("potrero_origen"),
+                            potrero_destino=payload.get("potrero_destino"),
+                            motivo=payload.get("motivo"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "celo":
+                        db_sync.registrar_celo(
+                            vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            am_pm=payload.get("am_pm"),
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "servicio":
+                        db_sync.registrar_servicio(
+                            vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            tipo_servicio=payload.get("tipo_servicio"),
+                            toro_pajilla=payload.get("toro_pajilla"),
+                            raza_toro=payload.get("raza_toro"),
+                            inseminador=payload.get("inseminador"),
+                            fep_calculada=payload.get("fep_calculada"),
+                            estado=payload.get("estado"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "muerte":
+                        db_sync.registrar_muerte(
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            causa_presunta=payload.get("causa_presunta"),
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "leche":
+                        db_sync.registrar_produccion_leche(
+                            fecha=fecha,
+                            litros=payload.get("litros"),
+                            notas=payload.get("notas"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "ronda":
+                        db_sync.registrar_ronda_campo(
+                            user_id=uid,
+                            usuario_nombre=session.get("nombre") or (_rol_actual() or "Usuario"),
+                            fecha=fecha,
+                            hora=payload.get("hora"),
+                            lat=payload.get("lat"),
+                            lon=payload.get("lon"),
+                            potrero_id=payload.get("potrero_id"),
+                            potrero_nombre=payload.get("potrero_nombre"),
+                            punto_control=payload.get("punto_control"),
+                            notas=payload.get("notas"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    else:
+                        errores.append(f"Tipo de evento no reconocido: {tipo}")
+                except Exception as e:
+                    logger.exception("Error al sincronizar evento %s: %s", id_local, e)
+                    errores.append(f"Error en evento {id_local or tipo}: {str(e)}")
+
+            return jsonify({
+                "ok": True,
+                "procesados": procesados,
+                "total": len(eventos),
+                "errores": errores,
+                "ids_ok": ids_ok,
+            })
+        finally:
+            db_sync.close()
+
+    @app.post("/api/manga/pesaje")
+    def api_manga_pesaje():
+        datos = request.get_json(silent=True) or request.form
+        tag = (datos.get("tag") or "").strip()
+        peso_raw = datos.get("peso_kg")
+        evento = datos.get("evento") or "PESAJE"
+        if not tag or peso_raw is None:
+            return jsonify({"error": "Tag y peso_kg son obligatorios."}), 400
+        try:
+            peso_kg = float(peso_raw)
+        except (ValueError, TypeError):
+            return jsonify({"error": "peso_kg debe ser un número."}), 400
+
+        db_m = _db(db_path)
+        try:
+            aid = db_m.resolve_animal(tag, crear=True)
+            ult_pesaje = db_m.query_one(
+                "SELECT peso_kg, fecha FROM pesajes WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+                (aid,),
+            )
+            hoy_iso = date.today().isoformat()
+            gmd_val = None
+            dias_dif = None
+            ult_peso = None
+
+            if ult_pesaje and ult_pesaje["peso_kg"] is not None and ult_pesaje["fecha"]:
+                ult_peso = float(ult_pesaje["peso_kg"])
+                d_ult = to_date(ult_pesaje["fecha"])
+                d_hoy = date.today()
+                if d_ult and d_ult < d_hoy:
+                    dias_dif = (d_hoy - d_ult).days
+                    if dias_dif > 0:
+                        gmd_val = round(((peso_kg - ult_peso) / dias_dif) * 1000.0, 1)
+
+            pid = db_m.registrar_pesaje(
+                animal_tag=tag,
+                fecha=hoy_iso,
+                peso_kg=peso_kg,
+                gmd_calculada=gmd_val,
+                evento=evento,
+                registrado_por=session.get("user_id"),
+            )
+            return jsonify({
+                "ok": True,
+                "pesaje_id": pid,
+                "tag": tag,
+                "peso_kg": peso_kg,
+                "peso_anterior": ult_peso,
+                "dias_entre_pesajes": dias_dif,
+                "gmd_g_dia": gmd_val,
+            })
+        finally:
+            db_m.close()
+
+    @app.post("/api/manga/tratamiento_lote")
+    def api_manga_tratamiento_lote():
+        datos = request.get_json(silent=True) or {}
+        tags = datos.get("tags") or []
+        producto = (datos.get("producto") or "").strip()
+        principio = (datos.get("principio_activo") or "").strip() or None
+        dosis = (datos.get("dosis") or "").strip() or None
+        via = (datos.get("via") or "").strip() or None
+        d_leche = int(datos.get("dias_retiro_leche") or 0)
+        d_carne = int(datos.get("dias_retiro_carne") or 0)
+        diagnostico = (datos.get("diagnostico") or "").strip() or None
+
+        potrero = (datos.get("potrero") or "").strip()
+
+        db_t = _db(db_path)
+        if not tags and potrero:
+            try:
+                filas_p = db_t.query(
+                    "SELECT a.tag FROM animales a JOIN potreros p ON a.potrero_id = p.id "
+                    "WHERE (p.nombre = ? OR p.codigo = ?) AND a.estado = 'ACTIVO'",
+                    (potrero, potrero),
+                )
+                tags = [f["tag"] for f in filas_p]
+            except Exception as e:
+                logger.warning("Fallo al buscar animales de potrero %s: %s", potrero, e)
+
+        if not tags or not producto:
+            db_t.close()
+            return jsonify({"error": "Debe enviar 'tags' o 'potrero' con animales activos, y 'producto'."}), 400
+
+        hoy_iso = date.today().isoformat()
+        procesados = 0
+        uid = session.get("user_id")
+
+        try:
+            for t in tags:
+                try:
+                    db_t.registrar_tratamiento(
+                        animal_tag=str(t).strip(),
+                        fecha=hoy_iso,
+                        producto=producto,
+                        principio_activo=principio,
+                        dosis=dosis,
+                        via=via,
+                        dias_retiro_leche=d_leche,
+                        dias_retiro_carne=d_carne,
+                        diagnostico=diagnostico,
+                        registrado_por=uid,
+                    )
+                    procesados += 1
+                except Exception as e:
+                    logger.warning("Fallo al aplicar tratamiento lote a %s: %s", t, e)
+            return jsonify({"ok": True, "procesados": procesados, "total": len(tags)})
+        finally:
+            db_t.close()
+
+    @app.post("/api/preguntar")
+    def api_preguntar():
+        datos = request.get_json(silent=True) or request.form
+        pregunta = (datos.get("pregunta") or "").strip()
+        if not pregunta:
+            return jsonify({"error": "Debe enviar 'pregunta'."}), 400
+
+        db_q = _db(db_path)
+        try:
+            try:
+                from ..engine.query_engine import QueryEngine
+            except ImportError:
+                from src.engine.query_engine import QueryEngine  # type: ignore
+            qe = QueryEngine(db_q)
+            respuesta = qe.responder(pregunta)
+            return jsonify({"ok": True, "pregunta": pregunta, "respuesta": respuesta})
+        except Exception as e:
+            logger.exception("Error al responder pregunta en PWA: %s", e)
+            return jsonify({"ok": False, "error": f"Error al procesar consulta: {e}"}), 500
+        finally:
+            db_q.close()
+
+    @app.post("/api/voz")
+    def api_voz():
+        audio_file = request.files.get("audio") if request.files else None
+        if not audio_file or not audio_file.filename:
+            return jsonify({"error": "Debe enviar un archivo en 'audio'."}), 400
+
+        import tempfile
+        ext = os.path.splitext(audio_file.filename)[1] or ".webm"
+        tmp_audio = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as f:
+                f.write(audio_file.read())
+                tmp_audio = f.name
+
+            try:
+                try:
+                    from ..parsers.media_handler import transcribe_audio
+                except ImportError:
+                    from src.parsers.media_handler import transcribe_audio  # type: ignore
+                tr = transcribe_audio(tmp_audio)
+                texto_transcripto = tr.texto if tr else ""
+            except Exception as e:
+                logger.warning("Fallo en transcripción Whisper: %s", e)
+                return jsonify({"ok": False, "error": f"No se pudo transcribir el audio: {e}"}), 500
+
+            if not texto_transcripto:
+                return jsonify({"ok": False, "error": "No se detectó voz clara en el audio."})
+
+            db_v = _db(db_path)
+            try:
+                try:
+                    from ..bot.bot_interface import Bot
+                except ImportError:
+                    from src.bot.bot_interface import Bot  # type: ignore
+                bot_inst = Bot(db_v)
+                respuesta = bot_inst.procesar_texto(texto_transcripto, user_id=session.get("user_id"))
+                return jsonify({
+                    "ok": True,
+                    "transcripcion": texto_transcripto,
+                    "respuesta": respuesta,
+                })
+            finally:
+                db_v.close()
+        finally:
+            if tmp_audio and os.path.isfile(tmp_audio):
+                try:
+                    os.remove(tmp_audio)
+                except Exception:
+                    pass
+
+    @app.get("/api/reporte.pdf")
+    def api_reporte_pdf():
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Se requiere rol ADMIN u OWNER para descargar reportes PDF."}), 403
+
+        periodo = request.args.get("periodo") or "semanal"
+        db_rep = _db(db_path)
+        try:
+            try:
+                from ..reports.pdf_report import generar_pdf
+            except ImportError:
+                from src.reports.pdf_report import generar_pdf  # type: ignore
+            ruta = generar_pdf(db_rep, periodo=periodo)
+            if not ruta or not os.path.isfile(ruta):
+                abort(500)
+            nombre_descarga = f"reporte_ganaderia_ja_{periodo}.pdf"
+            return send_file(os.path.abspath(ruta), mimetype="application/pdf",
+                             as_attachment=True, download_name=nombre_descarga)
+        except Exception as e:
+            logger.exception("Error al generar reporte PDF en PWA: %s", e)
+            abort(500)
+        finally:
+            db_rep.close()
+
+    @app.get("/api/sistema")
+    def api_sistema():
+        if _rol_actual() != "OWNER":
+            return jsonify({"error": "Acceso denegado. Se requiere rol OWNER (Propietario)."}), 403
+
+        db_inst = _db(db_path)
+        try:
+            try:
+                try:
+                    from ..server.formatters import formatear_tablero_sistema
+                    from ..server.auth import Auth
+                except ImportError:
+                    from src.server.formatters import formatear_tablero_sistema  # type: ignore
+                    from src.server.auth import Auth  # type: ignore
+                auth_inst = Auth(users_file)
+                texto_sistema = formatear_tablero_sistema(db_inst, auth_inst, db_path)
+            except Exception as e:
+                texto_sistema = f"Error al formatear tablero del sistema: {e}"
+
+            import platform
+            info_vps = {
+                "so": platform.platform(),
+                "python": platform.python_version(),
+            }
+            try:
+                import psutil
+                mem = psutil.virtual_memory()
+                ruta_disco = "/" if hasattr(os, "statvfs") or sys.platform != "win32" else "C:\\"
+                disk = psutil.disk_usage(ruta_disco)
+                info_vps["ram_total_mb"] = mem.total // (1024 * 1024)
+                info_vps["ram_used_mb"] = mem.used // (1024 * 1024)
+                info_vps["ram_pct"] = mem.percent
+                info_vps["disk_total_gb"] = round(disk.total / (1024**3), 1)
+                info_vps["disk_used_gb"] = round(disk.used / (1024**3), 1)
+                info_vps["disk_pct"] = disk.percent
+                proc = psutil.Process(os.getpid())
+                info_vps["proc_ram_mb"] = round(proc.memory_info().rss / (1024 * 1024), 1)
+            except Exception:
+                pass
+
+            tam_bytes = os.path.getsize(db_path) if os.path.isfile(db_path) else 0
+            tam_mb = round(tam_bytes / (1024 * 1024), 2)
+            row_a = db_inst.query_one("SELECT COUNT(*) as n FROM animales WHERE estado = 'ACTIVO'")
+            row_tot = db_inst.query_one("SELECT COUNT(*) as n FROM animales")
+            termo = db_inst.query_one("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC LIMIT 1")
+
+            return jsonify({
+                "texto": texto_sistema,
+                "vps": info_vps,
+                "db": {
+                    "path": db_path,
+                    "tam_mb": tam_mb,
+                    "activos": row_a["n"] if row_a else 0,
+                    "total": row_tot["n"] if row_tot else 0,
+                },
+                "termo": dict(termo) if termo else None,
+                "rol": "OWNER",
+            })
+        finally:
+            db_inst.close()
+
+    @app.get("/api/logs")
+    def api_logs():
+        if _rol_actual() != "OWNER":
+            return jsonify({"error": "Acceso denegado. Se requiere rol OWNER (Propietario)."}), 403
+
+        lineas = []
+        candidatos_log = [
+            os.path.join(RAIZ_PROYECTO, "data", "copias_import.log"),
+            os.path.join(RAIZ_PROYECTO, "data", "bitacora.log"),
+            os.path.join(RAIZ_PROYECTO, "bitacora.log"),
+        ]
+        for c in candidatos_log:
+            if os.path.isfile(c):
+                try:
+                    with open(c, "r", encoding="utf-8", errors="replace") as f:
+                        sub_lineas = f.readlines()[-60:]
+                        lineas.extend([l.strip() for l in sub_lineas])
+                except Exception:
+                    pass
+        if not lineas:
+            lineas = ["No hay archivos de logs registrados recientemente en data/."]
+        return jsonify({"logs": lineas[-80:], "rol": "OWNER"})
+
+    @app.post("/api/gps/potrero")
+    def api_gps_potrero():
+        datos = request.get_json(silent=True) or request.form
+        try:
+            lat = float(datos.get("lat"))
+            lon = float(datos.get("lon"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "lat y lon deben ser números válidos."}), 400
+
+        db_gps = _db(db_path)
+        try:
+            det = db_gps.detectar_potrero_gps(lat, lon)
+            if not det:
+                return jsonify({"detectado": False, "mensaje": "Ubicación fuera del área de potreros de la finca."})
+
+            animales = db_gps.query(
+                "SELECT id_animal, tag, nombre, sexo, raza FROM animales WHERE potrero_id = ? AND estado = 'ACTIVO' ORDER BY tag",
+                (det["id"],),
+            )
+            return jsonify({
+                "detectado": True,
+                "potrero": det,
+                "animales": _filas_dict(animales),
+                "total_animales": len(animales),
+            })
+        finally:
+            db_gps.close()
+
+    @app.post("/api/gps/ronda")
+    def api_gps_ronda():
+        datos = request.get_json(silent=True) or request.form
+        lat = datos.get("lat")
+        lon = datos.get("lon")
+        punto = datos.get("punto_control") or "recorrido"
+        notas = datos.get("notas")
+        pot_id = datos.get("potrero_id")
+        pot_nom = datos.get("potrero_nombre")
+
+        db_gps = _db(db_path)
+        try:
+            ronda_id = db_gps.registrar_ronda_campo(
+                user_id=session.get("user_id"),
+                usuario_nombre=session.get("nombre") or (_rol_actual() or "Usuario"),
+                lat=lat,
+                lon=lon,
+                potrero_id=pot_id,
+                potrero_nombre=pot_nom,
+                punto_control=punto,
+                notas=notas,
+            )
+            return jsonify({"ok": True, "ronda_id": ronda_id})
+        finally:
+            db_gps.close()
+
+    @app.get("/api/gps/rondas")
+    def api_gps_listar_rondas():
+        db_gps = _db(db_path)
+        try:
+            fecha = request.args.get("fecha")
+            filas = db_gps.listar_rondas_campo(fecha=fecha, limite=50)
+            return jsonify({"rondas": _filas_dict(filas)})
+        finally:
+            db_gps.close()
 
     @app.get("/api/ficha/<tag>/qr.pdf")
     def api_ficha_qr_pdf(tag):

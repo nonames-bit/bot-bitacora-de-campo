@@ -2,11 +2,19 @@
   {
     "user_id": 111111111,
     "nombre": "Duenio",
-    "rol": "OWNER"
+    "rol": "OWNER",
+    "pin": "1234"
+  },
+  {
+    "user_id": 333333333,
+    "nombre": "Administrador",
+    "rol": "ADMIN",
+    "pin": "2222"
   },
   {
     "user_id": 222222222,
     "nombre": "Mayordomo",
-    "rol": "TRABAJADOR"
+    "rol": "TRABAJADOR",
+    "pin": "1111"
   }
 ]

@@ -1,4 +1,5 @@
-/* Service Worker — PWA Bitácora JA (Fase 7, Etapa B "lite": lectura offline).
+/* Service Worker — PWA Bitácora JA (Fase 7, Etapa B "lite": lectura offline
+   + Etapa D+: escritura de eventos de campo con cola offline en IndexedDB).
 
 Estrategia:
 - Precarga del app-shell al instalar (/, /login, /offline.html, css, js, íconos).
@@ -7,16 +8,19 @@ Estrategia:
   si no hay copia y no hay red, se responde JSON 503 (la UI muestra aviso).
 - Navegaciones: network-first; si no hay red se sirve /offline.html.
 
-La PWA es SOLO LECTURA (no escribe en SQLite), así que este SW nunca encola
-escrituras. No cachear respuestas de login/logout (no GET) ni rutas no-GET.
+Este SW en sí sigue sin interceptar escrituras (no cachea respuestas de
+login/logout ni rutas no-GET): la cola offline de eventos de campo (Manga,
+GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 */
-// v19: fix KPIs (.kpis grid -> flex, ultima fila no dejaba hueco vacio),
-// icono roto en "Inventario y Poblacion" (cowDouble illegible a tamano
-// chico), y tabla de Distribucion por potrero que faltaba en esa vista.
+// v21: rate limit en /login (el PIN son 4 digitos en texto plano en
+// users.json -- sin limite de intentos era fuerza-bruteable en segundos),
+// fix perdida de datos en la cola offline (antes se borraba TODA la cola
+// con un solo HTTP 200 aunque un evento individual fallara), variables de
+// color --gris que faltaban en el tema "sun".
 // OJO: nunca bajar este numero -- un cliente que ya haya tenido una cache
 // con ese mismo nombre la trataria como "al dia" y se quedaria con el
 // HTML/JS/CSS viejo indefinidamente.
-var CACHE = "pwa-ja-v19"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+var CACHE = "pwa-ja-v21"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

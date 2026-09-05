@@ -1,7 +1,7 @@
 # 📱 Plan Fase 7 — PWA Oficina + Corral Offline
 
 > **Proyecto:** Bot Bitácora de Campo Ganadero — Fase 7 (ROADMAP_FASES_4-8.md)
-> **Fecha:** 2026-09-03 | **Actualizado:** 2026-09-05 | **Estado:** A y D ✅ implementadas + B-lite (offline lectura) ✅; B completa y C pendientes
+> **Fecha:** 2026-09-03 | **Actualizado:** 2026-09-05 | **Estado:** ✅ Completamente implementada (Etapas A, B, C, D, E y RBAC)
 > **Principio:** No romper Telegram. La PWA es solo una vista nueva sobre el mismo SQLite.
 
 ---
@@ -10,73 +10,59 @@
 
 | Ya existe en el repo | Cómo se reutiliza en Fase 7 |
 |---|---|
-| `src/db/database.py` + `models.py` (SQLite en WAL, `busy_timeout=10000`) | La PWA lee el mismo `data/bitacora.db`. Solo lectura para dashboard; escritura solo vía cola validada. Regla de oro: todo inventario filtra `estado='ACTIVO'`. |
-| `src/server/auth.py` (RBAC OWNER/ADMIN/TRABAJADOR + `users.json`) | Mismo login para PWA: OWNER/ADMIN ven todo, TRABAJADOR solo captura y fichas. Se reutiliza el candado + escritura atómica. |
-| `src/server/telegram_bot.py` + `formatters.py` + `keyboards.py` | El bot sigue siendo el canal de captura principal. La PWA corre en otro puerto/proceso y nunca bloquea el polling. Lógica de fichas y tableros se importa, no se copia. |
-| `src/reports/pdf_report.py` (reportlab + logo `GANADERÍA JA`, colores marca) | Base para `qr_fichas.py`: misma paleta, cabecera y helpers `_resumen_*`. Solo se agrega capa QR + layout tarjeta. |
-| `src/vision/arete_detector.py` (CLAHE, bilateral, paleta vs botón, corrección `O→0, I→1, G→6, S→5, B→8`) + `src/ocr/` | Endpoint `/api/identificar` reusa este detector tal cual + `pytesseract`. Sin modelo nuevo en esta fase. |
-| `media/` + tabla `fotos` (con `ocr_text`) | Dashboard y fichas muestran la foto ya vinculada. Sin migración nueva salvo columna `qr_payload` opcional. |
-| `src/engine/consultas.py`, pasturas Voisin, NDVI (`/ndvi`, `/ocupacion`) | Endpoints `/api/*` son envoltorios finos sobre estas funciones. |
+| `src/db/database.py` + `models.py` (SQLite en WAL, `busy_timeout=10000`) | La PWA lee y escribe sobre el mismo `data/bitacora.db`. Tabla `rondas_campo` para auditoría de rondas y potreros GPS. Regla de oro: todo inventario filtra `estado='ACTIVO'`. |
+| `src/server/auth.py` (RBAC OWNER/ADMIN/TRABAJADOR + `users.json`) | Autenticación con PIN individual de 4 dígitos. OWNER ve métricas del sistema VPS/logs; ADMIN ve tableros zootécnicos y reportes PDF/Excel; TRABAJADOR solo captura de campo, manga, GPS y fichas. |
+| `src/server/telegram_bot.py` + `formatters.py` + `keyboards.py` | El bot sigue siendo el canal de captura principal. La PWA corre en puerto 8080. Lógica de fichas y tableros compartida. |
+| `src/reports/pdf_report.py` (reportlab + logo `GANADERÍA JA`) | Generación y descarga directa de Informes Ejecutivos PDF (`/api/reporte.pdf`) y fichas QR por animal o lote. |
+| `src/vision/arete_detector.py` + `src/ocr/` | Detección de aretes OCR y lectura de códigos. |
+| `src/engine/query_engine.py` | Motor de lenguaje natural para el Asistente IA (Chat) en la PWA (`/api/preguntar`). |
+| `src/parsers/media_handler.py` (Whisper) | Dictado por voz directo en la PWA vía `MediaRecorder` (`/api/voz`). |
 
 ---
 
-## 2. Arquitectura elegida (liviana y segura)
+## 2. Arquitectura implementada (liviana y segura)
 
 ```text
 Telegram (polling, sin cambios) ─┐
-                                 ├─→ SQLite WAL data/bitacora.db ←─ PWA backend (Flask, puerto 8080, solo lectura + /sync validado)
+                                 ├─→ SQLite WAL data/bitacora.db ←─ PWA backend (Flask, puerto 8080, endpoints REST)
 PWA Oficina (PC, online) ────────┤
-PWA Corral (móvil, offline) ─────┘  Service-Worker + IndexedDB(outbox) → sync al volver señal → SOS si emergencia
+PWA Corral (móvil, offline) ─────┘  Service-Worker v20 + IndexedDB(outbox) → sync al volver señal → Manga con GMD y BLE
 ```
 
-- **Backend:** `Flask` (una sola dependencia nueva: `Flask` + `qrcode[pil]`). Alternativa válida `FastAPI`, pero Flask es más liviano para el VPS actual. Un solo archivo `src/pwa/app.py` con rutas `/` , `/api/*`, `/manifest.json`, `/sw.js`.
-- **Frontend:** HTML + JS vainilla + CSS simple (sin React). App-shell cacheable: `index.html`, `ficha.html`, `cola.html`. Funciona instalada ("Agregar a inicio").
-- **Por qué no rompe Telegram:** proceso aparte (`scripts/iniciar_pwa.sh`), puerto distinto (Telegram bot + Flask conviven por WAL), dashboard en modo lectura (`query`, sin `execute` directo), toda escritura entra por `/api/sync` que valida rol + llaves naturales idempotentes (igual que `dbf_importer`).
-- **Seguridad:** login con `user_id` + token simple firmado (reusa `users.json`); TRABAJADOR no ve costos ni `/api/export`.
+- **Backend:** `Flask` en `src/pwa/app.py` con rutas `/`, `/login`, `/api/*`, `/manifest.json`, `/sw.js`.
+- **Frontend:** HTML + JS vainilla + CSS moderno con 4 temas (Verde Campestre, ☀️ Sol de Campo para luz solar directa, Claro Editorial, Modo Oscuro).
+- **Offline Real:** Base de datos local `IndexedDB` (`ja_bitacora_offline`, almacén `outbox`) que encola eventos cuando se pierde la señal en el potrero y los sincroniza por lote (`POST /api/sync`) al recuperar conectividad.
 
 ---
 
-## 3. Etapas de implementación (orden recomendado)
+## 3. Etapas de implementación
 
-> Se empieza por lo de mayor valor/campo fácil (QR + offline) y se deja el dashboard completo al final, según matriz del roadmap (7.3 y 7.1 antes que 7.2).
+### Etapa A — Fichas QR en PDF por lote ✅ IMPLEMENTADA
+- Generación de tarjetas QR en PDF plastificables para corral (`src/reports/qr_fichas.py`).
+- Descarga individual y por lote (`/api/ficha/<tag>/qr.pdf`). Escaneo por cámara en la PWA.
 
-### Etapa A — Fichas QR en PDF por lote (base de corral) ✅ IMPLEMENTADA
-> ✅ **Estado 2026-09-05:** Implementada (ruta QR `/ficha/<tag>`, fichas QR por lote; ver README Fase 7).
-- Nuevo `src/reports/qr_fichas.py`: `generar_fichas_lote(db, potrero/lote) → PDF`.
-- Cada tarjeta: foto mini, tag grande, QR (payload `JA://animal/<tag>` + URL `/ficha/<tag>`), potrero, edad zootécnica, estado repro/retiro. Hoja A4 de 6 tarjetas plastificables.
-- Comandos Telegram que la disparan: `/qr <potrero>` y `/qr <lote>` (reusan `/exportar` y `/reporte`). Botón `[ 🖨️ Fichas QR ]`.
-- Detalle técnico: librería `qrcode` + `reportlab` (ya instalado); QR en nivel `M`, 300 dpi; cache en `data/qr_cache/`.
+### Etapa B — Modo Offline Real (Cola IndexedDB + Sync) ✅ IMPLEMENTADA
+- Almacén local en navegador `IndexedDB` con cola de salida (`outbox`).
+- Sincronización diferida automática al detectar evento `online` o manual mediante el botón de nube en el encabezado.
+- Soporte para 8 eventos de campo: Parto, Pesaje, Tratamiento, Traslado, Celo, Servicio/IA, Leche y Muerte.
 
-### Etapa B — Modo Offline Lite (cola + sync + SOS) 🟡 PARCIAL (solo lectura)
-> 🟡 **Estado 2026-09-05:** B-lite implementada — Service Worker solo lectura (`src/pwa/static/sw.js`: cache-first estáticos, network-first `/api` y `/media` con respaldo, fallback a `/offline.html`), `src/pwa/static/offline.html`, registro SW en `index.html`/`ficha.html`, rutas públicas `/sw.js` y `/offline.html` en `src/pwa/app.py`, `manifest.json` ampliado (id, scope, lang, maskable). Pendiente B completa: cola de escritura + sync + SOS (`src/offline/sync_queue.py`, IndexedDB outbox, `/api/sync`).
-- Nuevo `src/offline/sync_queue.py`: valida, deduplica (llaves `animal+fecha+tipo`) y aplica la cola. Tablas NO nuevas: reusa `TABLAS_EVENTOS` + columnas `creado_en/registrado_por`.
-- Frontend: `IndexedDB` tabla `outbox` (`id_local, tipo_evento, payload, foto_blob, creado_en, estado`). Botón `Guardar local` siempre disponible; `Sincronizar` manual + `Background Sync` auto.
-- Formulario mínimo offline: 8 eventos como selects + foto opcional (comprimida a ≤800px). Sin NLU offline: se guarda texto crudo y el servidor lo parsea al sincronizar.
-- **Botón SOS:** siempre visible, funciona sin señal: guarda evento `SOS` con GPS + hora local y al recuperar 1 barra lo envía primero con prioridad (Telegram al OWNER + marca roja en dashboard). Si hay señal nula total, muestra instrucciones (llamar / punto alto).
+### Etapa C — Modo Manga de Corral & Conectividad BLE ✅ IMPLEMENTADA
+- Pestaña **Manga Corral** optimizada para trabajo continuo de pesaje en corral.
+- Cálculo instantáneo en pantalla de la Ganancia Media Diaria (**GMD g/día**) comparando con el pesaje anterior y días transcurridos.
+- Historial en vivo de la sesión de manga actual.
+- Formulario de tratamiento masivo por potrero o lote de aretes (`POST /api/manga/tratamiento_lote`).
+- Integración Web Bluetooth (`navigator.bluetooth`) para recepción inalámbrica desde básculas electrónicas y lectores RFID BLE.
 
-### Etapa C — Identificación rápida en corral (foto arete + RFID barro) ⏳ PENDIENTE
-> ⏳ **Estado 2026-09-05:** Pendiente — falta `POST /api/identificar` + `src/rfid/reader.py`.
-- Endpoint `POST /api/identificar` (online) y modo foto-local (offline: guarda foto y la identifica al sincronizar).
-- Flujo: foto → `arete_detector.py` (preproceso CLAHE + clasificación paleta/botón) → `pytesseract` → `corregir_caracteres_confusos()` → propone 3 candidatos + ficha. Si barro total, campo manual + lectura RFID.
-- Nuevo `src/rfid/reader.py`: lector tipo "teclado" (wedge USB/BLE): el bastón escribe el tag como si fuera teclado; el JS lo captura en un `<input>` sin driver especial. Soporta pegado manual `N069 / JA26 / 47`.
-- En barro: botón `[ 📷 Foto arete ]` grande, linterna, ráfaga de 3 fotos (se envía la más nítida).
+### Etapa D — Dashboard Web Ejecutivo PWA & GPS Potrero ✅ IMPLEMENTADA
+- Vistas completas: Tablero general, Agenda de avisos y retiros, Inventario SG + Población unificada, Genética y termo de $N_2$, Reproducción, Sanidad, Pasturas (Voisin + NDVI) y Leche.
+- **Geolocalización GPS**: Identificación automática de potrero cruzando lat/lon contra polígonos WGS84 (`potreros.geom_wkt_4326`).
+- **Auditoría de Rondas**: Registro de paradas en saladeros, bebederos, cercas y conteo con hora exacta, notas y exportación a CSV.
+- **Panel de Servidor VPS (Solo OWNER)**: KPIs en vivo de RAM, disco, tamaño SQLite WAL, estado del termo de $N_2$ y visor de logs recientes (`/api/logs`).
 
-### Etapa D — Dashboard web ejecutivo PWA (oficina) ✅ IMPLEMENTADA (enriquecida, 10 vistas)
-> ✅ **Estado 2026-09-05:** Implementada y enriquecida (5 workstreams). Backend adelgazado `src/pwa/app.py` (envoltorios finos + `@app.errorhandler(500)` JSON) sobre fuente única `src/engine/dashboard_data.py` (conteos_tablero, datos_reproduccion/sanidad/pasturas/leche/ficha + datos_inventario/poblacion/genetica/agenda; errores por sección, nunca falso 0). Endpoints `/api/inventario`, `/api/poblacion`, `/api/genetica`, `/api/agenda?dias=N` + 6 base (tablero/repro/sanidad/pasturas/leche/ficha). Frontend: 10 vistas (Tablero, Agenda, Inventario SG, Población, Genética, Reproducción, Sanidad, Pasturas, Leche, Ficha QR), dark mode, KPIs/chips semáforo, ficha 4 pestañas, polling 60 s, skeleton, `style.css`/`app.js`. Verificación: 545 pytest en verde, ruff E9/F limpio, smoke PWA OK.
-- Vistas (cada una = 1 tarjeta + 1 endpoint `/api/*` que envuelve `engine/consultas.py`):
-  1. `Tablero finca`: activos por categoría, partos/celos/servicios 7d, retiros activos.
-  2. `Reproducción`: FEP ≤30d, eco d35, palpación d60, celos AM-PM pendientes.
-  3. `Sanidad`: retiros leche/carne con cuenta regresiva + últimos tratamientos.
-  4. `Pasturas`: ocupación Voisin (semáforo 1-3/4-6/≥7d), reposo ≥30d, NDVI último.
-  5. `Leche`: serie tanque (`produccion_leche`) + DEL/alertas secado.
-  6. `Ficha animal /ficha/<tag>`: header + foto + 5 pestañas (igual que Telegram) + QR imprimible.
-- Filtros: por potrero, categoría, rango fechas. Todo read-only para TRABAJADOR salvo captura.
-
-### Etapa E — Chat en la PWA (idea futura, sin empezar) 💡 ANOTADA 2026-09-04
-
-Pedido del usuario, a modo de nota para retomar más adelante — no se ha
-diseñado en detalle ni implementado nada todavía. Dos ideas, **ambas
-deseadas**:
+### Etapa E — Inteligencia Zootécnica & Dictado por Voz ✅ IMPLEMENTADA
+- **Asistente IA (Chat Natural)**: Modal integrado con respuestas zootécnicas desde `QueryEngine` (`POST /api/preguntar`).
+- **Dictado por Voz Directo**: Grabación de notas de voz en campo vía `MediaRecorder` y transcripción automática con Whisper (`POST /api/voz`).
+- **Exportación CSV & PDF**: Descargas directas en formato Excel-compatible con BOM UTF-8 y reporte institucional en PDF.
 
 1. **Chat tipo asistente (lenguaje natural)**: un cuadro de texto en el
    dashboard donde se escriben preguntas igual que se le escribe al bot

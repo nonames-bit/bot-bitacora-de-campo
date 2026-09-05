@@ -79,6 +79,22 @@ def test_login_con_clave_incorrecta_no_autentica(db_file):
     assert r.status_code == 401
 
 
+def test_login_bloquea_tras_muchos_intentos_fallidos(db_file):
+    """El PIN individual son solo 4 dígitos guardados en texto plano en
+    users.json -- sin límite de intentos, cualquiera con acceso a /login
+    (la app está expuesta a internet) podría fuerza-bruta un PIN en
+    segundos. Debe bloquear tras varios fallos consecutivos."""
+    app = crear_app(db_file, password="clave-de-prueba")
+    c = app.test_client()
+    for _ in range(8):
+        r = c.post("/login", data={"password": "0000"})
+        assert r.status_code in (301, 302, 303, 307, 308)
+    bloqueado = c.post("/login", data={"password": "clave-de-prueba"})
+    assert bloqueado.status_code == 429
+    # Ni siquiera la clave CORRECTA debe autenticar mientras está bloqueado.
+    assert c.get("/api/tablero").status_code == 401
+
+
 def test_logout_envia_clear_site_data(client):
     """En un equipo compartido, cerrar sesión debe limpiar la caché offline
     del Service Worker (cachea /api/*, ver static/sw.js) -- sin esto,
@@ -366,4 +382,141 @@ def test_api_ficha_grafico_whitelist(client):
     assert client.get("/api/ficha/47/grafico/algo").status_code == 404
     # Animal inexistente: 404.
     assert client.get("/api/ficha/ZZ999/grafico/peso").status_code == 404
+
+
+def test_autenticacion_pin_roles_y_usuario(tmp_path, db_file):
+    users_json = str(tmp_path / "users_test.json")
+    import json
+    with open(users_json, "w", encoding="utf-8") as f:
+        json.dump([
+            {"user_id": 100, "nombre": "Don Juan", "rol": "OWNER", "pin": "9999"},
+            {"user_id": 200, "nombre": "Pedro Admin", "rol": "ADMIN", "pin": "8888"},
+            {"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"},
+        ], f)
+
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+    c = app.test_client()
+
+    # Login como TRABAJADOR con PIN
+    r = c.post("/login", data={"pin": "7777"})
+    assert r.status_code == 302
+    u_info = c.get("/api/usuario").get_json()
+    assert u_info["autenticado"] is True
+    assert u_info["rol"] == "TRABAJADOR"
+    assert u_info["nombre"] == "Carlos Vaquero"
+
+    # TRABAJADOR no puede ver /api/sistema (403)
+    assert c.get("/api/sistema").status_code == 403
+    assert c.get("/api/logs").status_code == 403
+    assert c.get("/api/reporte.pdf").status_code == 403
+
+    # Logout
+    c.get("/logout")
+
+    # Login como OWNER con PIN
+    r = c.post("/login", data={"pin": "9999"})
+    assert r.status_code == 302
+    u_info = c.get("/api/usuario").get_json()
+    assert u_info["rol"] == "OWNER"
+
+    # OWNER sí puede ver /api/sistema y /api/logs
+    r_sis = c.get("/api/sistema")
+    assert r_sis.status_code == 200
+    d_sis = r_sis.get_json()
+    assert "vps" in d_sis and "db" in d_sis
+    assert c.get("/api/logs").status_code == 200
+
+
+def test_api_sync_offline(client):
+    eventos = [
+        {"tipo": "pesaje", "fecha": "2026-09-01", "payload": {"tag": "47", "peso_kg": 460.5, "evento": "CONTROL"}},
+        {"tipo": "tratamiento", "fecha": "2026-09-01", "payload": {"tag": "47", "producto": "Ivermectina", "dosis": "10ml", "via": "SC", "dias_retiro_carne": 28}},
+        {"tipo": "leche", "fecha": "2026-09-01", "payload": {"litros": 185.0, "notas": "Ordeño mañana"}},
+    ]
+    r = client.post("/api/sync", json={"eventos": eventos})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["procesados"] == 3
+
+
+def test_api_sync_solo_confirma_ids_ok_de_eventos_realmente_guardados(client):
+    """Bug real: el cliente borraba TODA su cola offline con un solo HTTP 200,
+    aunque un evento individual del lote hubiera fallado -- ese evento
+    desaparecía de la cola sin haberse guardado en el servidor (pérdida de
+    datos de campo silenciosa). El servidor debe reportar, por id_local,
+    cuáles sí se guardaron para que el cliente solo borre esos."""
+    eventos = [
+        {"tipo": "pesaje", "id_local": "loc_ok", "fecha": "2026-09-01",
+         "payload": {"tag": "47", "peso_kg": 460.5, "evento": "CONTROL"}},
+        {"tipo": "tipo_no_existe", "id_local": "loc_falla", "fecha": "2026-09-01", "payload": {}},
+    ]
+    r = client.post("/api/sync", json={"eventos": eventos})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["procesados"] == 1
+    assert d["ids_ok"] == ["loc_ok"]
+    assert "loc_falla" not in d["ids_ok"]
+    assert d["errores"]  # el fallo queda reportado, no silenciado
+
+
+def test_api_manga_pesaje_calcula_gmd(client, db_file):
+    # Registrar pesaje previo
+    d = Database(db_file)
+    d.registrar_pesaje("47", fecha="2026-08-01", peso_kg=400.0)
+    d.close()
+
+    # Nuevo pesaje vía API Manga
+    r = client.post("/api/manga/pesaje", json={"tag": "47", "peso_kg": 430.0})
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["ok"] is True
+    assert res["tag"] == "47"
+    assert res["peso_kg"] == 430.0
+    assert res["peso_anterior"] == 400.0
+    assert res["gmd_g_dia"] is not None
+    assert res["gmd_g_dia"] > 0
+
+
+def test_api_manga_tratamiento_lote(client):
+    r = client.post("/api/manga/tratamiento_lote", json={
+        "tags": ["47"],
+        "producto": "Oxitetraciclina",
+        "dosis": "1ml/10kg",
+        "via": "IM",
+        "dias_retiro_leche": 3,
+        "dias_retiro_carne": 14,
+    })
+    assert r.status_code == 200
+    assert r.get_json()["procesados"] == 1
+
+
+def test_api_preguntar_lenguaje_natural(client):
+    r = client.post("/api/preguntar", json={"pregunta": "¿cuántas vacas hay en Guayabal?"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert "Guayabal" in d["respuesta"] or "47" in d["respuesta"] or "vaca" in d["respuesta"].lower()
+
+
+def test_api_gps_potrero_y_rondas(client):
+    # Coordenadas dentro del polígono de prueba Guayabal (-74.065, 3.395)
+    r = client.post("/api/gps/potrero", json={"lat": 3.395, "lon": -74.065})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["detectado"] is True
+    assert d["potrero"]["nombre"] == "Guayabal"
+    assert d["total_animales"] >= 1
+
+    # Registrar ronda
+    r_ronda = client.post("/api/gps/ronda", json={
+        "lat": 3.395, "lon": -74.065, "punto_control": "saladero", "notas": "Saladero lleno y limpio"
+    })
+    assert r_ronda.status_code == 200
+    assert r_ronda.get_json()["ok"] is True
+
+    # Consultar rondas
+    r_list = client.get("/api/gps/rondas")
+    assert r_list.status_code == 200
+    assert len(r_list.get_json()["rondas"]) >= 1
 

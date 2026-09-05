@@ -281,6 +281,24 @@ CREATE TABLE IF NOT EXISTS monitoreo_satelital_lluvia (
 );
 
 CREATE INDEX IF NOT EXISTS idx_lluvia_satelital_fecha ON monitoreo_satelital_lluvia(fecha);
+
+CREATE TABLE IF NOT EXISTS rondas_campo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    usuario_nombre TEXT,
+    fecha TEXT NOT NULL,
+    hora TEXT NOT NULL,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    potrero_id INTEGER,
+    potrero_nombre TEXT,
+    punto_control TEXT,
+    notas TEXT,
+    creado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_rondas_fecha ON rondas_campo(fecha);
+CREATE INDEX IF NOT EXISTS idx_rondas_potrero ON rondas_campo(potrero_id);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -290,7 +308,7 @@ TABLAS = [
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
-    "monitoreo_satelital_lluvia",
+    "monitoreo_satelital_lluvia", "rondas_campo",
 ]
 
 

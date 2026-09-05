@@ -882,3 +882,264 @@ a.qr-pdf:hover { background: var(--verde-marca-pastel); }
 header .acciones .tema-btn, header .acciones button { position: relative; }
 #btn-notif .nav-badge { top: 0; right: 0; }
 #qr-video { max-height: 220px; object-fit: cover; background: #000; }
+
+/* --- Tema 4: Sol de Campo (Alto Contraste para luz solar directa) --- */
+:root[data-theme="sun"] {
+  --font-base: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Sans', monospace;
+  --theme-name: "Sol de Campo";
+  --fondo: #FFFFFF;
+  --superficie: #FFFFFF;
+  --borde: #000000;
+  --borde-fuerte: #000000;
+  --texto: #000000;
+  --texto-suave: #222222;
+  --verde-marca: #143516;
+  --verde-marca-hover: #000000;
+  --verde-marca-pastel: #E8F5E9;
+  --header-bg: #000000;
+  --header-txt: #FFFFFF;
+  --color-verde-bg: #C8E6C9;
+  --color-verde-txt: #000000;
+  --color-ambar-bg: #FFF9C4;
+  --color-ambar-txt: #000000;
+  --color-rojo-bg: #FFCDD2;
+  --color-rojo-txt: #000000;
+  --color-azul-bg: #BBDEFB;
+  --color-azul-txt: #000000;
+  --color-gris-bg: #E0E0E0;
+  --color-gris-txt: #000000;
+  --sombra: none;
+  --sombra-activa: none;
+}
+:root[data-theme="sun"] .card,
+:root[data-theme="sun"] input,
+:root[data-theme="sun"] button,
+:root[data-theme="sun"] select,
+:root[data-theme="sun"] table,
+:root[data-theme="sun"] th,
+:root[data-theme="sun"] td {
+  border-color: #000000 !important;
+  font-weight: 600;
+}
+
+/* --- Badge de Usuario & Sincronización en Header --- */
+.marca-titulo { display: inline-flex; align-items: center; gap: 8px; }
+.user-badge {
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #fff;
+}
+#btn-sync { position: relative; }
+#btn-sync .nav-badge { top: -2px; right: -2px; background: #e65100; }
+.btn-mic.grabando { background: #d32f2f !important; color: #fff !important; animation: pulso-rojo 1s infinite alternate; }
+@keyframes pulso-rojo {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.15); }
+}
+
+/* --- Botones de Exportar CSV en Tablas --- */
+.btn-csv {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 9px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--verde-marca);
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+.btn-csv:hover { background: var(--verde-marca-pastel); }
+
+/* --- Modales (Chat IA & Micrófono) --- */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 14px;
+}
+.modal-contenido {
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+.modal-header {
+  padding: 12px 16px;
+  background: var(--verde-marca);
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-cerrar {
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 0 6px;
+}
+.chat-cuerpo {
+  padding: 14px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 220px;
+  max-height: 380px;
+}
+.chat-msg {
+  padding: 9px 13px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  max-width: 85%;
+}
+.chat-msg.bot {
+  background: var(--fondo);
+  color: var(--texto);
+  align-self: flex-start;
+  border: 1px solid var(--borde);
+}
+.chat-msg.user {
+  background: var(--verde-marca);
+  color: #fff;
+  align-self: flex-end;
+}
+.chat-sugerencias {
+  display: flex;
+  gap: 6px;
+  padding: 8px 14px;
+  overflow-x: auto;
+  white-space: nowrap;
+  background: var(--fondo);
+  border-top: 1px solid var(--borde);
+}
+.chip-sug {
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--texto);
+}
+.chip-sug:hover { background: var(--verde-marca-pastel); }
+.chat-footer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--borde);
+}
+.chat-footer input { flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--borde-fuerte); font-size: 14px; }
+.chat-footer button { padding: 10px 16px; border-radius: 8px; background: var(--verde-marca); color: #fff; border: 0; font-weight: 600; cursor: pointer; }
+
+/* Modal Voz */
+.voz-cuerpo { padding: 28px 16px; text-align: center; }
+.voz-onda { font-size: 40px; margin-bottom: 12px; animation: pulso-rojo 0.9s infinite alternate; }
+.modal-acciones { padding: 12px 16px; border-top: 1px solid var(--borde); text-align: center; }
+.voz-res { text-align: left; background: var(--fondo); padding: 10px; border-radius: 8px; font-size: 13px; margin-top: 14px; }
+
+/* --- Modo Manga de Corral --- */
+.manga-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+.manga-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.manga-tab-btn {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--fondo);
+  color: var(--texto);
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: center;
+}
+.manga-tab-btn.act { background: var(--verde-marca); color: #fff; border-color: var(--verde-marca); }
+.manga-pesaje-box {
+  background: var(--fondo);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 12px;
+  padding: 18px 16px;
+  margin-bottom: 16px;
+}
+.manga-input-grande {
+  width: 100%;
+  font-size: 32px;
+  font-weight: 700;
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  border: 2px solid var(--borde-fuerte);
+  outline: none;
+  box-sizing: border-box;
+}
+.manga-input-grande:focus { border-color: var(--verde-marca); }
+.btn-guardar-manga {
+  width: 100%;
+  padding: 15px;
+  font-size: 17px;
+  font-weight: 700;
+  background: var(--verde-marca);
+  color: #fff;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.btn-guardar-manga:hover { opacity: 0.94; }
+.manga-resumen {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--superficie);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+/* --- GPS Potrero & Rondas --- */
+.gps-box {
+  background: var(--fondo);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 12px;
+  padding: 18px 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+.gps-potrero-tit { font-size: 20px; font-weight: 700; color: var(--verde-marca); margin: 8px 0; }
+.puntos-control-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 14px 0;
+}
+.btn-punto {
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 8px;
+  background: var(--superficie);
+  color: var(--texto);
+  cursor: pointer;
+  text-align: center;
+}
+.btn-punto.act { background: var(--verde-marca); color: #fff; border-color: var(--verde-marca); }
