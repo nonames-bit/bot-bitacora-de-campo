@@ -81,8 +81,14 @@
       // Lucide oficiales (ISC/MIT): gestación y diagnóstico
       egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
       stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>',
-      // Espermatozoide (IA) — dibujo a medida en trazo fino
-      sperm: '<path d="M9.5 2.8c2.2 0 3.8 2 3.8 4.4s-1.6 4.4-3.8 4.4S5.7 9.6 5.7 7.2 7.3 2.8 9.5 2.8z"/><path d="M13.2 10.6c2.4-1.9 4.9-1.6 7.2.8"/><path d="M20.4 11.4c.3 1.7-.2 3-1.3 4.1"/>'
+      // Espermatozoide (IA) — IconPark 'sperm' (Apache-2.0), dibujo clásico:
+      // cabeza ovalada + flagelo con cola ondulada. Coordenadas 48 → escala .5.
+      sperm: '<g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g>',
+      // Copo de nieve (frío criogénico N₂) — Lucide ISC
+      snowflake: '<path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/>',
+      // Cápsula/pastilla (tratamientos) — Lucide ISC
+      pill: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
+      cross: '<path d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a1 1 0 0 1 1 1v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4a1 1 0 0 1-1-1V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4a1 1 0 0 1-1 1z"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -160,7 +166,7 @@
       }).join("");
       h += "</table></div>";
     }
-    h += "<h4>" + icon("syringe") + "Últimos tratamientos</h4>"
+    h += "<h4>" + icon("pill") + "Últimos tratamientos</h4>"
       + tabla(d.ultimos_tratamientos, [
         ["tag", "Animal"], ["fecha", "Fecha"], ["producto", "Producto"],
         ["dosis", "Dosis"], ["via", "Vía"]
@@ -270,7 +276,7 @@
     (d.filas || []).forEach(function (f) { if (Number(f.n) > maxN) maxN = Number(f.n); });
     var filasBar = (d.filas || []).map(function (f) { return { categoria: f.categoria, n: f.n, pct: (Number(f.n) / maxN) * 100 }; });
     h += barrasDeFilas(filasBar, "pct", "n");
-    h += "<h4>" + icon("gauge") + "Últimos Pesajes y GMD (Ganancia Media Diaria)</h4>"
+    h += "<h4>" + icon("scale") + "Últimos Pesajes y GMD (Ganancia Media Diaria)</h4>"
       + tabla(d.gmd_reciente, [
         ["tag", "Animal"], ["fecha", "Fecha"], ["peso_kg", "Peso (kg)", "num"],
         ["gmd_calculada", "GMD (g/día)", "text", function (v) {
@@ -301,7 +307,7 @@
           return "<span class='chip " + c + "'>" + esc(n) + "</span>";
         }]
       ], "Sin inventario de pajuelas registrado.");
-    h += "<h4>" + icon("nitrogen") + "Recargas del Termo de Nitrógeno</h4>"
+    h += "<h4>" + icon("snowflake") + "Recargas del Termo de Nitrógeno</h4>"
       + tabla(d.termo_nitrogeno, [
         ["fecha_recarga", "Última Recarga"],
         ["proxima_recarga", "Próxima Recarga", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
