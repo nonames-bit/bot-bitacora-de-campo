@@ -17,10 +17,11 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // fix perdida de datos en la cola offline (antes se borraba TODA la cola
 // con un solo HTTP 200 aunque un evento individual fallara), variables de
 // color --gris que faltaban en el tema "sun".
-// OJO: nunca bajar este numero -- un cliente que ya haya tenido una cache
-// con ese mismo nombre la trataria como "al dia" y se quedaria con el
-// HTML/JS/CSS viejo indefinidamente.
-var CACHE = "pwa-ja-v21"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v22: homogeneización completa de interfaz con iconos vectoriales SVG Lucide
+// v23: Módulo interactivo de Gestión de Usuarios y Roles (RBAC) para Admin y Owner.
+// v24: SVG manga corral, celo, muerte, pajuelas, logo Ganadería JA y fix safe-area celular.
+// v25: Motor de telemetría GPS silenciosa en segundo plano y auditoría de rutas para OWNER.
+var CACHE = "pwa-ja-v25"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

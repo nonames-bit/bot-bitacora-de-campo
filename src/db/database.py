@@ -1819,3 +1819,106 @@ class Database:
             "SELECT * FROM rondas_campo ORDER BY fecha DESC, hora DESC, id DESC LIMIT ?",
             (limite,)
         )
+
+    def registrar_telemetria_gps(self, user_id: Optional[int] = None,
+                                usuario_nombre: Optional[str] = None,
+                                rol: Optional[str] = None,
+                                lat: Optional[float] = None,
+                                lon: Optional[float] = None,
+                                precision_m: Optional[float] = None,
+                                evento_origen: Optional[str] = None,
+                                fecha: Optional[str] = None,
+                                hora: Optional[str] = None) -> Optional[int]:
+        """Registra un punto de telemetría y movimiento de operario en la finca."""
+        if lat is None or lon is None:
+            return None
+        try:
+            lat_f = float(lat)
+            lon_f = float(lon)
+        except (ValueError, TypeError):
+            return None
+
+        f = iso(fecha) or date.today().isoformat()
+        h = hora or datetime.now().strftime("%H:%M:%S")
+
+        det = self.detectar_potrero_gps(lat_f, lon_f)
+        pot_id = det["id"] if det else None
+        pot_nom = det["nombre"] if det else None
+        dist_m = det.get("distancia_m", 0.0) if det else None
+        dentro = 1 if det else 0
+
+        return self.insert("telemetria_gps", {
+            "user_id": user_id,
+            "usuario_nombre": usuario_nombre,
+            "rol": rol,
+            "fecha": f,
+            "hora": h,
+            "lat": lat_f,
+            "lon": lon_f,
+            "precision_m": float(precision_m) if precision_m is not None else None,
+            "potrero_id": pot_id,
+            "potrero_nombre": pot_nom,
+            "distancia_m": dist_m,
+            "dentro_finca": dentro,
+            "evento_origen": evento_origen or "interaccion_app",
+            "creado_en": self._ahora(),
+        })
+
+    def listar_telemetria_gps(self, fecha: Optional[str] = None,
+                             user_id: Optional[int] = None,
+                             limite: int = 300) -> list[sqlite3.Row]:
+        """Lista puntos cronológicos de telemetría de operarios."""
+        f_iso = iso(fecha) if fecha else date.today().isoformat()
+        if user_id:
+            return self.query(
+                "SELECT * FROM telemetria_gps WHERE fecha = ? AND user_id = ? ORDER BY hora ASC, id ASC LIMIT ?",
+                (f_iso, int(user_id), limite)
+            )
+        return self.query(
+            "SELECT * FROM telemetria_gps WHERE fecha = ? ORDER BY hora ASC, id ASC LIMIT ?",
+            (f_iso, limite)
+        )
+
+    def resumen_rutas_operarios(self, fecha: Optional[str] = None) -> list[dict[str, Any]]:
+        """Genera resumen cronológico y secuencia de potreros visitados por operario."""
+        f_iso = iso(fecha) if fecha else date.today().isoformat()
+        puntos = self.listar_telemetria_gps(fecha=f_iso, limite=1000)
+
+        # Agrupar por usuario
+        por_usuario: dict[Any, list[dict]] = {}
+        for p in puntos:
+            dp = dict(p)
+            uid = dp.get("user_id") or dp.get("usuario_nombre") or "Anonimo"
+            por_usuario.setdefault(uid, []).append(dp)
+
+        resumen = []
+        for uid, pts in por_usuario.items():
+            if not pts:
+                continue
+            u_nom = pts[0].get("usuario_nombre") or f"Usuario {uid}"
+            u_rol = pts[0].get("rol") or "TRABAJADOR"
+            hora_inicio = pts[0].get("hora")
+            hora_fin = pts[-1].get("hora")
+
+            # Secuencia de potreros sin repetición consecutiva
+            secuencia_potreros = []
+            ultimo_pot = None
+            for pt in pts:
+                p_nom = pt.get("potrero_nombre") or "Área Externa"
+                if p_nom != ultimo_pot:
+                    secuencia_potreros.append({"potrero": p_nom, "hora": pt.get("hora")})
+                    ultimo_pot = p_nom
+
+            resumen.append({
+                "user_id": uid,
+                "usuario_nombre": u_nom,
+                "rol": u_rol,
+                "fecha": f_iso,
+                "total_puntos": len(pts),
+                "hora_inicio": hora_inicio,
+                "hora_fin": hora_fin,
+                "secuencia_potreros": secuencia_potreros,
+                "puntos": pts,
+            })
+        return resumen
+

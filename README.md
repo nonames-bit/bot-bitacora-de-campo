@@ -389,10 +389,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Cola de Escritura Offline Real** con `IndexedDB` (`POST /api/sync`) y sincronización automática/manual.
   - **Modo "Manga de Corral"**: Pesaje continuo de animales con cálculo instantáneo de GMD (g/día) en pantalla, historial en vivo de pesajes, tratamientos masivos en lote por potrero, y conector Web Bluetooth (`navigator.bluetooth`) para básculas y bastones RFID BLE.
   - **Geolocalización GPS & Auditoría de Rondas**: Detección automática del potrero actual sobre polígonos WGS84 de la finca (`potreros.geom_wkt_4326`), registro georreferenciado de visitas a saladeros, bebederos, cercas y recorridos de inspección con exportación directa a CSV.
+  - **Telemetría GPS Silenciosa en Segundo Plano & Auditoría de Rutas (Solo OWNER)**: Motor en segundo plano que registra coordenadas satelitales transparentemente sin alertar al operario (al abrir app, cambiar pestañas, guardar pesajes/capturas o por latido de 3 min), geocercado por potreros, soporte offline y panel exclusivo para OWNER con cronología de visitas, enlaces a Google Maps y exportación a CSV.
+  - **Gestión Interactiva de Usuarios & Roles (RBAC)**: Módulo administrativo en PWA para ADMIN y OWNER (`/api/usuarios`) con creación/edición de usuarios, PIN de 4 dígitos con validación de colisiones y jerarquía estricta.
+  - **Mejoras Visuales & UX Editorial**: Iconografía vectorial SVG Lucide (manga corral, celo, muerte, pajuelas francesas), logotipo oficial de Ganadería JA y soporte de `safe-area-inset-top` para pantallas móviles con notch.
   - **Autenticación por PIN & 3 Roles RBAC**: Login por PIN de 4 dígitos individual con permisos estrictos (`TRABAJADOR` para captura en campo, `ADMIN` para gestión zootécnica y reportes PDF/Excel, y `OWNER` con acceso exclusivo a panel de métricas VPS, SQLite WAL y visor de logs en vivo).
   - **Inteligencia & Voz**: Asistente zootécnico en lenguaje natural (`QueryEngine`) integrado en la PWA y dictado por voz directo (`MediaRecorder` + Whisper) para procesamiento de notas sin teclear.
   - **Tema "☀️ Sol de Campo"**: Modo de alto contraste en blanco y negro puro para legibilidad bajo sol directo en potrero.
-- [x] Suite de pruebas con pytest: **565 pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest: **566 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

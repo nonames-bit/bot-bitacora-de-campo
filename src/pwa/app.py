@@ -624,6 +624,18 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     """
     if not _FLASK_OK:
         return None
+
+    # Asegurar tablas e índices en la base de datos (migración idempotente al inicio)
+    try:
+        if db_path and db_path != ":memory:":
+            _db_exist = _resolver_db_existente(db_path)
+            if _db_exist:
+                _dbtmp = Database(_db_exist)
+                _dbtmp.create_tables()
+                _dbtmp.close()
+    except Exception:
+        logger.exception("No se pudo ejecutar la migración idempotente de tablas al iniciar PWA")
+
     app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "templates"),
                 static_folder=os.path.join(BASE_DIR, "static"))
     app.secret_key = _obtener_secret_key()
@@ -901,6 +913,158 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def api_usuario():
         return jsonify(_usuario_actual())
 
+    @app.get("/api/usuarios")
+    def api_listar_usuarios():
+        rol = _rol_actual()
+        if rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            usuarios = auth_inst.listar_usuarios()
+            # Si quien consulta es ADMIN, ocultar el PIN de los usuarios OWNER por seguridad
+            if rol != "OWNER":
+                for u in usuarios:
+                    if str(u.get("rol", "")).strip().upper() == "OWNER":
+                        u["pin"] = "****"
+            return jsonify({"ok": True, "usuarios": usuarios, "mi_rol": rol})
+        except Exception as e:
+            logger.exception("Error al listar usuarios")
+            return jsonify({"error": f"Error al leer usuarios: {e}"}), 500
+
+    @app.post("/api/usuarios")
+    def api_guardar_usuario():
+        mi_rol = _rol_actual()
+        if mi_rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+
+        datos = request.get_json(silent=True) or request.form
+        nombre = (datos.get("nombre") or "").strip()
+        rol_nuevo = str(datos.get("rol") or "TRABAJADOR").strip().upper()
+        pin = str(datos.get("pin") or "").strip()
+        uid_raw = datos.get("user_id")
+
+        if not nombre:
+            return jsonify({"error": "El nombre del usuario es obligatorio."}), 400
+        if rol_nuevo not in ("OWNER", "ADMIN", "TRABAJADOR"):
+            return jsonify({"error": f"Rol inválido: {rol_nuevo}. Permitidos: OWNER, ADMIN, TRABAJADOR."}), 400
+
+        # Un ADMIN no puede crear usuarios OWNER ni auto-promocionarse
+        if mi_rol != "OWNER" and rol_nuevo == "OWNER":
+            return jsonify({"error": "Solo un OWNER puede crear o asignar el rol OWNER."}), 403
+
+        # Validar PIN: 4 dígitos numéricos
+        if not re.match(r"^\d{4}$", pin):
+            return jsonify({"error": "El PIN debe tener exactamente 4 dígitos numéricos (ej. 4521)."}), 400
+
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            usuarios = auth_inst.listar_usuarios()
+
+            # Resolver o generar user_id único
+            if uid_raw:
+                try:
+                    uid = int(uid_raw)
+                except (ValueError, TypeError):
+                    return jsonify({"error": "user_id debe ser un entero numérico."}), 400
+            else:
+                ids_existentes = [int(u.get("user_id", 0)) for u in usuarios if isinstance(u.get("user_id"), int)]
+                uid = (max(ids_existentes) + 1) if ids_existentes else 100000001
+
+            # Si es ADMIN y está editando un usuario existente, no puede editar a un OWNER
+            if mi_rol != "OWNER":
+                for u in usuarios:
+                    if u.get("user_id") == uid and str(u.get("rol", "")).strip().upper() == "OWNER":
+                        return jsonify({"error": "Un ADMIN no puede modificar a un usuario OWNER."}), 403
+
+            # Verificar que el PIN no esté en colisión con OTRO usuario
+            for u in usuarios:
+                if u.get("user_id") != uid and str(u.get("pin", "")).strip() == pin:
+                    return jsonify({"error": f"El PIN '{pin}' ya está en uso por '{u.get('nombre')}'. Cada usuario debe tener un PIN único."}), 400
+
+            auth_inst.agregar_usuario(user_id=uid, nombre=nombre, rol=rol_nuevo, pin=pin)
+            return jsonify({
+                "ok": True,
+                "mensaje": f"Usuario '{nombre}' ({rol_nuevo}) guardado exitosamente.",
+                "usuario": {"user_id": uid, "nombre": nombre, "rol": rol_nuevo, "pin": pin}
+            })
+        except Exception as e:
+            logger.exception("Error al guardar usuario")
+            return jsonify({"error": str(e)}), 400
+
+    @app.post("/api/usuarios/<int:target_uid>/pin")
+    def api_cambiar_pin_usuario(target_uid: int):
+        mi_rol = _rol_actual()
+        if mi_rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+
+        datos = request.get_json(silent=True) or request.form
+        nuevo_pin = str(datos.get("pin") or "").strip()
+        if not re.match(r"^\d{4}$", nuevo_pin):
+            return jsonify({"error": "El nuevo PIN debe tener exactamente 4 dígitos numéricos."}), 400
+
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            usuarios = auth_inst.listar_usuarios()
+
+            # Si es ADMIN, no puede cambiarle el PIN a un OWNER
+            if mi_rol != "OWNER":
+                for u in usuarios:
+                    if u.get("user_id") == target_uid and str(u.get("rol", "")).strip().upper() == "OWNER":
+                        return jsonify({"error": "Un ADMIN no puede modificar el PIN de un OWNER."}), 403
+
+            # Verificar colisión de PIN
+            for u in usuarios:
+                if u.get("user_id") != target_uid and str(u.get("pin", "")).strip() == nuevo_pin:
+                    return jsonify({"error": f"El PIN '{nuevo_pin}' ya está en uso por '{u.get('nombre')}'. Ingrese un PIN diferente."}), 400
+
+            auth_inst.asignar_pin(target_uid, nuevo_pin)
+            return jsonify({"ok": True, "mensaje": "PIN actualizado exitosamente."})
+        except Exception as e:
+            logger.exception("Error al cambiar PIN")
+            return jsonify({"error": str(e)}), 400
+
+    @app.post("/api/usuarios/<int:target_uid>/eliminar")
+    def api_eliminar_usuario(target_uid: int):
+        mi_rol = _rol_actual()
+        if mi_rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            usuarios = auth_inst.listar_usuarios()
+
+            target_user = next((u for u in usuarios if u.get("user_id") == target_uid), None)
+            if not target_user:
+                return jsonify({"error": f"Usuario con ID {target_uid} no encontrado."}), 404
+
+            target_rol = str(target_user.get("rol", "")).strip().upper()
+
+            # Si es ADMIN, no puede eliminar OWNER ni otro ADMIN
+            if mi_rol != "OWNER" and target_rol in ("OWNER", "ADMIN"):
+                return jsonify({"error": "Un ADMIN solo puede eliminar usuarios de rol TRABAJADOR."}), 403
+
+            auth_inst.quitar_usuario(target_uid)
+            return jsonify({"ok": True, "mensaje": f"Usuario '{target_user.get('nombre')}' eliminado exitosamente."})
+        except Exception as e:
+            logger.exception("Error al eliminar usuario")
+            return jsonify({"error": str(e)}), 400
+
     @app.post("/api/sync")
     def api_sync():
         datos = request.get_json(silent=True) or {}
@@ -1045,6 +1209,21 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             potrero_nombre=payload.get("potrero_nombre"),
                             punto_control=payload.get("punto_control"),
                             notas=payload.get("notas"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("telemetria", "telemetria_ping"):
+                        db_sync.registrar_telemetria_gps(
+                            user_id=uid,
+                            usuario_nombre=session.get("nombre") or (_rol_actual() or "Usuario"),
+                            rol=_rol_actual() or "TRABAJADOR",
+                            lat=payload.get("lat"),
+                            lon=payload.get("lon"),
+                            precision_m=payload.get("precision_m"),
+                            evento_origen=payload.get("evento_origen") or "sync_offline",
+                            fecha=fecha,
+                            hora=payload.get("hora"),
                         )
                         procesados += 1
                         if id_local:
@@ -1418,6 +1597,60 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"rondas": _filas_dict(filas)})
         finally:
             db_gps.close()
+
+    @app.post("/api/telemetria/ping")
+    def api_telemetria_ping():
+        """Ping silencioso en segundo plano de ubicación de operarios en la finca."""
+        datos = request.get_json(silent=True) or request.form
+        try:
+            lat = float(datos.get("lat"))
+            lon = float(datos.get("lon"))
+        except (TypeError, ValueError):
+            return jsonify({"error": "lat y lon son requeridos y deben ser numéricos."}), 400
+
+        acc = datos.get("precision_m")
+        try:
+            acc_f = float(acc) if acc is not None else None
+        except (ValueError, TypeError):
+            acc_f = None
+
+        evento = (datos.get("evento_origen") or "interaccion_app").strip()
+        uid = session.get("user_id")
+        nombre = session.get("nombre") or "Usuario"
+        rol = _rol_actual() or "TRABAJADOR"
+
+        db_tele = _db(db_path)
+        try:
+            t_id = db_tele.registrar_telemetria_gps(
+                user_id=uid,
+                usuario_nombre=nombre,
+                rol=rol,
+                lat=lat,
+                lon=lon,
+                precision_m=acc_f,
+                evento_origen=evento,
+            )
+            det = db_tele.detectar_potrero_gps(lat, lon)
+            return jsonify({"ok": True, "telemetria_id": t_id, "potrero": det})
+        finally:
+            db_tele.close()
+
+    @app.get("/api/telemetria/rutas")
+    def api_telemetria_rutas():
+        """Consulta rutas y desplazamientos de operarios (EXCLUSIVO OWNER)."""
+        rol = _rol_actual()
+        if rol != "OWNER":
+            return jsonify({"error": "Acceso denegado. Solo el rol OWNER tiene acceso a la auditoría de rutas."}), 403
+
+        fecha = request.args.get("fecha")
+        db_tele = _db(db_path)
+        try:
+            rutas = db_tele.resumen_rutas_operarios(fecha=fecha)
+            rondas = [dict(r) for r in db_tele.listar_rondas_campo(fecha=fecha, limite=50)]
+            return jsonify({"ok": True, "rutas": rutas, "rondas": rondas})
+        finally:
+            db_tele.close()
+
 
     @app.get("/api/ficha/<tag>/qr.pdf")
     def api_ficha_qr_pdf(tag):

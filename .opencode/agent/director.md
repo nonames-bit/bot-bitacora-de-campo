@@ -1,7 +1,7 @@
-﻿---
+---
 description: Orquestador principal que coordina a los especialistas
 mode: primary
-model: opencode-go/Ox alpha
+model: cheaper-inference/muse-spark-1.2
 color: "#F59E0B"
 ---
 

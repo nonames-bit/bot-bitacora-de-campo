@@ -17,16 +17,16 @@
 <body>
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
-  <span class="marca-titulo"><b>🐮 GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
+  <span class="marca-titulo"><img src="/static/favicon.svg" class="logo-ja" alt="Logo Ganadería JA" width="24" height="24"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
-    <button id="btn-sync" class="tema-btn" title="Cola offline de eventos" aria-label="Sincronizar cola">☁️<span id="sync-count" class="nav-badge" style="display:none">0</span></button>
+    <button id="btn-sync" class="tema-btn" title="Cola offline de eventos" aria-label="Sincronizar cola"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg><span id="sync-count" class="nav-badge" style="display:none">0</span></button>
     <button id="btn-mic" class="tema-btn btn-mic" title="Dictar por voz"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
-    <button id="btn-chat" class="tema-btn" title="Asistente IA (Chat)">💬</button>
+    <button id="btn-chat" class="tema-btn" title="Asistente IA (Chat)"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
     <button id="btn-notif" class="tema-btn" title="Avisos y notificaciones" aria-label="Avisos"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg><span id="notif-dot" class="nav-badge"></span></button>
     <select id="select-tema" class="tema-btn" title="Estilo visual" aria-label="Cambiar tema">
       <option value="green">Verde Campestre</option>
-      <option value="sun">☀️ Sol de Campo</option>
+      <option value="sun">Sol de Campo</option>
       <option value="light">Claro Editorial</option>
       <option value="dark">Modo Oscuro</option>
     </select>
@@ -35,9 +35,9 @@
 </header>
 <nav id="nav-principal">
 <button data-v="tablero" class="act"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Tablero</button>
-<button data-v="manga"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg>Manga Corral</button>
+<button data-v="manga"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/></svg>Manga Corral</button>
 <button data-v="captura"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Captura</button>
-<button data-v="gps"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>GPS Potrero</button>
+<button data-v="gps" id="btn-nav-gps" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>GPS Rutas</button>
 <button data-v="agenda"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Agenda</button>
 <button data-v="inventario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Inventario</button>
 <button data-v="genetica"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg>Genética</button>
@@ -46,6 +46,7 @@
 <button data-v="pasturas"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg>Pasturas</button>
 <button data-v="leche"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/></svg>Leche</button>
 <button data-v="ficha"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Ficha</button>
+<button data-v="usuarios" id="btn-nav-usuarios" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Usuarios</button>
 <button data-v="sistema" id="btn-nav-sistema" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Sistema</button>
 </nav>
 <main>
@@ -62,17 +63,17 @@
 <div id="modal-chat" class="modal-overlay" style="display:none">
   <div class="modal-contenido chat-modal">
     <div class="modal-header">
-      <b>💬 Asistente IA · Bitácora JA</b>
+      <b><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>Asistente IA · Bitácora JA</b>
       <button class="modal-cerrar" id="btn-cerrar-chat">✕</button>
     </div>
     <div id="chat-historial" class="chat-cuerpo">
       <div class="chat-msg bot">Hola. Soy el asistente zootécnico de la finca. Puedes hacerme preguntas como <i>"¿cuántas vacas hay en Guayabal?"</i> o <i>"¿qué animales están en retiro?"</i>.</div>
     </div>
     <div class="chat-sugerencias">
-      <button class="chip-sug" data-p="¿cuántas vacas hay en ordeño?">🥛 Vacas ordeño</button>
-      <button class="chip-sug" data-p="¿qué animales están en retiro de leche o carne?">💊 Retiros activos</button>
-      <button class="chip-sug" data-p="¿qué potreros tienen más reposo?">🌿 Potreros reposo</button>
-      <button class="chip-sug" data-p="¿cuánto ganado activo hay en la finca?">🐄 Total hato</button>
+      <button class="chip-sug" data-p="¿cuántas vacas hay en ordeño?"><svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/></svg>Vacas ordeño</button>
+      <button class="chip-sug" data-p="¿qué animales están en retiro de leche o carne?"><svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>Retiros activos</button>
+      <button class="chip-sug" data-p="¿qué potreros tienen más reposo?"><svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg>Potreros reposo</button>
+      <button class="chip-sug" data-p="¿cuánto ganado activo hay en la finca?"><svg class="svg-icon" viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:4px;"><path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/></svg>Total hato</button>
     </div>
     <form id="form-chat" class="chat-footer">
       <input type="text" id="chat-input" placeholder="Pregunta algo sobre el ganado o potreros..." autocomplete="off">
@@ -85,11 +86,11 @@
 <div id="modal-voz" class="modal-overlay" style="display:none">
   <div class="modal-contenido voz-modal">
     <div class="modal-header">
-      <b>🎤 Dictar Nota de Campo</b>
+      <b><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>Dictar Nota de Campo</b>
       <button class="modal-cerrar" id="btn-cerrar-voz">✕</button>
     </div>
     <div class="voz-cuerpo">
-      <div id="voz-onda" class="voz-onda">🔴</div>
+      <div id="voz-onda" class="voz-onda"><svg class="svg-icon" viewBox="0 0 24 24" width="24" height="24" fill="#e53935" stroke="none"><circle cx="12" cy="12" r="8"/></svg></div>
       <p id="voz-estado">Iniciando micrófono…</p>
       <div id="voz-resultado" class="voz-res" style="display:none"></div>
     </div>

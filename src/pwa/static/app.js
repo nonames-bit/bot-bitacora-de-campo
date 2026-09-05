@@ -85,11 +85,35 @@
       syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
       // Reloj de arena (tiempo de ocupación/reposo) — Lucide ISC
       hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
-      // Tubo de ensayo (pajuelas de semen en el termo) — Lucide ISC
-      testTube: '<path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5c-1.4 0-2.5-1.1-2.5-2.5V2"/><path d="M8.5 2h7"/><path d="M14.5 16h-5"/>',
+      // Tubo de ensayo / pajuelas de inseminación artificial (dos pajuelas francesas)
+      testTube: '<rect x="6" y="2" width="4" height="20" rx="1.5"/><rect x="14" y="2" width="4" height="20" rx="1.5"/><line x1="6" y1="6" x2="10" y2="6"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="6" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="18" y2="11"/><line x1="6" y1="16" x2="10" y2="16"/><line x1="14" y1="16" x2="18" y2="16"/>',
+      pajuelas: '<rect x="6" y="2" width="4" height="20" rx="1.5"/><rect x="14" y="2" width="4" height="20" rx="1.5"/><line x1="6" y1="6" x2="10" y2="6"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="6" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="18" y2="11"/><line x1="6" y1="16" x2="10" y2="16"/><line x1="14" y1="16" x2="18" y2="16"/>',
+      flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+      skull: '<circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/>',
+      corral: '<path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/>',
+      manga: '<path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/>',
       // Cápsula/pastilla (tratamientos) — Lucide ISC
       pill: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
-      cross: '<path d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a1 1 0 0 1 1 1v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4a1 1 0 0 1-1-1V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4a1 1 0 0 1-1 1z"/>'
+      cross: '<path d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a1 1 0 0 1 1 1v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4a1 1 0 0 1-1-1V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4a1 1 0 0 1-1 1z"/>',
+      // --- Iconos Fase 7 y operacionales estilo Lucide ---
+      cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
+      chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+      bluetooth: '<path d="m7 7 10 10-5 5V2l5 5L7 17"/>',
+      save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+      pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+      salt: '<path d="M8 2h8v4H8z"/><rect x="6" y="6" width="12" height="15" rx="3"/><path d="M10 11h4"/><path d="M10 15h4"/>',
+      droplet: '<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 15.1 5 17 5 15a7 7 0 0 0 7 7z"/>',
+      fence: '<path d="M4 3 2 5v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5L4 3z"/><path d="M12 3l-2 2v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5l-2-2z"/><path d="m20 3-2 2v15c0 .6.4 1 1 1h2c.6 0 1-.4 1-1V5l-2-2z"/><path d="M2 8h20"/><path d="M2 16h20"/>',
+      walk: '<path d="M13 4a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z"/><path d="m9 10 3-1 2 4 4 1"/><path d="m6 21 3-7 3-2"/><path d="m14 13 2 8"/>',
+      clipboard: '<rect x="8" y="2" width="8" height="4" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+      download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+      refresh: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M3 21v-5h5"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+      filePdf: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>',
+      mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>',
+      square: '<rect x="4" y="4" width="16" height="16" rx="2"/>',
+      truck: '<path d="M10 17h4V5H2v12h3"/><polygon points="14 8 18 8 21 11 21 17 14 17 14 8"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+      target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -98,7 +122,7 @@
   /* ---------- Vistas principales ---------- */
   function renderTablero(d) {
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:5px 12px; margin-top:-4px;'>📄 Reporte PDF</a>";
+    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:5px 12px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
     var h = "<h3>" + icon("grid") + "Tablero finca" + pot + pdfBtn + "</h3>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
@@ -136,7 +160,7 @@
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
         ["dias_gestacion", "Días gest."]
       ], "Sin diagnósticos recientes.");
-    h += "<h4>" + icon("calendar") + "Celos recientes</h4>"
+    h += "<h4>" + icon("flame") + "Celos recientes</h4>"
       + tabla(d.celos_recientes, [["tag", "Vaca"], ["fecha", "Fecha"], ["am_pm", "AM/PM"]], "Sin celos recientes.");
     h += "<h4>" + icon("alert") + "Eco / Palpación pendientes</h4>"
       + tabla(d.eco_palp_pendientes, [
@@ -258,7 +282,7 @@
   }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var expBtn = "<button type='button' class='tema-btn' onclick='window.__exportarInventario()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>📥 Exportar CSV</button>";
+    var expBtn = "<button type='button' class='tema-btn' onclick='window.__exportarInventario()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
     var h = "<h3>" + icon("cow") + "Inventario y Población" + expBtn + "</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
@@ -327,7 +351,7 @@
     } else {
       h += vacio("Sin razas registradas en el hato activo.");
     }
-    h += "<h4>" + icon("testTube") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
+    h += "<h4>" + icon("pajuelas") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
       + tabla(d.pajuelas_inventario, [
         ["codigo_toro", "Código Toro"], ["raza", "Raza"],
         ["procedencia", "Procedencia"], ["canastilla", "Canastilla"],
@@ -346,7 +370,7 @@
     return h;
   }
   function renderAgenda(d) {
-    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>📄 Reporte PDF</a>";
+    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
     var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días" + pdfBtn + "</h3>" + erroresHtml(d);
     var evs = d.eventos || [];
     var urgencia = function (f) {
@@ -367,7 +391,7 @@
     }
     var ret = d.retiros || [];
     if (ret.length) {
-      var expRetBtn = "<button type='button' class='tema-btn' onclick='window.__exportarRetiros()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>📥 Exportar Retiros CSV</button>";
+      var expRetBtn = "<button type='button' class='tema-btn' onclick='window.__exportarRetiros()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar Retiros CSV</button>";
       h += "<h4>" + icon("alert") + "Retiros sanitarios activos" + expRetBtn + "</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       ret.forEach(function (r) {
         function c(f, df) {
@@ -385,11 +409,11 @@
   /* ---------- Modo Manga de Corral (Pesajes, Tratamientos Masivos, BLE) ---------- */
   var _sesionManga = [];
   function renderManga() {
-    var h = "<h3>" + icon("scale") + "Manga de Corral — Pesajes y Lotes</h3>";
+    var h = "<h3>" + icon("corral") + "Manga de Corral — Pesajes y Lotes</h3>";
     h += "<div class='manga-tabs'>"
-      + "<button type='button' class='manga-tab-btn act' data-mtab='pesaje'>⚖️ Pesaje Rápido & GMD</button>"
-      + "<button type='button' class='manga-tab-btn' data-mtab='lote'>💉 Tratamiento en Lote</button>"
-      + "<button type='button' class='manga-tab-btn' data-mtab='ble'>📶 Báscula / RFID BLE</button>"
+      + "<button type='button' class='manga-tab-btn act' data-mtab='pesaje'>" + icon("scale", 14) + "Pesaje Rápido & GMD</button>"
+      + "<button type='button' class='manga-tab-btn' data-mtab='lote'>" + icon("syringe", 14) + "Tratamiento en Lote</button>"
+      + "<button type='button' class='manga-tab-btn' data-mtab='ble'>" + icon("bluetooth", 14) + "Báscula / RFID BLE</button>"
       + "</div>";
 
     // Panel 1: Pesaje Rápido
@@ -407,7 +431,7 @@
       + "<select id='manga-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
       + "<option value='PESAJE'>Control Periódico</option><option value='DESTETE'>Destete</option><option value='ENTRADA'>Entrada / Compra</option><option value='VENTA'>Venta / Salida</option></select></div>"
       + "</div>"
-      + "<button type='button' id='btn-manga-guardar-peso' class='btn-guardar-manga'>💾 Guardar Pesaje (Enter)</button>"
+      + "<button type='button' id='btn-manga-guardar-peso' class='btn-guardar-manga'>" + icon("save", 15) + "Guardar Pesaje (Enter)</button>"
       + "</div>";
 
     h += "<div id='manga-resultado-kpi' style='display:none;' class='manga-pesaje-box'></div>";
@@ -435,7 +459,7 @@
       + "<div style='flex:1; min-width:140px;'><label>Retiro Carne (días): <input type='number' id='manga-lote-ret-carne' value='0' min='0' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
       + "</div>"
       + "<label>Diagnóstico / Motivo: <input id='manga-lote-diag' placeholder='ej. Control preventivo parásitos época seca' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-      + "<button type='button' id='btn-manga-guardar-lote' class='btn-guardar-manga' style='margin-top:10px; background:#1F6C9F;'>💉 Aplicar Tratamiento en Lote</button>"
+      + "<button type='button' id='btn-manga-guardar-lote' class='btn-guardar-manga' style='margin-top:10px; background:#1F6C9F;'>" + icon("syringe", 15) + "Aplicar Tratamiento en Lote</button>"
       + "</div>"
       + "</div>";
     h += "</div>";
@@ -445,7 +469,7 @@
     h += "<div class='gps-box'>"
       + "<h4>" + icon("alert") + "Conexión Web Bluetooth a Báscula / RFID</h4>"
       + "<p class='aviso'>Permite recibir el peso o arete leído automáticamente desde básculas electrónicas (Tru-Test, Gallagher) o bastones RFID (Allflex) por Bluetooth BLE sin teclear.</p>"
-      + "<button type='button' id='btn-manga-ble-conectar' class='btn-guardar-manga' style='max-width:320px; margin:14px auto;'>📶 Conectar Dispositivo BLE</button>"
+      + "<button type='button' id='btn-manga-ble-conectar' class='btn-guardar-manga' style='max-width:320px; margin:14px auto;'>" + icon("bluetooth", 15) + "Conectar Dispositivo BLE</button>"
       + "<div id='manga-ble-estado' class='aviso' style='margin-top:14px;'>Estado: Desconectado.</div>"
       + "</div>";
     h += "</div>";
@@ -526,6 +550,7 @@
         var resBox = document.getElementById("manga-resultado-kpi");
 
         function procesarResultadoLocal(data) {
+          enviarTelemetriaSilenciosa("pesaje_manga");
           var gmd = data.gmd_g_dia;
           var chipGmd = gmd != null && !isNaN(gmd)
             ? "<span class='chip " + (gmd >= 600 ? "verde" : gmd > 0 ? "ambar" : "rojo") + "'>" + (gmd > 0 ? "+" : "") + Number(gmd).toFixed(0) + " g/d</span>"
@@ -683,30 +708,30 @@
   var _tipoCapturaActual = "parto";
   function renderCaptura() {
     var tipos = [
-      { id: "parto", nom: "🐣 Parto" },
-      { id: "pesaje", nom: "⚖️ Pesaje" },
-      { id: "tratamiento", nom: "💊 Tratamiento" },
-      { id: "traslado", nom: "🚚 Traslado" },
-      { id: "celo", nom: "🎯 Celo" },
-      { id: "servicio", nom: "🧬 Servicio / IA" },
-      { id: "leche", nom: "🥛 Leche" },
-      { id: "muerte", nom: "⚠️ Muerte / Descarte" }
+      { id: "parto", nom: "Parto", ico: "egg" },
+      { id: "pesaje", nom: "Pesaje", ico: "scale" },
+      { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
+      { id: "traslado", nom: "Traslado", ico: "truck" },
+      { id: "celo", nom: "Celo", ico: "flame" },
+      { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
+      { id: "leche", nom: "Leche", ico: "milk" },
+      { id: "muerte", nom: "Muerte / Descarte", ico: "skull" }
     ];
 
-    var h = "<h3>" + icon("alert") + "Captura Rápida de Campo (Online / Offline)</h3>";
+    var h = "<h3>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>";
     h += "<p class='aviso'>Registra eventos directamente en el potrero. Si estás sin señal, se guardarán en la cola local de tu celular y se sincronizarán al volver a la casa.</p>";
 
     h += "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;'>";
     tipos.forEach(function (t) {
       var act = t.id === _tipoCapturaActual ? "act" : "";
-      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:13px;'>" + t.nom + "</button>";
+      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:13px;'>" + icon(t.ico, 14) + t.nom + "</button>";
     });
     h += "</div>";
 
     h += "<div class='card' style='padding:16px;'>"
       + "<form id='form-captura' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div id='captura-campos'></div>"
-      + "<button type='submit' id='btn-guardar-captura' class='btn-guardar-manga' style='margin-top:12px;'>💾 Guardar Registro</button>"
+      + "<button type='submit' id='btn-guardar-captura' class='btn-guardar-manga' style='margin-top:12px;'>" + icon("save", 15) + "Guardar Registro</button>"
       + "</form>"
       + "<div id='captura-feedback' style='margin-top:12px;'></div>"
       + "</div>";
@@ -838,6 +863,7 @@
         var feed = document.getElementById("captura-feedback");
 
         function mostrarExito(online) {
+          enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
               + (online ? "✅ Evento registrado en el servidor." : "💾 Evento guardado en cola local offline (se enviará al volver la señal).") + "</div>";
@@ -873,42 +899,140 @@
 
   /* ---------- GPS Potrero & Rondas de Campo ---------- */
   var _gpsUltimaPos = null;
+  /* ---------- Telemetría Silenciosa GPS en Segundo Plano ---------- */
+  function enviarTelemetriaSilenciosa(evento) {
+    if (!navigator.geolocation) return;
+    try {
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        var lat = pos.coords.latitude;
+        var lon = pos.coords.longitude;
+        var acc = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
+        var ahora = new Date();
+        var horaStr = ahora.toTimeString().split(" ")[0];
+        var fechaStr = ahora.toISOString().slice(0, 10);
+        var payload = {
+          lat: lat,
+          lon: lon,
+          precision_m: acc,
+          evento_origen: evento || "interaccion_app",
+          fecha: fechaStr,
+          hora: horaStr
+        };
+
+        if (navigator.onLine === false) {
+          encolarOffline("telemetria_ping", payload).catch(function () {});
+          return;
+        }
+
+        fetch("/api/telemetria/ping", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).catch(function () {
+          encolarOffline("telemetria_ping", payload).catch(function () {});
+        });
+      }, function (err) {
+        // Silencioso: no molestar al operario si no hay señal de satélite o está desactivado
+      }, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 30000
+      });
+    } catch (e) {
+      // Ignorar de forma silenciosa
+    }
+  }
+
+  var _fechaFiltroRutas = null;
   var _gpsUltimoPotrero = null;
   var _puntoRondaSeleccionado = "saladero";
+  var _gpsUltimaPos = null;
 
-  function renderGps(d) {
-    var h = "<h3>" + icon("search") + "GPS Potrero & Auditoría de Rondas</h3>"
-      + "<p class='aviso'>Verifica mediante el GPS del celular en qué potrero te encuentras y audita las visitas a saladeros, bebederos y cercas con hora exacta.</p>";
-
-    h += "<div class='gps-box'>"
-      + "<button type='button' id='btn-gps-detectar' class='btn-guardar-manga' style='max-width:320px; margin:0 auto 12px; font-size:16px;'>📍 Obtener Mi Ubicación GPS</button>"
-      + "<div id='gps-estado' style='font-size:13px; color:var(--texto-suave);'>Toque el botón para geolocalizar este teléfono.</div>"
-      + "<div id='gps-resultado-box' style='margin-top:14px; display:none;'></div>"
-      + "</div>";
-
-    h += "<div class='card' style='margin-top:14px; padding:16px;'>"
-      + "<h4>" + icon("alert") + "Registrar Punto de Ronda de Campo</h4>"
-      + "<p class='aviso' style='margin:4px 0;'>Selecciona el punto de control que estás revisando en este momento:</p>"
-      + "<div class='puntos-control-grid'>"
-      + "<button type='button' class='btn-punto act' data-punto='saladero'>🧂 Saladero</button>"
-      + "<button type='button' class='btn-punto' data-punto='bebedero'>💧 Bebedero</button>"
-      + "<button type='button' class='btn-punto' data-punto='cercas'>🪵 Cercas</button>"
-      + "<button type='button' class='btn-punto' data-punto='conteo'>🐄 Conteo</button>"
-      + "<button type='button' class='btn-punto' data-punto='recorrido'>🚶 Recorrido</button>"
-      + "</div>"
-      + "<input id='gps-ronda-notas' placeholder='Novedad (ej. falta sal mineralizada, alambre caído, todo OK)' style='width:100%; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); margin-bottom:12px;'>"
-      + "<button type='button' id='btn-gps-guardar-ronda' class='btn-guardar-manga'>📋 Registrar Parada en Ronda</button>"
-      + "<div id='gps-ronda-feedback' style='margin-top:10px;'></div>"
-      + "</div>";
-
+  function renderGps(d, fFecha) {
+    fFecha = fFecha || _fechaFiltroRutas || new Date().toISOString().slice(0, 10);
+    var rutas = (d && d.rutas) || [];
     var rondas = (d && d.rondas) || [];
-    h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:20px;'>"
-      + "<h4>" + icon("calendar") + "Rondas Realizadas Hoy (" + rondas.length + ")</h4>"
-      + "<button type='button' id='btn-exportar-rondas-csv' class='tema-btn' style='font-size:12px; padding:4px 10px;'>📥 Exportar CSV</button>"
+
+    var h = "<h3>" + icon("pin", 20) + "Auditoría de Rutas y Telemetría de Campo (Solo OWNER)</h3>"
+      + "<p class='aviso'>Monitoreo cronológico y automático de los desplazamientos de operarios en la finca. Identifica qué potreros visitaron, hora de entrada, permanencia y cobertura satelital.</p>";
+
+    // Barra de control de fecha
+    h += "<div class='card' style='padding:12px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;'>"
+      + "<label style='font-size:13px; font-weight:600; color:var(--texto-suave); display:flex; align-items:center; gap:6px;'>"
+      + icon("calendar", 15) + "Fecha a Auditar: "
+      + "<input type='date' id='filtro-fecha-rutas' value='" + esc(fFecha) + "' style='padding:6px 10px; border-radius:6px; border:1px solid var(--borde); font-size:13px;'>"
+      + "</label>"
+      + "<button type='button' id='btn-refrescar-rutas' class='tema-btn' style='font-size:13px; padding:6px 14px;'>" + icon("search", 14) + "Consultar Rutas</button>"
+      + "<button type='button' id='btn-ping-manual-gps' class='chip azul' style='font-size:13px; cursor:pointer;'>" + icon("pin", 14) + "Probar Mi GPS Ahora</button>"
+      + "</div>";
+
+    // Resumen de rutas por operario
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:16px; margin-bottom:10px;'>"
+      + "<h4>" + icon("walk", 16) + "Desplazamientos y Recorridos Detectados (" + rutas.length + ")</h4>"
+      + (rutas.length ? "<button type='button' id='btn-exportar-rutas-csv' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("download", 14) + "Exportar Rutas CSV</button>" : "")
+      + "</div>";
+
+    if (!rutas.length) {
+      h += vacio("No hay desplazamientos registrados para la fecha " + fechaCorta(fFecha) + ". Los puntos se capturan automáticamente en segundo plano cuando el operario interactúa con la aplicación en campo.");
+    } else {
+      rutas.forEach(function (r, idx) {
+        var rolBadge = r.rol === "OWNER" ? "rojo" : (r.rol === "ADMIN" ? "ambar" : "verde");
+        h += "<div class='card-operario-ruta'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;'>"
+          + "<div><b style='font-size:16px;'>" + esc(r.usuario_nombre) + "</b> <span class='chip " + rolBadge + "' style='font-size:11px;'>" + esc(r.rol) + "</span></div>"
+          + "<div style='font-size:12.5px; color:var(--texto-suave);'>"
+          + "🕒 Horario: <b>" + esc(r.hora_inicio || "—") + "</b> a <b>" + esc(r.hora_fin || "—") + "</b> · 📍 <b>" + r.total_puntos + " puntos GPS</b>"
+          + "</div>"
+          + "</div>";
+
+        // Secuencia cronológica de potreros
+        h += "<div style='font-size:12px; font-weight:600; color:var(--texto-suave); margin-bottom:4px;'>LÍNEA DE TIEMPO DE POTREROS VISITADOS:</div>";
+        h += "<div class='timeline-rutas'>";
+        if (!r.secuencia_potreros || !r.secuencia_potreros.length) {
+          h += "<span style='font-size:12px; color:var(--texto-suave);'>Sin visitas a potreros registradas</span>";
+        } else {
+          r.secuencia_potreros.forEach(function (s, sIdx) {
+            if (sIdx > 0) h += "<span class='chip-flecha'>➔</span>";
+            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> 🌾 " + esc(s.potrero) + "</span>";
+          });
+        }
+        h += "</div>";
+
+        // Detalle colapsable de puntos exactos
+        var tablaId = "tabla-pts-" + idx;
+        h += "<details style='margin-top:10px; font-size:13px;'>"
+          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:4px 0;'>🔍 Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
+          + "<div class='tabla-scroll' style='margin-top:8px;'>"
+          + "<table id='" + tablaId + "'><tr><th>Hora</th><th>Potrero</th><th>Latitud</th><th>Longitud</th><th>Precisión</th><th>Evento</th><th>Google Maps</th></tr>";
+
+        (r.puntos || []).forEach(function (pt) {
+          var mapsUrl = "https://maps.google.com/?q=" + pt.lat + "," + pt.lon;
+          var origen = pt.evento_origen || "interaccion";
+          h += "<tr>"
+            + "<td><b>" + esc(pt.hora) + "</b></td>"
+            + "<td><b>" + esc(pt.potrero_nombre || "Área Externa") + "</b></td>"
+            + "<td>" + Number(pt.lat).toFixed(6) + "</td>"
+            + "<td>" + Number(pt.lon).toFixed(6) + "</td>"
+            + "<td>±" + (pt.precision_m ? Math.round(pt.precision_m) + " m" : "—") + "</td>"
+            + "<td><span class='chip gris' style='font-size:11px;'>" + esc(origen) + "</span></td>"
+            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:11px; text-decoration:none;'>🗺️ Abrir Mapa</a></td>"
+            + "</tr>";
+        });
+        h += "</table></div></details>";
+
+        h += "</div>";
+      });
+    }
+
+    // Sección de Rondas de Campo Manuales
+    h += "<div class='card' style='margin-top:20px; padding:16px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;'>"
+      + "<h4>" + icon("calendar", 16) + "Puntos de Ronda Manuales (" + rondas.length + ")</h4>"
+      + (rondas.length ? "<button type='button' id='btn-exportar-rondas-csv' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("download", 14) + "Exportar Rondas CSV</button>" : "")
       + "</div>";
 
     if (!rondas.length) {
-      h += vacio("No hay rondas registradas en el día.");
+      h += vacio("No hay rondas manuales registradas en esta fecha.");
     } else {
       h += "<div class='tabla-scroll'><table id='tabla-rondas'><tr><th>Hora</th><th>Potrero</th><th>Punto</th><th>Usuario</th><th>Notas</th></tr>";
       rondas.forEach(function (r) {
@@ -920,136 +1044,112 @@
       });
       h += "</table></div>";
     }
+    h += "</div>";
 
     return h;
   }
 
-  function bindGps(d) {
-    var btnDetectar = document.getElementById("btn-gps-detectar");
-    var est = document.getElementById("gps-estado");
-    var resBox = document.getElementById("gps-resultado-box");
+  function bindGps(d, fFecha) {
+    fFecha = fFecha || _fechaFiltroRutas || new Date().toISOString().slice(0, 10);
 
-    if (btnDetectar) {
-      btnDetectar.addEventListener("click", function () {
+    var btnRefrescar = document.getElementById("btn-refrescar-rutas");
+    var inpFecha = document.getElementById("filtro-fecha-rutas");
+    if (btnRefrescar && inpFecha) {
+      btnRefrescar.addEventListener("click", function () {
+        _fechaFiltroRutas = inpFecha.value;
+        cargar(true);
+      });
+      inpFecha.addEventListener("change", function () {
+        _fechaFiltroRutas = inpFecha.value;
+        cargar(true);
+      });
+    }
+
+    var btnPing = document.getElementById("btn-ping-manual-gps");
+    if (btnPing) {
+      btnPing.addEventListener("click", function () {
         if (!navigator.geolocation) {
-          if (est) est.textContent = "❌ Geolocalización no disponible en este dispositivo.";
+          alert("Geolocalización no disponible en este dispositivo.");
           return;
         }
-        if (est) est.innerHTML = "⏳ Conectando con satélites GPS... (espere unos segundos)";
+        btnPing.textContent = "📡 Obteniendo GPS...";
         navigator.geolocation.getCurrentPosition(function (pos) {
-          _gpsUltimaPos = pos;
           var lat = pos.coords.latitude;
           var lon = pos.coords.longitude;
           var acc = Math.round(pos.coords.accuracy || 0);
-          if (est) est.innerHTML = "📡 Coordenadas: <b>" + lat.toFixed(6) + ", " + lon.toFixed(6) + "</b> (Precisión: ±" + acc + " m)";
-
-          fetch("/api/gps/potrero", {
+          fetch("/api/telemetria/ping", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: lat, lon: lon })
+            body: JSON.stringify({
+              lat: lat,
+              lon: lon,
+              precision_m: acc,
+              evento_origen: "prueba_manual_owner"
+            })
           }).then(function (r) { return r.json(); })
-            .then(function (data) {
-              if (resBox) resBox.style.display = "block";
-              if (data.detectado && data.potrero) {
-                _gpsUltimoPotrero = data.potrero;
-                var anims = data.animales || [];
-                var h = "<div class='gps-potrero-tit'>🌾 " + esc(data.potrero.nombre || data.potrero.codigo) + "</div>"
-                  + "<p style='margin:4px 0; font-size:13px;'>Detectado por " + esc(data.potrero.metodo || "polígono") + " · Ocupación actual: <b>" + data.total_animales + " animales</b></p>";
-                if (anims.length) {
-                  h += "<div style='font-size:12px; color:var(--texto-suave); margin-top:6px;'>Animales en potrero: "
-                    + anims.slice(0, 15).map(function (a) { return "<b>" + esc(a.tag) + "</b>"; }).join(", ")
-                    + (anims.length > 15 ? " y " + (anims.length - 15) + " más..." : "") + "</div>";
-                }
-                if (resBox) resBox.innerHTML = h;
-              } else {
-                _gpsUltimoPotrero = null;
-                if (resBox) resBox.innerHTML = "<p class='aviso'>⚠️ " + esc(data.mensaje || "Ubicación fuera de los polígonos de la finca.") + "</p>";
-              }
+            .then(function (res) {
+              btnPing.textContent = "✅ Posición Registrada";
+              setTimeout(function () { cargar(false); }, 700);
             }).catch(function (err) {
-              if (resBox) {
-                resBox.style.display = "block";
-                resBox.innerHTML = "<p class='aviso'>⚠️ Sin conexión para consultar el polígono del potrero. Coordenadas guardadas localmente.</p>";
-              }
+              btnPing.textContent = "❌ Error: " + err.message;
             });
         }, function (err) {
-          if (est) est.innerHTML = "❌ Error GPS: " + esc(err.message) + ". Verifique que el GPS esté encendido y que el navegador tenga permiso de ubicación.";
-        }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+          btnPing.textContent = "❌ " + err.message;
+        }, { enableHighAccuracy: true, timeout: 10000 });
       });
     }
 
-    qa(".puntos-control-grid button").forEach(function (b) {
-      b.addEventListener("click", function () {
-        qa(".puntos-control-grid button").forEach(function (x) { x.classList.remove("act"); });
-        b.classList.add("act");
-        _puntoRondaSeleccionado = b.getAttribute("data-punto") || "recorrido";
-      });
-    });
-
-    var btnRonda = document.getElementById("btn-gps-guardar-ronda");
-    if (btnRonda) {
-      btnRonda.addEventListener("click", function () {
-        var notas = (q("#gps-ronda-notas") && q("#gps-ronda-notas").value || "").trim();
-        var lat = _gpsUltimaPos ? _gpsUltimaPos.coords.latitude : null;
-        var lon = _gpsUltimaPos ? _gpsUltimaPos.coords.longitude : null;
-        var potId = _gpsUltimoPotrero ? _gpsUltimoPotrero.id : null;
-        var potNom = _gpsUltimoPotrero ? (_gpsUltimoPotrero.nombre || _gpsUltimoPotrero.codigo) : null;
-        var feed = document.getElementById("gps-ronda-feedback");
-
-        var payload = {
-          lat: lat,
-          lon: lon,
-          potrero_id: potId,
-          potrero_nombre: potNom,
-          punto_control: _puntoRondaSeleccionado,
-          notas: notas,
-          hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" })
-        };
-
-        if (navigator.onLine === false) {
-          encolarOffline("ronda", payload).then(function () {
-            if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Parada de ronda guardada offline. Se sincronizará al volver la señal.</div>";
-            if (q("#gps-ronda-notas")) q("#gps-ronda-notas").value = "";
+    var btnCsvRutas = document.getElementById("btn-exportar-rutas-csv");
+    if (btnCsvRutas) {
+      btnCsvRutas.addEventListener("click", function () {
+        var lineas = [["Usuario", "Rol", "Fecha", "Hora", "Potrero", "Latitud", "Longitud", "Precision_m", "Evento_Origen"]];
+        (d.rutas || []).forEach(function (r) {
+          (r.puntos || []).forEach(function (p) {
+            lineas.push([
+              r.usuario_nombre || "",
+              r.rol || "",
+              p.fecha || fFecha,
+              p.hora || "",
+              p.potrero_nombre || "Área Externa",
+              p.lat || "",
+              p.lon || "",
+              p.precision_m != null ? p.precision_m : "",
+              p.evento_origen || ""
+            ]);
           });
-          return;
-        }
-
-        fetch("/api/gps/ronda", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        }).then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (res.ok) {
-              if (feed) feed.innerHTML = "<div class='chip verde'>✅ Parada de ronda registrada con éxito.</div>";
-              if (q("#gps-ronda-notas")) q("#gps-ronda-notas").value = "";
-              setTimeout(function () { cargar(false); }, 1000);
-            } else {
-              encolarOffline("ronda", payload).then(function () {
-                if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Guardado offline (" + esc(res.error || "error") + ")</div>";
-              });
-            }
-          }).catch(function () {
-            encolarOffline("ronda", payload).then(function () {
-              if (feed) feed.innerHTML = "<div class='chip ambar'>💾 Guardado offline en cola local.</div>";
-            });
-          });
+        });
+        var csvContent = "\uFEFF" + lineas.map(function (row) {
+          return row.map(function (val) {
+            return '"' + String(val).replace(/"/g, '""') + '"';
+          }).join(";");
+        }).join("\r\n");
+        var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "rutas_telemetria_ja_" + fFecha + ".csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       });
     }
 
-    var btnCsv = document.getElementById("btn-exportar-rondas-csv");
-    if (btnCsv) {
-      btnCsv.addEventListener("click", function () {
-        exportarTablaCSV("rondas_campo", "#tabla-rondas");
+    var btnCsvRondas = document.getElementById("btn-exportar-rondas-csv");
+    if (btnCsvRondas) {
+      btnCsvRondas.addEventListener("click", function () {
+        exportarTablaCSV("rondas_campo_" + fFecha, "#tabla-rondas");
       });
     }
   }
+
 
   /* ---------- Sistema & Servidor VPS (Solo OWNER) ---------- */
   function renderSistema(d) {
     var vps = d.vps || {};
     var db = d.db || {};
 
-    var h = "<h3>⚙️ Servidor VPS & Sistema Ganadería JA</h3>"
+    var h = "<h3>" + icon("settings", 20) + "Servidor VPS & Sistema Ganadería JA</h3>"
       + "<p class='aviso'>Panel de control ejecutivo y métricas de infraestructura en vivo. Acceso restringido al Propietario (OWNER).</p>";
 
     h += "<div class='kpis'>"
@@ -1064,8 +1164,8 @@
       + esc(d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
     h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:20px;'>"
-      + "<h4>📜 Visor de Logs del Servidor (Últimas 80 líneas)</h4>"
-      + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:12px; padding:4px 10px;'>🔄 Refrescar Logs</button>"
+      + "<h4>" + icon("clipboard", 16) + "Visor de Logs del Servidor (Últimas 80 líneas)</h4>"
+      + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("refresh", 14) + "Refrescar Logs</button>"
       + "</div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:360px; overflow-y:auto; line-height:1.4;'>Cargando logs del servidor...</pre>";
 
@@ -1093,6 +1193,204 @@
     cargarLogs();
     var btnRef = document.getElementById("btn-refrescar-logs");
     if (btnRef) btnRef.addEventListener("click", cargarLogs);
+  }
+
+  /* ---------- Gestión de Usuarios & Accesos (ADMIN & OWNER) ---------- */
+  function renderUsuarios(d) {
+    var miRol = (d && d.mi_rol || "ADMIN").toUpperCase();
+    var usuarios = (d && d.usuarios) || [];
+
+    var h = "<h3>" + icon("users") + "Gestión de Personal & Accesos PWA</h3>"
+      + "<p class='aviso'>Control de acceso basado en roles (RBAC). Crea nuevos usuarios, define su PIN de 4 dígitos para ingresar al sistema y asigna permisos según sus funciones.</p>";
+
+    // Tarjeta 1: Formulario Agregar / Modificar Usuario
+    h += "<div class='card' style='padding:16px; margin-bottom:16px;'>"
+      + "<h4>" + icon("pin") + "Crear o Modificar Usuario</h4>"
+      + "<form id='form-usuario' style='display:flex; flex-direction:column; gap:12px; margin-top:12px;'>"
+      + "<input type='hidden' id='usr-edit-id' value=''>"
+      + "<div style='display:flex; gap:12px; flex-wrap:wrap;'>"
+      + "<div style='flex:2; min-width:200px;'><label style='font-size:12px; font-weight:600;'>Nombre del Usuario / Trabajador:</label>"
+      + "<input id='usr-nombre' placeholder='ej. Carlos Gómez (Mayordomo)' required style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
+      + "<div style='flex:1; min-width:160px;'><label style='font-size:12px; font-weight:600;'>Rol de Acceso:</label>"
+      + "<select id='usr-rol' style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+      + "<option value='TRABAJADOR'>TRABAJADOR (Campo: Manga, Captura, GPS, Ficha)</option>"
+      + "<option value='ADMIN'>ADMIN (Gestión, Tableros, Retiros, Reportes)</option>";
+    if (miRol === "OWNER") {
+      h += "<option value='OWNER'>OWNER (Propietario / Acceso Total + Servidor)</option>";
+    }
+    h += "</select></div>"
+      + "</div>"
+      + "<div style='display:flex; gap:12px; flex-wrap:wrap;'>"
+      + "<div style='flex:1; min-width:200px;'><label style='font-size:12px; font-weight:600;'>PIN de 4 Dígitos (Acceso Celular/PC):</label>"
+      + "<div style='display:flex; gap:6px;'>"
+      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:18px; letter-spacing:2px; text-align:center;'>"
+      + "<button type='button' id='btn-gen-pin' class='tema-btn' style='font-size:12px; padding:0 12px; white-space:nowrap;'>" + icon("refresh", 13) + "Generar PIN</button>"
+      + "</div></div>"
+      + "<div style='flex:1; min-width:180px;'><label style='font-size:12px; font-weight:600;'>ID Numérico / Telegram (Opcional):</label>"
+      + "<input id='usr-uid' type='number' placeholder='ej. 554231 o dejar vacío' style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono);'></div>"
+      + "</div>"
+      + "<div style='display:flex; gap:10px; align-items:center; margin-top:6px;'>"
+      + "<button type='submit' id='btn-guardar-usr' class='btn-guardar-manga' style='max-width:240px;'>" + icon("save", 15) + "Guardar Usuario</button>"
+      + "<button type='button' id='btn-cancelar-edit-usr' class='tema-btn' style='display:none; padding:10px 16px;'>Cancelar Edición</button>"
+      + "</div>"
+      + "</form>"
+      + "<div id='usr-feedback' style='margin-top:12px;'></div>"
+      + "</div>";
+
+    // Tarjeta 2: Tabla de Usuarios Existentes
+    h += "<div class='card' style='padding:16px;'>"
+      + "<h4>" + icon("users") + "Personal Registrado (" + usuarios.length + ")</h4>";
+
+    if (!usuarios.length) {
+      h += vacio("No hay usuarios registrados.");
+    } else {
+      h += "<div class='tabla-scroll'><table><tr><th>Usuario / Nombre</th><th>Rol</th><th>PIN</th><th>ID Sistema</th><th>Acciones</th></tr>";
+      usuarios.forEach(function (u) {
+        var rolU = String(u.rol || "").toUpperCase();
+        var rolClase = rolU === "OWNER" ? "verde" : rolU === "ADMIN" ? "azul" : "gris";
+        var esOwnerTarget = rolU === "OWNER";
+        var puedeEditar = miRol === "OWNER" || !esOwnerTarget;
+
+        h += "<tr>"
+          + "<td><b>" + esc(u.nombre || "Sin nombre") + "</b></td>"
+          + "<td><span class='chip " + rolClase + "'>" + esc(rolU) + "</span></td>"
+          + "<td><code style='background:var(--superficie); padding:3px 8px; border-radius:4px; border:1px solid var(--borde-fuerte); font-size:14px; font-weight:bold; letter-spacing:1px;'>" + esc(u.pin || "—") + "</code></td>"
+          + "<td><small style='color:var(--texto-suave); font-family:var(--font-mono);'>" + esc(u.user_id) + "</small></td>"
+          + "<td>";
+
+        if (puedeEditar) {
+          h += "<button type='button' class='btn-editar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' data-rol='" + esc(rolU) + "' data-pin='" + esc(u.pin || "") + "' style='font-size:11px; padding:3px 8px; margin-right:6px;'>" + icon("pin", 12) + "Editar</button>";
+          var numOwners = usuarios.filter(function (x) { return String(x.rol || "").toUpperCase() === "OWNER"; }).length;
+          var bloquearBorrar = esOwnerTarget && numOwners <= 1;
+          if (!bloquearBorrar && (miRol === "OWNER" || rolU === "TRABAJADOR")) {
+            h += "<button type='button' class='btn-borrar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:3px 8px; color:var(--color-rojo-txt);'>" + icon("xmark", 12) + "Eliminar</button>";
+          }
+        } else {
+          h += "<span style='color:var(--texto-suave); font-size:11px;'>Protegido</span>";
+        }
+
+        h += "</td></tr>";
+      });
+      h += "</table></div>";
+    }
+    h += "</div>";
+
+    return h;
+  }
+
+  function bindUsuarios(d) {
+    var form = document.getElementById("form-usuario");
+    var feed = document.getElementById("usr-feedback");
+    var btnGenPin = document.getElementById("btn-gen-pin");
+    var pinInp = document.getElementById("usr-pin");
+    var editIdInp = document.getElementById("usr-edit-id");
+    var nomInp = document.getElementById("usr-nombre");
+    var rolSel = document.getElementById("usr-rol");
+    var uidInp = document.getElementById("usr-uid");
+    var btnCancelar = document.getElementById("btn-cancelar-edit-usr");
+
+    if (btnGenPin && pinInp) {
+      btnGenPin.addEventListener("click", function () {
+        var randomPin = String(Math.floor(1000 + Math.random() * 9000));
+        pinInp.value = randomPin;
+      });
+    }
+
+    if (btnCancelar) {
+      btnCancelar.addEventListener("click", function () {
+        editIdInp.value = "";
+        nomInp.value = "";
+        pinInp.value = "";
+        uidInp.value = "";
+        uidInp.disabled = false;
+        btnCancelar.style.display = "none";
+        var btnGuardar = document.getElementById("btn-guardar-usr");
+        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + "Guardar Usuario";
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var nombre = (nomInp.value || "").trim();
+        var rol = rolSel.value;
+        var pin = (pinInp.value || "").trim();
+        var uidVal = editIdInp.value || (uidInp.value || "").trim();
+
+        if (!/^\d{4}$/.test(pin)) {
+          if (feed) feed.innerHTML = "<div class='chip rojo'>El PIN debe ser de 4 dígitos numéricos (ej. 4521).</div>";
+          return;
+        }
+
+        var payload = { nombre: nombre, rol: rol, pin: pin };
+        if (uidVal) payload.user_id = parseInt(uidVal, 10);
+
+        if (feed) feed.innerHTML = "<div class='aviso'>Guardando usuario...</div>";
+
+        fetch("/api/usuarios", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok) {
+              if (feed) feed.innerHTML = "<div class='chip verde'>" + esc(res.mensaje || "Usuario guardado con éxito.") + "</div>";
+              form.reset();
+              editIdInp.value = "";
+              uidInp.disabled = false;
+              if (btnCancelar) btnCancelar.style.display = "none";
+              setTimeout(function () { cargar(false); }, 700);
+            } else {
+              if (feed) feed.innerHTML = "<div class='chip rojo'>❌ " + esc(res.error || "No se pudo guardar") + "</div>";
+            }
+          }).catch(function (err) {
+            if (feed) feed.innerHTML = "<div class='chip rojo'>❌ Error de conexión: " + esc(err.message) + "</div>";
+          });
+      });
+    }
+
+    // Botones de editar usuario
+    qa(".btn-editar-usr").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var uid = btn.getAttribute("data-uid");
+        var nom = btn.getAttribute("data-nom");
+        var rol = btn.getAttribute("data-rol");
+        var pin = btn.getAttribute("data-pin");
+
+        editIdInp.value = uid;
+        nomInp.value = nom;
+        rolSel.value = rol;
+        pinInp.value = (pin && pin !== "****") ? pin : "";
+        uidInp.value = uid;
+        uidInp.disabled = true;
+        if (btnCancelar) btnCancelar.style.display = "";
+        var btnGuardar = document.getElementById("btn-guardar-usr");
+        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + "Actualizar Usuario";
+        form.scrollIntoView({ behavior: "smooth" });
+      });
+    });
+
+    // Botones de eliminar usuario
+    qa(".btn-borrar-usr").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var uid = btn.getAttribute("data-uid");
+        var nom = btn.getAttribute("data-nom");
+        if (!confirm("¿Está seguro de eliminar al usuario '" + nom + "' (ID: " + uid + ")?")) return;
+
+        fetch("/api/usuarios/" + encodeURIComponent(uid) + "/eliminar", { method: "POST" })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok) {
+              alert(res.mensaje || "Usuario eliminado");
+              cargar(false);
+            } else {
+              alert("Error: " + (res.error || "No se pudo eliminar"));
+            }
+          }).catch(function (err) {
+            alert("Error de conexión: " + err.message);
+          });
+      });
+    });
   }
 
   /* ---------- Exportación a CSV con UTF-8 BOM para Excel ---------- */
@@ -1230,7 +1528,7 @@
         return;
       }
       if (estado) estado.textContent = "Iniciando micrófono...";
-      if (btnAccion) { btnAccion.textContent = "⏹️ Detener y Enviar"; btnAccion.style.display = ""; }
+      if (btnAccion) { btnAccion.innerHTML = icon("square", 14) + "Detener y Enviar"; btnAccion.style.display = ""; }
       if (onda) onda.style.display = "block";
 
       _audioChunks = [];
@@ -1245,7 +1543,7 @@
             if (estado) estado.textContent = "No se capturó audio.";
             return;
           }
-          if (estado) estado.textContent = "⏳ Transcribiendo con Whisper y procesando en el bot...";
+          if (estado) estado.textContent = "Transcribiendo con Whisper y procesando en el bot...";
           if (onda) onda.style.display = "none";
 
           var blob = new Blob(_audioChunks, { type: _mediaRecorder.mimeType || "audio/webm" });
@@ -1257,10 +1555,10 @@
             .then(function (data) {
               if (resBox) resBox.style.display = "block";
               if (data.ok) {
-                if (estado) estado.textContent = "✅ Nota procesada con éxito.";
+                if (estado) estado.textContent = "Nota procesada con éxito.";
                 resBox.innerHTML = "<b>Transcripción:</b> <i>\"" + esc(data.transcripcion) + "\"</i><br><br>"
                   + "<b>Respuesta del Bot:</b><br>" + esc(data.respuesta || "Registrado.");
-                if (btnAccion) btnAccion.textContent = "🎤 Grabar Otra Nota";
+                if (btnAccion) btnAccion.innerHTML = icon("mic", 14) + "Grabar Otra Nota";
                 actualizarBadges();
               } else {
                 if (estado) estado.textContent = "⚠️ " + esc(data.error || "No se pudo procesar");
@@ -1471,19 +1769,28 @@
 
     var rol = (u.rol || "").toUpperCase();
     var btnSistema = document.getElementById("btn-nav-sistema");
+    var btnUsuarios = document.getElementById("btn-nav-usuarios");
+    var btnGps = document.getElementById("btn-nav-gps");
 
     if (rol === "OWNER") {
       if (btnSistema) btnSistema.style.display = "";
+      if (btnUsuarios) btnUsuarios.style.display = "";
+      if (btnGps) btnGps.style.display = "";
       qa("nav > button").forEach(function (b) { b.style.display = ""; });
     } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
       if (btnSistema) btnSistema.style.display = "none";
+      if (btnGps) btnGps.style.display = "none";
+      if (btnUsuarios) btnUsuarios.style.display = "";
       qa("nav > button").forEach(function (b) {
-        if (b.getAttribute("data-v") === "sistema") b.style.display = "none";
+        var v = b.getAttribute("data-v");
+        if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
     } else if (rol === "TRABAJADOR") {
       if (btnSistema) btnSistema.style.display = "none";
-      var permitidas = ["captura", "manga", "gps", "ficha"];
+      if (btnUsuarios) btnUsuarios.style.display = "none";
+      if (btnGps) btnGps.style.display = "none";
+      var permitidas = ["captura", "manga", "ficha"];
       qa("nav > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (permitidas.indexOf(v) !== -1) {
@@ -1652,7 +1959,8 @@
     manga:     { kpis: 0, graf: 0, tabla: 4 },
     captura:   { kpis: 0, graf: 0, tabla: 0 },
     gps:       { kpis: 0, graf: 0, tabla: 4 },
-    sistema:   { kpis: 4, graf: 0, tabla: 0 }
+    sistema:   { kpis: 4, graf: 0, tabla: 0 },
+    usuarios:  { kpis: 0, graf: 0, tabla: 5 }
   };
   function htmlSkeleton(v) {
     var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;
@@ -2015,10 +2323,11 @@
 
     if (actual === "gps") {
       skeleton(vista, "gps");
-      fetchJSON("/api/gps/rondas", function (d) {
+      var fFecha = _fechaFiltroRutas || (q("#filtro-fecha-rutas") && q("#filtro-fecha-rutas").value) || new Date().toISOString().slice(0, 10);
+      fetchJSON("/api/telemetria/rutas?fecha=" + encodeURIComponent(fFecha), function (d) {
         if (!vista) return;
-        montarVista(vista, renderGps(d), animar);
-        bindGps(d);
+        montarVista(vista, renderGps(d, fFecha), animar);
+        bindGps(d, fFecha);
       }, vista);
       return;
     }
@@ -2029,6 +2338,16 @@
         if (!vista) return;
         montarVista(vista, renderSistema(d), animar);
         bindSistema();
+      }, vista);
+      return;
+    }
+
+    if (actual === "usuarios") {
+      skeleton(vista, "usuarios");
+      fetchJSON("/api/usuarios", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderUsuarios(d), animar);
+        bindUsuarios(d);
       }, vista);
       return;
     }
@@ -2122,6 +2441,7 @@
       qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
       b.classList.add("act");
       actual = b.getAttribute("data-v");
+      enviarTelemetriaSilenciosa("navegacion_" + actual);
       cargar();
       if (VISTAS_BADGE.indexOf(actual) !== -1) {
         // Al abrir la vista, los datos frescos actualizan su badge al instante.
@@ -2135,6 +2455,7 @@
   // saltar a la vista que sabe usar ese campo antes de cargar).
   function irAVista(v) {
     actual = v;
+    enviarTelemetriaSilenciosa("salto_vista_" + v);
     qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
     if (destino) destino.classList.add("act");
@@ -2262,6 +2583,10 @@
     setupCampana();
     actualizarBadges();
     actualizarContadorSync();
+    enviarTelemetriaSilenciosa("apertura_app");
+    setInterval(function () {
+      enviarTelemetriaSilenciosa("latido_periodico");
+    }, 180000);
     // Primer refresco de badges y cola offline al reconectar tras estar sin señal.
     window.addEventListener("online", function () {
       actualizarBadges();

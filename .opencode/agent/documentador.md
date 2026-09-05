@@ -1,7 +1,7 @@
-﻿---
+---
 description: Documentador que redacta README y notas técnicas al cierre de la tarea
 mode: subagent
-model: opencode-go/qwen3.8-max
+model: opencode/muse-spark-1.3-contributor-free
 color: "#3B82F6"
 permission:
   edit: allow

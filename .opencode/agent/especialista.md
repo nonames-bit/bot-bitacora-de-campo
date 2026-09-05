@@ -1,7 +1,7 @@
-﻿---
+---
 description: Especialista que escribe el código fuente en src/
 mode: subagent
-model: cheaper-inference/deepseek-v4-flash
+model: opencode/muse-spark-1.3-contributor-free
 color: "#22C55E"
 permission:
   edit: allow

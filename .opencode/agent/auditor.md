@@ -1,7 +1,7 @@
-﻿---
+---
 description: Auditor de calidad que revisa el código generado
 mode: subagent
-model: opencode-go/minmax
+model: opencode/nemotron-3-ultra-free
 color: "#A855F7"
 permission:
   edit: deny

@@ -166,7 +166,10 @@ header {
   background: var(--header-bg);
   color: var(--header-txt);
   border-bottom: 1px solid var(--borde);
-  padding: 14px 20px;
+  padding: 12px 20px;
+  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding-left: calc(20px + env(safe-area-inset-left, 0px));
+  padding-right: calc(20px + env(safe-area-inset-right, 0px));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -176,6 +179,16 @@ header {
   top: 0;
   z-index: 20;
   box-shadow: 0 1px 4px var(--sombra);
+}
+.logo-ja {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  margin-right: 2px;
 }
 header b {
   font-size: 15px;
@@ -190,17 +203,22 @@ header a.salir {
   color: var(--header-txt);
   text-decoration: none;
   border: 1px solid var(--header-txt);
-  opacity: 0.85;
-  padding: 4px 10px;
+  opacity: 0.9;
+  padding: 0 10px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   transition: opacity .15s ease, background .15s ease;
+  box-sizing: border-box;
 }
 header a.salir:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
 }
-header .acciones { display: flex; align-items: center; gap: 12px; }
+header .acciones { display: flex; align-items: center; gap: 10px; }
 header .reloj {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -767,9 +785,37 @@ button:active {
 /* --- 3. Responsive y Navegación Móvil Fija Abajo --- */
 @media (max-width: 640px) {
   main { padding: 12px; }
-  header { padding: 10px 14px; }
-  header b { font-size: 13.5px; }
+  header {
+    padding: 8px 10px;
+    padding-top: calc(8px + env(safe-area-inset-top, 0px));
+    padding-left: calc(10px + env(safe-area-inset-left, 0px));
+    padding-right: calc(10px + env(safe-area-inset-right, 0px));
+    gap: 6px;
+  }
+  header b { font-size: 12.5px; }
   header .reloj { display: none; }
+  header .acciones { gap: 4px; flex-wrap: wrap; }
+  header .tema-btn {
+    min-height: 28px;
+    height: 28px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+  header #select-tema {
+    max-width: 95px;
+    font-size: 10.5px;
+    padding: 0 4px;
+  }
+  header a.salir {
+    height: 28px;
+    padding: 0 8px;
+    font-size: 10.5px;
+  }
+  .logo-ja {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+  }
   
   nav {
     position: fixed;
@@ -1143,3 +1189,42 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   text-align: center;
 }
 .btn-punto.act { background: var(--verde-marca); color: #fff; border-color: var(--verde-marca); }
+
+/* --- Telemetría de Rutas & Desplazamientos --- */
+.card-operario-ruta {
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.timeline-rutas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 12px;
+  background: var(--fondo);
+  border-radius: 8px;
+  border: 1px solid var(--borde);
+}
+.chip-ruta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--texto);
+}
+.chip-flecha {
+  color: var(--verde-marca);
+  font-weight: 800;
+  font-size: 15px;
+  user-select: none;
+}
+

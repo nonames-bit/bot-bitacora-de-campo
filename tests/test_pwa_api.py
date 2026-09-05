@@ -1,4 +1,4 @@
-"""Tests Etapa D Fase 7: backend PWA (solo lectura, URL de ficha QR)."""
+import json
 import pytest
 
 flask = pytest.importorskip("flask", reason="Flask no instalado")
@@ -519,4 +519,162 @@ def test_api_gps_potrero_y_rondas(client):
     r_list = client.get("/api/gps/rondas")
     assert r_list.status_code == 200
     assert len(r_list.get_json()["rondas"]) >= 1
+
+
+def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
+    import json
+    users_data = [
+        {"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234"},
+        {"user_id": 200, "nombre": "Admin", "rol": "ADMIN", "pin": "2222"},
+        {"user_id": 300, "nombre": "Trabajador", "rol": "TRABAJADOR", "pin": "3333"},
+    ]
+    u_path = str(tmp_path / "users_test.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    assert app is not None
+    app.config.update({"TESTING": True})
+
+    # 1. Sin sesión: 401
+    c_anon = app.test_client()
+    r = c_anon.get("/api/usuarios")
+    assert r.status_code == 401
+
+    # 2. Trabajador: 403
+    c_trab = app.test_client()
+    c_trab.post("/login", data={"pin": "3333"})
+    r_trab = c_trab.get("/api/usuarios")
+    assert r_trab.status_code == 403
+    r_trab_post = c_trab.post("/api/usuarios", json={"nombre": "X", "rol": "TRABAJADOR", "pin": "5555"})
+    assert r_trab_post.status_code == 403
+
+    # 3. Admin: Puede listar pero PIN de OWNER está enmascarado
+    c_adm = app.test_client()
+    c_adm.post("/login", data={"pin": "2222"})
+    r_adm = c_adm.get("/api/usuarios")
+    assert r_adm.status_code == 200
+    us = r_adm.get_json()["usuarios"]
+    owner_entry = next(u for u in us if u["user_id"] == 100)
+    assert owner_entry["pin"] == "****"
+
+    # Admin no puede crear OWNER
+    r_adm_owner = c_adm.post("/api/usuarios", json={"nombre": "Nuevo Dueño", "rol": "OWNER", "pin": "7777"})
+    assert r_adm_owner.status_code == 403
+
+    # Admin puede crear TRABAJADOR
+    r_adm_create = c_adm.post("/api/usuarios", json={"nombre": "Pepe", "rol": "TRABAJADOR", "pin": "7777"})
+    assert r_adm_create.status_code == 200
+    assert r_adm_create.get_json()["ok"] is True
+
+    # No se puede repetir PIN (colisión)
+    r_colision = c_adm.post("/api/usuarios", json={"nombre": "Repetido", "rol": "TRABAJADOR", "pin": "7777"})
+    assert r_colision.status_code == 400
+    assert "7777" in r_colision.get_json()["error"] and "Pepe" in r_colision.get_json()["error"]
+
+    # Admin no puede eliminar OWNER
+    r_adm_del_owner = c_adm.post("/api/usuarios/100/eliminar")
+    assert r_adm_del_owner.status_code == 403
+
+    # 4. Owner: Control total
+    c_owner = app.test_client()
+    c_owner.post("/login", data={"pin": "1234"})
+    r_owner_list = c_owner.get("/api/usuarios")
+    assert r_owner_list.status_code == 200
+    us_owner = r_owner_list.get_json()["usuarios"]
+    owner_u = next(u for u in us_owner if u["user_id"] == 100)
+    assert owner_u["pin"] == "1234"  # Owner sí ve los PINs
+
+    # Cambiar PIN de un usuario
+    pepe_uid = r_adm_create.get_json()["usuario"]["user_id"]
+    r_chg_pin = c_owner.post(f"/api/usuarios/{pepe_uid}/pin", json={"pin": "8888"})
+    assert r_chg_pin.status_code == 200
+
+    # Eliminar usuario creado
+    r_del = c_owner.post(f"/api/usuarios/{pepe_uid}/eliminar")
+    assert r_del.status_code == 200
+
+    # No se puede eliminar al último OWNER
+    r_del_owner = c_owner.post("/api/usuarios/100/eliminar")
+    assert r_del_owner.status_code == 400
+
+
+def test_telemetria_gps_ping_y_rutas(tmp_path):
+    users_data = [
+        {"user_id": 100, "nombre": "Patron", "rol": "OWNER", "pin": "1234"},
+        {"user_id": 200, "nombre": "Capataz", "rol": "ADMIN", "pin": "2222"},
+        {"user_id": 300, "nombre": "Juan Peon", "rol": "TRABAJADOR", "pin": "3333"},
+    ]
+    uf = tmp_path / "users.json"
+    uf.write_text(json.dumps(users_data), encoding="utf-8")
+
+    db_path = str(tmp_path / "bitacora.db")
+    d = Database(db_path)
+    d.create_tables()
+    pot_id = d.registrar_potrero(nombre="Guayabal", codigo="G1")
+    d.execute(
+        "UPDATE potreros SET geom_wkt_4326 = ?, centroide_lat = 3.395, centroide_lon = -74.065 WHERE id = ?",
+        (_WKT_TEST, pot_id),
+    )
+    d.close()
+
+    app = crear_app(db_path=db_path, users_file=str(uf))
+    app.config.update({"TESTING": True})
+
+    # 1. Trabajador envía ping de telemetría en segundo plano
+    c_trab = app.test_client()
+    c_trab.post("/login", data={"pin": "3333"})
+
+    r_ping = c_trab.post("/api/telemetria/ping", json={
+        "lat": 3.395,
+        "lon": -74.065,
+        "precision_m": 4.5,
+        "evento_origen": "apertura_app"
+    })
+    assert r_ping.status_code == 200
+    res_ping = r_ping.get_json()
+    assert res_ping["ok"] is True
+    assert res_ping["potrero"]["nombre"] == "Guayabal"
+
+    # 2. Trabajador NO tiene acceso a /api/telemetria/rutas (403)
+    r_rutas_trab = c_trab.get("/api/telemetria/rutas")
+    assert r_rutas_trab.status_code == 403
+
+    # 3. Admin tampoco tiene acceso a rutas (restringido a OWNER)
+    c_adm = app.test_client()
+    c_adm.post("/login", data={"pin": "2222"})
+    r_rutas_adm = c_adm.get("/api/telemetria/rutas")
+    assert r_rutas_adm.status_code == 403
+
+    # 4. Owner sí tiene acceso y ve la ruta del trabajador
+    c_owner = app.test_client()
+    c_owner.post("/login", data={"pin": "1234"})
+    r_rutas_owner = c_owner.get("/api/telemetria/rutas")
+    assert r_rutas_owner.status_code == 200
+    res_rutas = r_rutas_owner.get_json()
+    assert res_rutas["ok"] is True
+    assert len(res_rutas["rutas"]) == 1
+    ruta_juan = res_rutas["rutas"][0]
+    assert ruta_juan["usuario_nombre"] == "Juan Peon"
+    assert ruta_juan["total_puntos"] == 1
+    assert ruta_juan["secuencia_potreros"][0]["potrero"] == "Guayabal"
+
+    # 5. Sincronización offline de telemetría ping vía /api/sync
+    r_sync = c_trab.post("/api/sync", json={
+        "eventos": [{
+            "tipo": "telemetria_ping",
+            "payload": {
+                "lat": 3.3951,
+                "lon": -74.0651,
+                "precision_m": 6.0,
+                "evento_origen": "pesaje_manga",
+                "hora": "14:20:00"
+            },
+            "fecha": "2026-09-05"
+        }]
+    })
+    assert r_sync.status_code == 200
+    assert r_sync.get_json()["procesados"] == 1
+
+
 
