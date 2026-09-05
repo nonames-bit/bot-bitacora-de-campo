@@ -72,6 +72,33 @@ PWA Corral (móvil, offline) ─────┘  Service-Worker + IndexedDB(outb
   6. `Ficha animal /ficha/<tag>`: header + foto + 5 pestañas (igual que Telegram) + QR imprimible.
 - Filtros: por potrero, categoría, rango fechas. Todo read-only para TRABAJADOR salvo captura.
 
+### Etapa E — Chat en la PWA (idea futura, sin empezar) 💡 ANOTADA 2026-09-04
+
+Pedido del usuario, a modo de nota para retomar más adelante — no se ha
+diseñado en detalle ni implementado nada todavía. Dos ideas, **ambas
+deseadas**:
+
+1. **Chat tipo asistente (lenguaje natural)**: un cuadro de texto en el
+   dashboard donde se escriben preguntas igual que se le escribe al bot
+   de Telegram (ej. "¿cuántas vacas hay en Guayabal?") y responde con los
+   mismos datos — reutilizaría el motor de consultas en lenguaje natural
+   que ya existe para Telegram (`src/engine/query_engine.py`,
+   `src/parsers/nlp_engine.py`) en vez de reinventar el parser. Sería un
+   nuevo endpoint de solo lectura tipo `POST /api/preguntar` que delegue
+   en ese mismo motor.
+2. **Chat/mensajes del equipo**: una sección de notas o avisos donde los
+   trabajadores de la finca puedan dejarse mensajes entre sí, visible en
+   el dashboard. A diferencia de todo lo demás en la PWA (que es de solo
+   lectura), esto **sí implica escritura** — habría que decidir el
+   almacenamiento (¿tabla nueva en SQLite? ¿reusar `notas`/`alertas`
+   existentes?) y quién puede ver/borrar qué (RBAC), ya que rompe el
+   principio "solo lectura" que ha guiado el diseño de seguridad de la
+   PWA hasta ahora.
+
+Al retomar: decidir alcance y diseño concreto antes de implementar
+(especialmente la Etapa E.2, que necesita repensar el modelo de
+autenticación/escritura).
+
 ---
 
 ## 4. Tabla de tareas y estimación relativa (S <1d, M 2-4d, L 1-2 sem)
