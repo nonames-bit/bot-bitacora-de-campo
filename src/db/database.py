@@ -1,6 +1,7 @@
 """Capa de acceso a datos SQLite para la bitácora de campo zootécnico."""
 from __future__ import annotations
 
+import logging
 import re
 import sqlite3
 from datetime import date, datetime
@@ -8,6 +9,8 @@ from typing import Optional
 
 from ..utils import add_days, iso, to_date
 from .models import SCHEMA_SQL
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -80,10 +83,16 @@ class Database:
             self.conn.execute("UPDATE animales SET madre_id = NULL WHERE madre_id = id_animal")
             self.conn.execute("UPDATE animales SET padre_id = NULL WHERE padre_id = id_animal")
             self.conn.execute("DELETE FROM partos WHERE vaca_id = id_cria AND vaca_id IS NOT NULL")
+        except Exception as e:
+            logger.error("Error en saneamiento de autorreferencias en create_tables: %s", e, exc_info=True)
+        try:
             self.vincular_fotos_huerfanas()
+        except Exception as e:
+            logger.error("Error en vincular_fotos_huerfanas durante create_tables: %s", e, exc_info=True)
+        try:
             self.marcar_historicos_sg()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error("Error en marcar_historicos_sg durante create_tables: %s", e, exc_info=True)
         self.conn.commit()
         return self
 
@@ -343,9 +352,19 @@ class Database:
         ))
         if (tipo_servicio or "").upper() == "IA" and toro_pajilla:
             try:
-                self.descontar_pajuela(toro_pajilla, cantidad=1)
-            except Exception:
-                pass
+                ok = self.descontar_pajuela(toro_pajilla, cantidad=1)
+                if not ok:
+                    logger.warning(
+                        "No se pudo descontar pajuela automáticamente para toro/pajilla '%s' "
+                        "al registrar servicio id=%s: sin stock o toro inexistente",
+                        toro_pajilla, serv_id,
+                    )
+            except Exception as e:
+                logger.warning(
+                    "No se pudo descontar pajuela automáticamente para toro/pajilla '%s' "
+                    "al registrar servicio id=%s: %s",
+                    toro_pajilla, serv_id, e,
+                )
         return serv_id
 
     def registrar_celo(self, vaca_tag, fecha=None, am_pm=None, notas=None, registrado_por=None) -> int:

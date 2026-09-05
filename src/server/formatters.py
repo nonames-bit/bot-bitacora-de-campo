@@ -1724,7 +1724,12 @@ def formatear_reporte_importacion(conteos: dict) -> str:
             d = res.get("duplicados", 0)
             total_nuevos += n
             total_duplicados += d
-            lineas_tablas.append(f"• {tabla}: {n} nuevos, {d} duplicados")
+            linea = f"• {tabla}: {n} nuevos, {d} duplicados"
+            if res.get("errores"):
+                linea += f", {res.get('errores')} errores"
+            if res.get("error"):
+                linea += f" (error: {res.get('error')})"
+            lineas_tablas.append(linea)
 
     lineas = [
         "📦 Reporte de Importación de Backup:",

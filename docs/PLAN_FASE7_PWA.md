@@ -1,7 +1,7 @@
 # 📱 Plan Fase 7 — PWA Oficina + Corral Offline
 
 > **Proyecto:** Bot Bitácora de Campo Ganadero — Fase 7 (ROADMAP_FASES_4-8.md)
-> **Fecha:** 2026-09-03 | **Estado:** Plan aprobado para implementar (no implementado aún)
+> **Fecha:** 2026-09-03 | **Actualizado:** 2026-09-05 | **Estado:** A y D ✅ implementadas + B-lite (offline lectura) ✅; B completa y C pendientes
 > **Principio:** No romper Telegram. La PWA es solo una vista nueva sobre el mismo SQLite.
 
 ---
@@ -40,25 +40,29 @@ PWA Corral (móvil, offline) ─────┘  Service-Worker + IndexedDB(outb
 
 > Se empieza por lo de mayor valor/campo fácil (QR + offline) y se deja el dashboard completo al final, según matriz del roadmap (7.3 y 7.1 antes que 7.2).
 
-### Etapa A — Fichas QR en PDF por lote (base de corral)
+### Etapa A — Fichas QR en PDF por lote (base de corral) ✅ IMPLEMENTADA
+> ✅ **Estado 2026-09-05:** Implementada (ruta QR `/ficha/<tag>`, fichas QR por lote; ver README Fase 7).
 - Nuevo `src/reports/qr_fichas.py`: `generar_fichas_lote(db, potrero/lote) → PDF`.
 - Cada tarjeta: foto mini, tag grande, QR (payload `JA://animal/<tag>` + URL `/ficha/<tag>`), potrero, edad zootécnica, estado repro/retiro. Hoja A4 de 6 tarjetas plastificables.
 - Comandos Telegram que la disparan: `/qr <potrero>` y `/qr <lote>` (reusan `/exportar` y `/reporte`). Botón `[ 🖨️ Fichas QR ]`.
 - Detalle técnico: librería `qrcode` + `reportlab` (ya instalado); QR en nivel `M`, 300 dpi; cache en `data/qr_cache/`.
 
-### Etapa B — Modo Offline Lite (cola + sync + SOS)
+### Etapa B — Modo Offline Lite (cola + sync + SOS) 🟡 PARCIAL (solo lectura)
+> 🟡 **Estado 2026-09-05:** B-lite implementada — Service Worker solo lectura (`src/pwa/static/sw.js`: cache-first estáticos, network-first `/api` y `/media` con respaldo, fallback a `/offline.html`), `src/pwa/static/offline.html`, registro SW en `index.html`/`ficha.html`, rutas públicas `/sw.js` y `/offline.html` en `src/pwa/app.py`, `manifest.json` ampliado (id, scope, lang, maskable). Pendiente B completa: cola de escritura + sync + SOS (`src/offline/sync_queue.py`, IndexedDB outbox, `/api/sync`).
 - Nuevo `src/offline/sync_queue.py`: valida, deduplica (llaves `animal+fecha+tipo`) y aplica la cola. Tablas NO nuevas: reusa `TABLAS_EVENTOS` + columnas `creado_en/registrado_por`.
 - Frontend: `IndexedDB` tabla `outbox` (`id_local, tipo_evento, payload, foto_blob, creado_en, estado`). Botón `Guardar local` siempre disponible; `Sincronizar` manual + `Background Sync` auto.
 - Formulario mínimo offline: 8 eventos como selects + foto opcional (comprimida a ≤800px). Sin NLU offline: se guarda texto crudo y el servidor lo parsea al sincronizar.
 - **Botón SOS:** siempre visible, funciona sin señal: guarda evento `SOS` con GPS + hora local y al recuperar 1 barra lo envía primero con prioridad (Telegram al OWNER + marca roja en dashboard). Si hay señal nula total, muestra instrucciones (llamar / punto alto).
 
-### Etapa C — Identificación rápida en corral (foto arete + RFID barro)
+### Etapa C — Identificación rápida en corral (foto arete + RFID barro) ⏳ PENDIENTE
+> ⏳ **Estado 2026-09-05:** Pendiente — falta `POST /api/identificar` + `src/rfid/reader.py`.
 - Endpoint `POST /api/identificar` (online) y modo foto-local (offline: guarda foto y la identifica al sincronizar).
 - Flujo: foto → `arete_detector.py` (preproceso CLAHE + clasificación paleta/botón) → `pytesseract` → `corregir_caracteres_confusos()` → propone 3 candidatos + ficha. Si barro total, campo manual + lectura RFID.
 - Nuevo `src/rfid/reader.py`: lector tipo "teclado" (wedge USB/BLE): el bastón escribe el tag como si fuera teclado; el JS lo captura en un `<input>` sin driver especial. Soporta pegado manual `N069 / JA26 / 47`.
 - En barro: botón `[ 📷 Foto arete ]` grande, linterna, ráfaga de 3 fotos (se envía la más nítida).
 
-### Etapa D — Dashboard web ejecutivo PWA (oficina)
+### Etapa D — Dashboard web ejecutivo PWA (oficina) ✅ IMPLEMENTADA (enriquecida, 10 vistas)
+> ✅ **Estado 2026-09-05:** Implementada y enriquecida (5 workstreams). Backend adelgazado `src/pwa/app.py` (envoltorios finos + `@app.errorhandler(500)` JSON) sobre fuente única `src/engine/dashboard_data.py` (conteos_tablero, datos_reproduccion/sanidad/pasturas/leche/ficha + datos_inventario/poblacion/genetica/agenda; errores por sección, nunca falso 0). Endpoints `/api/inventario`, `/api/poblacion`, `/api/genetica`, `/api/agenda?dias=N` + 6 base (tablero/repro/sanidad/pasturas/leche/ficha). Frontend: 10 vistas (Tablero, Agenda, Inventario SG, Población, Genética, Reproducción, Sanidad, Pasturas, Leche, Ficha QR), dark mode, KPIs/chips semáforo, ficha 4 pestañas, polling 60 s, skeleton, `style.css`/`app.js`. Verificación: 545 pytest en verde, ruff E9/F limpio, smoke PWA OK.
 - Vistas (cada una = 1 tarjeta + 1 endpoint `/api/*` que envuelve `engine/consultas.py`):
   1. `Tablero finca`: activos por categoría, partos/celos/servicios 7d, retiros activos.
   2. `Reproducción`: FEP ≤30d, eco d35, palpación d60, celos AM-PM pendientes.

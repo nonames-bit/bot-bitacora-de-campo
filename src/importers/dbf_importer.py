@@ -8,6 +8,7 @@ la base de datos SQLite del bot. No requiere bibliotecas externas.
 from __future__ import annotations
 
 import io
+import logging
 import os
 import struct
 import zipfile
@@ -18,6 +19,8 @@ from ..db.database import Database
 from ..engine.growth_engine import gmd
 from ..engine.reproductive_engine import fecha_estimada_parto
 from ..utils import iso, to_date
+
+logger = logging.getLogger(__name__)
 
 DBF_REQUERIDOS = [
     "hoja.dbf", "partos.dbf", "celos.dbf", "iamn.dbf",
@@ -792,6 +795,7 @@ def import_fotos(
     os.makedirs(media_dir, exist_ok=True)
     nuevos = 0
     duplicados = 0
+    errores = 0
 
     fotos_map: dict[str, bytes] = {}
     if isinstance(fotos_source, bytes):
@@ -804,16 +808,31 @@ def import_fotos(
                         ext = os.path.splitext(name)[1].lower()
                         if ext in (".jpg", ".jpeg", ".png", ".bmp"):
                             fotos_map[os.path.basename(name)] = zf.read(name)
-        except Exception:
-            return {"nuevos": 0, "duplicados": 0}
+        except ValueError as e:  # _validar_zip_seguro: Zip Slip / zip-bomb
+            logger.error("Fotos.Zip rechazado por validación de seguridad: %s", e)
+            return {"nuevos": 0, "duplicados": 0, "errores": 0,
+                    "error": f"Fotos.Zip inseguro (Zip Slip / zip-bomb): {e}"}
+        except Exception as e:
+            logger.error("No se pudo procesar Fotos.Zip (bytes corruptos o ZIP inválido): %s", e)
+            return {"nuevos": 0, "duplicados": 0, "errores": 0,
+                    "error": f"Fotos.Zip corrupto o no es un ZIP válido: {e}"}
     elif isinstance(fotos_source, zipfile.ZipFile):
-        # Seguridad (H-12): validar el zip de fotos antes de iterar sus entradas.
-        _validar_zip_seguro(fotos_source)
-        for name in fotos_source.namelist():
-            if not name.endswith("/") and not os.path.basename(name).startswith("._"):
-                ext = os.path.splitext(name)[1].lower()
-                if ext in (".jpg", ".jpeg", ".png", ".bmp"):
-                    fotos_map[os.path.basename(name)] = fotos_source.read(name)
+        try:
+            # Seguridad (H-12): validar el zip de fotos antes de iterar sus entradas.
+            _validar_zip_seguro(fotos_source)
+            for name in fotos_source.namelist():
+                if not name.endswith("/") and not os.path.basename(name).startswith("._"):
+                    ext = os.path.splitext(name)[1].lower()
+                    if ext in (".jpg", ".jpeg", ".png", ".bmp"):
+                        fotos_map[os.path.basename(name)] = fotos_source.read(name)
+        except ValueError as e:  # _validar_zip_seguro: Zip Slip / zip-bomb
+            logger.error("Fotos.Zip rechazado por validación de seguridad: %s", e)
+            return {"nuevos": 0, "duplicados": 0, "errores": 0,
+                    "error": f"Fotos.Zip inseguro (Zip Slip / zip-bomb): {e}"}
+        except Exception as e:
+            logger.error("No se pudo procesar Fotos.Zip (ZipFile inválido): %s", e)
+            return {"nuevos": 0, "duplicados": 0, "errores": 0,
+                    "error": f"Fotos.Zip corrupto o no es un ZIP válido: {e}"}
     elif isinstance(fotos_source, dict):
         fotos_map = fotos_source
 
@@ -837,8 +856,14 @@ def import_fotos(
             if not os.path.exists(dest_path) or os.path.getsize(dest_path) != len(data):
                 with open(dest_path, "wb") as f:
                     f.write(data)
-        except Exception:
-            pass
+        except OSError as e:
+            logger.error("No se pudo escribir foto '%s' en '%s': %s", base_name, dest_path, e)
+            errores += 1
+            continue
+        except Exception as e:
+            logger.error("No se pudo escribir foto '%s' en '%s': %s", base_name, dest_path, e)
+            errores += 1
+            continue
 
         # Idempotencia: comprobar si ya existe en tabla fotos (por ruta o por tag y sufijo/caption)
         existe = db.query_one(
@@ -857,7 +882,11 @@ def import_fotos(
             )
             nuevos += 1
 
-    return {"nuevos": nuevos, "duplicados": duplicados}
+    resultado: dict = {"nuevos": nuevos, "duplicados": duplicados}
+    if errores:
+        resultado["errores"] = errores
+        resultado["error"] = f"{errores} foto(s) no pudieron escribirse a disco"
+    return resultado
 
 
 def import_dbfs(

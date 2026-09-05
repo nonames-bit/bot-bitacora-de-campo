@@ -2,17 +2,34 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ficha {{ tag }} · Bitácora JA</title>
+<meta name="theme-color" content="#2F5233">
 <link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body data-tag="{{ tag }}">
+<div id="barra-red">📡 Sin conexión — mostrando datos guardados. Reconectando…</div>
 <header>
   <span><a href="/">← Tablero</a> · 🐮 Ficha <b>{{ tag }}</b></span>
-  <a href="/logout" class="salir">Salir</a>
+  <span class="acciones">
+    <button id="btn-tema" class="tema-btn" title="Cambiar tema" aria-label="Cambiar tema">☀️</button>
+    <a href="/logout" class="salir">Salir</a>
+  </span>
 </header>
 <main><div id="ficha" class="card">Cargando…</div></main>
 <script src="/static/app.js"></script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("/sw.js").catch(function (e) { /* best-effort */ });
+  });
+}
+</script>
 </body>
 </html>

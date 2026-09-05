@@ -442,8 +442,8 @@ dos procesos independientes. Estado desplegado (2026-09-04):
   journalctl -u bitacora-pwa -f    # logs en vivo
   ```
   Unidad en `/etc/systemd/system/bitacora-pwa.service`, ejecuta
-  `python src/pwa/app.py` con `PWA_HOST=0.0.0.0`, `PWA_PORT=8080`,
-  `Restart=always`.
+  `python src/pwa/app.py` con `PWA_HOST=127.0.0.1`, `PWA_PORT=8080`,
+  `Restart=always` (escucha solo en loopback; Nginx es quien expone 80/443).
 - **Nginx como proxy + HTTPS** (`/etc/nginx/sites-available/bitacora-pwa`):
   Nginx escucha 80/443 y reenvía a `127.0.0.1:8080`. Certificado real vía
   **Let's Encrypt/certbot**, con renovación automática ya programada (no
@@ -457,6 +457,39 @@ dos procesos independientes. Estado desplegado (2026-09-04):
   en el firewall.
 - **Si el droplet cambia de IP** (recreación, migración): actualizar el
   registro de IP en duckdns.org — el dominio no se actualiza solo.
+
+### Plantillas del repositorio (actualización 2026-09-04)
+
+El repo ahora incluye versiones canónicas de los dos archivos que antes solo
+existían en el servidor, con dos mejoras de producción (X3):
+
+- `scripts/bitacora-pwa.service` — unidad systemd que sirve la PWA con
+  **waitress** (WSGI multi-hilo) escuchando SOLO en `127.0.0.1:8080` (no más
+  `0.0.0.0`: Nginx es quien expone 80/443). Nginx y la PWA quedan en el mismo
+  servidor, así que nadie externo habla directo con waitress.
+- `scripts/nginx-bitacora.conf` — vhost Nginx de referencia: proxy reverso a
+  `127.0.0.1:8080`, `client_max_body_size 25m` (para fotos de aretes grandes),
+  caché de `/static/` con excepción de `sw.js`/`manifest.json`/`offline.html`
+  (deben revalidarse siempre) y cabeceras de seguridad mínimas. Ajuste el
+  `server_name` antes de usar.
+
+Para aplicar en el VPS si algún día se recrea el droplet o se quiere migrar a
+waitress + loopback:
+
+```bash
+cd /root/bitacora
+cp scripts/bitacora-pwa.service /etc/systemd/system/bitacora-pwa.service
+cp scripts/nginx-bitacora.conf /etc/nginx/sites-available/bitacora-pwa
+# editar server_name dentro del conf y, en la unidad, asegurar PWA_HOST=127.0.0.1
+systemctl daemon-reload
+systemctl enable --now bitacora-pwa
+nginx -t && systemctl reload nginx
+# Sin waitress instalado aún:
+# /root/bitacora/.venv/bin/pip install waitress
+```
+
+La app elige waitress automáticamente si está instalado (`python -m src.pwa.app`)
+y solo cae al servidor de desarrollo de Flask con un aviso si no lo está.
 
 ---
 

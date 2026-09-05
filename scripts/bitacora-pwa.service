@@ -1,0 +1,37 @@
+# systemd unit — PWA Bitácora JA (Fase 7 Etapa D) en producción
+#
+# Instalar en el VPS (Ubuntu):
+#   sudo cp scripts/bitacora-pwa.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now bitacora-pwa
+#
+# La PWA corre en 127.0.0.1:8080 SOLO para el loopback; Nginx es quien
+# expone el puerto 443 (TLS) hacia la LAN/Internet. No exponer 8080.
+
+[Unit]
+Description=Bitácora JA - Dashboard PWA (waitress WSGI)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/bitacora
+# Ajusta la ruta del virtualenv si no es /root/bitacora/.venv
+ExecStart=/root/bitacora/.venv/bin/python -m src.pwa.app
+Restart=always
+RestartSec=5
+# Hardening básico
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+# Variables de entorno (rutas). Los secretos (PWA_PASSWORD, PWA_SECRET_KEY)
+# se cargan desde el .env del proyecto por la propia app (load_dotenv).
+EnvironmentFile=/root/bitacora/.env
+Environment=PWA_HOST=127.0.0.1
+Environment=PWA_PORT=8080
+Environment=BITACORA_DB=data/bitacora.db
+Environment=MEDIA_DIR=media
+
+[Install]
+WantedBy=multi-user.target

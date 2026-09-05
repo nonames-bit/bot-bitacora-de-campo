@@ -47,6 +47,22 @@ def calcular_hash_archivo(ruta: str, chunk_size: int = 65536) -> str:
     return h.hexdigest()
 
 
+def _conteos_tienen_error(conteos: dict) -> str | None:
+    """Devuelve el mensaje del primer error en conteos (clave 'error' o 'errores' > 0), o None si todo OK."""
+    if not isinstance(conteos, dict):
+        return None
+    for tabla, res in conteos.items():
+        if isinstance(res, dict):
+            if res.get("error"):
+                return f"{tabla}: {res.get('error')}"
+            try:
+                if int(res.get("errores", 0) or 0) > 0:
+                    return f"{tabla}: {res.get('errores')} foto(s) con error de escritura"
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
 def formatear_reporte_copias(
     conteos: dict,
     nombre_archivo: str,
@@ -75,21 +91,36 @@ def formatear_reporte_copias(
             d = res.get("duplicados", 0)
             total_nuevos += n
             total_duplicados += d
+            sufijo = ""
+            try:
+                if int(res.get("errores", 0) or 0) > 0:
+                    sufijo += f", {res.get('errores')} errores"
+            except (TypeError, ValueError):
+                pass
+            if res.get("error"):
+                sufijo += f" (error: {res.get('error')})"
             if modo_html:
-                lineas_tablas.append(f"• <b>{tabla}</b>: {n} nuevos, {d} duplicados")
+                lineas_tablas.append(f"• <b>{tabla}</b>: {n} nuevos, {d} duplicados{sufijo}")
             else:
-                lineas_tablas.append(f"• {tabla}: {n} nuevos, {d} duplicados")
+                lineas_tablas.append(f"• {tabla}: {n} nuevos, {d} duplicados{sufijo}")
 
     dur_str = f" ({duracion_s:.1f}s)" if duracion_s > 0 else ""
+    detalle_error = _conteos_tienen_error(conteos)
 
     if modo_html:
+        titulo = "📦 <b>Software Ganadero — Auto-Import Exitoso</b>"
+        if detalle_error:
+            titulo = "⚠️ <b>Software Ganadero — Auto-Import con errores</b>"
         lineas = [
-            "📦 <b>Software Ganadero — Auto-Import Exitoso</b>",
+            titulo,
             f"📁 Archivo: <code>{nombre_archivo}</code>{dur_str}",
             f"📊 Consolidado: <b>{total_nuevos} nuevos</b>, {total_duplicados} duplicados",
             "",
             "📋 <b>Detalle por tabla:</b>",
         ] + lineas_tablas
+        if detalle_error:
+            lineas.append("")
+            lineas.append(f"❌ <b>Error:</b> <code>{detalle_error}</code>")
         return "\n".join(lineas)
 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -97,7 +128,10 @@ def formatear_reporte_copias(
         f"[{timestamp}] IMPORTACIÓN AUTOMÁTICA: {nombre_archivo}{dur_str}",
         f"Total consolidado: {total_nuevos} nuevos, {total_duplicados} duplicados",
         "Detalle por tabla:",
-    ] + lineas_tablas + ["-" * 60]
+    ] + lineas_tablas
+    if detalle_error:
+        lineas.append(f"ERROR: {detalle_error}")
+    lineas.append("-" * 60)
     return "\n".join(lineas)
 
 
@@ -345,9 +379,23 @@ class CopiasWatcher:
             reporte_html = formatear_reporte_copias(conteos, nombre, duracion_s=duracion, modo_html=True)
             self.enviar_notificacion_telegram(reporte_html)
 
-            # Actualizar estado para evitar re-importación
+            detalle_error = _conteos_tienen_error(conteos)
+            if detalle_error:
+                logger.error("Importación de %s completada con errores: %s", nombre, detalle_error)
+                # NO se guarda estado: el zip quedó con errores (p. ej. fotos
+                # corruptas o no escribibles). Si se guardara aquí, un fallo
+                # transitorio (disco lleno) o un archivo reemplazado in-place
+                # con el mismo nombre/tamaño/mtime nunca se reintentaría.
+                return {
+                    "archivo": zip_path,
+                    "nombre": nombre,
+                    "conteos": conteos,
+                    "error": detalle_error,
+                    "duracion_s": duracion,
+                    "exito": False,
+                }
+            # Actualizar estado solo al importar sin errores: evita re-importación.
             self.guardar_estado(nombre, mtime, size, hash_val)
-
             logger.info("Importación completada para %s en %.2fs: %s", nombre, duracion, conteos)
             return {
                 "archivo": zip_path,

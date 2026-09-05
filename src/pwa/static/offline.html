@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sin conexión · Bitácora JA</title>
+<meta name="theme-color" content="#2F5233">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+body { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding-bottom: 0; }
+.card { width: 100%; max-width: 360px; padding: 28px 24px; text-align: center; }
+.card h1 { font-size: 20px; color: var(--verde-marca); margin: 10px 0 6px; }
+.card p { color: var(--texto-suave); font-size: 14px; }
+.card button { margin-top: 16px; width: 100%; }
+.ico { font-size: 44px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="ico">📡</div>
+  <h1>Sin conexión</h1>
+  <p>Estás viendo el tablero <b>Bitácora JA</b> sin conexión a la red.<br>
+     Las secciones ya cargadas siguen disponibles. Los datos nuevos se
+     actualizarán al reconectar.</p>
+  <button onclick="location.reload()">Reintentar</button>
+  <p><a href="/" style="color:var(--verde-marca)">← Volver al inicio</a></p>
+</div>
+</body>
+</html>

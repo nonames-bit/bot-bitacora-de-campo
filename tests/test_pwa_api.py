@@ -1,6 +1,4 @@
 """Tests Etapa D Fase 7: backend PWA (solo lectura, URL de ficha QR)."""
-import os
-
 import pytest
 
 flask = pytest.importorskip("flask", reason="Flask no instalado")
@@ -65,6 +63,15 @@ def test_login_con_clave_incorrecta_no_autentica(db_file):
     c.post("/login", data={"password": "clave-equivocada"})
     r = c.get("/api/tablero")
     assert r.status_code == 401
+
+
+def test_logout_envia_clear_site_data(client):
+    """En un equipo compartido, cerrar sesión debe limpiar la caché offline
+    del Service Worker (cachea /api/*, ver static/sw.js) -- sin esto,
+    alguien podría desconectarse de internet tras el logout y aún ver los
+    datos de la finca que quedaron guardados localmente."""
+    r = client.get("/logout")
+    assert r.headers.get("Clear-Site-Data") == '"cache", "storage"'
 
 
 def test_sin_password_configurada_bloquea_todo(db_file):
@@ -214,3 +221,80 @@ def test_media_sirve_archivo_y_bloquea_path_traversal(db_file, tmp_path):
     finally:
         pwa_app.MEDIA_DIR_DEFAULT = original_media_dir
         pwa_app.RAIZ_PROYECTO = original_raiz
+
+
+# --------------------------------------------------------------------------- #
+# WS-X2 / X4 / X5 — Identificar (OCR/RFID), ficha enriquecida y búsqueda
+# --------------------------------------------------------------------------- #
+
+def test_api_buscar_autocompletar(client):
+    r = client.get("/api/buscar?q=4")
+    assert r.status_code == 200
+    d = r.get_json()
+    tags = [a["tag"] for a in d["animales"]]
+    assert "47" in tags
+    # Los vendidos (99) no deben aparecer en el autocompletar de activos.
+    assert "99" not in tags
+    # Potreros buscables.
+    p = client.get("/api/buscar?q=Guaya")
+    assert any(x["nombre"] == "Guayabal" for x in p.get_json()["potreros"])
+
+
+def test_api_identificar_por_texto_rfid(client):
+    r = client.post("/api/identificar", data={"texto": "0000000000047"})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["existe"] is True
+    assert d["tag"] == "47"
+
+    r2 = client.post("/api/identificar", data={"texto": "N-069  "})
+    assert r2.status_code == 200
+    assert r2.get_json()["existe"] is False  # sin error, solo no encontrado
+
+
+def test_api_identificar_requiere_texto_o_foto(client):
+    r = client.post("/api/identificar", data={})
+    assert r.status_code == 400
+
+
+def test_api_identificar_foto_degrada_sin_ocr(client):
+    """Sin tesseract/easyocr la foto no debe romper el endpoint: responde
+    existe=False con mensaje claro (el pipeline vision/ocr ya degrada)."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    buf = BytesIO()
+    Image.new("RGB", (8, 8), color=(120, 120, 120)).save(buf, format="PNG")
+    buf.seek(0)
+    r = client.post(
+        "/api/identificar",
+        data={"foto": (buf, "arete.png")},
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["existe"] is False
+
+
+def test_ficha_enriquecida_secciones(client):
+    r = client.get("/api/ficha/47")
+    d = r.get_json()
+    for clave in ("partos", "servicios", "diagnosticos", "controles_leche", "lactancia"):
+        assert clave in d, clave
+    # lactancia es dict (si la vaca tiene parto) o None (sin lactancia).
+    assert d["lactancia"] is None or isinstance(d["lactancia"], dict)
+    if d["lactancia"]:
+        assert d["lactancia"]["fecha_parto"]
+        assert d["lactancia"]["estado"] in ("En ordeño", "Seca")
+
+
+def test_api_ficha_grafico_whitelist(client):
+    # Tipo válido: 200 o 404 (sin datos/matplotlib), nunca 500.
+    r = client.get("/api/ficha/47/grafico/peso")
+    assert r.status_code in (200, 404)
+    # Tipo NO whitelisteado: 404.
+    assert client.get("/api/ficha/47/grafico/algo").status_code == 404
+    # Animal inexistente: 404.
+    assert client.get("/api/ficha/ZZ999/grafico/peso").status_code == 404
+

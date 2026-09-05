@@ -2,20 +2,51 @@
    a los gráficos/PDF del bot (src/engine/charts.py, src/reports/qr_fichas.py).
    Mobile-first: la barra de navegación se vuelve fija abajo en pantallas
    angostas (patrón de app nativa), las tablas anchas scrollean en su propio
-   contenedor en vez de romper el layout. */
+   contenedor en vez de romper el layout. Mejoras WS-3: modo oscuro, chips
+   semáforo, tarjetas KPI, skeleton de carga, header fijo y banner offline. */
 
 :root {
   --verde-marca: #2F5233;
   --verde-claro: #66BB6A;
+  --verde-pastel: #E7EFE8;
   --tierra: #8D6E63;
+  --arena: #D4A373;
   --gris: #78909C;
   --rojo: #EF5350;
-  --arena: #D4A373;
+  --ambar: #F2B33D;
   --fondo: #f3f7f3;
+  --superficie: #ffffff;
+  --borde: #dde6dd;
   --texto: #222;
+  --texto-suave: #5b6b5d;
+  --sombra: rgba(0,0,0,.10);
+}
+
+/* Modo oscuro (preferencia del sistema y conmutador manual vía [data-theme]) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fondo: #161d17;
+    --superficie: #1f2921;
+    --borde: #2e3d31;
+    --texto: #e6efe6;
+    --texto-suave: #9fb2a1;
+    --verde-pastel: #243527;
+    --sombra: rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  --fondo: #161d17;
+  --superficie: #1f2921;
+  --borde: #2e3d31;
+  --texto: #e6efe6;
+  --texto-suave: #9fb2a1;
+  --verde-pastel: #243527;
+  --sombra: rgba(0,0,0,.45);
 }
 
 * { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
@@ -23,6 +54,7 @@ body {
   background: var(--fondo);
   color: var(--texto);
   padding-bottom: 76px; /* espacio para el nav fijo abajo en móvil */
+  transition: background .25s ease, color .25s ease;
 }
 
 header {
@@ -34,45 +66,117 @@ header {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 1px 6px var(--sombra);
 }
 header a { color: #fff; }
 header b { font-size: 15px; }
-header .salir { font-size: 13px; opacity: 0.9; white-space: nowrap; }
+header .salir { font-size: 13px; opacity: 0.9; white-space: nowrap; text-decoration: none; }
+header .acciones { display: flex; align-items: center; gap: 10px; }
+header .reloj { font-size: 12px; opacity: .85; white-space: nowrap; }
+header .tema-btn {
+  background: rgba(255,255,255,.14);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* Banner "sin conexión" (se muestra/oculta con JS, hidden por defecto) */
+#barra-red {
+  display: none;
+  background: #5b2d2d;
+  color: #fff;
+  text-align: center;
+  font-size: 13px;
+  padding: 6px 12px;
+}
+#barra-red.visible { display: block; }
 
 nav {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   padding: 10px 16px;
-  background: #E7EFE8;
+  background: var(--verde-pastel);
 }
 nav button {
   border: 1px solid var(--verde-marca);
-  background: #fff;
+  background: var(--superficie);
   color: var(--verde-marca);
   border-radius: 8px;
   padding: 8px 12px;
   min-height: 40px;
   cursor: pointer;
   font-size: 13.5px;
+  transition: background .15s ease, color .15s ease;
 }
 nav button.act { background: var(--verde-marca); color: #fff; }
 
-main { padding: 16px; max-width: 1000px; margin: auto; }
+main { padding: 16px; max-width: 1080px; margin: auto; }
 
 .card {
-  background: #fff;
-  border-radius: 10px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
   padding: 14px;
   margin-bottom: 14px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.10);
+  box-shadow: 0 1px 4px var(--sombra);
 }
 .card h3 { margin-top: 0; color: var(--verde-marca); }
 .card h4 { color: var(--tierra); margin-bottom: 6px; }
 
+/* Fila de tarjetas KPI (activos, eventos 7d, retiros, etc.) */
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.kpi {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  box-shadow: 0 1px 4px var(--sombra);
+}
+.kpi .num { font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--verde-marca); }
+.kpi .etiq { font-size: 11.5px; color: var(--texto-suave); }
+.kpi.alerta .num { color: var(--rojo); }
+.kpi.ok .num { color: var(--verde-claro); }
+
+/* Chips semáforo / estado */
+.chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.chip.verde { background: #e2f2e2; color: #1e6b1e; }
+.chip.ambar { background: #fdeecb; color: #8a6100; }
+.chip.rojo  { background: #fde0de; color: #a62a22; }
+.chip.gris  { background: #e9edf0; color: #55636b; }
+.chip.azul  { background: #ddebfb; color: #1c4e8c; }
+:root[data-theme="dark"] .chip.verde { background: #1e3520; color: #8fd88f; }
+:root[data-theme="dark"] .chip.ambar { background: #3a2f13; color: #f0c866; }
+:root[data-theme="dark"] .chip.rojo  { background: #3a1e1c; color: #ff9d97; }
+:root[data-theme="dark"] .chip.gris  { background: #2a3138; color: #aeb9c2; }
+:root[data-theme="dark"] .chip.azul  { background: #16283d; color: #8fbcff; }
+
+.aviso { font-size: 13px; color: var(--texto-suave); margin: 4px 0; }
+
 .tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-td, th { border: 1px solid #ddd; padding: 6px 8px; text-align: left; white-space: nowrap; }
+td, th { border: 1px solid var(--borde); padding: 6px 8px; text-align: left; white-space: nowrap; }
+tbody tr:nth-child(even) { background: color-mix(in srgb, var(--superficie) 96%, #000 4%); }
 
 input, select {
   padding: 8px;
@@ -80,6 +184,8 @@ input, select {
   border: 1px solid #999;
   font-size: 15px; /* >=15px evita el zoom automático de iOS al enfocar */
   min-height: 40px;
+  background: var(--superficie);
+  color: var(--texto);
 }
 button { min-height: 40px; }
 
@@ -88,43 +194,92 @@ button { min-height: 40px; }
   max-width: 100%;
   height: auto;
   border-radius: 8px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  box-shadow: 0 1px 4px var(--sombra);
 }
 
 .fotos-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
 .fotos-wrap img {
-  width: 96px; height: 96px; object-fit: cover;
-  border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15);
+  width: 110px; height: 110px; object-fit: cover;
+  border-radius: 8px; box-shadow: 0 1px 4px var(--sombra);
 }
 
 .semaforo { font-size: 16px; }
 
+/* Esqueleto de carga (shimmer) mientras llega la API */
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--borde) 25%, color-mix(in srgb, var(--borde) 55%, var(--superficie) 45%) 50%, var(--borde) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.2s infinite;
+  min-height: 16px;
+  margin: 8px 0;
+}
+.skeleton.h2 { min-height: 22px; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Ficha: encabezado del animal */
+.ficha-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 6px; }
+.ficha-head img.avatar {
+  width: 84px; height: 84px; object-fit: cover; border-radius: 12px;
+  box-shadow: 0 1px 5px var(--sombra);
+}
+.ficha-head .datos b { font-size: 18px; }
+.ficha-head .datos .meta { font-size: 13px; color: var(--texto-suave); }
+
+/* Pestañas de la ficha */
+#ficha-tabs { margin: 6px 0 4px; }
+#ficha-tabs nav.mini { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0 8px; background: transparent; }
+#ficha-tabs nav.mini button {
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: 999px;
+  padding: 6px 12px;
+  min-height: 34px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+#ficha-tabs nav.mini button.act { background: var(--verde-marca); color: #fff; border-color: var(--verde-marca); }
+
+/* Barras de proporción (vistas de inventario/población/genética) */
+.barra-fila { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
+.barra-fila .et { width: 150px; flex: 0 0 auto; text-align: right; color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.barra-fila .pista { flex: 1 1 auto; background: var(--borde); border-radius: 999px; height: 14px; overflow: hidden; }
+.barra-fila .relleno { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--verde-claro), var(--verde-marca)); min-width: 2px; }
+.barra-fila .num { width: 54px; flex: 0 0 auto; text-align: right; font-weight: 700; }
+
 /* --- Navegación tipo app nativa en pantallas de teléfono --- */
 @media (max-width: 640px) {
   main { padding: 10px; }
-  header b { font-size: 14px; }
+  header b { font-size: 13.5px; }
+  header .reloj { display: none; }
   nav {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
     z-index: 10;
-    justify-content: space-around;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
-    background: #fff;
-    border-top: 1px solid #ddd;
-    box-shadow: 0 -1px 6px rgba(0,0,0,.08);
+    background: var(--superficie);
+    border-top: 1px solid var(--borde);
+    box-shadow: 0 -1px 6px var(--sombra);
   }
   nav button {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     min-width: 0;
-    padding: 6px 2px;
+    padding: 6px 10px;
     font-size: 11px;
     border-radius: 8px;
     border-color: transparent;
     background: transparent;
-    color: #444;
+    color: var(--texto-suave);
   }
-  nav button.act { background: #E7EFE8; color: var(--verde-marca); border-color: var(--verde-marca); }
+  nav button.act { background: var(--verde-pastel); color: var(--verde-marca); border-color: var(--verde-marca); }
   td, th { font-size: 12.5px; padding: 5px 6px; }
+  .ficha-head img.avatar { width: 68px; height: 68px; }
+  .barra-fila .et { width: 110px; }
 }

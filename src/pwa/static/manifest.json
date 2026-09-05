@@ -1,13 +1,16 @@
 {
+  "id": "/",
   "background_color": "#f3f7f3",
-  "description": "Tablero ejecutivo Ganadería JA (online)",
+  "description": "Tablero ejecutivo Ganadería JA — consulta tu hato, reproducción, sanidad y pasturas desde el celular.",
   "display": "standalone",
+  "lang": "es",
+  "scope": "/",
+  "start_url": "/",
   "icons": [
-    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
-    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"}
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
   ],
   "name": "Bitácora JA",
   "short_name": "Bitácora JA",
-  "start_url": "/",
   "theme_color": "#2F5233"
 }

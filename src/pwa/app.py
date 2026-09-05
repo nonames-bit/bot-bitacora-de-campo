@@ -10,6 +10,7 @@ Si Flask no está instalado el módulo se importa sin romper el bot
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import socket
@@ -32,16 +33,51 @@ except Exception:
     pass
 import hmac
 import secrets
-from datetime import date, timedelta
 from typing import Any, Optional
 
 try:
     from ..db.database import Database
+    from ..engine.dashboard_data import (
+        _filas_dict as _filas_dict,
+        _ruta_relativa_media as _ruta_relativa_media,
+        conteos_tablero as _conteos_tablero,
+        datos_agenda as _datos_agenda,
+        datos_buscar as _datos_buscar,
+        datos_ficha_animal as _datos_ficha_animal,
+        datos_genetica as _datos_genetica,
+        datos_inventario as _datos_inventario,
+        datos_leche as _datos_leche,
+        datos_pasturas as _datos_pasturas,
+        datos_poblacion as _datos_poblacion,
+        datos_reproduccion as _datos_reproduccion,
+        datos_sanidad as _datos_sanidad,
+        resolver_tag_flexible as _resolver_tag_flexible,
+    )
 except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
 
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     from src.db.database import Database  # type: ignore
+    from src.engine.dashboard_data import (  # type: ignore
+        _filas_dict as _filas_dict,
+        _ruta_relativa_media as _ruta_relativa_media,
+        conteos_tablero as _conteos_tablero,
+        datos_agenda as _datos_agenda,
+        datos_buscar as _datos_buscar,
+        datos_ficha_animal as _datos_ficha_animal,
+        datos_genetica as _datos_genetica,
+        datos_inventario as _datos_inventario,
+        datos_leche as _datos_leche,
+        datos_pasturas as _datos_pasturas,
+        datos_poblacion as _datos_poblacion,
+        datos_reproduccion as _datos_reproduccion,
+        datos_sanidad as _datos_sanidad,
+        resolver_tag_flexible as _resolver_tag_flexible,
+    )
+
+logger = logging.getLogger(__name__)
+
+__all__ = ["_ruta_relativa_media"]  # re-export compat WS-2 (fuente: engine.dashboard_data)
 
 try:
     from flask import (Flask, abort, jsonify, redirect, render_template,  # type: ignore
@@ -91,7 +127,7 @@ except Exception:
 DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join("data", "bitacora.db"))
 USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join("src", "server", "users.json"))
 MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
-REPORTES_DIR_DEFAULT = os.path.join("data", "reportes")
+REPORTES_DIR_DEFAULT = os.path.join(RAIZ_PROYECTO, "data", "reportes")
 # Los gráficos (matplotlib) no cambian minuto a minuto -- el NDVI se
 # actualiza semanal, los datos del hato a lo sumo varían unas pocas veces
 # al día. Cachear 10 min evita regenerar la misma imagen si dos personas
@@ -236,19 +272,8 @@ def _generadores_graficos_pwa():
     }
 
 
-def _filas_dict(filas) -> list[dict]:
-    return [dict(r) for r in (filas or [])]
-
-
-def _ruta_relativa_media(ruta: str, media_dir: str = MEDIA_DIR_DEFAULT) -> str:
-    """`fotos.ruta` en la BD ya incluye el prefijo del directorio de media
-    (ej. `media/5953-2.jpg`, ver telegram_bot.py/dbf_importer.py) — esto lo
-    recorta para no duplicarlo al armar la URL `/media/<rel>`."""
-    r = str(ruta or "").replace("\\", "/").lstrip("/")
-    prefijo = media_dir.replace("\\", "/").strip("/") + "/"
-    if r.startswith(prefijo):
-        return r[len(prefijo):]
-    return os.path.basename(r)
+# _ruta_relativa_media y _filas_dict se importan desde engine.dashboard_data
+# (fuente única WS-2) y se re-exportan aquí para compatibilidad vía pwa.app.
 
 
 # ------------------------------------------------------------------ #
@@ -256,64 +281,19 @@ def _ruta_relativa_media(ruta: str, media_dir: str = MEDIA_DIR_DEFAULT) -> str:
 # ------------------------------------------------------------------ #
 def datos_tablero(db_path: str = DB_PATH_DEFAULT, potrero: Optional[str] = None) -> dict:
     """Tablero finca: activos por categoría, eventos 7d, retiros activos."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.conteos_tablero.
     db = _db(db_path)
     try:
-        hoy = date.today()
-        hace7 = (hoy - timedelta(days=7)).isoformat()
-        hoy_iso = hoy.isoformat()
-        filtro_pot = ""
-        params: tuple = ()
-        if potrero:
-            pid = db.potrero_id(potrero)
-            if pid is not None:
-                filtro_pot = " AND (a.potrero_id = ? OR a.id_animal IN (SELECT animal_id FROM traslados WHERE potrero_destino = ?))"
-                params = (pid, pid)
-        base = f"FROM animales a WHERE a.estado = 'ACTIVO'{filtro_pot}"
-        n = db.query_one(f"SELECT COUNT(*) n {base}", params)
-        hem = db.query_one(f"SELECT COUNT(*) n {base} AND UPPER(a.sexo) LIKE 'H%'", params)
-        mac = db.query_one(f"SELECT COUNT(*) n {base} AND UPPER(a.sexo) LIKE 'M%'", params)
-
-        def _cnt(tabla: str, col: str = "vaca_id", fid: str = "id_animal") -> int:
-            # Eventos 7d restringidos a animales ACTIVOS (y potrero si se filtra).
-            r = db.query_one(
-                f"SELECT COUNT(*) n FROM {tabla} e JOIN animales a ON a.id_animal = e.{col} "
-                f"WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?{filtro_pot}",
-                (hace7, hoy_iso) + params,
-            )
-            return int(r["n"]) if r else 0
-
         try:
-            ret = db.query_one(
-                """SELECT COUNT(DISTINCT t.animal_id) n FROM tratamientos t
-                   JOIN animales a ON a.id_animal = t.animal_id
-                   WHERE a.estado = 'ACTIVO'
-                   AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
-                    OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))""",
-                (hoy_iso, hoy_iso),
-            )
-            retiros = int(ret["n"]) if ret else 0
+            return _conteos_tablero(db, potrero=potrero)
         except Exception:
-            retiros = 0
-        por_potrero: list[dict] = []
-        try:
-            por_potrero = _filas_dict(db.query(
-                "SELECT COALESCE(p.nombre, p.codigo, 'Sin potrero') potrero, COUNT(*) n "
-                "FROM animales a LEFT JOIN potreros p ON p.id = a.potrero_id "
-                "WHERE a.estado = 'ACTIVO' GROUP BY potrero ORDER BY n DESC LIMIT 20"
-            ))
-        except Exception:
-            pass
-        return {
-            "activos": int(n["n"]) if n else 0,
-            "hembras": int(hem["n"]) if hem else 0,
-            "machos": int(mac["n"]) if mac else 0,
-            "partos_7d": _cnt("partos"),
-            "celos_7d": _cnt("celos"),
-            "servicios_7d": _cnt("servicios"),
-            "retiros_activos": retiros,
-            "por_potrero": por_potrero,
-            "potrero_filtro": potrero,
-        }
+            logger.exception("datos_tablero fallo completo")
+            return {
+                "activos": 0, "hembras": 0, "machos": 0,
+                "partos_7d": 0, "celos_7d": 0, "servicios_7d": 0,
+                "retiros_activos": 0, "por_potrero": [],
+                "potrero_filtro": potrero, "errores": {"tablero": "error interno"},
+            }
     finally:
         try:
             db.close()
@@ -323,46 +303,15 @@ def datos_tablero(db_path: str = DB_PATH_DEFAULT, potrero: Optional[str] = None)
 
 def datos_repro(db_path: str = DB_PATH_DEFAULT) -> dict:
     """Reproducción: FEP≤30d, eco d35 / palpación d60, celos AM-PM pendientes."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_reproduccion.
     db = _db(db_path)
     try:
-        hoy = date.today()
-        hoy_iso_repro = hoy.isoformat()
-        lim = (hoy + timedelta(days=30)).isoformat()
         try:
-            # "FEP ≤30d" = próximos partos, ventana hacia adelante desde hoy.
-            # Faltaba el límite inferior: sin él, traía las 30 fechas MÁS
-            # ANTIGUAS de toda la tabla (años atrás) en vez de las próximas.
-            fep = _filas_dict(db.query(
-                """SELECT a.tag, s.fecha, s.tipo_servicio, s.toro_pajilla, s.fep_calculada
-                   FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id
-                   WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL
-                   AND s.fep_calculada >= ? AND s.fep_calculada <= ?
-                   ORDER BY s.fep_calculada LIMIT 30""", (hoy_iso_repro, lim)))
+            return _datos_reproduccion(db)
         except Exception:
-            fep = []
-        try:
-            celos = _filas_dict(db.query(
-                """SELECT a.tag, c.fecha, c.am_pm FROM celos c
-                   JOIN animales a ON a.id_animal = c.vaca_id
-                   WHERE a.estado = 'ACTIVO' ORDER BY c.fecha DESC LIMIT 20"""))
-        except Exception:
-            celos = []
-        try:
-            diags = _filas_dict(db.query(
-                """SELECT a.tag, d.fecha, d.resultado, d.dias_gestacion FROM diagnosticos_gestacion d
-                   JOIN animales a ON a.id_animal = d.vaca_id
-                   WHERE a.estado = 'ACTIVO' ORDER BY d.fecha DESC LIMIT 20"""))
-        except Exception:
-            diags = []
-        try:
-            pendientes = _filas_dict(db.query(
-                "SELECT tipo_alerta, fecha_programada, descripcion FROM alertas "
-                "WHERE estado = 'PENDIENTE' AND tipo_alerta IN ('ECOGRAFIA','PALPACION') "
-                "ORDER BY fecha_programada LIMIT 30"))
-        except Exception:
-            pendientes = []
-        return {"fep_30d": fep, "celos_recientes": celos, "diagnosticos": diags,
-                "eco_palp_pendientes": pendientes}
+            logger.exception("datos_repro fallo completo")
+            return {"fep_30d": [], "celos_recientes": [], "diagnosticos": [],
+                    "eco_palp_pendientes": [], "errores": {"repro": "error interno"}}
     finally:
         try:
             db.close()
@@ -372,36 +321,15 @@ def datos_repro(db_path: str = DB_PATH_DEFAULT) -> dict:
 
 def datos_sanidad(db_path: str = DB_PATH_DEFAULT) -> dict:
     """Sanidad: retiros leche/carne con cuenta regresiva + últimos tratamientos."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_sanidad.
     db = _db(db_path)
     try:
-        hoy = date.today()
-        hoy_iso = hoy.isoformat()
         try:
-            retiros = _filas_dict(db.query(
-                """SELECT a.tag, t.producto, t.fecha, t.fecha_fin_retiro_leche,
-                          t.fecha_fin_retiro_carne FROM tratamientos t
-                   JOIN animales a ON a.id_animal = t.animal_id
-                   WHERE a.estado = 'ACTIVO'
-                   AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
-                    OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
-                   ORDER BY t.fecha DESC LIMIT 30""", (hoy_iso, hoy_iso)))
-            for r in retiros:
-                for k in ("fecha_fin_retiro_leche", "fecha_fin_retiro_carne"):
-                    if r.get(k):
-                        try:
-                            r[k + "_dias"] = (date.fromisoformat(r[k]) - hoy).days
-                        except Exception:
-                            r[k + "_dias"] = None
+            return _datos_sanidad(db)
         except Exception:
-            retiros = []
-        try:
-            ultimos = _filas_dict(db.query(
-                """SELECT a.tag, t.producto, t.dosis, t.via, t.fecha FROM tratamientos t
-                   JOIN animales a ON a.id_animal = t.animal_id
-                   WHERE a.estado = 'ACTIVO' ORDER BY t.fecha DESC, t.id DESC LIMIT 20"""))
-        except Exception:
-            ultimos = []
-        return {"retiros": retiros, "ultimos_tratamientos": ultimos}
+            logger.exception("datos_sanidad fallo completo")
+            return {"retiros": [], "ultimos_tratamientos": [],
+                    "errores": {"sanidad": "error interno"}}
     finally:
         try:
             db.close()
@@ -411,38 +339,15 @@ def datos_sanidad(db_path: str = DB_PATH_DEFAULT) -> dict:
 
 def datos_pasturas(db_path: str = DB_PATH_DEFAULT) -> dict:
     """Pasturas: ocupación Voisin (semáforo), reposo y último NDVI."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_pasturas.
     db = _db(db_path)
     try:
         try:
-            # Solo potreros con geometría real (Fase B del plan geoespacial)
-            # — mismo criterio que Database.resumen_ndvi_finca(): los
-            # códigos legacy (numéricos/L/G) no son potreros reales/actuales
-            # de la finca (confirmado por el usuario contra el reporte
-            # nativo de Software Ganadero SG) y no deben listarse como si
-            # fueran potreros activos.
-            potreros = _filas_dict(db.query(
-                "SELECT id, nombre, codigo, area_has, dias_ocupacion, dias_reposo, "
-                "fecha_entrada, fecha_salida FROM potreros "
-                "WHERE geom_wkt_4326 IS NOT NULL ORDER BY nombre"))
+            return _datos_pasturas(db)
         except Exception:
-            potreros = []
-        for p in potreros:
-            oc = p.get("dias_ocupacion")
-            try:
-                oc_i = int(oc) if oc is not None else None
-            except Exception:
-                oc_i = None
-            # Semáforo Voisin: 1-3 verde, 4-6 amarillo, ≥7 rojo.
-            p["semaforo"] = ("🟢" if (oc_i is not None and oc_i <= 3)
-                             else "🟡" if (oc_i is not None and oc_i <= 6)
-                             else "🔴" if oc_i is not None else "⚪")
-        try:
-            ndvi = _filas_dict(db.query(
-                """SELECT p.nombre potrero, n.fecha, n.ndvi_promedio FROM monitoreo_satelital_ndvi n
-                   JOIN potreros p ON p.id = n.potrero_id ORDER BY n.fecha DESC LIMIT 10"""))
-        except Exception:
-            ndvi = []
-        return {"potreros": potreros, "ndvi_reciente": ndvi}
+            logger.exception("datos_pasturas fallo completo")
+            return {"potreros": [], "ndvi_reciente": [],
+                    "errores": {"pasturas": "error interno"}}
     finally:
         try:
             db.close()
@@ -452,23 +357,15 @@ def datos_pasturas(db_path: str = DB_PATH_DEFAULT) -> dict:
 
 def datos_leche(db_path: str = DB_PATH_DEFAULT) -> dict:
     """Leche: serie del tanque (produccion_leche) + últimos controles."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_leche.
     db = _db(db_path)
     try:
         try:
-            serie = _filas_dict(db.query(
-                "SELECT fecha, SUM(litros) litros FROM produccion_leche "
-                "GROUP BY fecha ORDER BY fecha DESC LIMIT 30"))
-            serie = list(reversed(serie))
+            return _datos_leche(db)
         except Exception:
-            serie = []
-        try:
-            controles = _filas_dict(db.query(
-                """SELECT a.tag, l.fecha, l.litros FROM produccion_leche l
-                   LEFT JOIN animales a ON a.id_animal = l.animal_id
-                   ORDER BY l.fecha DESC LIMIT 20"""))
-        except Exception:
-            controles = []
-        return {"serie_tanque": serie, "controles": controles}
+            logger.exception("datos_leche fallo completo")
+            return {"serie_tanque": [], "controles": [],
+                    "errores": {"leche": "error interno"}}
     finally:
         try:
             db.close()
@@ -478,47 +375,189 @@ def datos_leche(db_path: str = DB_PATH_DEFAULT) -> dict:
 
 def datos_ficha(tag: str, db_path: str = DB_PATH_DEFAULT) -> dict:
     """Ficha animal: header + historial resumido + QR payload (abre /ficha/<tag>)."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_ficha_animal.
     db = _db(db_path)
     try:
-        t = str(tag or "").strip()
-        aid = db.resolve_animal(t)
-        if aid is None:
-            return {"existe": False, "tag": t}
-        an = db.get_animal(aid)
-        base = {"existe": True, "tag": an["tag"], "nombre": an["nombre"],
-                "sexo": an["sexo"], "raza": an["raza"],
-                "fecha_nacimiento": an["fecha_nacimiento"], "estado": an["estado"],
-                "qr_payload": f"JA://animal/{an['tag']}", "qr_url": f"/ficha/{an['tag']}"}
         try:
-            base["ultimo_parto"] = dict(db.ultimo_parto(aid)) if db.ultimo_parto(aid) else None
+            return _datos_ficha_animal(db, tag)
         except Exception:
-            base["ultimo_parto"] = None
+            logger.exception("datos_ficha fallo completo")
+            return {"existe": False, "tag": str(tag or "").strip(),
+                    "errores": {"ficha": "error interno"}}
+    finally:
         try:
-            base["ultimo_servicio"] = dict(db.ultimo_servicio(aid)) if db.ultimo_servicio(aid) else None
+            db.close()
         except Exception:
-            base["ultimo_servicio"] = None
+            pass
+
+
+def datos_inventario(db_path: str = DB_PATH_DEFAULT) -> dict:
+    """Inventario SG: brackets etarios (misma fuente que /animales del bot)."""
+    db = _db(db_path)
+    try:
         try:
-            base["pesajes"] = _filas_dict(db.query(
-                "SELECT fecha, peso_kg, gmd_calculada FROM pesajes WHERE animal_id = ? "
-                "ORDER BY fecha DESC LIMIT 5", (aid,)))
+            return _datos_inventario(db)
         except Exception:
-            base["pesajes"] = []
+            logger.exception("datos_inventario fallo completo")
+            return {"filas": [], "total_activos": 0, "total_hembras": 0,
+                    "total_machos": 0, "total_sin_sexo": 0, "terneros_menor_12m": 0,
+                    "errores": {"inventario": "error interno"}}
+    finally:
         try:
-            base["tratamientos"] = _filas_dict(db.query(
-                "SELECT fecha, producto, dosis, fecha_fin_retiro_leche, fecha_fin_retiro_carne "
-                "FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT 5", (aid,)))
+            db.close()
         except Exception:
-            base["tratamientos"] = []
+            pass
+
+
+def datos_poblacion(db_path: str = DB_PATH_DEFAULT) -> dict:
+    """Población / edades: brackets + edad promedio del hato activo."""
+    db = _db(db_path)
+    try:
         try:
-            fotos = db.fotos_de(aid, limit=3)
-            base["fotos"] = [
-                {"fecha": f["fecha"], "caption": f["caption"],
-                 "url": f"/media/{_ruta_relativa_media(f['ruta'])}" if f["ruta"] else None}
-                for f in fotos
-            ]
+            return _datos_poblacion(db)
         except Exception:
-            base["fotos"] = []
-        return base
+            logger.exception("datos_poblacion fallo completo")
+            return {"filas": [], "total_activos": 0, "total_hembras": 0,
+                    "total_machos": 0, "edad_promedio": None,
+                    "errores": {"poblacion": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def datos_genetica(db_path: str = DB_PATH_DEFAULT) -> dict:
+    """Genética: distribución por raza del hato activo."""
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_genetica(db)
+        except Exception:
+            logger.exception("datos_genetica fallo completo")
+            return {"filas": [], "total": 0,
+                    "errores": {"genetica": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def datos_agenda(db_path: str = DB_PATH_DEFAULT, dias: int = 7) -> dict:
+    """Agenda próxima: alertas PENDIENTES (partos, eco, palpación, secado, N₂)."""
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_agenda(db, dias=dias)
+        except Exception:
+            logger.exception("datos_agenda fallo completo")
+            return {"dias": dias, "eventos": [], "retiros": [],
+                    "errores": {"agenda": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def datos_buscar(db_path: str = DB_PATH_DEFAULT, q: str = "", limite: int = 8) -> dict:
+    """Autocompletar de animales/potreros para el buscador del dashboard."""
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_buscar(db, q=q, limite=limite)
+        except Exception:
+            logger.exception("datos_buscar fallo completo")
+            return {"animales": [], "potreros": [],
+                    "errores": {"buscar": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+# Generadores de gráficos por animal (whitelist, patrón idéntico al de
+# /api/grafico/<tipo>): solo estas claves fijas se pueden pedir por URL.
+def _generadores_graficos_ficha():
+    try:
+        from ..engine import charts
+    except ImportError:  # ejecución directa: python src/pwa/app.py
+        from src.engine import charts  # type: ignore
+    return {
+        "peso": charts.generar_grafico_peso,
+        "lactancia": charts.generar_grafico_lactancia,
+    }
+
+
+def _identificar_foto(db: Database, foto_bytes: bytes, ext: str = ".jpg") -> dict:
+    """Ejecuta detección de arete (visión + OCR) sobre una foto subida.
+
+    Lee SOLO la imagen (no persiste en BD ni en media/): guarda un temporal
+    en el directorio del sistema, llama a ``detectar_arete_avanzado`` (el
+    mismo pipeline del bot de Telegram para fotos de aretes) y resuelve el
+    candidato contra la base. Si OCR no está disponible (sin tesseract/
+    easyocr) la detección degrada a ``texto_bruto=""`` sin romper nada.
+    """
+    import tempfile
+    from datetime import datetime
+
+    from ..vision.arete_detector import detectar_arete_avanzado
+    ext = (ext or ".jpg").lower()
+    if not ext.startswith("."):
+        ext = "." + ext
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f"bitacora_ident_{datetime.now().strftime('%H%M%S')}_",
+            suffix=ext, delete=False,
+        ) as f:
+            f.write(foto_bytes or b"")
+            tmp_path = f.name
+        det = detectar_arete_avanzado(tmp_path) or {}
+        tag_candidato = (det.get("tag") or "").strip() or None
+        resultado: dict[str, Any] = {
+            "ocr_tag": tag_candidato,
+            "ocr_texto": (det.get("texto_bruto") or "")[:200],
+            "confianza": det.get("confianza") or 0.0,
+            "tipo_arete": det.get("tipo_arete") or "DESCONOCIDO",
+        }
+        if tag_candidato:
+            res = _resolver_tag_flexible(db, tag_candidato)
+            resultado.update(res)
+            resultado["candidato_leido"] = tag_candidato
+        else:
+            resultado.update({"existe": False, "sugerencias": []})
+            resultado["mensaje"] = (
+                "No se pudo leer el arete en la foto (¿muy lejos, oscura o sin "
+                "tesseract/easyocr en el servidor?). Pruebe con mejor luz o "
+                "escribiendo el arete/RFID en el campo de texto."
+            )
+        return resultado
+    finally:
+        if tmp_path and os.path.isfile(tmp_path):
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+
+def datos_identificar(db_path: str = DB_PATH_DEFAULT, texto: Optional[str] = None,
+                      foto_bytes: Optional[bytes] = None, foto_ext: str = ".jpg") -> dict:
+    """Identifica un animal por arete/RFID (texto) o por foto del arete (OCR)."""
+    db = _db(db_path)
+    try:
+        if texto:
+            return _resolver_tag_flexible(db, str(texto).strip())
+        if not foto_bytes:
+            return {"existe": False, "error": "Sin foto ni texto para identificar."}
+        try:
+            return _identificar_foto(db, foto_bytes, ext=foto_ext)
+        except Exception:
+            logger.exception("datos_identificar foto fallo completo")
+            return {"existe": False, "mensaje": "Error procesando la foto.",
+                    "errores": {"foto": "error interno"}}
     finally:
         try:
             db.close()
@@ -545,7 +584,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     # Rutas que no requieren sesión iniciada (nombres de endpoint de Flask,
     # es decir el nombre de la función de vista, no la URL).
-    _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest"}
+    _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest", "sw_js", "offline_page"}
 
     def _rol_actual() -> Optional[str]:
         if session is None:
@@ -562,6 +601,17 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if request.path.startswith("/api/") or request.path.startswith("/media/"):
             return jsonify({"error": "No autenticado. Inicie sesión en /login."}), 401
         return redirect("/login")
+
+    @app.errorhandler(500)
+    def error_interno(_e):
+        logger.exception("error interno PWA")
+        try:
+            p = request.path if request is not None else ""
+        except Exception:
+            p = ""
+        if p.startswith("/api/") or p.startswith("/media/"):
+            return jsonify({"error": "Error interno del servidor"}), 500
+        return "Error interno del servidor", 500
 
     @app.get("/login")
     def login_form():
@@ -594,7 +644,15 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/logout")
     def logout():
         session.clear()
-        return redirect("/login")
+        resp = redirect("/login")
+        # Respaldo del lado del servidor al borrado de caché en JS (app.js):
+        # si el navegador soporta Clear-Site-Data, esto limpia la caché del
+        # Service Worker aunque JS esté deshabilitado o el logout se dispare
+        # por navegación directa (sin pasar por el listener de app.js). En
+        # un equipo compartido, sin esto alguien podría ver offline los
+        # datos de la finca cacheados por la sesión anterior tras cerrarla.
+        resp.headers["Clear-Site-Data"] = '"cache", "storage"'
+        return resp
 
     @app.get("/")
     def index():
@@ -607,6 +665,22 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/manifest.json")
     def manifest():
         return app.send_static_file("manifest.json")
+
+    @app.get("/sw.js")
+    def sw_js():
+        # El service worker debe servirse en la raíz de su scope ("/") y sin
+        # caché HTTP (los navegadores lo revalidan agresivamente). Público.
+        resp = app.send_static_file("sw.js")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
+        return resp
+
+    @app.get("/offline.html")
+    def offline_page():
+        # Página de respaldo para el SW (navegación offline). Público.
+        resp = app.send_static_file("offline.html")
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
 
     @app.get("/api/tablero")
     def api_tablero():
@@ -644,6 +718,97 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out = datos_ficha(tag, db_path)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.get("/api/inventario")
+    def api_inventario():
+        out = datos_inventario(db_path)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/poblacion")
+    def api_poblacion():
+        out = datos_poblacion(db_path)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/genetica")
+    def api_genetica():
+        out = datos_genetica(db_path)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/agenda")
+    def api_agenda():
+        try:
+            dias = int(request.args.get("dias") or 7)
+        except (TypeError, ValueError):
+            dias = 7
+        dias = max(1, min(dias, 60))
+        out = datos_agenda(db_path, dias=dias)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/buscar")
+    def api_buscar():
+        q = (request.args.get("q") or "").strip()
+        out = datos_buscar(db_path, q=q)
+        return jsonify(out)
+
+    @app.post("/api/identificar")
+    def api_identificar():
+        # Identificación por texto (arete/RFID/lector de corral) o foto del
+        # arete. SOLO LECTURA: nunca inserta ni actualiza registros.
+        texto = (request.form.get("texto") or "").strip() or None
+        foto = request.files.get("foto") if request.files else None
+        if not texto and (foto is None or not foto.filename):
+            return jsonify({"existe": False, "error": "Envíe 'texto' (arete/RFID) o un archivo 'foto'."}), 400
+        if foto is not None and foto.filename:
+            ext = os.path.splitext(foto.filename)[1] or ".jpg"
+            out = datos_identificar(db_path, foto_bytes=foto.read(), foto_ext=ext)
+        else:
+            out = datos_identificar(db_path, texto=texto)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/ficha/<tag>/grafico/<tipo>")
+    def api_ficha_grafico(tag, tipo):
+        # Gráfico por animal (curva de peso, lactancia) con caché por tag+tipo.
+        generadores = _generadores_graficos_ficha()
+        generador = generadores.get(tipo)
+        if generador is None:
+            abort(404)
+        db_graf = _db(db_path)
+        try:
+            aid = db_graf.resolve_animal(tag, crear=False)
+            if aid is None:
+                abort(404)
+            cache_path = os.path.join(REPORTES_DIR_DEFAULT,
+                                      f"_pwa_cache_ficha_{aid}_{tipo}.png")
+            try:
+                fresco = (
+                    os.path.isfile(cache_path)
+                    and (time.time() - os.path.getmtime(cache_path)) < CACHE_GRAFICOS_SEGUNDOS
+                )
+            except Exception:
+                fresco = False
+            if fresco:
+                return send_file(os.path.abspath(cache_path), mimetype="image/png")
+            try:
+                from ..engine.charts import graficos_disponibles
+            except ImportError:  # ejecución directa
+                from src.engine.charts import graficos_disponibles  # type: ignore
+            if not graficos_disponibles():
+                abort(404)
+            ruta = generador(db_graf, tag, output_dir=REPORTES_DIR_DEFAULT)
+            if not ruta or not os.path.isfile(ruta):
+                abort(404)
+            try:
+                shutil.copyfile(ruta, cache_path)
+            except Exception:
+                cache_path = ruta
+            return send_file(os.path.abspath(cache_path), mimetype="image/png")
+        finally:
+            db_graf.close()
 
     @app.get("/api/grafico/<tipo>")
     def api_grafico(tipo):
@@ -749,8 +914,27 @@ if __name__ == "__main__":  # pragma: no cover
         print("   Instálelo con:  pip install flask", flush=True)
         raise SystemExit(2)
     _imprimir_banner(_host, _puerto)
-    try:
+
+    def _servir() -> None:
+        """Sirve la app con waitress (WSGI de producción, multi-hilo) si está
+        instalado; si no, cae al servidor de desarrollo de Flask con un aviso
+        (útil en local; nunca recomendado para VPS expuesto)."""
+        try:
+            from waitress import serve  # type: ignore
+
+            print("▶️  Servidor WSGI: waitress (producción, multi-hilo)", flush=True)
+            serve(_app, host=_host, port=_puerto, threads=8)
+            return
+        except ImportError:
+            print(
+                "⚠️  waitress no está instalado — usando el servidor de desarrollo "
+                "de Flask (solo para local). En producción instale:  pip install waitress\n",
+                flush=True,
+            )
         _app.run(host=_host, port=_puerto, debug=False)
+
+    try:
+        _servir()
     except OSError as e:
         # 4) Puerto ocupado (WinError 10048 / errno 48/98): mensaje accionable.
         msg = str(e).lower()
