@@ -48,13 +48,9 @@
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
   // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
   var COW_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
-  // Dos vacas (pequeña atrás-arriba + grande adelante-abajo, como el icono "users").
-  var COW_HEAD_X2 = '<g transform="translate(-0.8 1.6) scale(.38)">' + COW_HEAD + '</g>'
-    + '<g transform="translate(11.2 7.6) scale(.5)">' + COW_HEAD + '</g>';
   function icon(name, size) {
     var paths = {
       cow: COW_HEAD,
-      cowDouble: COW_HEAD_X2,
       grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
@@ -261,7 +257,7 @@
   }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var h = "<h3>" + icon("cowDouble") + "Inventario y Población</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("cow") + "Inventario y Población</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
       + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
@@ -274,6 +270,20 @@
       h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.acum) + "%</td></tr>";
     });
     h += "</table></div>";
+    h += "<h4>" + icon("grass") + "Distribución por potrero</h4>";
+    if (!d.por_potrero || !d.por_potrero.length) {
+      h += vacio("Ningún potrero con animales.");
+    } else {
+      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Cabezas</th></tr>";
+      (d.por_potrero || []).forEach(function (f) {
+        var nom = String(f.potrero || "");
+        var celda = (nom && nom.toLowerCase() !== "sin potrero")
+          ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "'>" + esc(nom) + "</a>"
+          : esc(nom);
+        h += "<tr><td>" + celda + "</td><td>" + esc(f.n) + "</td></tr>";
+      });
+      h += "</table></div>";
+    }
     // Pirámide de edades
     var maxP = 1;
     (d.piramide || []).forEach(function (f) { maxP = Math.max(maxP, Number(f.hembras) || 0, Number(f.machos) || 0); });

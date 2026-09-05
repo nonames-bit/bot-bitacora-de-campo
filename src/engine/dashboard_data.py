@@ -700,14 +700,30 @@ def _gmd_recientes(db: Database, limite: int = 15) -> list[dict]:
         return []
 
 
+def _por_potrero(db: Database) -> list[dict]:
+    """Cabezas ACTIVAS agrupadas por potrero (mismo criterio que el Tablero:
+    incluye "Sin potrero" y potreros legacy si de verdad tienen animales
+    activos ahí -- es el estado real de la base, no un listado de opciones)."""
+    try:
+        return _filas_dict(db.query(
+            "SELECT COALESCE(p.nombre, p.codigo, 'Sin potrero') potrero, COUNT(*) n "
+            "FROM animales a LEFT JOIN potreros p ON p.id = a.potrero_id "
+            "WHERE a.estado = 'ACTIVO' GROUP BY potrero ORDER BY n DESC LIMIT 20"
+        ))
+    except Exception:
+        logger.error("seccion por_potrero fallo", exc_info=True)
+        return []
+
+
 def datos_inventario(db: Database) -> dict:
     """Resumen unificado Inventario + Población (vista única del hato).
 
     Reutiliza ``engine.query.helpers.calcular_brackets_inventario_sg`` (la
     misma función que usa el bot de Telegram para /animales y /status) para
     que la PWA y Telegram nunca muestren brackets distintos. Incluye la
-    pirámide etaria, la edad promedio y los últimos pesajes con GMD para
-    mostrar todo el hato en una sola vista sin repetir información.
+    pirámide etaria, la edad promedio, los últimos pesajes con GMD y la
+    distribución por potrero para mostrar todo el hato en una sola vista sin
+    repetir información.
     """
     errores: dict[str, str] = {}
     try:
@@ -728,6 +744,7 @@ def datos_inventario(db: Database) -> dict:
         "piramide": _piramide_desde_brackets(brackets),
         "edad_promedio": _edad_promedio_anios(db),
         "gmd_reciente": gmd,
+        "por_potrero": _por_potrero(db),
     }
     if errores:
         out["errores"] = errores

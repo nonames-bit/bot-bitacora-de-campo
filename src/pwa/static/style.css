@@ -421,14 +421,21 @@ header {
   .nav-badge.on { animation: none; }
 }
 
-/* Fila de tarjetas KPI */
+/* Fila de tarjetas KPI.
+   flex (no grid): con grid-template-columns: repeat(auto-fit, minmax()) las
+   columnas se comparten entre TODAS las filas, así que una última fila
+   incompleta (ej. 6 KPIs en un ancho que cabe 4 por fila -> 4+2) deja hueco
+   vacío en vez de repartir el espacio -- se veía roto en pantallas angostas
+   (bug real reportado por el usuario en Inventario/Población). flex-wrap
+   reparte el ancho entre los ítems de CADA fila por separado. */
 .kpis {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 18px;
 }
 .kpi {
+  flex: 1 1 110px;
   background: var(--superficie);
   border: 1px solid var(--borde);
   border-radius: 8px;

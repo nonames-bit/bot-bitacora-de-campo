@@ -10,11 +10,13 @@ Estrategia:
 La PWA es SOLO LECTURA (no escribe en SQLite), así que este SW nunca encola
 escrituras. No cachear respuestas de login/logout (no GET) ni rutas no-GET.
 */
-// v18: regex de tags clicables ampliada (sufijos -N y _N; ~6% del hato no
-// era clicable). OJO: nunca bajar este numero -- un cliente que ya haya
-// tenido una cache con ese mismo nombre la trataria como "al dia" y se
-// quedaria con el HTML/JS/CSS viejo indefinidamente.
-var CACHE = "pwa-ja-v18"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v19: fix KPIs (.kpis grid -> flex, ultima fila no dejaba hueco vacio),
+// icono roto en "Inventario y Poblacion" (cowDouble illegible a tamano
+// chico), y tabla de Distribucion por potrero que faltaba en esa vista.
+// OJO: nunca bajar este numero -- un cliente que ya haya tenido una cache
+// con ese mismo nombre la trataria como "al dia" y se quedaria con el
+// HTML/JS/CSS viejo indefinidamente.
+var CACHE = "pwa-ja-v19"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

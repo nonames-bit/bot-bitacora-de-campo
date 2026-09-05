@@ -287,6 +287,10 @@ def test_inventario_unificado_incluye_piramide_y_gmd(client):
     assert isinstance(d["gmd_reciente"], list)
     total_pi = sum(f["hembras"] + f["machos"] for f in d["piramide"])
     assert total_pi <= d["total_activos"]  # nunca mayor que el hato activo
+    # Bug real reportado por el usuario: faltaba la tabla de distribución por
+    # potrero en la vista unificada (sí existía en Tablero).
+    assert "por_potrero" in d
+    assert any(p["potrero"] == "Guayabal" for p in d["por_potrero"])
 
 
 def test_api_poblacion_sigue_disponible_como_alias(client):
