@@ -611,7 +611,10 @@
   }
   // Convierte la primera columna de tablas (cuando es un arete) en un enlace
   // que abre la ficha del animal sin volver a teclear.
-  var _TAG_RE = /^([A-Za-z]{0,4}\d{1,6}|[A-Za-z]{1,4}-\d{1,6}|\d{1,4}-\d{1,3})$/;
+  // Cubre los formatos de arete reales de la finca, incluyendo los sufijos
+  // "-N" (generación/lote, ej. JA26-6, V064-6) y "_N" de las crías nuevas
+  // (ej. NM_67965) -- sin esto, ~6% del hato activo no era clicable.
+  var _TAG_RE = /^([A-Za-z]{0,4}\d{1,6}(-\d{1,3})?|[A-Za-z]{1,4}-\d{1,6}(-\d{1,3})?|\d{1,4}-\d{1,3}(-\d{1,3})?|[A-Za-z]{1,4}_\d{1,8})$/;
   var _CAB_NO_CLICK = /potrero|fecha|categor[ií]a|raza|c[óo]digo|banda|toro|bracket|peso/i;
   function abrirFichaDesdeTag(tag) {
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
