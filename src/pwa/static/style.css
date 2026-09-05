@@ -474,7 +474,30 @@ header {
   from { transform: scale(.4); opacity: 0; }
   to   { transform: scale(1); opacity: 1; }
 }
-.svg-icon { animation: iconPop .22s ease-out; }
+.svg-icon {
+  animation: iconPop .22s ease-out both;
+  transform-origin: center;
+}
+/* Trazo que se "escribe solo" (lo dispara JS midiendo cada path) */
+svg.svg-icon path,
+svg.svg-icon line,
+svg.svg-icon circle,
+svg.svg-icon rect,
+svg.svg-icon polyline,
+svg.svg-icon polygon {
+  transition: stroke-dashoffset .55s ease-out;
+}
+/* Flotación muy sutil de los iconos en títulos de sección */
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-1.5px); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .card h3 .svg-icon {
+    animation: iconPop .22s ease-out both,
+               iconFloat 4s ease-in-out 1.2s infinite;
+  }
+}
 h3 .svg-icon, h4 .svg-icon { transition: transform .15s ease; }
 nav button:hover .svg-icon,
 .mini button:hover .svg-icon,
@@ -482,7 +505,11 @@ button:hover .svg-icon {
   transform: scale(1.15) rotate(-6deg);
 }
 @media (prefers-reduced-motion: reduce) {
-  .svg-icon { animation: none; }
+  .svg-icon, .card h3 .svg-icon { animation: none; }
+  svg.svg-icon path, svg.svg-icon line, svg.svg-icon circle,
+  svg.svg-icon rect, svg.svg-icon polyline, svg.svg-icon polygon {
+    transition: none;
+  }
   nav button:hover .svg-icon, .mini button:hover .svg-icon, button:hover .svg-icon { transform: none; }
 }
 

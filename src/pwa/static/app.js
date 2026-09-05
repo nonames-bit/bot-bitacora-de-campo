@@ -70,7 +70,10 @@
       heartPulse: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
       heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
       shieldPlus: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/>',
-      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      // Lucide oficiales (ISC/MIT): gestación/reproducción y diagnóstico
+      egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
+      stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -104,13 +107,13 @@
     return h;
   }
   function renderRepro(d) {
-    var h = "<h3>" + icon("heartPulse") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    var h = "<h3>" + icon("egg") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
         ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }]
       ], "Sin partos próximos en 30 días.");
-    h += "<h4>" + icon("gauge") + "Diagnósticos de gestación recientes</h4>"
+    h += "<h4>" + icon("stethoscope") + "Diagnósticos de gestación recientes</h4>"
       + tabla(d.diagnosticos, [
         ["tag", "Vaca"], ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
@@ -335,7 +338,7 @@
   /* ---------- Ficha con pestañas ---------- */
   var TABS = [
     { id: "general", label: icon("cow") + "General" },
-    { id: "repro", label: icon("heartPulse") + "Reproducción" },
+    { id: "repro", label: icon("egg") + "Reproducción" },
     { id: "sanidad", label: icon("shieldPlus") + "Tratamientos" },
     { id: "leche", label: icon("milk") + "Leche" },
     { id: "pesos", label: icon("scale") + "Pesos" }
@@ -367,7 +370,7 @@
   }
   function chipResultado(v) {
     var s = String(v == null ? "" : v).toUpperCase();
-    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("heartPulse", 14) + "PREÑADA</span>";
+    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("egg", 14) + "PREÑADA</span>";
     if (s === "VACIA" || s === "VACÍA") return "<span class='chip ambar'>" + icon("circleEmpty", 14) + "VACÍA</span>";
     if (s === "FALLIDO") return "<span class='chip rojo'>" + icon("xmark", 14) + "FALLIDO</span>";
     if (!s) return "—";
@@ -519,6 +522,36 @@
       requestAnimationFrame(paso);
     });
   }
+  // "Escribe" los trazos de cada icono SVG (efecto dibujado, tipo Lucide).
+  // Mide cada path/line/circle con getTotalLength y lo anima con
+  // stroke-dashoffset. Se salta con prefers-reduced-motion.
+  function animarIconos(root) {
+    if (!root) return;
+    var redu = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (redu) return;
+    qa("svg.svg-icon", root).forEach(function (svg, iSvg) {
+      var hijos = qa("path,line,circle,rect,polyline,polygon", svg);
+      if (!hijos.length) return;
+      var largos = hijos.map(function (nd) {
+        try { return nd.getTotalLength ? nd.getTotalLength() : 0; }
+        catch (e) { return 0; }
+      });
+      var tieneTrazo = largos.some(function (l) { return l > 0; });
+      if (!tieneTrazo) return;
+      hijos.forEach(function (nd, i) {
+        if (largos[i] <= 0) return;
+        nd.style.strokeDasharray = String(largos[i]);
+        nd.style.strokeDashoffset = String(largos[i]);
+      });
+      void svg.getBoundingClientRect(); // forzar reflow para arrancar la transición
+      var delay = 80 + iSvg * 40; // pequeño escalonado entre iconos
+      setTimeout(function () {
+        hijos.forEach(function (nd, i) {
+          if (largos[i] > 0) nd.style.strokeDashoffset = "0";
+        });
+      }, delay);
+    });
+  }
   // Monta el HTML de una vista con la animación de entrada (si `animar`) y
   // refresca los KPIs. En el polling en silencio se evita la animación para
   // no "parpadear" la pantalla cada minuto.
@@ -530,8 +563,9 @@
       void el.offsetWidth; // reinicia la animación
       el.classList.add("vista-entra");
       setTimeout(function () { el.classList.remove("vista-entra"); }, 300);
+      animarKpis(el);
+      animarIconos(el);
     }
-    if (animar) animarKpis(el);
   }
   function fetchJSON(url, cb, target) {
     target = target || vista;
@@ -723,12 +757,31 @@
       }
     });
   });
+  // Cambia de pestaña activa sin recargar (usado por el buscador de arriba:
+  // si el usuario escribe un tag/potrero estando en OTRA vista, hay que
+  // saltar a la vista que sabe usar ese campo antes de cargar).
+  function irAVista(v) {
+    actual = v;
+    qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
+    var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+    if (destino) destino.classList.add("act");
+  }
+  // Cargar manual (botón o Enter): el tag manda a Ficha y el potrero manda a
+  // Tablero (únicas vistas que usan esos campos), sin importar qué pestaña
+  // estaba activa antes.
+  function cargarManual() {
+    var t = (q("#f-tag") && q("#f-tag").value || "").trim();
+    var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
+    if (t && actual !== "ficha") irAVista("ficha");
+    else if (!t && pot && actual !== "tablero") irAVista("tablero");
+    cargar();
+  }
   var btn = document.getElementById("btn-cargar");
-  if (btn) btn.addEventListener("click", cargar);
+  if (btn) btn.addEventListener("click", cargarManual);
   // Enter en los campos de filtro dispara Cargar.
   ["f-potrero", "f-tag"].forEach(function (id) {
     var el = document.getElementById(id);
-    if (el) el.addEventListener("keydown", function (e) { if (e.key === "Enter") cargar(); });
+    if (el) el.addEventListener("keydown", function (e) { if (e.key === "Enter") cargarManual(); });
   });
   // Autocompletar: tecleo en tag/potrero consulta /api/buscar y llena datalist.
   ["f-potrero", "f-tag"].forEach(function (id) {

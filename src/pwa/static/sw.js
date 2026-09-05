@@ -10,8 +10,9 @@ Estrategia:
 La PWA es SOLO LECTURA (no escribe en SQLite), así que este SW nunca encola
 escrituras. No cachear respuestas de login/logout (no GET) ni rutas no-GET.
 */
-// v7: iconos SVG en la ficha (reemplaza emojis) + animacion de iconos + icono dna real.
-var CACHE = "pwa-ja-v8"; // subir versión al cambiar app.js/style.css (cache-first)
+// v11: buscar por Tag/Potrero funciona desde cualquier pestaña + efecto de
+// "dibujado" en los iconos SVG.
+var CACHE = "pwa-ja-v12"; // subir versión al cambiar app.js/style.css (cache-first)
 var PRECACHE = [
   "/",
   "/login",
