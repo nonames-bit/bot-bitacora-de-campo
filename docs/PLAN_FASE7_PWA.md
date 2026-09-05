@@ -99,6 +99,32 @@ Al retomar: decidir alcance y diseño concreto antes de implementar
 (especialmente la Etapa E.2, que necesita repensar el modelo de
 autenticación/escritura).
 
+### Etapa F — Usuarios y roles reales en la PWA (idea futura, sin empezar) 💡 ANOTADA 2026-09-05
+
+Pedido del usuario tras preguntar cómo se crean los usuarios de la PWA —
+hoy **no se crean**: hay una sola `PWA_PASSWORD` compartida en el `.env`
+(quien la tenga, entra) y un campo opcional de "ID de Telegram" en el
+login que solo *identifica* la sesión contra `src/server/users.json` (el
+mismo archivo que usa el bot) — el rol que devuelve (`OWNER`/`TRABAJADOR`)
+se guarda y se puede leer en las respuestas de la API, pero **hoy no
+restringe nada**: cualquiera con la contraseña ve exactamente lo mismo,
+sin importar su rol.
+
+Para que esto sea real haría falta:
+1. **Contraseña por persona** en vez de una compartida (ej. agregar un
+   campo `pwa_pin`/hash de contraseña a cada entrada de `users.json`, o
+   una tabla nueva) — así se sabe quién entró realmente, no solo "alguien
+   con la clave".
+2. **Aplicar el rol a lo que se muestra/permite**, no solo guardarlo —
+   ej. si algún día la Etapa E.2 (chat de equipo) o cualquier endpoint de
+   escritura se implementa, decidir explícitamente qué puede hacer
+   TRABAJADOR vs OWNER.
+
+Está directamente relacionado con la Etapa E de arriba: cualquier feature
+de escritura (chat de equipo, etc.) casi seguro necesita resolver esto
+primero. Nada de esto está diseñado en detalle ni implementado, es solo
+la nota para no perder la idea.
+
 ---
 
 ## 4. Tabla de tareas y estimación relativa (S <1d, M 2-4d, L 1-2 sem)
