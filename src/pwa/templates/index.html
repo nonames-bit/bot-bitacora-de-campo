@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bitácora JA · Dashboard</title>
-<meta name="theme-color" content="#2F5233">
+<meta name="theme-color" content="#1C1E21">
 <meta name="description" content="Tablero ejecutivo Ganadería JA">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
@@ -15,33 +15,39 @@
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<div id="barra-red">📡 Sin conexión — mostrando datos guardados. Reconectando…</div>
+<div id="barra-red">Sin conexión — mostrando datos locales. Reconectando…</div>
 <header>
-  <b>🐮 GANADERÍA JA · Tablero ejecutivo</b>
+  <b>GANADERÍA JA · Bitácora</b>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
-    <button id="btn-tema" class="tema-btn" title="Cambiar tema" aria-label="Cambiar tema">☀️</button>
+    <select id="select-tema" class="tema-btn" title="Estilo visual" aria-label="Cambiar tema">
+      <option value="green">Verde Campestre</option>
+      <option value="light">Claro Editorial</option>
+      <option value="dark">Modo Oscuro</option>
+    </select>
     <a href="/logout" class="salir">Salir</a>
   </span>
 </header>
 <nav>
-<button data-v="tablero" class="act">🐮 Tablero</button>
-<button data-v="agenda">📋 Agenda</button>
-<button data-v="inventario">📊 Inventario</button>
-<button data-v="poblacion">📈 Población</button>
-<button data-v="genetica">🧬 Genética</button>
-<button data-v="repro">🤰 Reproducción</button>
-<button data-v="sanidad">💉 Sanidad</button>
-<button data-v="pasturas">🌿 Pasturas</button>
-<button data-v="leche">🥛 Leche</button>
-<button data-v="ficha">🔎 Ficha</button>
+<button data-v="tablero" class="act">Tablero</button>
+<button data-v="agenda">Agenda</button>
+<button data-v="inventario">Inventario</button>
+<button data-v="poblacion">Población</button>
+<button data-v="genetica">Genética</button>
+<button data-v="repro">Reproducción</button>
+<button data-v="sanidad">Sanidad</button>
+<button data-v="pasturas">Pasturas</button>
+<button data-v="leche">Leche</button>
+<button data-v="ficha">Ficha</button>
 </nav>
 <main>
-<div class="card filtros"><label>Potrero: <input id="f-potrero" placeholder="ej. Guayabal" autocomplete="off" list="dl-potreros"></label>
-<label>Tag: <input id="f-tag" placeholder="ej. 47 · N069 · RFID" autocomplete="off" list="dl-tags"></label>
-<button id="btn-cargar">Cargar</button>
-<datalist id="dl-potreros"></datalist>
-<datalist id="dl-tags"></datalist></div>
+<div class="card filtros">
+  <label>Potrero: <input id="f-potrero" placeholder="ej. Guayabal" autocomplete="off" list="dl-potreros"></label>
+  <label>Tag: <input id="f-tag" placeholder="ej. 47 · N069" autocomplete="off" list="dl-tags"></label>
+  <button id="btn-cargar">Cargar</button>
+  <datalist id="dl-potreros"></datalist>
+  <datalist id="dl-tags"></datalist>
+</div>
 <div id="vista" class="card">Cargando…</div>
 </main>
 <script src="/static/app.js"></script>

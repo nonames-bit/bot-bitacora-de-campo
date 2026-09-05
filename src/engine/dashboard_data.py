@@ -187,8 +187,24 @@ def datos_reproduccion(db: Database) -> dict:
         logger.error("seccion eco_palp_pendientes fallo", exc_info=True)
         errores["eco_palp_pendientes"] = str(e)
         pendientes = []
-    out: dict[str, Any] = {"fep_30d": fep, "celos_recientes": celos, "diagnosticos": diags,
-            "eco_palp_pendientes": pendientes}
+    try:
+        cc_critica = _filas_dict(db.query(
+            """SELECT a.tag, cc.fecha, cc.valor, cc.notas FROM condicion_corporal cc
+               JOIN animales a ON a.id_animal = cc.animal_id
+               WHERE a.estado = 'ACTIVO' AND cc.valor < 2.5
+               ORDER BY cc.fecha DESC LIMIT 15"""
+        ))
+    except Exception as e:
+        logger.error("seccion condicion_corporal_critica fallo", exc_info=True)
+        errores["condicion_corporal_critica"] = str(e)
+        cc_critica = []
+    out: dict[str, Any] = {
+        "fep_30d": fep,
+        "celos_recientes": celos,
+        "diagnosticos": diags,
+        "eco_palp_pendientes": pendientes,
+        "condicion_corporal_critica": cc_critica,
+    }
     if errores:
         out["errores"] = errores
     return out
@@ -270,7 +286,31 @@ def datos_pasturas(db: Database) -> dict:
         logger.error("seccion ndvi_reciente fallo", exc_info=True)
         errores["ndvi_reciente"] = str(e)
         ndvi = []
-    out: dict[str, Any] = {"potreros": potreros, "ndvi_reciente": ndvi}
+    try:
+        pluviometria = _filas_dict(db.query(
+            """SELECT fecha, mm_lluvia, observaciones FROM pluviometria 
+               ORDER BY fecha DESC LIMIT 15"""
+        ))
+    except Exception as e:
+        logger.error("seccion pluviometria_reciente fallo", exc_info=True)
+        errores["pluviometria_reciente"] = str(e)
+        pluviometria = []
+    try:
+        aforos = _filas_dict(db.query(
+            """SELECT p.nombre potrero, af.fecha, af.aforo_kg_m2, af.pct_ms FROM aforos_historico af
+               JOIN potreros p ON p.id = af.potrero_id
+               ORDER BY af.fecha DESC LIMIT 15"""
+        ))
+    except Exception as e:
+        logger.error("seccion aforos_recientes fallo", exc_info=True)
+        errores["aforos_recientes"] = str(e)
+        aforos = []
+    out: dict[str, Any] = {
+        "potreros": potreros,
+        "ndvi_reciente": ndvi,
+        "pluviometria_reciente": pluviometria,
+        "aforos_recientes": aforos,
+    }
     if errores:
         out["errores"] = errores
     return out
@@ -648,12 +688,24 @@ def datos_poblacion(db: Database) -> dict:
     except Exception as e:
         logger.error("seccion edad_promedio fallo", exc_info=True)
         errores["edad_promedio"] = str(e)
+    try:
+        gmd_reciente = _filas_dict(db.query(
+            """SELECT a.tag, p.fecha, p.peso_kg, p.gmd_calculada FROM pesajes p
+               JOIN animales a ON a.id_animal = p.animal_id
+               WHERE a.estado = 'ACTIVO' AND p.gmd_calculada IS NOT NULL
+               ORDER BY p.fecha DESC LIMIT 15"""
+        ))
+    except Exception as e:
+        logger.error("seccion gmd_reciente fallo", exc_info=True)
+        errores["gmd_reciente"] = str(e)
+        gmd_reciente = []
     out: dict[str, Any] = {
         "filas": _brackets_a_filas(brackets) if brackets else [],
         "total_activos": brackets.get("total_activos", 0) if brackets else 0,
         "total_hembras": brackets.get("total_hembras", 0) if brackets else 0,
         "total_machos": brackets.get("total_machos", 0) if brackets else 0,
         "edad_promedio": edad_promedio,
+        "gmd_reciente": gmd_reciente,
     }
     if errores:
         out["errores"] = errores
@@ -697,7 +749,30 @@ def datos_genetica(db: Database) -> dict:
     except Exception as e:
         logger.error("seccion genetica fallo", exc_info=True)
         errores["genetica"] = str(e)
-    out: dict[str, Any] = {"filas": filas, "total": total}
+    try:
+        pajuelas = _filas_dict(db.query(
+            """SELECT codigo_toro, raza, procedencia, canastilla, cantidad FROM pajuelas_inventario
+               ORDER BY cantidad DESC LIMIT 20"""
+        ))
+    except Exception as e:
+        logger.error("seccion pajuelas_inventario fallo", exc_info=True)
+        errores["pajuelas_inventario"] = str(e)
+        pajuelas = []
+    try:
+        termos = _filas_dict(db.query(
+            """SELECT fecha_recarga, proxima_recarga, dias_intervalo FROM termo_nitrogeno
+               ORDER BY fecha_recarga DESC LIMIT 10"""
+        ))
+    except Exception as e:
+        logger.error("seccion termo_nitrogeno fallo", exc_info=True)
+        errores["termo_nitrogeno"] = str(e)
+        termos = []
+    out: dict[str, Any] = {
+        "filas": filas,
+        "total": total,
+        "pajuelas_inventario": pajuelas,
+        "termo_nitrogeno": termos,
+    }
     if errores:
         out["errores"] = errores
     return out

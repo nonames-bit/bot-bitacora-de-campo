@@ -45,10 +45,36 @@
   }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
 
+  // SVG Icon helper (Phosphor-like technical style, stroke-width: 1.5px, size: 18px)
+  function icon(name, size) {
+    var paths = {
+      cow: '<path d="M12 21a6 6 0 0 1-6-6v-3a6 6 0 1 1 12 0v3a6 6 0 0 1-6 6zm0 0v-3"/>',
+      calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+      chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+      chartLine: '<path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>',
+      dna: '<path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/>',
+      baby: '<circle cx="12" cy="10" r="3"/><path d="M12 13a5 5 0 0 0-5 5v2h10v-2a5 5 0 0 0-5-5z"/>',
+      syringe: '<path d="M5 21l3-3m-3 3L3 19m2 2L19 7m-11 11l1.5-1.5M10 16l4-4M19 7l2-2-3-3-2 2M18 6l-4-4"/>',
+      grass: '<path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/>',
+      milk: '<path d="M7 2h10l1 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6l1-4zm0 4h10"/>',
+      search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+      alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+      rain: '<path d="M17 10a5 5 0 0 0-10 0 4 4 0 0 0 0 8h10a4 4 0 0 0 0-8zm-8 10l-1 2m4-2l-1 2m4-2l-1 2"/>',
+      gauge: '<path d="M3 12a9 9 0 0 1 15 0"/><path d="M12 12L9 9"/>',
+      nitrogen: '<path d="M12 2a5 5 0 0 0-5 5v5H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2V7a5 5 0 0 0-5-5z"/>',
+      camera: '<path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+      scale: '<circle cx="4.5" cy="12" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.5 12h11"/><path d="M8 9v6M16 9v6"/>',
+      circleEmpty: '<circle cx="12" cy="12" r="9"/>',
+      xmark: '<path d="M18 6 6 18M6 6l12 12"/>'
+    };
+    var s = size || 18;
+    return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
+  }
+
   /* ---------- Vistas principales ---------- */
   function renderTablero(d) {
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var h = "<h3>🐮 Tablero finca" + pot + "</h3>";
+    var h = "<h3>" + icon("cow") + "Tablero finca" + pot + "</h3>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
       + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
@@ -56,7 +82,7 @@
       + kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : "") + "</div>";
     h += erroresHtml(d);
     h += grafico("evolucion", "Evolución del rebaño") + grafico("categorias", "Categorías del hato");
-    h += "<h4>Distribución por potrero (toca para filtrar)</h4>";
+    h += "<h4>" + icon("grass") + "Distribución por potrero (toca para filtrar)</h4>";
     if (!d.por_potrero || !d.por_potrero.length) {
       h += vacio("Ningún potrero con animales.");
     } else {
@@ -73,30 +99,36 @@
     return h;
   }
   function renderRepro(d) {
-    var h = "<h3>🤰 Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
-    h += "<h4>📅 FEP ≤30d (próximos partos)</h4>"
+    var h = "<h3>" + icon("baby") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
         ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }]
       ], "Sin partos próximos en 30 días.");
-    h += "<h4>Diagnósticos de gestación recientes</h4>"
+    h += "<h4>" + icon("gauge") + "Diagnósticos de gestación recientes</h4>"
       + tabla(d.diagnosticos, [
         ["tag", "Vaca"], ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
         ["dias_gestacion", "Días gest."]
       ], "Sin diagnósticos recientes.");
-    h += "<h4>Celos recientes</h4>"
+    h += "<h4>" + icon("calendar") + "Celos recientes</h4>"
       + tabla(d.celos_recientes, [["tag", "Vaca"], ["fecha", "Fecha"], ["am_pm", "AM/PM"]], "Sin celos recientes.");
-    h += "<h4>Eco / Palpación pendientes</h4>"
+    h += "<h4>" + icon("alert") + "Eco / Palpación pendientes</h4>"
       + tabla(d.eco_palp_pendientes, [
         ["tipo_alerta", "Tipo"],
         ["fecha_programada", "Fecha", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
         ["descripcion", "Detalle"]
       ], "Sin eco/palpaciones programadas.");
+    h += "<h4>" + icon("alert") + "Condición Corporal Crítica (&lt; 2.5)</h4>"
+      + tabla(d.condicion_corporal_critica, [
+        ["tag", "Animal"], ["fecha", "Fecha"],
+        ["valor", "Condición CC", "text", function (v) { return "<span class='chip rojo'>" + esc(v) + "</span>"; }],
+        ["notas", "Observaciones"]
+      ], "Ningún animal con condición corporal crítica registrada. 🎉");
     return h;
   }
   function renderSanidad(d) {
-    var h = "<h3>💉 Sanidad</h3>" + erroresHtml(d) + "<h4>⛔ Retiros activos (leche / carne)</h4>";
+    var h = "<h3>" + icon("syringe") + "Sanidad</h3>" + erroresHtml(d) + "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
     if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
@@ -111,7 +143,7 @@
       }).join("");
       h += "</table></div>";
     }
-    h += "<h4>Últimos tratamientos</h4>"
+    h += "<h4>" + icon("syringe") + "Últimos tratamientos</h4>"
       + tabla(d.ultimos_tratamientos, [
         ["tag", "Animal"], ["fecha", "Fecha"], ["producto", "Producto"],
         ["dosis", "Dosis"], ["via", "Vía"]
@@ -119,9 +151,9 @@
     return h;
   }
   function renderPasturas(d) {
-    var h = "<h3>🌿 Pasturas (Voisin)</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("grass") + "Pasturas (Voisin)</h3>" + erroresHtml(d);
     h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
-    h += "<h4>Ocupación y reposo por potrero</h4>";
+    h += "<h4>" + icon("gauge") + "Ocupación y reposo por potrero</h4>";
     if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th>Ocupación</th><th>Reposo</th><th>Ha</th></tr>";
@@ -134,7 +166,7 @@
       }).join("");
       h += "</table></div>";
     }
-    h += "<h4>🛰️ NDVI reciente (satélite)</h4>"
+    h += "<h4>" + icon("chartLine") + "NDVI reciente (satélite)</h4>"
       + tabla(d.ndvi_reciente, [
         ["potrero", "Potrero"], ["fecha", "Fecha"],
         ["ndvi_promedio", "NDVI", "text", function (v) {
@@ -143,12 +175,30 @@
           return "<span class='chip " + c + "'>" + esc(v) + "</span>";
         }]
       ], "Sin lecturas NDVI recientes.");
+    h += "<h4>" + icon("rain") + "Pluviómetro Local Reciente</h4>"
+      + tabla(d.pluviometria_reciente, [
+        ["fecha", "Fecha"],
+        ["mm_lluvia", "Lluvia", "text", function (v) {
+          return "<b>" + esc(v) + " mm</b>";
+        }],
+        ["observaciones", "Observaciones"]
+      ], "Sin registros de pluviometría manual.");
+    h += "<h4>" + icon("grass") + "Aforos de Pasto Recientes</h4>"
+      + tabla(d.aforos_recientes, [
+        ["potrero", "Potrero"], ["fecha", "Fecha"],
+        ["aforo_kg_m2", "Aforo MV", "text", function (v) {
+          return "<b>" + esc(v) + " kg/m²</b>";
+        }],
+        ["pct_ms", "% MS", "text", function (v) {
+          return esc(v) + " %";
+        }]
+      ], "Sin aforos históricos registrados.");
     return h;
   }
   function renderLeche(d) {
     var total = 0;
     (d.serie_tanque || []).forEach(function (f) { total += Number(f.litros) || 0; });
-    var h = "<h3>🥛 Leche (tanque)</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("milk") + "Leche (tanque)</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.controles.length, "Controles") + kpi(total.toFixed(0), "L últimos 30 días");
     var mejor = (d.ranking_vacas && d.ranking_vacas.length) ? d.ranking_vacas[0] : null;
     if (mejor) {
@@ -156,14 +206,14 @@
     }
     h += "</div>";
     h += grafico("leche_total", "Producción total de leche") + grafico("eficiencia_lechera", "Eficiencia lechera");
-    h += "<h4>Ranking de vacas por litros (acumulado)</h4>"
+    h += "<h4>" + icon("chartBar") + "Ranking de vacas por litros (acumulado)</h4>"
       + tabla(d.ranking_vacas, [
         ["tag", "Vaca"], ["total_litros", "Total L", "num"], ["controles", "Controles", "num"],
         ["ultima_fecha", "Último control", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }]
       ], "Sin producción por vaca registrada.");
-    h += "<h4>Producción por día</h4>"
+    h += "<h4>" + icon("chartLine") + "Producción por día</h4>"
       + tabla(d.serie_tanque, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin registros de tanque.");
-    h += "<h4>Controles individuales</h4>"
+    h += "<h4>" + icon("calendar") + "Controles individuales</h4>"
       + tabla(d.controles, [["tag", "Vaca"], ["fecha", "Fecha"], ["litros", "L", "num"]], "Sin controles individuales.");
     return h;
   }
@@ -181,12 +231,12 @@
     return h;
   }
   function renderInventario(d) {
-    var h = "<h3>📊 Inventario SG</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("chartBar") + "Inventario SG</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
       + kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : "")
       + kpi(d.terneros_menor_12m, "Crías <12m") + "</div>";
-    h += "<h4>Brackets de edad (Software Ganadero)</h4>";
+    h += "<h4>" + icon("chartLine") + "Brackets de edad (Software Ganadero)</h4>";
     h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Nro</th><th>Distrib.</th><th>Acum.</th></tr>";
     (d.filas || []).forEach(function (f) {
       h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.acum) + "%</td></tr>";
@@ -195,30 +245,55 @@
     return h;
   }
   function renderPoblacion(d) {
-    var h = "<h3>📈 Población y edades</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("chartLine") + "Población y edades</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos") + kpi(d.total_hembras, "Hembras")
       + kpi(d.total_machos, "Machos") + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio") + "</div>";
-    h += "<h4>Composición por bracket de edad</h4>";
+    h += "<h4>" + icon("chartBar") + "Composición por bracket de edad</h4>";
     var maxN = 1;
     (d.filas || []).forEach(function (f) { if (Number(f.n) > maxN) maxN = Number(f.n); });
     var filasBar = (d.filas || []).map(function (f) { return { categoria: f.categoria, n: f.n, pct: (Number(f.n) / maxN) * 100 }; });
     h += barrasDeFilas(filasBar, "pct", "n");
+    h += "<h4>" + icon("gauge") + "Últimos Pesajes y GMD (Ganancia Media Diaria)</h4>"
+      + tabla(d.gmd_reciente, [
+        ["tag", "Animal"], ["fecha", "Fecha"], ["peso_kg", "Peso (kg)", "num"],
+        ["gmd_calculada", "GMD (g/día)", "text", function (v) {
+          var n = Number(v) * 1000;
+          var c = n >= 600 ? "verde" : n >= 300 ? "ambar" : n > 0 ? "gris" : "rojo";
+          return "<span class='chip " + c + "'>" + esc(n.toFixed(0)) + " g</span>";
+        }]
+      ], "Sin pesajes con GMD calculada recientemente.");
     return h;
   }
   function renderGenetica(d) {
-    var h = "<h3>🧬 Composición genética (razas)</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("dna") + "Composición genética (razas)</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total, "Animales tipificados") + "</div>";
     if (d.filas && d.filas.length) {
       var porNombre = (d.filas || []).map(function (f) { return { categoria: f.raza_nombre || f.raza, n: f.n, pct: f.pct }; });
-      h += "<h4>Distribución por raza</h4>" + barrasDeFilas(porNombre, "pct", "n");
-      h += "<h4>Detalle</h4>" + tabla(d.filas, [["raza_nombre", "Raza"], ["raza", "Código"], ["n", "Cabezas", "num"], ["pct", "% del hato"]], "Sin datos.");
+      h += "<h4>" + icon("chartBar") + "Distribución por raza</h4>" + barrasDeFilas(porNombre, "pct", "n");
+      h += "<h4>" + icon("chartLine") + "Detalle</h4>" + tabla(d.filas, [["raza_nombre", "Raza"], ["raza", "Código"], ["n", "Cabezas", "num"], ["pct", "% del hato"]], "Sin datos.");
     } else {
       h += vacio("Sin razas registradas en el hato activo.");
     }
+    h += "<h4>" + icon("dna") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
+      + tabla(d.pajuelas_inventario, [
+        ["codigo_toro", "Código Toro"], ["raza", "Raza"],
+        ["procedencia", "Procedencia"], ["canastilla", "Canastilla"],
+        ["cantidad", "Pajuelas", "num", function (v) {
+          var n = Number(v);
+          var c = n >= 10 ? "verde" : n >= 3 ? "ambar" : "rojo";
+          return "<span class='chip " + c + "'>" + esc(n) + "</span>";
+        }]
+      ], "Sin inventario de pajuelas registrado.");
+    h += "<h4>" + icon("nitrogen") + "Recargas del Termo de Nitrógeno</h4>"
+      + tabla(d.termo_nitrogeno, [
+        ["fecha_recarga", "Última Recarga"],
+        ["proxima_recarga", "Próxima Recarga", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
+        ["dias_intervalo", "Intervalo (días)", "num"]
+      ], "Sin historial de recargas de nitrógeno.");
     return h;
   }
   function renderAgenda(d) {
-    var h = "<h3>📋 Agenda próximos " + esc(d.dias) + " días</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + erroresHtml(d);
     var evs = d.eventos || [];
     var urgencia = function (f) {
       if (f.faltan_dias == null) return "gris";
@@ -228,17 +303,17 @@
       return "<span class='chip " + urgencia(v) + "'>" + esc(v.faltan_dias != null ? (v.faltan_dias <= 0 ? "HOY" : v.faltan_dias + "d") : "?") + "</span>";
     };
     if (evs.length) {
-      h += "<h4>🔔 Alertas programadas</h4><div class='tabla-scroll'><table><tr><th>Fecha</th><th>Tipo</th><th>Animal</th><th>Detalle</th><th>En</th></tr>";
+      h += "<h4>" + icon("alert") + "Alertas programadas</h4><div class='tabla-scroll'><table><tr><th>Fecha</th><th>Tipo</th><th>Animal</th><th>Detalle</th><th>En</th></tr>";
       evs.forEach(function (e) {
         h += "<tr><td><b>" + esc(e.fecha) + "</b></td><td>" + esc(e.etiqueta) + "</td><td>" + esc(e.tag || "—") + "</td><td>" + esc(e.descripcion || "—") + "</td><td>" + chipUrg(e) + "</td></tr>";
       });
       h += "</table></div>";
     } else {
-      h += "<p class='aviso'>🔔 Sin alertas programadas en los próximos " + esc(d.dias) + " días.</p>";
+      h += "<p class='aviso'>Sin alertas programadas en los próximos " + esc(d.dias) + " días.</p>";
     }
     var ret = d.retiros || [];
     if (ret.length) {
-      h += "<h4>⛔ Retiros sanitarios activos</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
+      h += "<h4>" + icon("alert") + "Retiros sanitarios activos</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       ret.forEach(function (r) {
         function c(f, df) {
           if (!f) return "<td>—</td>";
@@ -254,20 +329,20 @@
 
   /* ---------- Ficha con pestañas ---------- */
   var TABS = [
-    { id: "general", label: "🐮 General" },
-    { id: "repro", label: "🤰 Reproducción" },
-    { id: "sanidad", label: "💉 Tratamientos" },
-    { id: "leche", label: "🥛 Leche" },
-    { id: "pesos", label: "⚖️ Pesos" }
+    { id: "general", label: icon("cow") + "General" },
+    { id: "repro", label: icon("baby") + "Reproducción" },
+    { id: "sanidad", label: icon("syringe") + "Tratamientos" },
+    { id: "leche", label: icon("milk") + "Leche" },
+    { id: "pesos", label: icon("scale") + "Pesos" }
   ];
   // HTML del panel "identificar por foto del arete" (solo en el dashboard,
   // no en la página /ficha/<tag> que llega desde el QR ya identificado).
   function identPanelHtml() {
     return "<div class='card ident-box' style='margin-bottom:10px'>"
-      + "<b>📷 Identificar por foto del arete</b>"
+      + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
       + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar.</p>"
       + "<input type='file' id='f-ident-foto' accept='image/*' capture='environment' style='min-height:40px'>"
-      + "<button id='btn-ident' type='button'>🔎 Identificar</button>"
+      + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
       + "<span id='ident-estado' class='aviso'></span>"
       + "<div id='ident-resultado'></div></div>";
   }
@@ -276,7 +351,7 @@
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
       head += "<img class='avatar' src='" + esc(f.fotos[0].url) + "' alt='foto' onerror='this.style.display=\"none\"'>";
     }
-    head += "<div class='datos'><b>🐮 " + esc(f.tag) + " " + esc(f.nombre || "") + "</b><br>"
+    head += "<div class='datos'><b>" + icon("cow") + esc(f.tag) + " " + esc(f.nombre || "") + "</b><br>"
       + "<span class='meta'>" + esc(f.sexo || "") + " · " + esc(f.raza || "S/D") + " · " + esc(f.estado || "") + "</span><br>"
       + "<span class='meta'>Nac: " + esc(fechaCorta(f.fecha_nacimiento) || "S/D") + "</span></div></div>";
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
@@ -287,9 +362,9 @@
   }
   function chipResultado(v) {
     var s = String(v == null ? "" : v).toUpperCase();
-    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>🤰 PREÑADA</span>";
-    if (s === "VACIA" || s === "VACÍA") return "<span class='chip ambar'>⭕ VACÍA</span>";
-    if (s === "FALLIDO") return "<span class='chip rojo'>✖ FALLIDO</span>";
+    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("baby", 14) + "PREÑADA</span>";
+    if (s === "VACIA" || s === "VACÍA") return "<span class='chip ambar'>" + icon("circleEmpty", 14) + "VACÍA</span>";
+    if (s === "FALLIDO") return "<span class='chip rojo'>" + icon("xmark", 14) + "FALLIDO</span>";
     if (!s) return "—";
     return "<span class='chip gris'>" + esc(v) + "</span>";
   }
@@ -314,7 +389,7 @@
         ["dias_gestacion", "Días gest."]
       ], "Sin diagnósticos registrados.");
       if (f.ultimo_servicio && f.ultimo_servicio.fep_calculada) {
-        h += "<p class='aviso'>📅 FEP (parto estimado): <b>" + esc(fechaCorta(f.ultimo_servicio.fep_calculada)) + "</b></p>";
+        h += "<p class='aviso'>" + icon("calendar", 14) + "FEP (parto estimado): <b>" + esc(fechaCorta(f.ultimo_servicio.fep_calculada)) + "</b></p>";
       }
       return h;
     }
@@ -330,7 +405,7 @@
       var lac = f.lactancia || {};
       var h3 = "<h4>Estado de lactancia</h4>";
       if (lac && lac.fecha_parto) {
-        h3 += "<p class='aviso'>🥛 " + esc(lac.estado) + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
+        h3 += "<p class='aviso'>" + icon("milk", 14) + esc(lac.estado) + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
       } else {
         h3 += vacio("Sin lactancia activa (sin parto registrado o es macho).");
       }
@@ -348,7 +423,7 @@
           ["fecha", "Fecha"], ["peso_kg", "kg", "num"],
           ["gmd_calculada", "GMD (g/d)", "text", function (v) {
             if (v == null) return "—";
-            var n = Number(v);
+            var n = Number(v) * 1000;
             var c = n < 0 ? "rojo" : n > 0 ? "verde" : "gris";
             return "<span class='chip " + c + "'>" + esc(n.toFixed(0)) + "</span>";
           }]
@@ -404,7 +479,7 @@
     skeleton(target);
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
       if (!f.existe) {
-        if (target) target.innerHTML = "<h3>🔎 Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
+        if (target) target.innerHTML = "<h3>" + icon("search") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
           + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
           + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>";
         return;
@@ -438,7 +513,7 @@
     if (res.sugerencias && res.sugerencias.length) {
       var h = "<p class='aviso'>¿Quiso decir alguno de estos?</p>";
       h += "<div class='fotos-wrap'>" + res.sugerencias.map(function (s) {
-        return "<button data-tag='" + esc(s.tag) + "' class='chip' style='font-size:13px'>🐮 " + esc(s.tag)
+        return "<button data-tag='" + esc(s.tag) + "' class='chip' style='font-size:13px'>" + icon("cow", 14) + esc(s.tag)
           + (s.nombre ? " " + esc(s.nombre) : "") + "</button>";
       }).join("") + "</div>";
       out.innerHTML = h;
@@ -504,7 +579,7 @@
   function cargar() {
     if (actual === "ficha") {
       var t = (q("#f-tag") && q("#f-tag").value || "").trim();
-      if (!t) { if (vista) vista.innerHTML = "<h3>🔎 Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(); if (vista) bindIdent(); return; }
+      if (!t) { if (vista) vista.innerHTML = "<h3>" + icon("search") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(); if (vista) bindIdent(); return; }
       abrirFicha(t, vista, true);
       return;
     }
@@ -570,25 +645,22 @@
     cargar();
   }, 60000);
 
-  /* ---------- Modo oscuro ---------- */
-  var temaBtn = document.getElementById("btn-tema");
+  /* ---------- Selección de Tema (3 Modos) ---------- */
+  var selectTema = document.getElementById("select-tema");
   function aplicarTema(modo) {
     if (modo === "dark") document.documentElement.setAttribute("data-theme", "dark");
     else if (modo === "light") document.documentElement.setAttribute("data-theme", "light");
-    else document.documentElement.removeAttribute("data-theme");
-    try { localStorage.setItem("pwa_tema", modo || ""); } catch (e) { /* noop */ }
+    else document.documentElement.setAttribute("data-theme", "green");
+    try { localStorage.setItem("pwa_tema", modo || "green"); } catch (e) { /* noop */ }
+    if (selectTema) selectTema.value = modo || "green";
   }
   function temaInicial() {
-    try { return localStorage.getItem("pwa_tema") || ""; } catch (e) { return ""; }
+    try { return localStorage.getItem("pwa_tema") || "green"; } catch (e) { return "green"; }
   }
   aplicarTema(temaInicial());
-  if (temaBtn) {
-    var actualizarIconoTema = function () { temaBtn.textContent = document.documentElement.getAttribute("data-theme") === "dark" ? "🌙" : "☀️"; };
-    actualizarIconoTema();
-    temaBtn.addEventListener("click", function () {
-      var oscuro = document.documentElement.getAttribute("data-theme") !== "dark";
-      aplicarTema(oscuro ? "dark" : "light");
-      actualizarIconoTema();
+  if (selectTema) {
+    selectTema.addEventListener("change", function () {
+      aplicarTema(selectTema.value);
     });
   }
 

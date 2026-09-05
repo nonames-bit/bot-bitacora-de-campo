@@ -1,268 +1,578 @@
-/* Estilo compartido del Dashboard PWA Bitácora JA — paleta de marca igual
-   a los gráficos/PDF del bot (src/engine/charts.py, src/reports/qr_fichas.py).
-   Mobile-first: la barra de navegación se vuelve fija abajo en pantallas
-   angostas (patrón de app nativa), las tablas anchas scrollean en su propio
-   contenedor en vez de romper el layout. Mejoras WS-3: modo oscuro, chips
-   semáforo, tarjetas KPI, skeleton de carga, header fijo y banner offline. */
+/* ==========================================================================
+   🌱 Dashboard PWA Bitácora JA — Estilos Premium y Minimalismo Editorial
+   ========================================================================== */
 
-:root {
+/* --- 1. Definición de Variables y Temas (3 Modos) --- */
+
+/* Tema 1: Verde Campestre (Por Defecto - Identidad Ganadera) */
+:root, :root[data-theme="green"] {
+  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --theme-name: "Verde Campestre";
+
+  --fondo: #F3F7F3;
+  --superficie: #FFFFFF;
+  --borde: rgba(47, 82, 51, 0.08);
+  --borde-fuerte: #A4C1A8;
+  
+  --texto: #1F2D21;
+  --texto-suave: #556B58;
+  
   --verde-marca: #2F5233;
-  --verde-claro: #66BB6A;
-  --verde-pastel: #E7EFE8;
-  --tierra: #8D6E63;
-  --arena: #D4A373;
-  --gris: #78909C;
-  --rojo: #EF5350;
-  --ambar: #F2B33D;
-  --fondo: #f3f7f3;
-  --superficie: #ffffff;
-  --borde: #dde6dd;
-  --texto: #222;
-  --texto-suave: #5b6b5d;
-  --sombra: rgba(0,0,0,.10);
+  --verde-marca-hover: #1E3521;
+  --verde-marca-pastel: #EDF3EC;
+
+  --header-bg: #2F5233;
+  --header-txt: #FFFFFF;
+
+  /* Semáforos Muted / Pasteles */
+  --color-verde-bg: #EDF3EC;
+  --color-verde-txt: #346538;
+  --color-ambar-bg: #FBF3DB;
+  --color-ambar-txt: #956400;
+  --color-rojo-bg: #FDEBEC;
+  --color-rojo-txt: #9F2F2D;
+  --color-gris-bg: #F2F1EE;
+  --color-gris-txt: #5F5E5B;
+  --color-azul-bg: #E1F3FE;
+  --color-azul-txt: #1F6C9F;
+
+  --sombra: rgba(0, 0, 0, 0.015);
+  --sombra-activa: rgba(0, 0, 0, 0.03);
 }
 
-/* Modo oscuro (preferencia del sistema y conmutador manual vía [data-theme]) */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --fondo: #161d17;
-    --superficie: #1f2921;
-    --borde: #2e3d31;
-    --texto: #e6efe6;
-    --texto-suave: #9fb2a1;
-    --verde-pastel: #243527;
-    --sombra: rgba(0,0,0,.45);
-  }
+/* Tema 2: Claro Editorial (Limpio y Minimalista) */
+:root[data-theme="light"] {
+  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --theme-name: "Claro Editorial";
+
+  --fondo: #FBFBFA;
+  --superficie: #FFFFFF;
+  --borde: rgba(0, 0, 0, 0.05);
+  --borde-fuerte: #EAEAEA;
+  
+  --texto: #1C1E21;
+  --texto-suave: #787774;
+  
+  --verde-marca: #111111; /* Accentos en negro minimalista */
+  --verde-marca-hover: #333333;
+  --verde-marca-pastel: #F4F4F3;
+
+  --header-bg: #FFFFFF;
+  --header-txt: #1C1E21;
+
+  /* Semáforos */
+  --color-verde-bg: #EDF3EC;
+  --color-verde-txt: #346538;
+  --color-ambar-bg: #FBF3DB;
+  --color-ambar-txt: #956400;
+  --color-rojo-bg: #FDEBEC;
+  --color-rojo-txt: #9F2F2D;
+  --color-gris-bg: #F2F1EE;
+  --color-gris-txt: #5F5E5B;
+  --color-azul-bg: #E1F3FE;
+  --color-azul-txt: #1F6C9F;
+
+  --sombra: rgba(0, 0, 0, 0.01);
+  --sombra-activa: rgba(0, 0, 0, 0.02);
 }
+
+/* Tema 3: Modo Oscuro (Elegante con Accentos Verdes) */
 :root[data-theme="dark"] {
-  --fondo: #161d17;
-  --superficie: #1f2921;
-  --borde: #2e3d31;
-  --texto: #e6efe6;
-  --texto-suave: #9fb2a1;
-  --verde-pastel: #243527;
-  --sombra: rgba(0,0,0,.45);
+  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --theme-name: "Modo Oscuro";
+
+  --fondo: #121212;
+  --superficie: #1E1E1E;
+  --borde: rgba(255, 255, 255, 0.06);
+  --borde-fuerte: #333333;
+
+  --texto: #E1E1E1;
+  --texto-suave: #888888;
+  
+  --verde-marca: #66BB6A; /* Accento verde brillante para modo oscuro */
+  --verde-marca-hover: #4CAF50;
+  --verde-marca-pastel: #1E2D1F;
+
+  --header-bg: #1C1C1C;
+  --header-txt: #E1E1E1;
+
+  /* Semáforos adaptados a la oscuridad */
+  --color-verde-bg: #1B2A1C;
+  --color-verde-txt: #8FD88F;
+  --color-ambar-bg: #322712;
+  --color-ambar-txt: #F0C866;
+  --color-rojo-bg: #3D1B1B;
+  --color-rojo-txt: #FF9D97;
+  --color-gris-bg: #2C2C2C;
+  --color-gris-txt: #A0A0A0;
+  --color-azul-bg: #16283D;
+  --color-azul-txt: #8FBCFF;
+
+  --sombra: rgba(0, 0, 0, 0.3);
+  --sombra-activa: rgba(0, 0, 0, 0.4);
 }
+
+/* --- 2. Estilos Generales --- */
 
 * { box-sizing: border-box; }
 
 html { -webkit-text-size-adjust: 100%; }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  font-family: var(--font-base);
   margin: 0;
   background: var(--fondo);
   color: var(--texto);
-  padding-bottom: 76px; /* espacio para el nav fijo abajo en móvil */
-  transition: background .25s ease, color .25s ease;
+  padding-bottom: 76px; /* espacio para navegación móvil fija */
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
 }
 
 header {
-  background: var(--verde-marca);
-  color: #fff;
-  padding: 12px 16px;
+  background: var(--header-bg);
+  color: var(--header-txt);
+  border-bottom: 1px solid var(--borde);
+  padding: 14px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-wrap: wrap;
   position: sticky;
   top: 0;
   z-index: 20;
-  box-shadow: 0 1px 6px var(--sombra);
+  box-shadow: 0 1px 4px var(--sombra);
 }
-header a { color: #fff; }
-header b { font-size: 15px; }
-header .salir { font-size: 13px; opacity: 0.9; white-space: nowrap; text-decoration: none; }
-header .acciones { display: flex; align-items: center; gap: 10px; }
-header .reloj { font-size: 12px; opacity: .85; white-space: nowrap; }
-header .tema-btn {
-  background: rgba(255,255,255,.14);
-  color: #fff;
-  border: 1px solid rgba(255,255,255,.35);
-  border-radius: 8px;
-  min-height: 32px;
+header b {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+header a.salir {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--header-txt);
+  text-decoration: none;
+  border: 1px solid var(--header-txt);
+  opacity: 0.85;
   padding: 4px 10px;
-  font-size: 13px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  transition: opacity .15s ease, background .15s ease;
+}
+header a.salir:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+}
+header .acciones { display: flex; align-items: center; gap: 12px; }
+header .reloj {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--header-txt);
+  opacity: 0.85;
+}
+header .tema-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--header-txt);
+  border: 1px solid var(--header-txt);
+  opacity: 0.85;
+  border-radius: 6px;
+  min-height: 30px;
+  padding: 2px 10px;
+  font-size: 12px;
   cursor: pointer;
+  transition: opacity .15s ease, background .15s ease;
+}
+header .tema-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
 }
 
-/* Banner "sin conexión" (se muestra/oculta con JS, hidden por defecto) */
+/* Banner de estado de red */
 #barra-red {
   display: none;
-  background: #5b2d2d;
-  color: #fff;
+  background: var(--color-rojo-bg);
+  color: var(--color-rojo-txt);
   text-align: center;
-  font-size: 13px;
-  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--borde);
 }
 #barra-red.visible { display: block; }
 
+/* Navegación Principal */
 nav {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 10px 16px;
-  background: var(--verde-pastel);
+  padding: 12px 20px;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borde);
 }
 nav button {
-  border: 1px solid var(--verde-marca);
+  font-family: var(--font-base);
+  border: 1px solid var(--borde);
   background: var(--superficie);
-  color: var(--verde-marca);
-  border-radius: 8px;
-  padding: 8px 12px;
-  min-height: 40px;
+  color: var(--texto-suave);
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-height: 38px;
   cursor: pointer;
-  font-size: 13.5px;
-  transition: background .15s ease, color .15s ease;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background .1s ease, color .1s ease, border-color .1s ease;
 }
-nav button.act { background: var(--verde-marca); color: #fff; }
+nav button:hover {
+  background: var(--fondo);
+  color: var(--texto);
+}
+nav button.act {
+  background: var(--verde-marca-pastel);
+  color: var(--verde-marca);
+  border-color: var(--verde-marca);
+  font-weight: 600;
+}
 
-main { padding: 16px; max-width: 1080px; margin: auto; }
+main {
+  padding: 20px;
+  max-width: 1120px;
+  margin: auto;
+}
 
+/* Tarjetas */
 .card {
   background: var(--superficie);
   border: 1px solid var(--borde);
   border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 14px;
-  box-shadow: 0 1px 4px var(--sombra);
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 3px var(--sombra);
 }
-.card h3 { margin-top: 0; color: var(--verde-marca); }
-.card h4 { color: var(--tierra); margin-bottom: 6px; }
+.card h3 {
+  margin-top: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--texto);
+  letter-spacing: -0.02em;
+  margin-bottom: 16px;
+}
+.card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  margin-top: 24px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--borde);
+  padding-bottom: 6px;
+}
 
-/* Fila de tarjetas KPI (activos, eventos 7d, retiros, etc.) */
+/* Fila de tarjetas KPI */
 .kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 8px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
 }
 .kpi {
   background: var(--superficie);
   border: 1px solid var(--borde);
-  border-radius: 12px;
-  padding: 10px 8px;
-  text-align: center;
-  box-shadow: 0 1px 4px var(--sombra);
+  border-radius: 8px;
+  padding: 12px 10px;
+  text-align: left;
+  box-shadow: 0 1px 2px var(--sombra);
 }
-.kpi .num { font-size: 22px; font-weight: 800; line-height: 1.1; color: var(--verde-marca); }
-.kpi .etiq { font-size: 11.5px; color: var(--texto-suave); }
-.kpi.alerta .num { color: var(--rojo); }
-.kpi.ok .num { color: var(--verde-claro); }
+.kpi .num {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--texto);
+  letter-spacing: -0.03em;
+}
+.kpi .etiq {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--texto-suave);
+  margin-top: 6px;
+}
+.kpi.alerta .num { color: var(--color-rojo-txt); }
+.kpi.ok .num { color: var(--color-verde-txt); }
 
-/* Chips semáforo / estado */
+/* Chips de estado */
 .chip {
   display: inline-block;
   border-radius: 999px;
-  padding: 2px 9px;
-  font-size: 12px;
+  padding: 2px 8px;
+  font-size: 11px;
   font-weight: 600;
   white-space: nowrap;
 }
-.chip.verde { background: #e2f2e2; color: #1e6b1e; }
-.chip.ambar { background: #fdeecb; color: #8a6100; }
-.chip.rojo  { background: #fde0de; color: #a62a22; }
-.chip.gris  { background: #e9edf0; color: #55636b; }
-.chip.azul  { background: #ddebfb; color: #1c4e8c; }
-:root[data-theme="dark"] .chip.verde { background: #1e3520; color: #8fd88f; }
-:root[data-theme="dark"] .chip.ambar { background: #3a2f13; color: #f0c866; }
-:root[data-theme="dark"] .chip.rojo  { background: #3a1e1c; color: #ff9d97; }
-:root[data-theme="dark"] .chip.gris  { background: #2a3138; color: #aeb9c2; }
-:root[data-theme="dark"] .chip.azul  { background: #16283d; color: #8fbcff; }
+.chip.verde { background: var(--color-verde-bg); color: var(--color-verde-txt); }
+.chip.ambar { background: var(--color-ambar-bg); color: var(--color-ambar-txt); }
+.chip.rojo  { background: var(--color-rojo-bg); color: var(--color-rojo-txt); }
+.chip.gris  { background: var(--color-gris-bg); color: var(--color-gris-txt); }
+.chip.azul  { background: var(--color-azul-bg); color: var(--color-azul-txt); }
 
-.aviso { font-size: 13px; color: var(--texto-suave); margin: 4px 0; }
+/* Iconos SVG: entrada suave al aparecer + reacción al pasar el mouse */
+@keyframes iconPop {
+  from { transform: scale(.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+.svg-icon { animation: iconPop .22s ease-out; }
+h3 .svg-icon, h4 .svg-icon { transition: transform .15s ease; }
+nav button:hover .svg-icon,
+.mini button:hover .svg-icon,
+button:hover .svg-icon {
+  transform: scale(1.15) rotate(-6deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .svg-icon { animation: none; }
+  nav button:hover .svg-icon, .mini button:hover .svg-icon, button:hover .svg-icon { transform: none; }
+}
 
-.tabla-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
-td, th { border: 1px solid var(--borde); padding: 6px 8px; text-align: left; white-space: nowrap; }
-tbody tr:nth-child(even) { background: color-mix(in srgb, var(--superficie) 96%, #000 4%); }
+.aviso {
+  font-size: 12.5px;
+  color: var(--texto-suave);
+  margin: 6px 0;
+  padding: 8px 12px;
+  background: var(--fondo);
+  border-radius: 6px;
+  border: 1px solid var(--borde);
+}
 
-input, select {
-  padding: 8px;
+/* Tablas */
+.tabla-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--borde);
   border-radius: 8px;
-  border: 1px solid #999;
-  font-size: 15px; /* >=15px evita el zoom automático de iOS al enfocar */
-  min-height: 40px;
+  margin: 10px 0;
   background: var(--superficie);
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+th {
+  background: var(--fondo);
+  font-weight: 600;
+  color: var(--texto-suave);
+  border-bottom: 1px solid var(--borde);
+  padding: 8px 10px;
+  text-align: left;
+}
+td {
+  border-bottom: 1px solid var(--borde);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
   color: var(--texto);
 }
-button { min-height: 40px; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:nth-child(even) {
+  background: rgba(0, 0, 0, 0.015);
+}
 
-.grafico-wrap { margin: 10px 0; text-align: center; }
+/* Inputs, Filtros y Botones */
+.filtros {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filtros label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+input, select {
+  font-family: var(--font-base);
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--texto);
+  font-size: 14px;
+  min-height: 36px;
+  outline: none;
+  transition: border-color .15s ease;
+}
+input:focus, select:focus {
+  border-color: var(--verde-marca);
+}
+button {
+  font-family: var(--font-base);
+  background: var(--verde-marca);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  min-height: 36px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, transform .1s ease;
+}
+button:hover {
+  background: var(--verde-marca-hover);
+}
+button:active {
+  transform: scale(0.98);
+}
+
+/* Gráficos y Multimedia */
+.grafico-wrap {
+  margin: 14px 0;
+  text-align: center;
+  background: var(--superficie);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--borde);
+}
 .grafico-wrap img {
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
-  box-shadow: 0 1px 4px var(--sombra);
+  border-radius: 6px;
 }
 
-.fotos-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.fotos-wrap {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
 .fotos-wrap img {
-  width: 110px; height: 110px; object-fit: cover;
-  border-radius: 8px; box-shadow: 0 1px 4px var(--sombra);
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--borde);
+  box-shadow: 0 1px 2px var(--sombra);
 }
 
-.semaforo { font-size: 16px; }
-
-/* Esqueleto de carga (shimmer) mientras llega la API */
+/* Esqueleto de Carga Shimmer */
 .skeleton {
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--borde) 25%, color-mix(in srgb, var(--borde) 55%, var(--superficie) 45%) 50%, var(--borde) 75%);
+  background: linear-gradient(90deg, var(--borde) 25%, var(--fondo) 50%, var(--borde) 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.2s infinite;
+  animation: shimmer 1.5s infinite linear;
   min-height: 16px;
   margin: 8px 0;
 }
 .skeleton.h2 { min-height: 22px; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
-/* Ficha: encabezado del animal */
-.ficha-head { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-bottom: 6px; }
-.ficha-head img.avatar {
-  width: 84px; height: 84px; object-fit: cover; border-radius: 12px;
-  box-shadow: 0 1px 5px var(--sombra);
+/* Ficha del Animal */
+.ficha-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
 }
-.ficha-head .datos b { font-size: 18px; }
-.ficha-head .datos .meta { font-size: 13px; color: var(--texto-suave); }
+.ficha-head img.avatar {
+  width: 76px;
+  height: 76px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--borde);
+  box-shadow: 0 1px 3px var(--sombra);
+}
+.ficha-head .datos b {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.ficha-head .datos .meta {
+  font-size: 12.5px;
+  color: var(--texto-suave);
+}
 
-/* Pestañas de la ficha */
-#ficha-tabs { margin: 6px 0 4px; }
-#ficha-tabs nav.mini { display: flex; gap: 6px; flex-wrap: wrap; padding: 4px 0 8px; background: transparent; }
+/* Pestañas de la Ficha */
+#ficha-tabs { margin: 10px 0; }
+#ficha-tabs nav.mini {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  background: transparent;
+  border: none;
+}
 #ficha-tabs nav.mini button {
   border: 1px solid var(--borde);
   background: var(--superficie);
-  color: var(--texto);
-  border-radius: 999px;
-  padding: 6px 12px;
-  min-height: 34px;
-  font-size: 12.5px;
-  cursor: pointer;
+  color: var(--texto-suave);
+  border-radius: 20px;
+  padding: 6px 14px;
+  min-height: 30px;
+  font-size: 12px;
 }
-#ficha-tabs nav.mini button.act { background: var(--verde-marca); color: #fff; border-color: var(--verde-marca); }
+#ficha-tabs nav.mini button.act {
+  background: var(--verde-marca);
+  color: #FFFFFF;
+  border-color: var(--verde-marca);
+  font-weight: 600;
+}
 
-/* Barras de proporción (vistas de inventario/población/genética) */
-.barra-fila { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
-.barra-fila .et { width: 150px; flex: 0 0 auto; text-align: right; color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Riel neutro a propósito (gris translúcido, NO --borde): en modo oscuro
-   --borde es un verde grisáceo casi idéntico al extremo oscuro del
-   degradado anterior de .relleno, así que la barra se veía "toda llena"
-   sin importar el valor real -- no se distinguía dónde terminaba el
-   relleno. Un color plano y de alto contraste en .relleno arregla esto
-   en los dos temas. */
-.barra-fila .pista { flex: 1 1 auto; background: rgba(120, 144, 156, .28); border-radius: 999px; height: 14px; overflow: hidden; }
-/* display:block es obligatorio: .relleno es un <span> (inline por
-   defecto) y los elementos inline IGNORAN la propiedad width del todo --
-   por eso el ancho calculado en JS (ej. "width:65%") nunca se veía, sin
-   importar el valor real (bug real: todas las barras se veían "llenas"). */
-.barra-fila .relleno { display: block; height: 100%; border-radius: 999px; background: var(--verde-claro); min-width: 2px; }
-.barra-fila .num { width: 54px; flex: 0 0 auto; text-align: right; font-weight: 700; }
+/* Barras de Proporción */
+.barra-fila {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+  font-size: 12.5px;
+}
+.barra-fila .et {
+  width: 140px;
+  flex: 0 0 auto;
+  text-align: right;
+  color: var(--texto-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.barra-fila .pista {
+  flex: 1 1 auto;
+  background: var(--borde);
+  border-radius: 999px;
+  height: 12px;
+  overflow: hidden;
+}
+.barra-fila .relleno {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--verde-marca);
+  min-width: 2px;
+}
+.barra-fila .num {
+  width: 50px;
+  flex: 0 0 auto;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
 
-/* --- Navegación tipo app nativa en pantallas de teléfono --- */
+/* --- 3. Responsive y Navegación Móvil Fija Abajo --- */
 @media (max-width: 640px) {
-  main { padding: 10px; }
+  main { padding: 12px; }
+  header { padding: 10px 14px; }
   header b { font-size: 13.5px; }
   header .reloj { display: none; }
+  
   nav {
     position: fixed;
     bottom: 0;
@@ -273,23 +583,38 @@ button { min-height: 40px; }
     flex-wrap: nowrap;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
     background: var(--superficie);
     border-top: 1px solid var(--borde);
-    box-shadow: 0 -1px 6px var(--sombra);
+    border-bottom: none;
+    box-shadow: 0 -1px 4px var(--sombra);
   }
   nav button {
     flex: 0 0 auto;
     min-width: 0;
-    padding: 6px 10px;
+    padding: 6px 12px;
     font-size: 11px;
-    border-radius: 8px;
+    border-radius: 6px;
     border-color: transparent;
     background: transparent;
     color: var(--texto-suave);
+    min-height: 32px;
   }
-  nav button.act { background: var(--verde-pastel); color: var(--verde-marca); border-color: var(--verde-marca); }
-  td, th { font-size: 12.5px; padding: 5px 6px; }
-  .ficha-head img.avatar { width: 68px; height: 68px; }
-  .barra-fila .et { width: 110px; }
+  nav button.act {
+    background: var(--verde-marca-pastel);
+    color: var(--verde-marca);
+    border: 1px solid var(--borde);
+  }
+  
+  td, th {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+  .ficha-head img.avatar {
+    width: 60px;
+    height: 60px;
+  }
+  .barra-fila .et {
+    width: 100px;
+  }
 }
