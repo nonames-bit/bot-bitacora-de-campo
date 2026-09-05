@@ -32,8 +32,15 @@ try:
 except Exception:
     pass
 import hmac
+import mimetypes
 import secrets
 from typing import Any, Optional
+
+# Flask sirve /static con mimetypes.guess_type; .woff2 no viene registrado y
+# se entregaría como application/octet-stream, que algunos navegadores
+# rechazan en @font-face. Registro explícito aquí (global).
+mimetypes.add_type("font/woff2", ".woff2")
+mimetypes.add_type("font/woff", ".woff")
 
 try:
     from ..db.database import Database
@@ -42,6 +49,7 @@ try:
         _ruta_relativa_media as _ruta_relativa_media,
         conteos_tablero as _conteos_tablero,
         datos_agenda as _datos_agenda,
+        datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
         datos_ficha_animal as _datos_ficha_animal,
         datos_genetica as _datos_genetica,
@@ -63,6 +71,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
         _ruta_relativa_media as _ruta_relativa_media,
         conteos_tablero as _conteos_tablero,
         datos_agenda as _datos_agenda,
+        datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
         datos_ficha_animal as _datos_ficha_animal,
         datos_genetica as _datos_genetica,
@@ -478,6 +487,23 @@ def datos_buscar(db_path: str = DB_PATH_DEFAULT, q: str = "", limite: int = 8) -
             pass
 
 
+def datos_badges(db_path: str = DB_PATH_DEFAULT, dias: int = 7) -> dict:
+    """Contadores para los badges de la navegación (Agenda/Repro/Sanidad)."""
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_badges(db, dias=dias)
+        except Exception:
+            logger.exception("datos_badges fallo completo")
+            return {"agenda": 0, "repro": 0, "sanidad": 0, "dias": dias,
+                    "errores": {"badges": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
 # Generadores de gráficos por animal (whitelist, patrón idéntico al de
 # /api/grafico/<tipo>): solo estas claves fijas se pueden pedir por URL.
 def _generadores_graficos_ficha():
@@ -752,6 +778,16 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def api_buscar():
         q = (request.args.get("q") or "").strip()
         out = datos_buscar(db_path, q=q)
+        return jsonify(out)
+
+    @app.get("/api/badges")
+    def api_badges():
+        # Contadores ligeros para los badges de la navegación (Agenda/Repro/Sanidad).
+        try:
+            dias = int(request.args.get("dias") or 7)
+        except (TypeError, ValueError):
+            dias = 7
+        out = datos_badges(db_path, dias=max(1, min(dias, 60)))
         return jsonify(out)
 
     @app.post("/api/identificar")

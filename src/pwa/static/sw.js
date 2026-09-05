@@ -11,7 +11,7 @@ La PWA es SOLO LECTURA (no escribe en SQLite), así que este SW nunca encola
 escrituras. No cachear respuestas de login/logout (no GET) ni rutas no-GET.
 */
 // v7: iconos SVG en la ficha (reemplaza emojis) + animacion de iconos + icono dna real.
-var CACHE = "pwa-ja-v7";
+var CACHE = "pwa-ja-v8"; // subir versión al cambiar app.js/style.css (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -21,7 +21,11 @@ var PRECACHE = [
   "/static/app.js",
   "/static/favicon.svg",
   "/static/icon-192.png",
-  "/static/icon-512.png"
+  "/static/icon-512.png",
+  "/static/fonts/geist-sans-latin-400-normal.woff2",
+  "/static/fonts/geist-sans-latin-500-normal.woff2",
+  "/static/fonts/geist-sans-latin-600-normal.woff2",
+  "/static/fonts/geist-sans-latin-700-normal.woff2"
 ];
 
 self.addEventListener("install", function (e) {

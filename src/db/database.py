@@ -293,6 +293,14 @@ class Database:
                 self.execute(
                     "UPDATE animales SET madre_id = COALESCE(madre_id, ?) WHERE id_animal = ? AND (madre_id IS NULL OR madre_id != ?)", (vaca_id, id_cria, id_cria)
                 )
+                # La cría nace en el mismo potrero donde está la madre en ese
+                # momento -- si no se hereda aquí, queda "sin potrero" hasta
+                # el próximo backup/import de Software Ganadero.
+                fila_vaca = self.query_one("SELECT potrero_id FROM animales WHERE id_animal = ?", (vaca_id,))
+                if fila_vaca and fila_vaca["potrero_id"] is not None:
+                    self.execute(
+                        "UPDATE animales SET potrero_id = COALESCE(potrero_id, ?) WHERE id_animal = ?", (fila_vaca["potrero_id"], id_cria)
+                    )
             if sexo_cria:
                 self.execute(
                     "UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria)

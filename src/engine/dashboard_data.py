@@ -871,3 +871,77 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
         out["errores"] = errores
     return out
 
+
+def datos_badges(db: Database, dias: int = 7) -> dict:
+    """Contadores mínimos para los badges de la navegación PWA.
+
+    Un único endpoint liviano (una llamada por polling en vez de 3) con los
+    totales que el mayordomo debe ver sin abrir cada vista:
+    - agenda:  alertas PENDIENTES con fecha en [hoy, hoy+dias] + retiros activos
+    - repro:   vacas con FEP ≤30d + eco/palpaciones pendientes
+    - sanidad: animales en retiro activo (leche/carne)
+
+    Todas las consultas restringen a animales ACTIVOS (regla AGENTS.md).
+    """
+    errores: dict[str, str] = {}
+    hoy = date.today()
+    hoy_iso = hoy.isoformat()
+    lim = (hoy + timedelta(days=dias)).isoformat()
+    lim30 = (hoy + timedelta(days=30)).isoformat()
+
+    agenda = repro = sanidad = 0
+
+    def _cnt_retiros_activos() -> int:
+        r = db.query_one(
+            """SELECT COUNT(DISTINCT t.animal_id) n FROM tratamientos t
+               JOIN animales a ON a.id_animal = t.animal_id
+               WHERE a.estado = 'ACTIVO'
+               AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+                OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))""",
+            (hoy_iso, hoy_iso),
+        )
+        return int(r["n"]) if r else 0
+
+    try:
+        r = db.query_one(
+            "SELECT COUNT(*) n FROM alertas WHERE estado='PENDIENTE' "
+            "AND fecha_programada IS NOT NULL AND fecha_programada >= ? AND fecha_programada <= ?",
+            (hoy_iso, lim),
+        )
+        alertas = int(r["n"]) if r else 0
+        retiros = _cnt_retiros_activos()
+        agenda = alertas + retiros
+    except Exception as e:
+        logger.error("seccion badges_agenda fallo", exc_info=True)
+        errores["agenda"] = str(e)
+
+    try:
+        retiros = _cnt_retiros_activos()
+        sanidad = retiros
+    except Exception as e:
+        logger.error("seccion badges_sanidad fallo", exc_info=True)
+        errores["sanidad"] = str(e)
+
+    try:
+        r1 = db.query_one(
+            """SELECT COUNT(*) n FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id
+               WHERE a.estado='ACTIVO' AND s.fep_calculada IS NOT NULL
+               AND s.fep_calculada >= ? AND s.fep_calculada <= ?""",
+            (hoy_iso, lim30),
+        )
+        r2 = db.query_one(
+            "SELECT COUNT(*) n FROM alertas WHERE estado='PENDIENTE' "
+            "AND tipo_alerta IN ('ECOGRAFIA','PALPACION') AND fecha_programada >= ? AND fecha_programada <= ?",
+            (hoy_iso, lim),
+        )
+        repro = int(r1["n"]) if r1 else 0
+        repro += int(r2["n"]) if r2 else 0
+    except Exception as e:
+        logger.error("seccion badges_repro fallo", exc_info=True)
+        errores["repro"] = str(e)
+
+    out: dict[str, Any] = {"agenda": agenda, "repro": repro, "sanidad": sanidad, "dias": dias}
+    if errores:
+        out["errores"] = errores
+    return out
+

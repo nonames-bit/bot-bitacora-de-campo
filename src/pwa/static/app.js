@@ -56,7 +56,7 @@
       baby: '<circle cx="12" cy="10" r="3"/><path d="M12 13a5 5 0 0 0-5 5v2h10v-2a5 5 0 0 0-5-5z"/>',
       syringe: '<path d="M5 21l3-3m-3 3L3 19m2 2L19 7m-11 11l1.5-1.5M10 16l4-4M19 7l2-2-3-3-2 2M18 6l-4-4"/>',
       grass: '<path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/>',
-      milk: '<path d="M7 2h10l1 4v12a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V6l1-4zm0 4h10"/>',
+      milk: '<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/>',
       search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
       alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
       rain: '<path d="M17 10a5 5 0 0 0-10 0 4 4 0 0 0 0 8h10a4 4 0 0 0 0-8zm-8 10l-1 2m4-2l-1 2m4-2l-1 2"/>',
@@ -65,7 +65,12 @@
       camera: '<path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
       scale: '<circle cx="4.5" cy="12" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.5 12h11"/><path d="M8 9v6M16 9v6"/>',
       circleEmpty: '<circle cx="12" cy="12" r="9"/>',
-      xmark: '<path d="M18 6 6 18M6 6l12 12"/>'
+      xmark: '<path d="M18 6 6 18M6 6l12 12"/>',
+      // --- Iconos Lucide (MIT) re-importados: trazo fino y minimalista ---
+      heartPulse: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
+      heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
+      shieldPlus: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/>',
+      users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -99,7 +104,7 @@
     return h;
   }
   function renderRepro(d) {
-    var h = "<h3>" + icon("baby") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    var h = "<h3>" + icon("heartPulse") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -128,7 +133,7 @@
     return h;
   }
   function renderSanidad(d) {
-    var h = "<h3>" + icon("syringe") + "Sanidad</h3>" + erroresHtml(d) + "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
+    var h = "<h3>" + icon("shieldPlus") + "Sanidad</h3>" + erroresHtml(d) + "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
     if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
@@ -245,7 +250,7 @@
     return h;
   }
   function renderPoblacion(d) {
-    var h = "<h3>" + icon("chartLine") + "Población y edades</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("users") + "Población y edades</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos") + kpi(d.total_hembras, "Hembras")
       + kpi(d.total_machos, "Machos") + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio") + "</div>";
     h += "<h4>" + icon("chartBar") + "Composición por bracket de edad</h4>";
@@ -330,8 +335,8 @@
   /* ---------- Ficha con pestañas ---------- */
   var TABS = [
     { id: "general", label: icon("cow") + "General" },
-    { id: "repro", label: icon("baby") + "Reproducción" },
-    { id: "sanidad", label: icon("syringe") + "Tratamientos" },
+    { id: "repro", label: icon("heartPulse") + "Reproducción" },
+    { id: "sanidad", label: icon("shieldPlus") + "Tratamientos" },
     { id: "leche", label: icon("milk") + "Leche" },
     { id: "pesos", label: icon("scale") + "Pesos" }
   ];
@@ -362,7 +367,7 @@
   }
   function chipResultado(v) {
     var s = String(v == null ? "" : v).toUpperCase();
-    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("baby", 14) + "PREÑADA</span>";
+    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("heartPulse", 14) + "PREÑADA</span>";
     if (s === "VACIA" || s === "VACÍA") return "<span class='chip ambar'>" + icon("circleEmpty", 14) + "VACÍA</span>";
     if (s === "FALLIDO") return "<span class='chip rojo'>" + icon("xmark", 14) + "FALLIDO</span>";
     if (!s) return "—";
@@ -457,9 +462,76 @@
   }
 
   /* ---------- Carga de datos ---------- */
-  function skeleton(target) {
+  // Skeleton mimético por tipo de vista (más pulido que un bloque genérico).
+  var ESQUELETOS = {
+    tablero:   { kpis: 7, graf: 2, tabla: 7 },
+    agenda:    { kpis: 0, graf: 0, tabla: 6 },
+    inventario:{ kpis: 5, graf: 0, tabla: 11 },
+    poblacion: { kpis: 4, graf: 0, tabla: 6 },
+    genetica:  { kpis: 1, graf: 0, tabla: 10 },
+    repro:     { kpis: 0, graf: 1, tabla: 12 },
+    sanidad:   { kpis: 0, graf: 0, tabla: 9 },
+    pasturas:  { kpis: 0, graf: 3, tabla: 8 },
+    leche:     { kpis: 3, graf: 2, tabla: 8 },
+    ficha:     { kpis: 0, graf: 1, tabla: 7 }
+  };
+  function htmlSkeleton(v) {
+    var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;
+    var h = "";
+    if (cfg.kpis) {
+      h += "<div class='sk-kpis'>";
+      for (var i = 0; i < cfg.kpis; i++) h += "<div class='skeleton'></div>";
+      h += "</div>";
+    }
+    if (cfg.graf) {
+      h += "<div class='sk-graficos'>";
+      for (var j = 0; j < cfg.graf; j++) h += "<div class='skeleton'></div>";
+      h += "</div>";
+    }
+    if (cfg.tabla) {
+      h += "<div class='sk-tabla'>";
+      for (var k = 0; k < cfg.tabla; k++) h += "<div class='skeleton'></div>";
+      h += "</div>";
+    }
+    return h || "<div class='skeleton h2'></div><div class='skeleton'></div>";
+  }
+  function skeleton(target, view) {
     target = target || vista;
-    if (target) target.innerHTML = "<div class='skeleton h2'></div><div class='skeleton'></div><div class='skeleton'></div><div class='skeleton' style='width:70%'></div>";
+    if (target) target.innerHTML = htmlSkeleton(view || actual);
+  }
+  // Cuenta los números de los KPIs desde 0 hasta su valor (solo valores puros).
+  function animarKpis(root) {
+    if (!root) return;
+    qa(".kpi .num", root).forEach(function (el) {
+      var txt = (el.textContent || "").trim();
+      if (!/^-?[\d.]+$/.test(txt)) return; // "—", tags, "3.61a", etc.
+      var destino = parseFloat(txt.replace(/\./g, ""));
+      if (!isFinite(destino)) return;
+      var dur = 550, t0 = null;
+      function paso(ts) {
+        if (!t0) t0 = ts;
+        var p = Math.min((ts - t0) / dur, 1);
+        p = 1 - Math.pow(1 - p, 3); // ease-out cubic
+        el.textContent = String(Math.round(destino * p));
+        if (p < 1) requestAnimationFrame(paso);
+        else el.textContent = txt;
+      }
+      requestAnimationFrame(paso);
+    });
+  }
+  // Monta el HTML de una vista con la animación de entrada (si `animar`) y
+  // refresca los KPIs. En el polling en silencio se evita la animación para
+  // no "parpadear" la pantalla cada minuto.
+  function montarVista(el, html, animar) {
+    if (!el) return;
+    el.innerHTML = html;
+    if (animar) {
+      el.classList.remove("vista-entra");
+      void el.offsetWidth; // reinicia la animación
+      el.classList.add("vista-entra");
+      setTimeout(function () { el.classList.remove("vista-entra"); }, 300);
+    }
+    if (animar) animarKpis(el);
   }
   function fetchJSON(url, cb, target) {
     target = target || vista;
@@ -475,17 +547,18 @@
         if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button onclick='location.reload()'>Reintentar</button>";
       });
   }
-  function abrirFicha(tag, target, showIdent) {
-    skeleton(target);
+  function abrirFicha(tag, target, showIdent, animar) {
+    if (animar === undefined) animar = true;
+    skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
       if (!f.existe) {
-        if (target) target.innerHTML = "<h3>" + icon("search") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
+        if (target) montarVista(target, "<h3>" + icon("search") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
           + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
-          + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>";
+          + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>", animar);
         return;
       }
       window.__ultimaFicha = f;
-      if (target) target.innerHTML = fichaHtml(f, !!showIdent);
+      montarVista(target, fichaHtml(f, !!showIdent), animar);
       bindTabs(f);
       if (showIdent) bindIdent();
     }, target);
@@ -576,28 +649,65 @@
     clearTimeout(_deb);
     _deb = setTimeout(function () { sugerirDesde(v); }, 250);
   }
-  function cargar() {
+  function cargar(animar) {
+    if (animar === undefined) animar = true;
     if (actual === "ficha") {
       var t = (q("#f-tag") && q("#f-tag").value || "").trim();
-      if (!t) { if (vista) vista.innerHTML = "<h3>" + icon("search") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(); if (vista) bindIdent(); return; }
-      abrirFicha(t, vista, true);
+      if (!t) {
+        if (vista) montarVista(vista, "<h3>" + icon("search") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(), animar);
+        if (vista) bindIdent();
+        return;
+      }
+      abrirFicha(t, vista, true, animar);
       return;
     }
     var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
     var url = "/api/" + actual + (pot && actual === "tablero" ? "?potrero=" + encodeURIComponent(pot) : "");
-    skeleton(vista);
+    skeleton(vista, actual);
     fetchJSON(url, function (d) {
       if (!vista) return;
-      if (actual === "tablero") vista.innerHTML = renderTablero(d);
-      else if (actual === "repro") vista.innerHTML = renderRepro(d);
-      else if (actual === "sanidad") vista.innerHTML = renderSanidad(d);
-      else if (actual === "pasturas") vista.innerHTML = renderPasturas(d);
-      else if (actual === "leche") vista.innerHTML = renderLeche(d);
-      else if (actual === "inventario") vista.innerHTML = renderInventario(d);
-      else if (actual === "poblacion") vista.innerHTML = renderPoblacion(d);
-      else if (actual === "genetica") vista.innerHTML = renderGenetica(d);
-      else if (actual === "agenda") vista.innerHTML = renderAgenda(d);
+      var html;
+      if (actual === "tablero") html = renderTablero(d);
+      else if (actual === "repro") html = renderRepro(d);
+      else if (actual === "sanidad") html = renderSanidad(d);
+      else if (actual === "pasturas") html = renderPasturas(d);
+      else if (actual === "leche") html = renderLeche(d);
+      else if (actual === "inventario") html = renderInventario(d);
+      else if (actual === "poblacion") html = renderPoblacion(d);
+      else if (actual === "genetica") html = renderGenetica(d);
+      else if (actual === "agenda") html = renderAgenda(d);
+      montarVista(vista, html, animar);
     }, vista);
+  }
+
+  /* ---------- Badges de contadores en la navegación ---------- */
+  var VISTAS_BADGE = ["agenda", "repro", "sanidad"];
+  var badgesCache = {};
+  function crearBadgesNav() {
+    VISTAS_BADGE.forEach(function (v) {
+      var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+      if (!btn || btn.querySelector(".nav-badge")) return;
+      var span = document.createElement("span");
+      span.className = "nav-badge";
+      span.textContent = "";
+      btn.appendChild(span);
+    });
+  }
+  function actualizarBadges() {
+    if (navigator.onLine === false) return;
+    fetch("/api/badges").then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) {
+        badgesCache = d || {};
+        VISTAS_BADGE.forEach(function (v) {
+          var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+          if (!btn) return;
+          var span = btn.querySelector(".nav-badge");
+          if (!span) return;
+          var n = parseInt(d && d[v], 10) || 0;
+          if (n > 0) { span.textContent = n > 99 ? "99+" : String(n); span.classList.add("on"); }
+          else { span.textContent = ""; span.classList.remove("on"); }
+        });
+      }).catch(function () { /* sin red: se ocultan */ });
   }
 
   qa("nav > button").forEach(function (b) {
@@ -606,6 +716,11 @@
       b.classList.add("act");
       actual = b.getAttribute("data-v");
       cargar();
+      if (VISTAS_BADGE.indexOf(actual) !== -1) {
+        // Al abrir la vista, los datos frescos actualizan su badge al instante.
+        var span = b.querySelector(".nav-badge");
+        if (span) { span.textContent = ""; span.classList.remove("on"); }
+      }
     });
   });
   var btn = document.getElementById("btn-cargar");
@@ -641,8 +756,9 @@
   tick();
   setInterval(function () {
     tick();
-    if (document.hidden || navigator.onLine === false || actual === "ficha") return;
-    cargar();
+    if (document.hidden || navigator.onLine === false || actual === "ficha") { if (!document.hidden) actualizarBadges(); return; }
+    cargar(false); // polling en silencio: sin animación ni count-up
+    actualizarBadges();
   }, 60000);
 
   /* ---------- Selección de Tema (3 Modos) ---------- */
@@ -702,8 +818,12 @@
   }
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";
-    abrirFicha(tag, fb, false); // QR ya identifica el animal: sin panel de foto
+    abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
   } else {
+    crearBadgesNav();
+    actualizarBadges();
+    // Primer refresco de badges al reconectar tras estar sin señal.
+    window.addEventListener("online", function () { actualizarBadges(); });
     arrancarDesdeUrl();
   }
 })();

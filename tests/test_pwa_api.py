@@ -251,6 +251,15 @@ def test_api_buscar_autocompletar(client):
     assert any(x["nombre"] == "Guayabal" for x in p.get_json()["potreros"])
 
 
+def test_api_badges_contadores(client):
+    r = client.get("/api/badges")
+    assert r.status_code == 200
+    d = r.get_json()
+    for clave in ("agenda", "repro", "sanidad"):
+        assert clave in d, clave
+        assert isinstance(d[clave], int)
+
+
 def test_api_identificar_por_texto_rfid(client):
     r = client.post("/api/identificar", data={"texto": "0000000000047"})
     assert r.status_code == 200

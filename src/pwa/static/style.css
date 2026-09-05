@@ -2,12 +2,42 @@
    🌱 Dashboard PWA Bitácora JA — Estilos Premium y Minimalismo Editorial
    ========================================================================== */
 
+/* --- 0. Tipografía Geist (self-hosted, offline) --- */
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/static/fonts/geist-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/static/fonts/geist-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/static/fonts/geist-sans-latin-600-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Geist Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/static/fonts/geist-sans-latin-700-normal.woff2') format('woff2');
+}
+
 /* --- 1. Definición de Variables y Temas (3 Modos) --- */
 
 /* Tema 1: Verde Campestre (Por Defecto - Identidad Ganadera) */
 :root, :root[data-theme="green"] {
-  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
   --theme-name: "Verde Campestre";
 
   --fondo: #F3F7F3;
@@ -43,8 +73,8 @@
 
 /* Tema 2: Claro Editorial (Limpio y Minimalista) */
 :root[data-theme="light"] {
-  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
   --theme-name: "Claro Editorial";
 
   --fondo: #FBFBFA;
@@ -80,8 +110,8 @@
 
 /* Tema 3: Modo Oscuro (Elegante con Accentos Verdes) */
 :root[data-theme="dark"] {
-  --font-base: 'SF Pro Display', 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Mono', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
   --theme-name: "Modo Oscuro";
 
   --fondo: #121212;
@@ -219,6 +249,7 @@ nav {
 }
 nav button {
   font-family: var(--font-base);
+  position: relative;
   border: 1px solid var(--borde);
   background: var(--superficie);
   color: var(--texto-suave);
@@ -272,6 +303,122 @@ main {
   margin-bottom: 10px;
   border-bottom: 1px solid var(--borde);
   padding-bottom: 6px;
+}
+
+/* --- 2.1 Microinteracciones y animaciones --- */
+
+/* Transición de entrada de cada vista (opacity + leve desplazamiento) */
+@keyframes vistaEntra {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vista-entra { animation: vistaEntra .24s ease-out; }
+
+/* Aparición escalonada de las tarjetas/áreas de una vista ya montada */
+@keyframes itemEntra {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.vista-entra > .kpis > .kpi,
+.vista-entra > .grafico-wrap,
+.vista-entra > .tabla-scroll,
+.vista-entra > .card,
+.vista-entra > .ficha-head,
+.vista-entra > h3,
+.vista-entra > h4,
+.vista-entra > .aviso,
+.vista-entra > .barra-fila {
+  animation: itemEntra .28s ease-out both;
+}
+.vista-entra > .kpis > .kpi:nth-child(1) { animation-delay: .02s; }
+.vista-entra > .kpis > .kpi:nth-child(2) { animation-delay: .05s; }
+.vista-entra > .kpis > .kpi:nth-child(3) { animation-delay: .08s; }
+.vista-entra > .kpis > .kpi:nth-child(4) { animation-delay: .11s; }
+.vista-entra > .kpis > .kpi:nth-child(5) { animation-delay: .14s; }
+.vista-entra > .kpis > .kpi:nth-child(6) { animation-delay: .17s; }
+.vista-entra > .kpis > .kpi:nth-child(7) { animation-delay: .20s; }
+
+/* Botón primario: elevación suave al hover y anillo de foco accesible */
+button {
+  transition: background .15s ease, transform .12s ease, box-shadow .15s ease;
+}
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--sombra-activa);
+}
+button:active {
+  transform: scale(.97);
+  box-shadow: none;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--verde-marca);
+  outline-offset: 2px;
+}
+
+/* KPIs: elevación + brillo al pasar el mouse (escritorio) */
+.kpi {
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+}
+.kpi:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px var(--sombra-activa);
+  border-color: var(--borde-fuerte);
+}
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  .kpi:hover { transform: none; box-shadow: 0 1px 2px var(--sombra); }
+  button:hover { transform: none; box-shadow: none; }
+  .vista-entra, .vista-entra > .kpis > .kpi,
+  .vista-entra > .grafico-wrap, .vista-entra > .tabla-scroll,
+  .vista-entra > .card, .vista-entra > .ficha-head,
+  .vista-entra > h3, .vista-entra > h4, .vista-entra > .aviso,
+  .vista-entra > .barra-fila { animation: none; }
+}
+
+/* Header "vidrio": translúcido + blur sobre el contenido al hacer scroll */
+header {
+  background: var(--header-bg);
+}
+@supports (backdrop-filter: blur(6px)) {
+  header {
+    background: color-mix(in srgb, var(--header-bg) 86%, transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+}
+
+/* Badge contador en botones de la navegación (alertas pendientes, retiros…) */
+.nav-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-rojo-bg);
+  color: var(--color-rojo-txt);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--superficie);
+  opacity: 0;
+  transform: scale(.5);
+  transition: opacity .15s ease, transform .15s ease;
+  pointer-events: none;
+}
+.nav-badge.on { opacity: 1; transform: scale(1); }
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--superficie), 0 0 0 0 var(--color-rojo-bg); }
+  50%      { box-shadow: 0 0 0 2px var(--superficie), 0 0 0 5px transparent; }
+}
+.nav-badge.on { animation: badgePulse 2.4s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .nav-badge.on { animation: none; }
 }
 
 /* Fila de tarjetas KPI */
@@ -475,6 +622,23 @@ button:active {
 .skeleton.h2 { min-height: 22px; }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+/* Variantes de skeleton por tipo de vista (mimetizan la estructura real) */
+.sk-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.sk-kpis .skeleton { height: 58px; margin: 0; }
+.sk-graficos { margin: 12px 0; }
+.sk-graficos .skeleton { height: 180px; margin: 0 0 12px; border-radius: 8px; }
+.sk-tabla .skeleton { height: 18px; margin: 6px 0; }
+.sk-tabla .skeleton:first-child { height: 30px; }
+.sk-tabla .skeleton:nth-child(2) { width: 92%; }
+.sk-tabla .skeleton:nth-child(3) { width: 85%; }
+.sk-tabla .skeleton:nth-child(4) { width: 96%; }
+.sk-tabla .skeleton:nth-child(5) { width: 78%; }
+
 /* Ficha del Animal */
 .ficha-head {
   display: flex;
@@ -599,6 +763,15 @@ button:active {
     background: transparent;
     color: var(--texto-suave);
     min-height: 32px;
+    position: relative;
+  }
+  nav button .nav-badge {
+    top: -2px;
+    right: 0;
+    font-size: 8.5px;
+    min-width: 14px;
+    height: 14px;
+    line-height: 14px;
   }
   nav button.act {
     background: var(--verde-marca-pastel);
