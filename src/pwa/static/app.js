@@ -48,12 +48,12 @@
   // SVG Icon helper (Phosphor-like technical style, stroke-width: 1.5px, size: 18px)
   function icon(name, size) {
     var paths = {
-      cow: '<path d="M12 21a6 6 0 0 1-6-6v-3a6 6 0 1 1 12 0v3a6 6 0 0 1-6 6zm0 0v-3"/>',
+      cow: '<path d="M16.4 13.7A6.5 6.5 0 1 0 6.28 6.6c-1.1 3.13-.78 3.9-3.18 6.08A3 3 0 0 0 5 18c4 0 8.4-1.8 11.4-4.3"/><path d="m18.5 6 1.754 3.5a6.48 6.48 0 0 1-1.854 8.2C15.4 20.2 11 22 7 22a3 3 0 0 1-2.68-1.66L2.4 16.5"/><circle cx="12.5" cy="8.5" r="2.5"/>', // Lucide 'beef': cabeza de vaca con argolla
+      grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
       chartLine: '<path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>',
       dna: '<path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/>',
-      baby: '<circle cx="12" cy="10" r="3"/><path d="M12 13a5 5 0 0 0-5 5v2h10v-2a5 5 0 0 0-5-5z"/>',
       syringe: '<path d="M5 21l3-3m-3 3L3 19m2 2L19 7m-11 11l1.5-1.5M10 16l4-4M19 7l2-2-3-3-2 2M18 6l-4-4"/>',
       grass: '<path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/>',
       milk: '<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/>',
@@ -66,14 +66,16 @@
       scale: '<circle cx="4.5" cy="12" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.5 12h11"/><path d="M8 9v6M16 9v6"/>',
       circleEmpty: '<circle cx="12" cy="12" r="9"/>',
       xmark: '<path d="M18 6 6 18M6 6l12 12"/>',
-      // --- Iconos Lucide (MIT) re-importados: trazo fino y minimalista ---
+      // --- Iconos Lucide (ISC/MIT) re-importados: trazo fino y minimalista ---
       heartPulse: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
       heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
       shieldPlus: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/>',
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-      // Lucide oficiales (ISC/MIT): gestación/reproducción y diagnóstico
+      // Lucide oficiales (ISC/MIT): gestación y diagnóstico
       egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
-      stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>'
+      stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>',
+      // Espermatozoide (IA) — dibujo a medida en trazo fino
+      sperm: '<path d="M9.5 2.8c2.2 0 3.8 2 3.8 4.4s-1.6 4.4-3.8 4.4S5.7 9.6 5.7 7.2 7.3 2.8 9.5 2.8z"/><path d="M13.2 10.6c2.4-1.9 4.9-1.6 7.2.8"/><path d="M20.4 11.4c.3 1.7-.2 3-1.3 4.1"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -82,7 +84,7 @@
   /* ---------- Vistas principales ---------- */
   function renderTablero(d) {
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var h = "<h3>" + icon("cow") + "Tablero finca" + pot + "</h3>";
+    var h = "<h3>" + icon("grid") + "Tablero finca" + pot + "</h3>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
       + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
@@ -107,7 +109,7 @@
     return h;
   }
   function renderRepro(d) {
-    var h = "<h3>" + icon("egg") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    var h = "<h3>" + icon("sperm") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -253,7 +255,7 @@
     return h;
   }
   function renderPoblacion(d) {
-    var h = "<h3>" + icon("users") + "Población y edades</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("cow") + "Población y edades</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos") + kpi(d.total_hembras, "Hembras")
       + kpi(d.total_machos, "Machos") + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio") + "</div>";
     h += "<h4>" + icon("chartBar") + "Composición por bracket de edad</h4>";
@@ -338,7 +340,7 @@
   /* ---------- Ficha con pestañas ---------- */
   var TABS = [
     { id: "general", label: icon("cow") + "General" },
-    { id: "repro", label: icon("egg") + "Reproducción" },
+    { id: "repro", label: icon("sperm") + "Reproducción" },
     { id: "sanidad", label: icon("shieldPlus") + "Tratamientos" },
     { id: "leche", label: icon("milk") + "Leche" },
     { id: "pesos", label: icon("scale") + "Pesos" }
@@ -370,7 +372,7 @@
   }
   function chipResultado(v) {
     var s = String(v == null ? "" : v).toUpperCase();
-    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("egg", 14) + "PREÑADA</span>";
+    if (s === "PREÑADA" || s === "PREGNANT") return "<span class='chip verde'>" + icon("sperm", 14) + "PREÑADA</span>";
     if (s === "VACIA" || s === "VACÍA") return "<span class='chip ambar'>" + icon("circleEmpty", 14) + "VACÍA</span>";
     if (s === "FALLIDO") return "<span class='chip rojo'>" + icon("xmark", 14) + "FALLIDO</span>";
     if (!s) return "—";
@@ -586,7 +588,7 @@
     skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
       if (!f.existe) {
-        if (target) montarVista(target, "<h3>" + icon("search") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
+        if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
           + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
           + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>", animar);
         return;
@@ -688,7 +690,7 @@
     if (actual === "ficha") {
       var t = (q("#f-tag") && q("#f-tag").value || "").trim();
       if (!t) {
-        if (vista) montarVista(vista, "<h3>" + icon("search") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(), animar);
+        if (vista) montarVista(vista, "<h3>" + icon("cow") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(), animar);
         if (vista) bindIdent();
         return;
       }
