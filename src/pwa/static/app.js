@@ -60,7 +60,6 @@
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
       chartLine: '<path d="M3 3v18h18"/><path d="M18.7 8l-5.1 5.2-2.8-2.7L7 14.3"/>',
       dna: '<path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/>',
-      syringe: '<path d="M5 21l3-3m-3 3L3 19m2 2L19 7m-11 11l1.5-1.5M10 16l4-4M19 7l2-2-3-3-2 2M18 6l-4-4"/>',
       grass: '<path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/>',
       milk: '<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/>',
       search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
@@ -86,6 +85,12 @@
       sperm: '<g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g>',
       // Copo de nieve (frío criogénico N₂) — Lucide ISC
       snowflake: '<path d="m10 20-1.25-2.5L6 18"/><path d="M10 4 8.75 6.5 6 6"/><path d="m14 20 1.25-2.5L18 18"/><path d="m14 4 1.25 2.5L18 6"/><path d="m17 21-3-6h-4"/><path d="m17 3-3 6 1.5 3"/><path d="M2 12h6.5L10 9"/><path d="m20 10-1.5 2 1.5 2"/><path d="M22 12h-6.5L14 15"/><path d="m4 10 1.5 2L4 14"/><path d="m7 21 3-6-1.5-3"/><path d="m7 3 3 6h4"/>',
+      // Jeringa oficial Lucide (ISC) — la reemplaza el dibujo anterior
+      syringe: '<path d="m18 2 4 4"/><path d="m17 7 3-3"/><path d="M19 9 8.7 19.3c-1 1-2.5 1-3.4 0l-.6-.6c-1-1-1-2.5 0-3.4L15 5"/><path d="m9 11 4 4"/><path d="m5 19-3 3"/><path d="m14 4 6 6"/>',
+      // Reloj de arena (tiempo de ocupación/reposo) — Lucide ISC
+      hourglass: '<path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/>',
+      // Tubo de ensayo (pajuelas de semen en el termo) — Lucide ISC
+      testTube: '<path d="M14.5 2v17.5c0 1.4-1.1 2.5-2.5 2.5c-1.4 0-2.5-1.1-2.5-2.5V2"/><path d="M8.5 2h7"/><path d="M14.5 16h-5"/>',
       // Cápsula/pastilla (tratamientos) — Lucide ISC
       pill: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
       cross: '<path d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a1 1 0 0 1 1 1v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4a1 1 0 0 1-1-1V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4a1 1 0 0 1-1 1z"/>'
@@ -176,7 +181,7 @@
   function renderPasturas(d) {
     var h = "<h3>" + icon("grass") + "Pasturas (Voisin)</h3>" + erroresHtml(d);
     h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
-    h += "<h4>" + icon("gauge") + "Ocupación y reposo por potrero</h4>";
+    h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
     if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th>Ocupación</th><th>Reposo</th><th>Ha</th></tr>";
@@ -229,6 +234,7 @@
     }
     h += "</div>";
     h += grafico("leche_total", "Producción total de leche") + grafico("eficiencia_lechera", "Eficiencia lechera");
+    h += grafico("ranking_vacas_leche", "Ranking de producción por vaca");
     h += "<h4>" + icon("chartBar") + "Ranking de vacas por litros (acumulado)</h4>"
       + tabla(d.ranking_vacas, [
         ["tag", "Vaca"], ["total_litros", "Total L", "num"], ["controles", "Controles", "num"],
@@ -254,29 +260,41 @@
     return h;
   }
   function renderInventario(d) {
-    var h = "<h3>" + icon("chartBar") + "Inventario SG</h3>" + erroresHtml(d);
+    // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
+    var h = "<h3>" + icon("cowDouble") + "Inventario y Población</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
+      + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
       + kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : "")
       + kpi(d.terneros_menor_12m, "Crías <12m") + "</div>";
+    h += grafico("waterfall_inventario", "Movimientos del hato (entradas/salidas)");
     h += "<h4>" + icon("chartLine") + "Brackets de edad (Software Ganadero)</h4>";
     h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Nro</th><th>Distrib.</th><th>Acum.</th></tr>";
     (d.filas || []).forEach(function (f) {
       h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.acum) + "%</td></tr>";
     });
     h += "</table></div>";
-    return h;
-  }
-  function renderPoblacion(d) {
-    var h = "<h3>" + icon("cowDouble") + "Población y edades</h3>" + erroresHtml(d);
-    h += "<div class='kpis'>" + kpi(d.total_activos, "Activos") + kpi(d.total_hembras, "Hembras")
-      + kpi(d.total_machos, "Machos") + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio") + "</div>";
-    h += "<h4>" + icon("chartBar") + "Composición por bracket de edad</h4>";
-    var maxN = 1;
-    (d.filas || []).forEach(function (f) { if (Number(f.n) > maxN) maxN = Number(f.n); });
-    var filasBar = (d.filas || []).map(function (f) { return { categoria: f.categoria, n: f.n, pct: (Number(f.n) / maxN) * 100 }; });
-    h += barrasDeFilas(filasBar, "pct", "n");
+    // Pirámide de edades
+    var maxP = 1;
+    (d.piramide || []).forEach(function (f) { maxP = Math.max(maxP, Number(f.hembras) || 0, Number(f.machos) || 0); });
+    h += "<h4>" + icon("chartBar") + "Pirámide de edades (hembras · machos)</h4>";
+    if (!d.piramide || !d.piramide.length) {
+      h += vacio("Sin datos de edad para dibujar la pirámide.");
+    } else {
+      h += "<div class='piramide'>";
+      (d.piramide || []).forEach(function (f) {
+        var hB = Math.round((Number(f.hembras) || 0) / maxP * 100);
+        var mB = Math.round((Number(f.machos) || 0) / maxP * 100);
+        h += "<div class='pir-fila'>"
+          + "<div class='pir-pista der'><div class='pir-barra hembra' style='width:" + hB + "%'></div></div>"
+          + "<div class='pir-banda'>" + esc(f.banda) + "<br><small>" + esc(f.hembras) + " H · " + esc(f.machos) + " M</small></div>"
+          + "<div class='pir-pista izq'><div class='pir-barra macho' style='width:" + mB + "%'></div></div>"
+          + "</div>";
+      });
+      h += "</div>";
+    }
     h += "<h4>" + icon("scale") + "Últimos Pesajes y GMD (Ganancia Media Diaria)</h4>"
+      + grafico("gmd_hato", "GMD del hato (kg/día)")
       + tabla(d.gmd_reciente, [
         ["tag", "Animal"], ["fecha", "Fecha"], ["peso_kg", "Peso (kg)", "num"],
         ["gmd_calculada", "GMD (g/día)", "text", function (v) {
@@ -297,7 +315,7 @@
     } else {
       h += vacio("Sin razas registradas en el hato activo.");
     }
-    h += "<h4>" + icon("dna") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
+    h += "<h4>" + icon("testTube") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
       + tabla(d.pajuelas_inventario, [
         ["codigo_toro", "Código Toro"], ["raza", "Raza"],
         ["procedencia", "Procedencia"], ["canastilla", "Canastilla"],
@@ -363,11 +381,16 @@
   function identPanelHtml() {
     return "<div class='card ident-box' style='margin-bottom:10px'>"
       + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
-      + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar.</p>"
-      + "<input type='file' id='f-ident-foto' accept='image/*' capture='environment' style='min-height:40px'>"
+      + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
+      + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
+      + "<input type='file' id='f-ident-foto' accept='image/*' capture='environment' style='min-height:40px; flex:1'>"
       + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
+      + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
+      + "</div>"
       + "<span id='ident-estado' class='aviso'></span>"
-      + "<div id='ident-resultado'></div></div>";
+      + "<div id='ident-resultado'></div>"
+      + "<video id='qr-video' style='display:none; width:100%; max-width:320px; border-radius:8px; margin-top:8px' autoplay playsinline></video>"
+      + "</div>";
   }
   function fichaHtml(f, showIdent) {
     var head = "<div class='ficha-head'>";
@@ -462,7 +485,10 @@
         .map(function (x) { return "<img src='" + esc(x.url) + "' alt='foto' loading='lazy' onerror='this.style.display=\"none\"'>"; }).join("") + "</div>";
     } else { fotos = vacio("Sin fotos para este animal."); }
     var qr = f.qr_payload ? "<p class='aviso'>QR <code>" + esc(f.qr_payload) + "</code> · <a href='" + esc(f.qr_url || "") + "'>abrir ficha</a></p>" : "";
-    return "<h4>General</h4>" + fotos + qr;
+    var pdf = (f.qr_url)
+      ? "<p><a class='qr-pdf' href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' download>Descargar tarjeta QR (PDF)</a></p>"
+      : "";
+    return "<h4>General</h4>" + fotos + qr + pdf;
   }
   function bindTabs(ficha) {
     var nav = document.getElementById("ficha-tabs");
@@ -573,6 +599,7 @@
   function montarVista(el, html, animar) {
     if (!el) return;
     el.innerHTML = html;
+    vincularTagsFicha(el); // tags clicables -> ficha del animal
     if (animar) {
       el.classList.remove("vista-entra");
       void el.offsetWidth; // reinicia la animación
@@ -581,6 +608,46 @@
       animarKpis(el);
       animarIconos(el);
     }
+  }
+  // Convierte la primera columna de tablas (cuando es un arete) en un enlace
+  // que abre la ficha del animal sin volver a teclear.
+  var _TAG_RE = /^([A-Za-z]{0,4}\d{1,6}|[A-Za-z]{1,4}-\d{1,6}|\d{1,4}-\d{1,3})$/;
+  var _CAB_NO_CLICK = /potrero|fecha|categor[ií]a|raza|c[óo]digo|banda|toro|bracket|peso/i;
+  function abrirFichaDesdeTag(tag) {
+    var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
+    if (!destino) return; // vista dedicada /ficha/<tag> (QR): sin nav
+    var inp = q("#f-tag");
+    if (inp) inp.value = tag;
+    destino.click();
+  }
+  function vincularTagsFicha(root) {
+    if (!root) return;
+    if (!qa("nav > button").length) return; // solo en el dashboard con navegación
+    var trs = qa("table tr", root);
+    trs.forEach(function (tr) {
+      var celdas = qa("td", tr);
+      if (!celdas.length) return;
+      var first = celdas[0];
+      if (!first || first.querySelector("a, button, input")) return;
+      var txt = (first.textContent || "").trim();
+      if (!_TAG_RE.test(txt)) return;
+      var tablaEl = first.closest("table");
+      if (!tablaEl) return;
+      var encabezado = tablaEl.querySelector("tr");
+      var th0 = encabezado ? encabezado.querySelector("th") : null;
+      if (th0 && _CAB_NO_CLICK.test(th0.textContent || "")) return;
+      var link = document.createElement("a");
+      link.href = "#";
+      link.className = "ficha-link";
+      link.title = "Ver ficha de " + txt;
+      link.textContent = txt;
+      link.addEventListener("click", function (e) {
+        e.preventDefault();
+        abrirFichaDesdeTag(txt);
+      });
+      first.textContent = "";
+      first.appendChild(link);
+    });
   }
   function fetchJSON(url, cb, target) {
     target = target || vista;
@@ -649,9 +716,70 @@
       out.innerHTML = "<p class='aviso'>" + esc(res.mensaje || "No se encontró ese identificador en la base.") + "</p>";
     }
   }
+  var _qrStream = null;
+  var _qrTimer = null;
+  function detenerEscanerQR() {
+    if (_qrTimer) { clearInterval(_qrTimer); _qrTimer = null; }
+    if (_qrStream) {
+      _qrStream.getTracks().forEach(function (t) { t.stop(); });
+      _qrStream = null;
+    }
+    var v = document.getElementById("qr-video");
+    if (v) { v.style.display = "none"; v.srcObject = null; }
+    var boton = document.getElementById("btn-scan-qr");
+    if (boton) boton.textContent = "";
+    var est = document.getElementById("ident-estado");
+    if (boton) boton.innerHTML = icon("camera") + "Escanear QR";
+    if (est && est.getAttribute("data-scan") === "1") est.textContent = "";
+  }
+  function escanearQRCamara() {
+    var estado = document.getElementById("ident-estado");
+    var video = document.getElementById("qr-video");
+    var boton = document.getElementById("btn-scan-qr");
+    var out = document.getElementById("ident-resultado");
+    if (!video || !boton) return;
+    if (_qrStream) { detenerEscanerQR(); return; }
+    if (!("BarcodeDetector" in window)) {
+      if (estado) estado.textContent = "Tu navegador no permite escanear QR con cámara (usa Chrome/Edge). Escribe el código en el campo Tag.";
+      return;
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (estado) estado.textContent = "Cámara no disponible en este dispositivo/navegador.";
+      return;
+    }
+    if (estado) { estado.setAttribute("data-scan", "1"); estado.textContent = "Apuntando a un QR de ficha… toca 'Escanear QR' para detener."; }
+    if (out) out.innerHTML = "";
+    boton.innerHTML = icon("xmark") + "Detener";
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } } })
+      .then(function (stream) {
+        _qrStream = stream;
+        video.srcObject = stream;
+        video.style.display = "block";
+        video.play().catch(function () { /* noop */ });
+        var detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+        _qrTimer = setInterval(function () {
+          if (!_qrStream) return;
+          detector.detect(video).then(function (codes) {
+            if (!codes || !codes.length) return;
+            var value = (codes[0].rawValue || "").trim();
+            var m = value.match(/JA:\/\/animal\/([A-Za-z0-9_-]+)/i) || value.match(/\/ficha\/([A-Za-z0-9_-]+)\/?/i);
+            if (!m) { if (estado) estado.textContent = "QR leído, pero no es de una ficha del hato."; return; }
+            detenerEscanerQR();
+            var tag = m[1];
+            if (q("#f-tag")) q("#f-tag").value = tag;
+            abrirFicha(tag, vista, true, true);
+          }).catch(function () { /* siguiente frame */ });
+        }, 350);
+      })
+      .catch(function (e) {
+        if (estado) { estado.removeAttribute("data-scan"); estado.textContent = "No se pudo abrir la cámara (permiso o HTTPS). " + (e && e.name || ""); }
+        boton.innerHTML = icon("camera") + "Escanear QR";
+      });
+  }
   function bindIdent() {
     var btn = document.getElementById("btn-ident");
     var file = document.getElementById("f-ident-foto");
+    var btnQr = document.getElementById("btn-scan-qr");
     if (!btn || !file) return;
     btn.addEventListener("click", function () {
       var estado = document.getElementById("ident-estado");
@@ -676,6 +804,7 @@
           .catch(function (e) { if (estado) estado.textContent = "❌ " + (e && e.message || e); });
       }
     });
+    if (btnQr) btnQr.addEventListener("click", escanearQRCamara);
   }
   // Autocompletar (datalist) para tag y potrero.
   function rellenarDatalist(id, items) {
@@ -731,7 +860,7 @@
       else if (actual === "pasturas") html = renderPasturas(d);
       else if (actual === "leche") html = renderLeche(d);
       else if (actual === "inventario") html = renderInventario(d);
-      else if (actual === "poblacion") html = renderPoblacion(d);
+      else if (actual === "poblacion") html = renderInventario(d); // alias (vista unificada)
       else if (actual === "genetica") html = renderGenetica(d);
       else if (actual === "agenda") html = renderAgenda(d);
       montarVista(vista, html, animar);
@@ -765,7 +894,42 @@
           if (n > 0) { span.textContent = n > 99 ? "99+" : String(n); span.classList.add("on"); }
           else { span.textContent = ""; span.classList.remove("on"); }
         });
+        // Campana del header (total = agenda) + notificación al aumentar.
+        var camp = document.getElementById("notif-dot");
+        var nA = parseInt(d && d.agenda, 10) || 0;
+        if (camp) {
+          if (nA > 0) { camp.textContent = nA > 99 ? "99+" : String(nA); camp.classList.add("on"); }
+          else { camp.textContent = ""; camp.classList.remove("on"); }
+        }
+        var prev = window.__agendaPrev || -1;
+        if (prev >= 0 && nA > prev && nA > 0 && document.hidden
+            && "Notification" in window && Notification.permission === "granted") {
+          try {
+            var notif = new Notification("Bitácora JA", {
+              body: nA + " aviso(s) pendientes en la Agenda (partos, secado, retiros).",
+              tag: "bitacora-aviso", icon: "/static/icon-192.png"
+            });
+            notif.onclick = function () { window.focus(); };
+          } catch (e) { /* noop */ }
+        }
+        window.__agendaPrev = nA;
       }).catch(function () { /* sin red: se ocultan */ });
+  }
+
+  function setupCampana() {
+    var camp = document.getElementById("btn-notif");
+    if (!camp) return;
+    camp.addEventListener("click", function () {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().then(function (p) {
+          // concedida o denegada: se guarda implícito en el navegador
+          var s = document.getElementById("notif-dot");
+          if (s) s.title = p === "granted" ? "Notificaciones activadas" : "Notificaciones apagadas";
+        });
+      }
+      var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
+      if (destino) destino.click();
+    });
   }
 
   qa("nav > button").forEach(function (b) {
@@ -886,6 +1050,8 @@
     var v = params.get("v");
     var pot = params.get("potrero");
     var tag = params.get("tag");
+    // Alias: la vista de población se unificó dentro de Inventario.
+    if (v === "poblacion") v = "inventario";
     if (pot && q("#f-potrero")) q("#f-potrero").value = pot;
     if (tag && q("#f-tag")) q("#f-tag").value = tag;
     if (!v && (pot || tag)) v = pot ? "tablero" : "ficha";
@@ -903,6 +1069,7 @@
     abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
   } else {
     crearBadgesNav();
+    setupCampana();
     actualizarBadges();
     // Primer refresco de badges al reconectar tras estar sin señal.
     window.addEventListener("online", function () { actualizarBadges(); });

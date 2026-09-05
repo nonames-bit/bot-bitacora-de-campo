@@ -648,12 +648,66 @@ def _brackets_a_filas(datos_brackets: dict) -> list[dict]:
     return filas
 
 
+def _piramide_desde_brackets(brackets: dict) -> list[dict]:
+    """Pirámide hembras/machos en 3 bandas comparables (<1, 1-2, 2+).
+
+    Mismo origen que ``calcular_brackets_inventario_sg``: las hembras "2+"
+    suman sus brackets 2-4/4-8/8-10/>10 y los machos "2+" suman >2 años más
+    reproductores (SG separa reproductores solo en machos).
+    """
+    if not brackets:
+        return []
+    hb = brackets.get("h_brackets", {})
+    mb = brackets.get("m_brackets", {})
+
+    def _s(d, *k):
+        return int(sum(int(d.get(x, 0)) for x in k))
+
+    return [
+        {"banda": "< 1 año", "hembras": _s(hb, "menor_1"), "machos": _s(mb, "menor_1")},
+        {"banda": "1 - 2 años", "hembras": _s(hb, "1_2"), "machos": _s(mb, "1_2")},
+        {"banda": "2+ años", "hembras": _s(hb, "2_4", "4_8", "8_10", "mayor_10"),
+         "machos": _s(mb, "mayor_2", "reproductor")},
+    ]
+
+
+def _edad_promedio_anios(db: Database) -> Optional[float]:
+    """Edad promedio (años) de animales ACTIVOS con fecha de nacimiento."""
+    try:
+        row = db.query_one(
+            """SELECT AVG(julianday('now') - julianday(fecha_nacimiento)) AS dias
+               FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL"""
+        )
+        if row and row["dias"] is not None:
+            return round(float(row["dias"]) / 365.25, 2)
+    except Exception:
+        logger.error("seccion edad_promedio fallo", exc_info=True)
+    return None
+
+
+def _gmd_recientes(db: Database, limite: int = 15) -> list[dict]:
+    """Últimos pesajes con GMD de animales ACTIVOS (para la vista unificada)."""
+    try:
+        return _filas_dict(db.query(
+            """SELECT a.tag, p.fecha, p.peso_kg, p.gmd_calculada FROM pesajes p
+               JOIN animales a ON a.id_animal = p.animal_id
+               WHERE a.estado = 'ACTIVO' AND p.gmd_calculada IS NOT NULL
+               ORDER BY p.fecha DESC LIMIT ?""",
+            (limite,),
+        ))
+    except Exception:
+        logger.error("seccion gmd_reciente fallo", exc_info=True)
+        return []
+
+
 def datos_inventario(db: Database) -> dict:
-    """Resumen de inventario SG: brackets etarios exactos + totales por sexo.
+    """Resumen unificado Inventario + Población (vista única del hato).
 
     Reutiliza ``engine.query.helpers.calcular_brackets_inventario_sg`` (la
     misma función que usa el bot de Telegram para /animales y /status) para
-    que la PWA y Telegram nunca muestren brackets distintos.
+    que la PWA y Telegram nunca muestren brackets distintos. Incluye la
+    pirámide etaria, la edad promedio y los últimos pesajes con GMD para
+    mostrar todo el hato en una sola vista sin repetir información.
     """
     errores: dict[str, str] = {}
     try:
@@ -663,6 +717,7 @@ def datos_inventario(db: Database) -> dict:
         logger.error("seccion inventario_brackets fallo", exc_info=True)
         errores["brackets"] = str(e)
         brackets = {}
+    gmd = _gmd_recientes(db)
     out: dict[str, Any] = {
         "filas": _brackets_a_filas(brackets) if brackets else [],
         "total_activos": brackets.get("total_activos", 0) if brackets else 0,
@@ -670,6 +725,9 @@ def datos_inventario(db: Database) -> dict:
         "total_machos": brackets.get("total_machos", 0) if brackets else 0,
         "total_sin_sexo": brackets.get("total_sin_sexo", 0) if brackets else 0,
         "terneros_menor_12m": brackets.get("terneros_menor_12m", 0) if brackets else 0,
+        "piramide": _piramide_desde_brackets(brackets),
+        "edad_promedio": _edad_promedio_anios(db),
+        "gmd_reciente": gmd,
     }
     if errores:
         out["errores"] = errores
@@ -677,12 +735,8 @@ def datos_inventario(db: Database) -> dict:
 
 
 def datos_poblacion(db: Database) -> dict:
-    """Composición etaria del hato: brackets SG + edad promedio en años.
-
-    Mismo origen de datos que ``datos_inventario``; añade la edad promedio
-    (por animal ACTIVO con fecha de nacimiento resoluble) para la vista
-    "Población / Edades".
-    """
+    """Composición etaria del hato (endpoint compatible; vista unificada usa
+    ``datos_inventario`` que ahora incluye pirámide/edad/GMD)."""
     errores: dict[str, str] = {}
     try:
         from .query.helpers import calcular_brackets_inventario_sg
@@ -691,36 +745,15 @@ def datos_poblacion(db: Database) -> dict:
         logger.error("seccion poblacion_brackets fallo", exc_info=True)
         errores["brackets"] = str(e)
         brackets = {}
-    edad_promedio = None
-    try:
-        # Promedio de edad (días) de animales ACTIVOS con fecha resoluble.
-        row = db.query_one(
-            """SELECT AVG(julianday('now') - julianday(fecha_nacimiento)) AS dias
-               FROM animales WHERE estado='ACTIVO' AND fecha_nacimiento IS NOT NULL"""
-        )
-        if row and row["dias"] is not None:
-            edad_promedio = round(float(row["dias"]) / 365.25, 2)
-    except Exception as e:
-        logger.error("seccion edad_promedio fallo", exc_info=True)
-        errores["edad_promedio"] = str(e)
-    try:
-        gmd_reciente = _filas_dict(db.query(
-            """SELECT a.tag, p.fecha, p.peso_kg, p.gmd_calculada FROM pesajes p
-               JOIN animales a ON a.id_animal = p.animal_id
-               WHERE a.estado = 'ACTIVO' AND p.gmd_calculada IS NOT NULL
-               ORDER BY p.fecha DESC LIMIT 15"""
-        ))
-    except Exception as e:
-        logger.error("seccion gmd_reciente fallo", exc_info=True)
-        errores["gmd_reciente"] = str(e)
-        gmd_reciente = []
+    gmd = _gmd_recientes(db)
     out: dict[str, Any] = {
         "filas": _brackets_a_filas(brackets) if brackets else [],
         "total_activos": brackets.get("total_activos", 0) if brackets else 0,
         "total_hembras": brackets.get("total_hembras", 0) if brackets else 0,
         "total_machos": brackets.get("total_machos", 0) if brackets else 0,
-        "edad_promedio": edad_promedio,
-        "gmd_reciente": gmd_reciente,
+        "edad_promedio": _edad_promedio_anios(db),
+        "gmd_reciente": gmd,
+        "piramide": _piramide_desde_brackets(brackets),
     }
     if errores:
         out["errores"] = errores

@@ -341,6 +341,109 @@ def generar_fichas_lote(
     return ruta
 
 
+def generar_ficha_qr_individual(
+    db: Database,
+    tag: str,
+    salida: Optional[str] = None,
+    media_dir: str = "media",
+    base_url: str = "",
+    hoy: Optional[date] = None,
+    cache_dir: str = QR_CACHE_DIR,
+) -> str:
+    """Genera una tarjeta QR única (una por página, formato apaisado A4)
+    para exportar la ficha de UN animal desde la PWA (botón "Descargar QR").
+
+    Devuelve la ruta del PDF. Lanza ValueError si el animal no existe o no
+    está ACTIVO.
+    """
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfgen import canvas
+
+    hoy = hoy or date.today()
+    hoy_iso = hoy.isoformat()
+    tag_clean = str(tag or "").strip()
+    aid = db.animal_id(tag_clean)
+    if aid is None:
+        raise ValueError(f"Sin animal ACTIVO con tag '{tag_clean}'.")
+    animal = db.get_animal(aid)
+    if animal is None or str(animal["estado"] or "").upper() != "ACTIVO":
+        raise ValueError(f"El animal '{tag_clean}' no está ACTIVO.")
+    an_tag = str(animal["tag"] or tag_clean)
+    payload, url = qr_payload(an_tag)
+    potrero = _potrero_display(db, animal)
+    edad = _edad_str(animal, hoy)
+    estado = _estado_repro_retiro(db, aid, hoy_iso)
+
+    safe = re.sub(r"[^A-Za-z0-9_-]+", "_", an_tag) or "animal"
+    ruta = salida or os.path.join("data", "reportes", f"ficha_qr_{safe}_{hoy_iso}.pdf")
+    os.makedirs(os.path.dirname(os.path.abspath(ruta)), exist_ok=True)
+
+    W, H = landscape(A4)
+    c = canvas.Canvas(ruta, pagesize=landscape(A4))
+    m = 30
+    cw, ch = W - 2 * m, H - 2 * m - 22
+
+    # Marco + franja marca.
+    c.setStrokeColor(_COLOR_MARCA)
+    c.setLineWidth(1.4)
+    c.rect(m, m + 20, cw, ch, stroke=1, fill=0)
+    c.setFillColor(_COLOR_MARCA)
+    c.rect(m, m + ch + 20 - 24, cw, 24, stroke=0, fill=1)
+    c.setFillColor("white")
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(m + 8, m + ch - 16, "GANADERÍA JA · Ficha QR")
+    c.setFont("Helvetica", 9)
+    c.drawRightString(m + cw - 8, m + ch - 16, f"{potrero[:44]} · {hoy_iso}")
+
+    # Tag grande.
+    c.setFillColor("black")
+    c.setFont("Helvetica-Bold", 34)
+    c.drawString(m + 12, m + ch - 64, an_tag[:20])
+
+    # QR (o placeholder).
+    qx, qy, qs = m + 12, m + 30, 160
+    qr_png = _qr_png_path(an_tag, cache_dir)
+    if qr_png and os.path.exists(qr_png):
+        try:
+            c.drawImage(ImageReader(qr_png), qx, qy, width=qs, height=qs)
+        except Exception:
+            c.rect(qx, qy, qs, qs)
+    else:
+        c.rect(qx, qy, qs, qs)
+        c.setFont("Helvetica", 8)
+        c.drawCentredString(qx + qs / 2, qy + qs / 2, payload[:40])
+
+    tx = qx + qs + 18
+    c.setFont("Helvetica", 12)
+    c.drawString(tx, qy + 150, f"Tag: {an_tag[:18]}")
+    c.drawString(tx, qy + 130, f"Edad: {edad[:42]}")
+    c.setFont("Helvetica", 10.5)
+    for i, linea in enumerate(estado[i:i + 60] for i in range(0, len(estado), 60)):
+        if i >= 4:
+            break
+        c.drawString(tx, qy + 108 - i * 16, linea[:60])
+
+    full_url = f"{base_url.rstrip('/')}{url}" if base_url else url
+    c.setFont("Helvetica", 9)
+    c.drawString(tx, qy + 40, f"QR: {payload[:60]}")
+    c.drawString(tx, qy + 24, f"Web: {full_url[:80]}")
+
+    # Foto mini si existe.
+    try:
+        foto = buscar_foto_animal(db, an_tag, media_dir=media_dir) if buscar_foto_animal else None
+        if foto and os.path.exists(foto):
+            c.drawImage(ImageReader(foto), m + cw - 170, qy, width=158, height=118,
+                        preserveAspectRatio=True)
+    except Exception:
+        pass
+
+    c.setFont("Helvetica-Oblique", 8)
+    c.drawCentredString(W / 2, 12, f"Ficha QR individual · {an_tag} · ACTIVO · {hoy_iso}")
+    c.save()
+    return ruta
+
+
 if __name__ == "__main__":  # pragma: no cover
     import sys as _s
 

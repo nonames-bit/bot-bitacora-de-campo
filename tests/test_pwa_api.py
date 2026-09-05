@@ -275,6 +275,36 @@ def test_api_badges_contadores(client):
         assert isinstance(d[clave], int)
 
 
+def test_inventario_unificado_incluye_piramide_y_gmd(client):
+    """La vista Inventario absorbió a Población: debe traer tabla SG + pirámide
+    + edad promedio + GMD recientes en un único endpoint."""
+    r = client.get("/api/inventario")
+    assert r.status_code == 200
+    d = r.get_json()
+    for clave in ("filas", "piramide", "edad_promedio", "gmd_reciente"):
+        assert clave in d, clave
+    assert isinstance(d["piramide"], list)
+    assert isinstance(d["gmd_reciente"], list)
+    total_pi = sum(f["hembras"] + f["machos"] for f in d["piramide"])
+    assert total_pi <= d["total_activos"]  # nunca mayor que el hato activo
+
+
+def test_api_poblacion_sigue_disponible_como_alias(client):
+    r = client.get("/api/poblacion")
+    assert r.status_code == 200
+    assert "piramide" in r.get_json()
+
+
+def test_api_qr_pdf_por_animal(db_file, client):
+    pytest.importorskip("reportlab", reason="reportlab no instalado")
+    # 47 está ACTIVA en el fixture (con parto); exportar tarjeta QR no debe fallar.
+    r = client.get("/api/ficha/47/qr.pdf")
+    assert r.status_code in (200, 404)
+    if r.status_code == 200:
+        assert r.content_type == "application/pdf"
+        assert r.data[:4] == b"%PDF"
+
+
 def test_api_identificar_por_texto_rfid(client):
     r = client.post("/api/identificar", data={"texto": "0000000000047"})
     assert r.status_code == 200

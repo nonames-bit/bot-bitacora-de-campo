@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import socket
 import sys
@@ -278,6 +279,10 @@ def _generadores_graficos_pwa():
         "leche_total": charts.generar_grafico_leche_total_hato,
         "eficiencia_lechera": charts.generar_grafico_eficiencia_lechera,
         "reproductivo_hato": charts.generar_grafico_estado_reproductivo_hato,
+        # Extras (WS 2): gráficos de hato/leche/población que faltaban en la PWA.
+        "gmd_hato": charts.generar_grafico_gmd_hato,
+        "ranking_vacas_leche": charts.generar_grafico_ranking_vacas_leche,
+        "waterfall_inventario": charts.generar_grafico_waterfall_inventario,
     }
 
 
@@ -805,6 +810,40 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             out = datos_identificar(db_path, texto=texto)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.get("/api/ficha/<tag>/qr.pdf")
+    def api_ficha_qr_pdf(tag):
+        # Exporta la tarjeta QR del animal como PDF (botón "Descargar QR").
+        db_pdf = _db(db_path)
+        try:
+            try:
+                from ..reports.qr_fichas import generar_ficha_qr_individual
+            except ImportError:  # ejecución directa
+                from src.reports.qr_fichas import generar_ficha_qr_individual  # type: ignore
+            # URL pública para imprimir en la tarjeta: la de la propia petición.
+            try:
+                base_url = request.host_url.rstrip("/")
+            except Exception:
+                base_url = ""
+            ruta = generar_ficha_qr_individual(
+                db_pdf, str(tag), media_dir=MEDIA_DIR_DEFAULT, base_url=base_url,
+            )
+            if not ruta or not os.path.isfile(ruta):
+                abort(404)
+            tag_safe = re.sub(r"[^A-Za-z0-9_-]+", "_", str(tag)) or "animal"
+            return send_file(os.path.abspath(ruta), mimetype="application/pdf",
+                             as_attachment=True, download_name=f"ficha_qr_{tag_safe}.pdf")
+        except ValueError as e:
+            logger.warning("qr.pdf no encontrado para %s: %s", tag, e)
+            abort(404)
+        except Exception:
+            logger.exception("error generando qr.pdf para %s", tag)
+            abort(500)
+        finally:
+            try:
+                db_pdf.close()
+            except Exception:
+                pass
 
     @app.get("/api/ficha/<tag>/grafico/<tipo>")
     def api_ficha_grafico(tag, tipo):
