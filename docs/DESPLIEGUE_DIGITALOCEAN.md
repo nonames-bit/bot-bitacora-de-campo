@@ -427,7 +427,8 @@ del job de NDVI para no chocar cuotas de Earth Engine):
 
 El dashboard web ejecutivo (`src/pwa/app.py`, Flask) corre como servicio
 aparte del bot de Telegram — comparten la misma base SQLite (WAL), pero son
-dos procesos independientes. Estado desplegado (2026-09-04):
+dos procesos independientes. Estado desplegado (actualizado 2026-09-05,
+migrado a waitress + loopback):
 
 - **Dirección pública:** `https://ganaderiaja.duckdns.org` (dominio gratuito
   de [DuckDNS](https://www.duckdns.org) apuntando a la IP del droplet;
@@ -435,61 +436,59 @@ dos procesos independientes. Estado desplegado (2026-09-04):
 - **Login:** `PWA_PASSWORD` en `/root/bitacora/.env` (fail-closed — sin esa
   variable, la PWA no sirve nada). Cámbiela y reinicie con
   `systemctl restart bitacora-pwa` si hace falta.
-- **Servicio systemd** `bitacora-pwa` (mismo patrón que `bitacora-bot`):
+- **Servicio systemd** `bitacora-pwa` (unidad canónica en
+  `scripts/bitacora-pwa.service`, copiada a
+  `/etc/systemd/system/bitacora-pwa.service`):
   ```bash
   systemctl status bitacora-pwa    # ver estado
   systemctl restart bitacora-pwa   # aplicar cambios de código o .env
   journalctl -u bitacora-pwa -f    # logs en vivo
   ```
-  Unidad en `/etc/systemd/system/bitacora-pwa.service`, ejecuta
-  `python src/pwa/app.py` con `PWA_HOST=127.0.0.1`, `PWA_PORT=8080`,
-  `Restart=always` (escucha solo en loopback; Nginx es quien expone 80/443).
-- **Nginx como proxy + HTTPS** (`/etc/nginx/sites-available/bitacora-pwa`):
-  Nginx escucha 80/443 y reenvía a `127.0.0.1:8080`. Certificado real vía
-  **Let's Encrypt/certbot**, con renovación automática ya programada (no
-  requiere acción manual). Para renovar a mano si hiciera falta:
-  `certbot renew`.
-- **Firewall (`ufw`)**: activo, permite solo `22` (SSH), `80` y `443`. El
-  puerto `8080` (HTTP plano de Flask) queda **bloqueado desde afuera** —
-  solo Nginx (que corre en el mismo servidor) puede hablarle por
-  `127.0.0.1`. Si se necesita depurar el puerto 8080 directo, usar un túnel
-  SSH (`ssh -L 8080:localhost:8080 root@206.189.188.183`) en vez de abrirlo
-  en el firewall.
+  Ejecuta `python -m src.pwa.app` con `PWA_HOST=127.0.0.1` (**no** `0.0.0.0`:
+  ni siquiera escucha en la interfaz pública, Nginx es el único punto de
+  entrada), `PWA_PORT=8080`, `Restart=always`, hardening básico
+  (`NoNewPrivileges`, `ProtectSystem=full`, `PrivateTmp`). Sirve con
+  **waitress** (WSGI multi-hilo de producción, ver banner
+  `▶️ Servidor WSGI: waitress` en los logs) — cae solo al servidor de
+  desarrollo de Flask con un aviso si `waitress` no está instalado
+  (`pip install waitress`, ya en `requirements.txt`).
+- **Nginx como proxy + HTTPS** (`/etc/nginx/sites-available/bitacora-pwa`,
+  basado en `scripts/nginx-bitacora.conf`): Nginx escucha 80/443 y reenvía
+  todo (incluido `/static/*`) a `127.0.0.1:8080` — **ojo:** la plantilla del
+  repo sugiere servir `/static/` directo con Nginx (`alias`), pero eso da
+  `403 Forbidden` en este VPS porque los archivos viven dentro de `/root`
+  (Nginx corre como `www-data`, sin permiso para atravesar el home de
+  root); se dejó todo proxied a Flask/waitress en vez de abrir permisos de
+  `/root`. Agrega headers de seguridad (`X-Content-Type-Options`,
+  `X-Frame-Options`, `Content-Security-Policy`, `Referrer-Policy`) y
+  `client_max_body_size 25m` (fotos de aretes para `/api/identificar`).
+  Certificado real vía **Let's Encrypt/certbot**, con renovación automática
+  ya programada (no requiere acción manual; `certbot renew` a mano si
+  hiciera falta). Las líneas `# managed by Certbot` del archivo **no se
+  deben editar a mano** — certbot las regenera solo.
+- **Firewall (`ufw`)**: activo, permite solo `22` (SSH), `80` y `443`.
+  Doble defensa sobre el puerto 8080: además del firewall, waitress ya ni
+  siquiera escucha en la interfaz pública (`127.0.0.1` en vez de `0.0.0.0`)
+  — si el firewall se desactivara por error, el puerto seguiría sin ser
+  alcanzable desde afuera. Si se necesita depurar el puerto 8080 directo,
+  usar un túnel SSH (`ssh -L 8080:localhost:8080 root@206.189.188.183`).
 - **Si el droplet cambia de IP** (recreación, migración): actualizar el
   registro de IP en duckdns.org — el dominio no se actualiza solo.
 
-### Plantillas del repositorio (actualización 2026-09-04)
-
-El repo ahora incluye versiones canónicas de los dos archivos que antes solo
-existían en el servidor, con dos mejoras de producción (X3):
-
-- `scripts/bitacora-pwa.service` — unidad systemd que sirve la PWA con
-  **waitress** (WSGI multi-hilo) escuchando SOLO en `127.0.0.1:8080` (no más
-  `0.0.0.0`: Nginx es quien expone 80/443). Nginx y la PWA quedan en el mismo
-  servidor, así que nadie externo habla directo con waitress.
-- `scripts/nginx-bitacora.conf` — vhost Nginx de referencia: proxy reverso a
-  `127.0.0.1:8080`, `client_max_body_size 25m` (para fotos de aretes grandes),
-  caché de `/static/` con excepción de `sw.js`/`manifest.json`/`offline.html`
-  (deben revalidarse siempre) y cabeceras de seguridad mínimas. Ajuste el
-  `server_name` antes de usar.
-
-Para aplicar en el VPS si algún día se recrea el droplet o se quiere migrar a
-waitress + loopback:
+### Aplicar esta configuración desde cero (droplet nuevo)
 
 ```bash
 cd /root/bitacora
+.venv/bin/pip install -r requirements.txt   # trae waitress
 cp scripts/bitacora-pwa.service /etc/systemd/system/bitacora-pwa.service
-cp scripts/nginx-bitacora.conf /etc/nginx/sites-available/bitacora-pwa
-# editar server_name dentro del conf y, en la unidad, asegurar PWA_HOST=127.0.0.1
-systemctl daemon-reload
-systemctl enable --now bitacora-pwa
+systemctl daemon-reload && systemctl enable --now bitacora-pwa
+# Nginx: copiar scripts/nginx-bitacora.conf a /etc/nginx/sites-available/bitacora-pwa,
+# AJUSTAR server_name, y quitar/adaptar el bloque `location /static/ { alias ... }`
+# si /root no es accesible para el usuario de Nginx (ver nota arriba).
+ln -sf /etc/nginx/sites-available/bitacora-pwa /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
-# Sin waitress instalado aún:
-# /root/bitacora/.venv/bin/pip install waitress
+certbot --nginx -d SU_DOMINIO --agree-tos --register-unsafely-without-email --redirect
 ```
-
-La app elige waitress automáticamente si está instalado (`python -m src.pwa.app`)
-y solo cae al servidor de desarrollo de Flask con un aviso si no lo está.
 
 ---
 
