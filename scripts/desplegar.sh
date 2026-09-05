@@ -18,10 +18,11 @@ echo "== Instalando dependencias (por si cambiaron) =="
 echo "== Corriendo suite de pruebas antes de reiniciar =="
 .venv/bin/python -m pytest -q
 
-echo "== Reiniciando servicio =="
-systemctl restart bitacora-bot
+echo "== Reiniciando servicios (Bot Telegram + Dashboard PWA) =="
+systemctl restart bitacora-bot bitacora-pwa
 sleep 2
 systemctl is-active bitacora-bot
+systemctl is-active bitacora-pwa
 
 echo "== Desplegado =="
 git log -1 --oneline
