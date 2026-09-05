@@ -244,8 +244,18 @@ button { min-height: 40px; }
 /* Barras de proporción (vistas de inventario/población/genética) */
 .barra-fila { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 13px; }
 .barra-fila .et { width: 150px; flex: 0 0 auto; text-align: right; color: var(--texto-suave); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.barra-fila .pista { flex: 1 1 auto; background: var(--borde); border-radius: 999px; height: 14px; overflow: hidden; }
-.barra-fila .relleno { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--verde-claro), var(--verde-marca)); min-width: 2px; }
+/* Riel neutro a propósito (gris translúcido, NO --borde): en modo oscuro
+   --borde es un verde grisáceo casi idéntico al extremo oscuro del
+   degradado anterior de .relleno, así que la barra se veía "toda llena"
+   sin importar el valor real -- no se distinguía dónde terminaba el
+   relleno. Un color plano y de alto contraste en .relleno arregla esto
+   en los dos temas. */
+.barra-fila .pista { flex: 1 1 auto; background: rgba(120, 144, 156, .28); border-radius: 999px; height: 14px; overflow: hidden; }
+/* display:block es obligatorio: .relleno es un <span> (inline por
+   defecto) y los elementos inline IGNORAN la propiedad width del todo --
+   por eso el ancho calculado en JS (ej. "width:65%") nunca se veía, sin
+   importar el valor real (bug real: todas las barras se veían "llenas"). */
+.barra-fila .relleno { display: block; height: 100%; border-radius: 999px; background: var(--verde-claro); min-width: 2px; }
 .barra-fila .num { width: 54px; flex: 0 0 auto; text-align: right; font-weight: 700; }
 
 /* --- Navegación tipo app nativa en pantallas de teléfono --- */

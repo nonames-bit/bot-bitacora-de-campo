@@ -10,7 +10,10 @@ Estrategia:
 La PWA es SOLO LECTURA (no escribe en SQLite), así que este SW nunca encola
 escrituras. No cachear respuestas de login/logout (no GET) ni rutas no-GET.
 */
-var CACHE = "pwa-ja-v1";
+// v3: fix real de las barras de población/genética -- .relleno es un span
+// (inline) y CSS ignora `width` en elementos inline; faltaba display:block.
+// v2 fue el intento de contraste de color, insuficiente por sí solo.
+var CACHE = "pwa-ja-v3";
 var PRECACHE = [
   "/",
   "/login",
