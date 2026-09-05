@@ -9,6 +9,20 @@ from src.pwa.app import crear_app, datos_ficha, datos_pasturas, datos_tablero
 _WKT_TEST = "POLYGON((-74.07 3.39, -74.06 3.39, -74.06 3.40, -74.07 3.40, -74.07 3.39))"
 
 
+@pytest.fixture(autouse=True)
+def _reportes_dir_aislado(tmp_path, monkeypatch):
+    """Aísla la caché de /api/grafico/<tipo> a un directorio temporal por
+    test. Sin esto, cualquier test que pida un gráfico genera el PNG con
+    datos de prueba (ej. el potrero "Guayabal") directo en
+    data/reportes/_pwa_cache_<tipo>.png -- el mismo directorio que usa el
+    servidor real corriendo en la máquina del desarrollador -- y ese PNG
+    de prueba queda cacheado 10 minutos tapando el mapa/gráficos reales.
+    Bug real: el usuario vio "Guayabal" en el mapa de potreros de su PWA
+    local después de correr la suite de tests."""
+    import src.pwa.app as pwa_app
+    monkeypatch.setattr(pwa_app, "REPORTES_DIR_DEFAULT", str(tmp_path / "reportes"))
+
+
 @pytest.fixture
 def db_file(tmp_path):
     ruta = str(tmp_path / "bitacora.db")
@@ -174,11 +188,8 @@ def test_api_grafico_usa_cache_en_la_segunda_llamada(client, monkeypatch, tmp_pa
     dos personas abren la misma pestaña casi al tiempo."""
     import src.pwa.app as pwa_app
 
-    # Directorio de reportes aislado: REPORTES_DIR_DEFAULT apunta a la
-    # carpeta real del repo (data/reportes), que puede tener una caché
-    # fresca de usos previos (manuales o de otros tests) y falsear el conteo.
-    monkeypatch.setattr(pwa_app, "REPORTES_DIR_DEFAULT", str(tmp_path / "reportes"))
-
+    # El directorio de reportes ya queda aislado por el fixture autouse
+    # _reportes_dir_aislado (arriba); aquí solo falta instrumentar el conteo.
     llamadas = {"n": 0}
     generadores_originales = pwa_app._generadores_graficos_pwa()
     original = generadores_originales["mapa_potreros"]
