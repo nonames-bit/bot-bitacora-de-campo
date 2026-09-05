@@ -55,6 +55,25 @@ def test_registrar_parto_enlaza_cria(db):
     assert len(h_cria["nacimiento"]) == 1
 
 
+def test_registrar_parto_hereda_potrero_real_de_la_madre(db):
+    pid = db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="A24")
+    db.execute("UPDATE potreros SET geom_wkt_4326 = ? WHERE id = ?", ("POLYGON((0 0,0 1,1 1,1 0,0 0))", pid))
+    db.registrar_animal("JA379", sexo="Hembra", potrero=pid, estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA379", fecha="2026-08-24", sexo_cria="Hembra", id_cria_tag="NO65")
+    cria = db.get_animal("NO65")
+    assert cria["potrero_id"] == pid
+
+
+def test_registrar_parto_no_hereda_potrero_legacy_sin_geometria(db):
+    # Potrero sin geom_wkt_4326: es un código legacy de Software Ganadero,
+    # ya no vigente -- no debe "contaminar" a la cría con una ubicación falsa.
+    pid = db.registrar_potrero(nombre="ALTOMONOS", codigo="18")
+    db.registrar_animal("JA16", sexo="Hembra", potrero=pid, estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA16", fecha="2018-02-19", sexo_cria="Macho", id_cria_tag="NM_38776")
+    cria = db.get_animal("NM_38776")
+    assert cria["potrero_id"] is None
+
+
 def test_registrar_parto_autorreferenciado_proteccion(db):
     # Intentar registrar parto donde vaca_tag == id_cria_tag
     res = db.registrar_parto(vaca_tag="V009", fecha="2026-03-02", sexo_cria="Macho", id_cria_tag="V009")

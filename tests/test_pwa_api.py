@@ -251,6 +251,21 @@ def test_api_buscar_autocompletar(client):
     assert any(x["nombre"] == "Guayabal" for x in p.get_json()["potreros"])
 
 
+def test_api_buscar_potreros_excluye_legacy_sin_geometria(client):
+    """El selector de potreros (lista completa con q="" y autocompletar al
+    escribir) no debe ofrecer códigos legacy sin geom_wkt_4326 -- son los
+    mismos potreros no reales/actuales confirmados por el usuario, no debe
+    poder filtrarse el tablero por ellos ni por accidente."""
+    r = client.get("/api/buscar?q=")
+    nombres = [p["nombre"] for p in r.get_json()["potreros"]]
+    assert "Guayabal" in nombres
+    assert "09" not in nombres
+
+    r2 = client.get("/api/buscar?q=09")
+    nombres2 = [p["nombre"] for p in r2.get_json()["potreros"]]
+    assert "09" not in nombres2
+
+
 def test_api_badges_contadores(client):
     r = client.get("/api/badges")
     assert r.status_code == 200

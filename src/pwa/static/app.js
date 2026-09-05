@@ -45,10 +45,16 @@
   }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
 
-  // SVG Icon helper (Phosphor-like technical style, stroke-width: 1.5px, size: 18px)
+  // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
+  // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
+  var COW_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
+  // Dos vacas (pequeña atrás-arriba + grande adelante-abajo, como el icono "users").
+  var COW_HEAD_X2 = '<g transform="translate(-0.8 1.6) scale(.38)">' + COW_HEAD + '</g>'
+    + '<g transform="translate(11.2 7.6) scale(.5)">' + COW_HEAD + '</g>';
   function icon(name, size) {
     var paths = {
-      cow: '<path d="M16.4 13.7A6.5 6.5 0 1 0 6.28 6.6c-1.1 3.13-.78 3.9-3.18 6.08A3 3 0 0 0 5 18c4 0 8.4-1.8 11.4-4.3"/><path d="m18.5 6 1.754 3.5a6.48 6.48 0 0 1-1.854 8.2C15.4 20.2 11 22 7 22a3 3 0 0 1-2.68-1.66L2.4 16.5"/><circle cx="12.5" cy="8.5" r="2.5"/>', // Lucide 'beef': cabeza de vaca con argolla
+      cow: COW_HEAD,
+      cowDouble: COW_HEAD_X2,
       grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
@@ -63,7 +69,8 @@
       gauge: '<path d="M3 12a9 9 0 0 1 15 0"/><path d="M12 12L9 9"/>',
       nitrogen: '<path d="M12 2a5 5 0 0 0-5 5v5H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2V7a5 5 0 0 0-5-5z"/>',
       camera: '<path d="M4 8a2 2 0 0 1 2-2h1.2l1-1.6A1 1 0 0 1 9 4h6a1 1 0 0 1 .8.4L16.8 6H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
-      scale: '<circle cx="4.5" cy="12" r="2"/><circle cx="19.5" cy="12" r="2"/><path d="M6.5 12h11"/><path d="M8 9v6M16 9v6"/>',
+      scale: '<path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/>', // Lucide scale (balanza romana) — perfecto para pesajes
+      weight: '<circle cx="12" cy="5" r="3"/><path d="M6.5 8a2 2 0 0 0-1.905 1.46L2.1 18.5A2 2 0 0 0 4 21h16a2 2 0 0 0 1.925-2.54L19.4 9.5A2 2 0 0 0 17.48 8Z"/>',
       circleEmpty: '<circle cx="12" cy="12" r="9"/>',
       xmark: '<path d="M18 6 6 18M6 6l12 12"/>',
       // --- Iconos Lucide (ISC/MIT) re-importados: trazo fino y minimalista ---
@@ -255,7 +262,7 @@
     return h;
   }
   function renderPoblacion(d) {
-    var h = "<h3>" + icon("cow") + "Población y edades</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("cowDouble") + "Población y edades</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos") + kpi(d.total_hembras, "Hembras")
       + kpi(d.total_machos, "Machos") + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio") + "</div>";
     h += "<h4>" + icon("chartBar") + "Composición por bracket de edad</h4>";
@@ -681,9 +688,18 @@
   var _deb = null;
   function onInputSugerir(ev) {
     var v = (ev.target.value || "").trim();
-    if (!v) return;
+    if (!v) { cargarListaPotreros(); return; }
     clearTimeout(_deb);
     _deb = setTimeout(function () { sugerirDesde(v); }, 250);
+  }
+  // Llena el datalist de potreros con la lista COMPLETA (selector desplegable).
+  function cargarListaPotreros() {
+    fetch("/api/buscar?q=").then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.potreros) {
+          rellenarDatalist("dl-potreros", d.potreros.map(function (p) { return p.nombre || p.codigo; }));
+        }
+      }).catch(function () { /* best-effort */ });
   }
   function cargar(animar) {
     if (animar === undefined) animar = true;
@@ -786,10 +802,15 @@
     if (el) el.addEventListener("keydown", function (e) { if (e.key === "Enter") cargarManual(); });
   });
   // Autocompletar: tecleo en tag/potrero consulta /api/buscar y llena datalist.
-  ["f-potrero", "f-tag"].forEach(function (id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener("input", onInputSugerir);
-  });
+  var inpPotrero = document.getElementById("f-potrero");
+  var inpTag = document.getElementById("f-tag");
+  if (inpTag) inpTag.addEventListener("input", onInputSugerir);
+  if (inpPotrero) {
+    inpPotrero.addEventListener("input", onInputSugerir);
+    // Al enfocar (o tocar en móvil) se ofrece la lista completa para elegir.
+    inpPotrero.addEventListener("focus", function () { cargarListaPotreros(); });
+    inpPotrero.addEventListener("click", function () { cargarListaPotreros(); });
+  }
 
   /* ---------- Online/offline + polling ---------- */
   var barra = document.getElementById("barra-red");

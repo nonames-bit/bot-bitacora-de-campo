@@ -295,11 +295,18 @@ class Database:
                 )
                 # La cría nace en el mismo potrero donde está la madre en ese
                 # momento -- si no se hereda aquí, queda "sin potrero" hasta
-                # el próximo backup/import de Software Ganadero.
-                fila_vaca = self.query_one("SELECT potrero_id FROM animales WHERE id_animal = ?", (vaca_id,))
-                if fila_vaca and fila_vaca["potrero_id"] is not None:
+                # el próximo backup/import de Software Ganadero. Solo se
+                # hereda si el potrero de la madre es uno real y vigente
+                # (con geometría), no uno legacy de Software Ganadero --
+                # heredar un potrero legacy sería peor que dejarlo sin
+                # potrero: mostraría una ubicación falsa en vez de "sin dato".
+                fila_vaca = self.query_one(
+                    "SELECT p.id FROM animales a JOIN potreros p ON p.id = a.potrero_id "
+                    "WHERE a.id_animal = ? AND p.geom_wkt_4326 IS NOT NULL", (vaca_id,)
+                )
+                if fila_vaca is not None:
                     self.execute(
-                        "UPDATE animales SET potrero_id = COALESCE(potrero_id, ?) WHERE id_animal = ?", (fila_vaca["potrero_id"], id_cria)
+                        "UPDATE animales SET potrero_id = COALESCE(potrero_id, ?) WHERE id_animal = ?", (fila_vaca["id"], id_cria)
                     )
             if sexo_cria:
                 self.execute(
