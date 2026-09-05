@@ -164,3 +164,31 @@ def test_auth_logging_intentos_denegados(tmp_path, caplog):
     mensajes = [record.message for record in caplog.records if record.name == "bitacora.auth"]
     assert any("no autorizado" in m.lower() for m in mensajes)
     assert any("denegado" in m.lower() for m in mensajes)
+
+
+def test_auth_telegram_id_y_avatar(tmp_path):
+    archivo = tmp_path / "users.json"
+    auth = Auth(users_file=str(archivo))
+    auth.agregar_usuario(
+        user_id=1,
+        nombre="Don José",
+        rol="OWNER",
+        pin="1234",
+        telegram_id=6123051140,
+        avatar="patron"
+    )
+
+    # Verificar autorización por ID local y por telegram_id
+    assert auth.es_autorizado(1) is True
+    assert auth.es_autorizado(6123051140) is True
+    assert auth.rol_de(1) == "OWNER"
+    assert auth.rol_de(6123051140) == "OWNER"
+
+    # Autenticación PIN
+    u = auth.autenticar_pin("1234")
+    assert u is not None
+    assert u["user_id"] == 1
+    assert u["telegram_id"] == 6123051140
+    assert u["avatar"] == "patron"
+    assert u["nombre"] == "Don José"
+

@@ -72,6 +72,9 @@
       heartPulse: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>',
       heart: '<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>',
       shieldPlus: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/>',
+      crown: '<path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.201a4 4 0 0 1-3.86 2.93H8.713a4 4 0 0 1-3.86-2.93L2.019 6.019a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><circle cx="12" cy="19.5" r="1.5"/>',
+      cowboy: '<path d="M2 17c0-2.5 4.5-4 10-4s10 1.5 10 4M12 4c-3 0-5 2-5 5v4h10V9c0-3-2-5-5-5zM6 13a6 6 0 0 0-4 4h20a6 6 0 0 0-4-4"/>',
+      tractor: '<path d="M3 11V9a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M11 11h3a2 2 0 0 1 2 2v2"/><circle cx="6.5" cy="16.5" r="3.5"/><circle cx="18" cy="17" r="2"/><path d="M10 16.5h6"/><path d="M7 11V8"/>',
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
       // Lucide oficiales (ISC/MIT): gestación y diagnóstico
       egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
@@ -1195,42 +1198,118 @@
     if (btnRef) btnRef.addEventListener("click", cargarLogs);
   }
 
-  /* ---------- Gestión de Usuarios & Accesos (ADMIN & OWNER) ---------- */
+  /* ---------- Sistema de Avatares & Niveles (Level 1, 2, 3) ---------- */
+  var AVATARES = {
+    patron: { key: "patron", label: "Patrón / Dueño", ic: "crown", color: "#d97706", bg: "rgba(217,119,6,0.14)" },
+    admin: { key: "admin", label: "Administrador", ic: "shieldPlus", color: "#2563eb", bg: "rgba(37,99,235,0.14)" },
+    vaquero: { key: "vaquero", label: "Vaquero / Campo", ic: "cowboy", color: "#16a34a", bg: "rgba(22,163,74,0.14)" },
+    veterinaria: { key: "veterinaria", label: "Veterinaria", ic: "stethoscope", color: "#9333ea", bg: "rgba(147,51,234,0.14)" },
+    pasturas: { key: "pasturas", label: "Pasturas / Forraje", ic: "grass", color: "#059669", bg: "rgba(5,150,105,0.14)" },
+    tractor: { key: "tractor", label: "Maquinaria / Tractor", ic: "tractor", color: "#ea580c", bg: "rgba(234,88,12,0.14)" }
+  };
+
+  function defaultAvatar(rol) {
+    var r = (rol || "").toUpperCase();
+    if (r === "OWNER") return "patron";
+    if (r === "ADMIN" || r === "ADMINISTRADOR") return "admin";
+    return "vaquero";
+  }
+
+  function rolToNivel(rol) {
+    var r = (rol || "").toUpperCase();
+    if (r === "OWNER") return { lvl: 1, txt: "Level 1 (OWNER)", badge: "L1", color: "#d97706", chip: "amarillo" };
+    if (r === "ADMIN" || r === "ADMINISTRADOR") return { lvl: 2, txt: "Level 2 (ADMIN)", badge: "L2", color: "#2563eb", chip: "azul" };
+    return { lvl: 3, txt: "Level 3 (TRABAJADOR)", badge: "L3", color: "#16a34a", chip: "verde" };
+  }
+
+  function renderAvatarBadge(avKey, rol, size, showLvl) {
+    size = size || 38;
+    var av = AVATARES[avKey] || AVATARES[defaultAvatar(rol)] || AVATARES.vaquero;
+    var nv = rolToNivel(rol);
+    var icSize = Math.max(12, Math.round(size * 0.52));
+    var h = "<div class='avatar-box' style='width:" + size + "px; height:" + size + "px; background:" + av.bg + "; color:" + av.color + "; border-color:" + av.color + ";'>";
+    h += icon(av.ic, icSize);
+    if (showLvl !== false) {
+      h += "<span class='avatar-lvl-mini' style='background:" + nv.color + ";'>" + nv.lvl + "</span>";
+    }
+    h += "</div>";
+    return h;
+  }
+
+  /* ---------- Gestión de Usuarios & Accesos (Niveles 1, 2, 3) ---------- */
   function renderUsuarios(d) {
     var miRol = (d && d.mi_rol || "ADMIN").toUpperCase();
     var usuarios = (d && d.usuarios) || [];
 
-    var h = "<h3>" + icon("users") + "Gestión de Personal & Accesos PWA</h3>"
-      + "<p class='aviso'>Control de acceso basado en roles (RBAC). Crea nuevos usuarios, define su PIN de 4 dígitos para ingresar al sistema y asigna permisos según sus funciones.</p>";
+    var h = "<h3>" + icon("users") + "Gestión de Personal & Accesos (Niveles 1, 2, 3)</h3>"
+      + "<p class='aviso'>Control de acceso basado en roles por niveles. Define el nombre, nivel de jerarquía, PIN de acceso de 4 dígitos, ID local secuencial, ID de Telegram y foto/avatar representativo.</p>";
 
     // Tarjeta 1: Formulario Agregar / Modificar Usuario
-    h += "<div class='card' style='padding:16px; margin-bottom:16px;'>"
+    h += "<div class='card' style='padding:18px; margin-bottom:16px;'>"
       + "<h4>" + icon("pin") + "Crear o Modificar Usuario</h4>"
-      + "<form id='form-usuario' style='display:flex; flex-direction:column; gap:12px; margin-top:12px;'>"
+      + "<form id='form-usuario' style='display:flex; flex-direction:column; gap:14px; margin-top:12px;'>"
       + "<input type='hidden' id='usr-edit-id' value=''>"
+      + "<input type='hidden' id='usr-avatar-val' value='vaquero'>"
+
+      // Fila 1: Nombre con máximo espacio horizontal
+      + "<div>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>Nombre Completo del Usuario / Trabajador:</label>"
+      + "<input id='usr-nombre' placeholder='ej. Don José (Propietario) o Carlos Gómez (Mayordomo)' required style='width:100%; box-sizing:border-box; padding:11px 14px; font-size:15px; border-radius:8px; border:1px solid var(--borde-fuerte);'>"
+      + "</div>"
+
+      // Fila 2: Nivel (Rol) y PIN de 4 dígitos
       + "<div style='display:flex; gap:12px; flex-wrap:wrap;'>"
-      + "<div style='flex:2; min-width:200px;'><label style='font-size:12px; font-weight:600;'>Nombre del Usuario / Trabajador:</label>"
-      + "<input id='usr-nombre' placeholder='ej. Carlos Gómez (Mayordomo)' required style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
-      + "<div style='flex:1; min-width:160px;'><label style='font-size:12px; font-weight:600;'>Rol de Acceso:</label>"
-      + "<select id='usr-rol' style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-      + "<option value='TRABAJADOR'>TRABAJADOR (Campo: Manga, Captura, GPS, Ficha)</option>"
-      + "<option value='ADMIN'>ADMIN (Gestión, Tableros, Retiros, Reportes)</option>";
+      + "<div style='flex:1.2; min-width:220px;'>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>Nivel de Acceso (Jerarquía):</label>"
+      + "<select id='usr-rol' style='width:100%; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-weight:600;'>"
+      + "<option value='TRABAJADOR'>Level 3 · TRABAJADOR (Campo: Manga, Captura, Ficha)</option>"
+      + "<option value='ADMIN'>Level 2 · ADMIN (Gestión, Tableros, Retiros, Reportes, Usuarios)</option>";
     if (miRol === "OWNER") {
-      h += "<option value='OWNER'>OWNER (Propietario / Acceso Total + Servidor)</option>";
+      h += "<option value='OWNER'>Level 1 · OWNER (Dueño / Acceso Total + GPS Rutas + Servidor)</option>";
     }
     h += "</select></div>"
-      + "</div>"
-      + "<div style='display:flex; gap:12px; flex-wrap:wrap;'>"
-      + "<div style='flex:1; min-width:200px;'><label style='font-size:12px; font-weight:600;'>PIN de 4 Dígitos (Acceso Celular/PC):</label>"
+      + "<div style='flex:1; min-width:200px;'>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>PIN de 4 Dígitos (Acceso Celular/PC):</label>"
       + "<div style='display:flex; gap:6px;'>"
-      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:18px; letter-spacing:2px; text-align:center;'>"
-      + "<button type='button' id='btn-gen-pin' class='tema-btn' style='font-size:12px; padding:0 12px; white-space:nowrap;'>" + icon("refresh", 13) + "Generar PIN</button>"
+      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:17px; font-weight:bold; letter-spacing:2px; text-align:center;'>"
+      + "<button type='button' id='btn-gen-pin' class='tema-btn' style='font-size:12px; padding:0 12px; white-space:nowrap;'>" + icon("refresh", 13) + " Generar PIN</button>"
       + "</div></div>"
-      + "<div style='flex:1; min-width:180px;'><label style='font-size:12px; font-weight:600;'>ID Numérico / Telegram (Opcional):</label>"
-      + "<input id='usr-uid' type='number' placeholder='ej. 554231 o dejar vacío' style='width:100%; padding:10px; border-radius:6px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono);'></div>"
       + "</div>"
+
+      // Fila 3: ID Local e ID Telegram lado a lado
+      + "<div style='display:flex; gap:12px; flex-wrap:wrap;'>"
+      + "<div style='flex:1; min-width:180px;'>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>ID Local Sistema:</label>"
+      + "<input id='usr-uid' type='number' placeholder='Automático (#1, #2...)' style='width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); background:var(--superficie);'>"
+      + "<small style='color:var(--texto-suave); font-size:11px; display:block; margin-top:3px;'>Identificador secuencial interno de la finca.</small>"
+      + "</div>"
+      + "<div style='flex:1; min-width:180px;'>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>ID Telegram (idtelegram - Opcional):</label>"
+      + "<input id='usr-telegram-id' type='number' placeholder='ej. 6123051140' style='width:100%; box-sizing:border-box; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono);'>"
+      + "<small style='color:var(--texto-suave); font-size:11px; display:block; margin-top:3px;'>Identificador de Telegram para autorizar el bot.</small>"
+      + "</div>"
+      + "</div>"
+
+      // Fila 4: Selector de Foto / Avatar Temático
+      + "<div>"
+      + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>Foto / Avatar de Usuario (Estilo Ganadería JA):</label>"
+      + "<div id='picker-avatares' class='avatar-picker'>";
+
+    Object.keys(AVATARES).forEach(function (k) {
+      var av = AVATARES[k];
+      var esActivo = k === "vaquero" ? " act" : "";
+      h += "<div class='avatar-pick-item" + esActivo + "' data-av='" + k + "'>"
+        + renderAvatarBadge(k, "TRABAJADOR", 38, false)
+        + "<span>" + esc(av.label) + "</span>"
+        + "</div>";
+    });
+
+    h += "</div>"
+      + "</div>"
+
+      // Botones de acción
       + "<div style='display:flex; gap:10px; align-items:center; margin-top:6px;'>"
-      + "<button type='submit' id='btn-guardar-usr' class='btn-guardar-manga' style='max-width:240px;'>" + icon("save", 15) + "Guardar Usuario</button>"
+      + "<button type='submit' id='btn-guardar-usr' class='btn-guardar-manga' style='max-width:240px;'>" + icon("save", 15) + " Guardar Usuario</button>"
       + "<button type='button' id='btn-cancelar-edit-usr' class='tema-btn' style='display:none; padding:10px 16px;'>Cancelar Edición</button>"
       + "</div>"
       + "</form>"
@@ -1244,26 +1323,42 @@
     if (!usuarios.length) {
       h += vacio("No hay usuarios registrados.");
     } else {
-      h += "<div class='tabla-scroll'><table><tr><th>Usuario / Nombre</th><th>Rol</th><th>PIN</th><th>ID Sistema</th><th>Acciones</th></tr>";
+      h += "<div class='tabla-scroll'><table>"
+        + "<tr>"
+        + "<th>Usuario / Foto</th>"
+        + "<th>Nivel de Acceso</th>"
+        + "<th>ID Local</th>"
+        + "<th>ID Telegram</th>"
+        + "<th>PIN</th>"
+        + "<th>Acciones</th>"
+        + "</tr>";
+
       usuarios.forEach(function (u) {
         var rolU = String(u.rol || "").toUpperCase();
-        var rolClase = rolU === "OWNER" ? "verde" : rolU === "ADMIN" ? "azul" : "gris";
+        var nv = rolToNivel(rolU);
         var esOwnerTarget = rolU === "OWNER";
         var puedeEditar = miRol === "OWNER" || !esOwnerTarget;
+        var avKey = u.avatar || defaultAvatar(rolU);
 
         h += "<tr>"
-          + "<td><b>" + esc(u.nombre || "Sin nombre") + "</b></td>"
-          + "<td><span class='chip " + rolClase + "'>" + esc(rolU) + "</span></td>"
+          + "<td>"
+          + "<div style='display:flex; align-items:center; gap:10px;'>"
+          + renderAvatarBadge(avKey, rolU, 36, true)
+          + "<div><b style='font-size:13.5px;'>" + esc(u.nombre || "Sin nombre") + "</b></div>"
+          + "</div>"
+          + "</td>"
+          + "<td><span class='chip " + nv.chip + "' style='font-weight:700;'>" + nv.badge + " · " + esc(rolU) + "</span></td>"
+          + "<td><span style='font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--texto);'>#" + esc(u.user_id) + "</span></td>"
+          + "<td>" + (u.telegram_id ? "<code style='background:var(--superficie); padding:2px 6px; border-radius:4px; font-size:12px; font-family:var(--font-mono);'>" + esc(u.telegram_id) + "</code>" : "<span style='color:var(--texto-suave); font-size:12px;'>—</span>") + "</td>"
           + "<td><code style='background:var(--superficie); padding:3px 8px; border-radius:4px; border:1px solid var(--borde-fuerte); font-size:14px; font-weight:bold; letter-spacing:1px;'>" + esc(u.pin || "—") + "</code></td>"
-          + "<td><small style='color:var(--texto-suave); font-family:var(--font-mono);'>" + esc(u.user_id) + "</small></td>"
           + "<td>";
 
         if (puedeEditar) {
-          h += "<button type='button' class='btn-editar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' data-rol='" + esc(rolU) + "' data-pin='" + esc(u.pin || "") + "' style='font-size:11px; padding:3px 8px; margin-right:6px;'>" + icon("pin", 12) + "Editar</button>";
+          h += "<button type='button' class='btn-editar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' data-rol='" + esc(rolU) + "' data-pin='" + esc(u.pin || "") + "' data-tgid='" + esc(u.telegram_id || "") + "' data-avatar='" + esc(avKey) + "' style='font-size:11px; padding:4px 9px; margin-right:6px;'>" + icon("pin", 12) + " Editar</button>";
           var numOwners = usuarios.filter(function (x) { return String(x.rol || "").toUpperCase() === "OWNER"; }).length;
           var bloquearBorrar = esOwnerTarget && numOwners <= 1;
           if (!bloquearBorrar && (miRol === "OWNER" || rolU === "TRABAJADOR")) {
-            h += "<button type='button' class='btn-borrar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:3px 8px; color:var(--color-rojo-txt);'>" + icon("xmark", 12) + "Eliminar</button>";
+            h += "<button type='button' class='btn-borrar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:4px 9px; color:var(--color-rojo-txt);'>" + icon("xmark", 12) + " Eliminar</button>";
           }
         } else {
           h += "<span style='color:var(--texto-suave); font-size:11px;'>Protegido</span>";
@@ -1284,10 +1379,36 @@
     var btnGenPin = document.getElementById("btn-gen-pin");
     var pinInp = document.getElementById("usr-pin");
     var editIdInp = document.getElementById("usr-edit-id");
+    var avInput = document.getElementById("usr-avatar-val");
     var nomInp = document.getElementById("usr-nombre");
     var rolSel = document.getElementById("usr-rol");
     var uidInp = document.getElementById("usr-uid");
+    var tgIdInp = document.getElementById("usr-telegram-id");
     var btnCancelar = document.getElementById("btn-cancelar-edit-usr");
+
+    function seleccionarAvatar(avKey) {
+      if (!avKey) avKey = "vaquero";
+      if (avInput) avInput.value = avKey;
+      qa(".avatar-pick-item").forEach(function (el) {
+        if (el.getAttribute("data-av") === avKey) el.classList.add("act");
+        else el.classList.remove("act");
+      });
+    }
+
+    qa(".avatar-pick-item").forEach(function (item) {
+      item.addEventListener("click", function () {
+        var avKey = item.getAttribute("data-av");
+        seleccionarAvatar(avKey);
+      });
+    });
+
+    if (rolSel) {
+      rolSel.addEventListener("change", function () {
+        if (!editIdInp.value) {
+          seleccionarAvatar(defaultAvatar(rolSel.value));
+        }
+      });
+    }
 
     if (btnGenPin && pinInp) {
       btnGenPin.addEventListener("click", function () {
@@ -1303,9 +1424,11 @@
         pinInp.value = "";
         uidInp.value = "";
         uidInp.disabled = false;
+        if (tgIdInp) tgIdInp.value = "";
+        seleccionarAvatar(defaultAvatar(rolSel ? rolSel.value : "TRABAJADOR"));
         btnCancelar.style.display = "none";
         var btnGuardar = document.getElementById("btn-guardar-usr");
-        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + "Guardar Usuario";
+        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + " Guardar Usuario";
       });
     }
 
@@ -1316,14 +1439,17 @@
         var rol = rolSel.value;
         var pin = (pinInp.value || "").trim();
         var uidVal = editIdInp.value || (uidInp.value || "").trim();
+        var tgIdVal = (tgIdInp && tgIdInp.value || "").trim();
+        var avatar = avInput ? avInput.value : defaultAvatar(rol);
 
         if (!/^\d{4}$/.test(pin)) {
           if (feed) feed.innerHTML = "<div class='chip rojo'>El PIN debe ser de 4 dígitos numéricos (ej. 4521).</div>";
           return;
         }
 
-        var payload = { nombre: nombre, rol: rol, pin: pin };
+        var payload = { nombre: nombre, rol: rol, pin: pin, avatar: avatar };
         if (uidVal) payload.user_id = parseInt(uidVal, 10);
+        if (tgIdVal) payload.telegram_id = parseInt(tgIdVal, 10);
 
         if (feed) feed.innerHTML = "<div class='aviso'>Guardando usuario...</div>";
 
@@ -1338,6 +1464,8 @@
               form.reset();
               editIdInp.value = "";
               uidInp.disabled = false;
+              if (tgIdInp) tgIdInp.value = "";
+              seleccionarAvatar(defaultAvatar(rolSel.value));
               if (btnCancelar) btnCancelar.style.display = "none";
               setTimeout(function () { cargar(false); }, 700);
             } else {
@@ -1356,6 +1484,8 @@
         var nom = btn.getAttribute("data-nom");
         var rol = btn.getAttribute("data-rol");
         var pin = btn.getAttribute("data-pin");
+        var tgid = btn.getAttribute("data-tgid");
+        var av = btn.getAttribute("data-avatar") || defaultAvatar(rol);
 
         editIdInp.value = uid;
         nomInp.value = nom;
@@ -1363,9 +1493,11 @@
         pinInp.value = (pin && pin !== "****") ? pin : "";
         uidInp.value = uid;
         uidInp.disabled = true;
+        if (tgIdInp) tgIdInp.value = tgid || "";
+        seleccionarAvatar(av);
         if (btnCancelar) btnCancelar.style.display = "";
         var btnGuardar = document.getElementById("btn-guardar-usr");
-        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + "Actualizar Usuario";
+        if (btnGuardar) btnGuardar.innerHTML = icon("save", 15) + " Actualizar Usuario";
         form.scrollIntoView({ behavior: "smooth" });
       });
     });
@@ -1761,10 +1893,14 @@
 
   function aplicarRBAC(u) {
     var badge = document.getElementById("user-badge");
-    if (badge && u.nombre) {
+    if (badge && u && u.nombre) {
       var rol = (u.rol || "INVITADO").toUpperCase();
-      badge.textContent = u.nombre + " · " + rol;
-      badge.style.display = "inline-block";
+      var nv = rolToNivel(rol);
+      var avKey = u.avatar || defaultAvatar(rol);
+      badge.innerHTML = renderAvatarBadge(avKey, rol, 20, false)
+        + "<span style='margin-left:4px; font-weight:600;'>" + esc(u.nombre) + "</span>"
+        + "<span class='chip " + nv.chip + "' style='font-size:10px; padding:1px 6px; margin-left:5px; line-height:1.2;'>" + nv.badge + "</span>";
+      badge.style.display = "inline-flex";
     }
 
     var rol = (u.rol || "").toUpperCase();

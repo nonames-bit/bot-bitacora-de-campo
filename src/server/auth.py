@@ -104,7 +104,7 @@ class Auth:
             return False
 
         for u in self.usuarios:
-            if u.get("user_id") == uid:
+            if u.get("user_id") == uid or u.get("telegram_id") == uid:
                 return True
 
         logger.warning("Intento de acceso no autorizado: user_id=%s", uid)
@@ -118,7 +118,7 @@ class Auth:
             return None
 
         for u in self.usuarios:
-            if u.get("user_id") == uid:
+            if u.get("user_id") == uid or u.get("telegram_id") == uid:
                 return str(u.get("rol", "")).strip().upper()
         return None
 
@@ -162,10 +162,14 @@ class Auth:
         for u in self.usuarios:
             pin_u = str(u.get("pin", "")).strip()
             if pin_u and pin_u == pin_limpio:
+                rol_u = str(u.get("rol", "")).strip().upper()
+                avatar_u = u.get("avatar") or ("patron" if rol_u == "OWNER" else "admin" if rol_u == "ADMIN" else "vaquero")
                 return {
                     "user_id": u.get("user_id"),
+                    "telegram_id": u.get("telegram_id"),
                     "nombre": u.get("nombre", ""),
-                    "rol": str(u.get("rol", "")).strip().upper(),
+                    "rol": rol_u,
+                    "avatar": avatar_u,
                 }
         return None
 
@@ -179,14 +183,22 @@ class Auth:
 
             pin_limpio = str(pin).strip()
             for u in self.usuarios:
-                if u.get("user_id") == uid:
+                if u.get("user_id") == uid or u.get("telegram_id") == uid:
                     u["pin"] = pin_limpio
                     self._guardar_sin_lock()
                     logger.info("PIN actualizado para user_id=%s", uid)
                     return
             raise ValueError(f"El usuario con ID {uid} no existe.")
 
-    def agregar_usuario(self, user_id: int, nombre: str, rol: str, pin: Optional[str] = None) -> None:
+    def agregar_usuario(
+        self,
+        user_id: int,
+        nombre: str,
+        rol: str,
+        pin: Optional[str] = None,
+        telegram_id: Optional[int] = None,
+        avatar: Optional[str] = None,
+    ) -> None:
         """Agrega o actualiza un usuario y persiste los cambios."""
         # Mutación + persistencia como una sola unidad crítica bajo el candado
         # de módulo (ver _LOCK): evita perder actualizaciones entre hilos.
@@ -204,6 +216,8 @@ class Auth:
 
             nombre_norm = str(nombre).strip() if nombre else f"Usuario_{uid}"
             pin_norm = str(pin).strip() if pin else None
+            tg_id_norm = int(telegram_id) if telegram_id else None
+            avatar_norm = avatar or ("patron" if rol_norm == "OWNER" else "admin" if rol_norm == "ADMIN" else "vaquero")
 
             for u in self.usuarios:
                 if u.get("user_id") == uid:
@@ -211,6 +225,8 @@ class Auth:
                     u["rol"] = rol_norm
                     if pin_norm is not None:
                         u["pin"] = pin_norm
+                    u["telegram_id"] = tg_id_norm
+                    u["avatar"] = avatar_norm
                     self._guardar_sin_lock()
                     logger.info("Usuario actualizado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
                     return
@@ -219,6 +235,8 @@ class Auth:
                 "user_id": uid,
                 "nombre": nombre_norm,
                 "rol": rol_norm,
+                "telegram_id": tg_id_norm,
+                "avatar": avatar_norm,
             }
             if pin_norm:
                 nuevo["pin"] = pin_norm

@@ -974,10 +974,13 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 .user-badge {
   font-size: 11px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.16);
+  padding: 2px 8px 2px 4px;
   border-radius: 999px;
   color: #fff;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 #btn-sync { position: relative; }
 #btn-sync .nav-badge { top: -2px; right: -2px; background: #e65100; }
@@ -1227,4 +1230,70 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   font-size: 15px;
   user-select: none;
 }
+
+/* --- Avatares & Roles por Nivel (Level 1, 2, 3) --- */
+.avatar-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  flex-shrink: 0;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  transition: transform .15s ease;
+}
+.avatar-lvl-mini {
+  position: absolute;
+  bottom: -2px;
+  right: -3px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  border-radius: 50%;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--superficie);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+.avatar-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+.avatar-pick-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 2px solid var(--borde);
+  border-radius: 12px;
+  background: var(--superficie);
+  cursor: pointer;
+  transition: all .15s ease;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  text-align: center;
+}
+.avatar-pick-item:hover {
+  border-color: var(--verde-marca);
+  transform: translateY(-2px);
+  color: var(--texto);
+}
+.avatar-pick-item.act {
+  border-color: var(--verde-marca);
+  background: var(--fondo);
+  box-shadow: 0 0 0 2px rgba(46, 125, 50, 0.25);
+  color: var(--texto);
+}
+.avatar-pick-item .avatar-box {
+  margin-bottom: 2px;
+}
+
 

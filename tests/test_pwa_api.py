@@ -598,6 +598,29 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     r_del_owner = c_owner.post("/api/usuarios/100/eliminar")
     assert r_del_owner.status_code == 400
 
+    # Crear usuario con telegram_id y avatar temático
+    r_avatar_user = c_owner.post("/api/usuarios", json={
+        "nombre": "Dra. Veterinaria",
+        "rol": "ADMIN",
+        "pin": "9999",
+        "telegram_id": 9876543210,
+        "avatar": "veterinaria"
+    })
+    assert r_avatar_user.status_code == 200
+    res_data = r_avatar_user.get_json()["usuario"]
+    assert res_data["telegram_id"] == 9876543210
+    assert res_data["avatar"] == "veterinaria"
+
+    # Login con ese nuevo usuario y verificar /api/usuario
+    c_vet = app.test_client()
+    c_vet.post("/login", data={"pin": "9999"})
+    r_vet_info = c_vet.get("/api/usuario")
+    assert r_vet_info.status_code == 200
+    info = r_vet_info.get_json()
+    assert info["telegram_id"] == 9876543210
+    assert info["avatar"] == "veterinaria"
+    assert info["rol"] == "ADMIN"
+
 
 def test_telemetria_gps_ping_y_rutas(tmp_path):
     users_data = [

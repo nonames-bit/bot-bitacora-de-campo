@@ -685,11 +685,15 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def _usuario_actual() -> dict[str, Any]:
         if session is None:
             return {"autenticado": False, "rol": None, "nombre": None, "user_id": None}
+        rol_act = _rol_actual() or "TRABAJADOR"
+        default_av = "patron" if rol_act == "OWNER" else "admin" if rol_act == "ADMIN" else "vaquero"
         return {
             "autenticado": bool(session.get("autenticado")),
-            "rol": _rol_actual() or "TRABAJADOR",
+            "rol": rol_act,
             "nombre": session.get("nombre") or "Usuario",
             "user_id": session.get("user_id"),
+            "telegram_id": session.get("telegram_id"),
+            "avatar": session.get("avatar") or default_av,
         }
 
     @app.before_request
@@ -755,8 +759,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if user_auth:
             session["autenticado"] = True
             session["user_id"] = user_auth.get("user_id")
+            session["telegram_id"] = user_auth.get("telegram_id")
             session["nombre"] = user_auth.get("nombre") or "Usuario"
             session["rol"] = user_auth.get("rol") or "TRABAJADOR"
+            session["avatar"] = user_auth.get("avatar") or "vaquero"
             return redirect("/")
 
         # 2. Intentar autenticar por contraseña maestra (PWA_PASSWORD)
@@ -765,6 +771,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             session["user_id"] = uid_form
             session["rol"] = _rol_de(uid_form, users_file) or "OWNER"
             session["nombre"] = "Propietario" if session["rol"] == "OWNER" else "Usuario"
+            session["avatar"] = "patron" if session["rol"] == "OWNER" else "admin"
             return redirect("/")
 
         _login_registrar_intento(ip)
@@ -946,15 +953,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         rol_nuevo = str(datos.get("rol") or "TRABAJADOR").strip().upper()
         pin = str(datos.get("pin") or "").strip()
         uid_raw = datos.get("user_id")
+        tg_id_raw = datos.get("telegram_id")
+        avatar = str(datos.get("avatar") or "").strip() or None
+
+        tg_id = None
+        if tg_id_raw is not None and str(tg_id_raw).strip() != "":
+            try:
+                tg_id = int(tg_id_raw)
+            except (ValueError, TypeError):
+                return jsonify({"error": "El ID de Telegram debe ser un número entero (ej. 6123051140)."}), 400
 
         if not nombre:
             return jsonify({"error": "El nombre del usuario es obligatorio."}), 400
         if rol_nuevo not in ("OWNER", "ADMIN", "TRABAJADOR"):
-            return jsonify({"error": f"Rol inválido: {rol_nuevo}. Permitidos: OWNER, ADMIN, TRABAJADOR."}), 400
+            return jsonify({"error": f"Rol inválido: {rol_nuevo}. Permitidos: OWNER (Level 1), ADMIN (Level 2), TRABAJADOR (Level 3)."}), 400
 
         # Un ADMIN no puede crear usuarios OWNER ni auto-promocionarse
         if mi_rol != "OWNER" and rol_nuevo == "OWNER":
-            return jsonify({"error": "Solo un OWNER puede crear o asignar el rol OWNER."}), 403
+            return jsonify({"error": "Solo un OWNER (Level 1) puede crear o asignar el rol OWNER."}), 403
 
         # Validar PIN: 4 dígitos numéricos
         if not re.match(r"^\d{4}$", pin):
@@ -968,32 +984,46 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             auth_inst = Auth(users_file)
             usuarios = auth_inst.listar_usuarios()
 
-            # Resolver o generar user_id único
+            # Resolver o generar ID local secuencial (1, 2, 3...)
             if uid_raw:
                 try:
                     uid = int(uid_raw)
                 except (ValueError, TypeError):
                     return jsonify({"error": "user_id debe ser un entero numérico."}), 400
             else:
-                ids_existentes = [int(u.get("user_id", 0)) for u in usuarios if isinstance(u.get("user_id"), int)]
-                uid = (max(ids_existentes) + 1) if ids_existentes else 100000001
+                ids_existentes = [int(u.get("user_id", 0)) for u in usuarios if isinstance(u.get("user_id"), int) and int(u.get("user_id", 0)) < 1000000]
+                uid = (max(ids_existentes) + 1) if ids_existentes else 1
 
             # Si es ADMIN y está editando un usuario existente, no puede editar a un OWNER
             if mi_rol != "OWNER":
                 for u in usuarios:
                     if u.get("user_id") == uid and str(u.get("rol", "")).strip().upper() == "OWNER":
-                        return jsonify({"error": "Un ADMIN no puede modificar a un usuario OWNER."}), 403
+                        return jsonify({"error": "Un ADMIN no puede modificar a un usuario OWNER (Level 1)."}), 403
 
             # Verificar que el PIN no esté en colisión con OTRO usuario
             for u in usuarios:
                 if u.get("user_id") != uid and str(u.get("pin", "")).strip() == pin:
                     return jsonify({"error": f"El PIN '{pin}' ya está en uso por '{u.get('nombre')}'. Cada usuario debe tener un PIN único."}), 400
 
-            auth_inst.agregar_usuario(user_id=uid, nombre=nombre, rol=rol_nuevo, pin=pin)
+            auth_inst.agregar_usuario(
+                user_id=uid,
+                nombre=nombre,
+                rol=rol_nuevo,
+                pin=pin,
+                telegram_id=tg_id,
+                avatar=avatar,
+            )
             return jsonify({
                 "ok": True,
-                "mensaje": f"Usuario '{nombre}' ({rol_nuevo}) guardado exitosamente.",
-                "usuario": {"user_id": uid, "nombre": nombre, "rol": rol_nuevo, "pin": pin}
+                "mensaje": f"Usuario '{nombre}' (Level {1 if rol_nuevo=='OWNER' else 2 if rol_nuevo=='ADMIN' else 3}) guardado exitosamente.",
+                "usuario": {
+                    "user_id": uid,
+                    "telegram_id": tg_id,
+                    "nombre": nombre,
+                    "rol": rol_nuevo,
+                    "pin": pin,
+                    "avatar": avatar or ("patron" if rol_nuevo=="OWNER" else "admin" if rol_nuevo=="ADMIN" else "vaquero"),
+                }
             })
         except Exception as e:
             logger.exception("Error al guardar usuario")
