@@ -62,50 +62,39 @@ class ReproduccionQueryMixin:
 
     def _genealogia(self, tag) -> str:
         if not tag:
-            return "¿De cuál animal desea consultar la genealogía? (ej. '¿quién es la madre de patricia?')"
-        aid = self.db.resolve_animal(tag)
-        if aid is None:
-            return f"No se encontró el animal '{tag}' en los registros."
-        animal = self.db.get_animal(aid)
-        if not animal:
-            return f"No se encontró el animal '{tag}' en los registros."
-
-        tag_str = animal["tag"] or str(tag)
-        nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
-
-        madre_str = "Desconocida"
-        if animal["madre_id"]:
-            m_row = self.db.get_animal(animal["madre_id"])
-            if m_row:
-                madre_str = m_row["tag"] + (f" ({m_row['nombre']})" if m_row["nombre"] else "")
-
-        padre_str = "Desconocido"
-        if animal["padre_id"]:
-            p_row = self.db.get_animal(animal["padre_id"])
-            if p_row:
-                padre_str = p_row["tag"] + (f" ({p_row['nombre']})" if p_row["nombre"] else "")
-
-        crias = self.db.query(
-            "SELECT a.tag, a.nombre, a.sexo, p.fecha FROM partos p "
-            "LEFT JOIN animales a ON a.id_animal = p.id_cria "
-            "WHERE p.vaca_id = ? AND (p.id_cria IS NULL OR p.id_cria != ?) ORDER BY p.fecha DESC",
-            (aid, aid),
-        )
-        crias_str = f"{len(crias)} partos registrados"
-        if crias:
-            crias_desc = []
-            for c in crias[:3]:
-                c_tag = c["tag"] or "Sin arete"
-                c_fec = f" ({c['fecha']})" if c["fecha"] else ""
-                crias_desc.append(f"{c_tag}{c_fec}")
-            crias_str += f" [{', '.join(crias_desc)}]"
-
-        return (
-            f"🌳 <b>Genealogía de {tag_str}{nombre}</b>\n"
-            f"• Madre: <b>{madre_str}</b>\n"
-            f"• Padre: <b>{padre_str}</b>\n"
-            f"• Crías: {crias_str}"
-        )
+            ejemplos = self.db.query(
+                """
+                SELECT a.tag FROM animales a
+                WHERE a.madre_id IS NOT NULL OR a.padre_id IS NOT NULL
+                ORDER BY a.id_animal DESC LIMIT 4
+                """
+            )
+            tags_ej = ", ".join([f"<code>{r['tag']}</code>" for r in ejemplos]) if ejemplos else "<code>A007</code>, <code>JA238</code>"
+            return (
+                "🌳 <b>ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)</b>\n\n"
+                "El sistema registra y verifica 3 generaciones de ancestros (padres, abuelos y bisabuelos), "
+                "descendencia completa (crías) y control automático de consanguinidad zootécnica.\n\n"
+                "💡 <i>Para consultar el árbol de un animal, indique su arete:</i>\n"
+                f"• Aretes de ejemplo con genealogía: {tags_ej}\n"
+                "• Ejemplos: <i>'árbol de A007'</i>, <i>'genealogía de JA238'</i>, <i>'pedigree de 47'</i>\n"
+                "• En Telegram también puede usar el comando directo: <code>/arbol &lt;tag&gt;</code>"
+            )
+        try:
+            try:
+                from ..server.formatters import formatear_genealogia_animal_tab
+            except (ImportError, ValueError):
+                from src.server.formatters import formatear_genealogia_animal_tab
+            return formatear_genealogia_animal_tab(self.db, tag)
+        except Exception:
+            aid = self.db.resolve_animal(tag)
+            if aid is None:
+                return f"No se encontró el animal '{tag}' en los registros."
+            animal = self.db.get_animal(aid)
+            if not animal:
+                return f"No se encontró el animal '{tag}' en los registros."
+            tag_str = animal["tag"] or str(tag)
+            nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
+            return f"🌳 <b>Genealogía de {tag_str}{nombre}</b>\n• Registro disponible en ficha zootécnica."
 
     def _palpacion_pendiente(self) -> str:
         hoy = self.hoy

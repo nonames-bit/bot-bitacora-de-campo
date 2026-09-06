@@ -266,9 +266,12 @@ class QueryEngine(
                 return self._retiro_animal(tag)
             return self._en_retiro()
 
-        # 5. Genealogía y familia
-        if tag and re.search(r"\b(?:madre|padre|mama|papa|genealogia|familia|hijos?|hijas?|crias?)\b", t):
-            return self._genealogia(tag)
+        # 5. Genealogía, Árbol (3G), Pedigree y Trazabilidad
+        if re.search(r"\b(?:madre|padre|mama|papa|genealogia|arbol|pedigree|trazabilidad|linaje|consanguinidad|familia|hijos?|hijas?|crias?)\b", t):
+            if tag:
+                return self._genealogia(tag)
+            if re.search(r"\b(?:genealogia|arbol|pedigree|trazabilidad|linaje|consanguinidad)\b", t):
+                return self._genealogia(None)
 
         # 5b. Notas, Observaciones y Apuntes de Campo
         if re.search(r"\b(?:notas?|observaci[oó]n|observaciones|apuntes?|comentarios?)\b", t):

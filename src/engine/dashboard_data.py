@@ -496,26 +496,150 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base["potrero"] = potrero_nom
     base["potrero_id"] = an.get("potrero_id")
 
-    # 2. Genealogía
-    madre_dict = None
-    if an.get("madre_id"):
+    # 2. Genealogía y Trazabilidad (3G)
+    def _info_ancestro(animal_id: Optional[int]) -> Optional[dict[str, Any]]:
+        if not animal_id:
+            return None
         try:
-            m = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["madre_id"],))
-            if m:
-                madre_dict = {"id_animal": m["id_animal"], "tag": m["tag"], "nombre": m["nombre"], "raza": m["raza"]}
+            row = db.query_one(
+                "SELECT id_animal, tag, nombre, raza, sexo, padre_id, madre_id, estado "
+                "FROM animales WHERE id_animal = ?", (animal_id,)
+            )
+            if not row:
+                return None
+            return {
+                "id_animal": row["id_animal"],
+                "tag": row["tag"],
+                "nombre": row["nombre"],
+                "raza": row["raza"] or "S/D",
+                "sexo": row["sexo"] or "S/D",
+                "padre_id": row["padre_id"],
+                "madre_id": row["madre_id"],
+                "estado": row["estado"],
+            }
         except Exception:
-            logger.error("seccion madre fallo", exc_info=True)
-    base["madre"] = madre_dict
+            return None
 
-    padre_dict = None
-    if an.get("padre_id"):
+    padre_info = _info_ancestro(an.get("padre_id"))
+    madre_info = _info_ancestro(an.get("madre_id"))
+    base["padre"] = padre_info
+    base["madre"] = madre_info
+
+    # Abuelos Paternos y Maternos
+    p_abuelo_pat = _info_ancestro(padre_info["padre_id"]) if padre_info else None
+    p_abuela_pat = _info_ancestro(padre_info["madre_id"]) if padre_info else None
+    m_abuelo_mat = _info_ancestro(madre_info["padre_id"]) if madre_info else None
+    m_abuela_mat = _info_ancestro(madre_info["madre_id"]) if madre_info else None
+
+    # Bisabuelos (3G) si están registrados
+    p_bisabuelo_pp = _info_ancestro(p_abuelo_pat["padre_id"]) if p_abuelo_pat else None
+    p_bisabuela_pp = _info_ancestro(p_abuelo_pat["madre_id"]) if p_abuelo_pat else None
+    p_bisabuelo_pm = _info_ancestro(p_abuela_pat["padre_id"]) if p_abuela_pat else None
+    p_bisabuela_pm = _info_ancestro(p_abuela_pat["madre_id"]) if p_abuela_pat else None
+
+    m_bisabuelo_mp = _info_ancestro(m_abuelo_mat["padre_id"]) if m_abuelo_mat else None
+    m_bisabuela_mp = _info_ancestro(m_abuelo_mat["madre_id"]) if m_abuelo_mat else None
+    m_bisabuelo_mm = _info_ancestro(m_abuela_mat["padre_id"]) if m_abuelo_mat else None
+    m_bisabuela_mm = _info_ancestro(m_abuela_mat["madre_id"]) if m_abuela_mat else None
+
+    # Crías registradas (tanto si es hembra - madre, como si es macho - padre)
+    crias_list: list[dict[str, Any]] = []
+    try:
+        crias_rows = db.query(
+            """
+            SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.estado,
+                   p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
+            FROM animales a
+            LEFT JOIN partos p ON p.id_cria = a.id_animal
+            WHERE a.madre_id = ? OR a.padre_id = ?
+               OR (p.vaca_id = ? AND a.id_animal IS NOT NULL)
+            GROUP BY a.id_animal
+            ORDER BY COALESCE(p.fecha, a.fecha_nacimiento) DESC, a.id_animal DESC
+            """,
+            (aid, aid, aid),
+        )
+        crias_list = _filas_dict(crias_rows)
+
+        # Partos sin cría registrada formalmente en animales
+        partos_sin_cria = db.query(
+            """
+            SELECT NULL AS id_animal, 'Sin arete' AS tag, NULL AS nombre, sexo_cria AS sexo,
+                   NULL AS raza, fecha AS fecha_nacimiento, 'ACTIVO' AS estado,
+                   fecha AS fecha_parto, peso_nacimiento, estado_cria
+            FROM partos
+            WHERE vaca_id = ? AND id_cria IS NULL
+            ORDER BY fecha DESC
+            """,
+            (aid,),
+        )
+        for pc in partos_sin_cria:
+            crias_list.append(dict(pc))
+    except Exception as e:
+        logger.error("seccion crias genealogia fallo", exc_info=True)
+        errores["crias_genealogia"] = str(e)
+
+    base["crias"] = crias_list
+
+    # Consanguinidad en 3G
+    consang_info: dict[str, Any] = {
+        "evaluable": False,
+        "consanguineo": False,
+        "detalle": "No evaluable (registro incompleto de padre o madre)",
+        "icono": "circleEmpty",
+        "clase": "gris",
+    }
+    try:
+        if an.get("madre_id") and an.get("padre_id"):
+            es_c = db.verificar_consanguinidad(an["madre_id"], an["padre_id"])
+            consang_info = {
+                "evaluable": True,
+                "consanguineo": es_c,
+                "detalle": "⚠️ Cruzamiento consanguíneo detectado (padres emparentados en 3G)" if es_c else "✅ 0.0% (Líneas independientes en 3 generaciones)",
+                "icono": "alert" if es_c else "shieldCheck",
+                "clase": "rojo" if es_c else "verde",
+            }
+    except Exception:
+        logger.error("seccion consanguinidad fallo", exc_info=True)
+
+    # Texto ASCII del árbol (idéntico a Telegram)
+    try:
+        from ..server.formatters import formatear_genealogia_animal_tab
+        texto_arbol = formatear_genealogia_animal_tab(db, an["tag"])
+    except Exception:
         try:
-            p = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["padre_id"],))
-            if p:
-                padre_dict = {"id_animal": p["id_animal"], "tag": p["tag"], "nombre": p["nombre"], "raza": p["raza"]}
+            from src.server.formatters import formatear_genealogia_animal_tab
+            texto_arbol = formatear_genealogia_animal_tab(db, an["tag"])
         except Exception:
-            logger.error("seccion padre fallo", exc_info=True)
-    base["padre"] = padre_dict
+            texto_arbol = ""
+
+    base["abuelo_pat"] = p_abuelo_pat
+    base["abuela_pat"] = p_abuela_pat
+    base["abuelo_mat"] = m_abuelo_mat
+    base["abuela_mat"] = m_abuela_mat
+    base["consanguinidad"] = consang_info
+
+    base["genealogia_3g"] = {
+        "animal": {"id_animal": an.get("id_animal"), "tag": an.get("tag"), "nombre": an.get("nombre"), "raza": an.get("raza"), "sexo": an.get("sexo")},
+        "padre": padre_info,
+        "madre": madre_info,
+        "abuelo_pat": p_abuelo_pat,
+        "abuela_pat": p_abuela_pat,
+        "abuelo_mat": m_abuelo_mat,
+        "abuela_mat": m_abuela_mat,
+        "bisabuelos": {
+            "pat_pat_p": p_bisabuelo_pp,
+            "pat_pat_m": p_bisabuela_pp,
+            "pat_mat_p": p_bisabuelo_pm,
+            "pat_mat_m": p_bisabuela_pm,
+            "mat_pat_p": m_bisabuelo_mp,
+            "mat_pat_m": m_bisabuela_mp,
+            "mat_mat_p": m_bisabuelo_mm,
+            "mat_mat_m": m_bisabuela_mm,
+        },
+        "consanguinidad": consang_info,
+        "crias": crias_list,
+        "texto_arbol": texto_arbol,
+    }
 
     # 3. Edad zootécnica y días
     f_nac = to_date_safe(an.get("fecha_nacimiento"))

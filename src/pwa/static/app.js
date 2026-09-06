@@ -2626,6 +2626,7 @@
   /* ---------- Ficha con pestañas ---------- */
   var TABS = [
     { id: "general", label: icon("cow") + "General" },
+    { id: "genealogia", label: icon("dna") + "Genealogía (3G)" },
     { id: "repro", label: icon("sperm") + "Reproducción" },
     { id: "sanidad", label: icon("shieldPlus") + "Tratamientos" },
     { id: "leche", label: icon("milk") + "Leche" },
@@ -2691,7 +2692,7 @@
 
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
     html += "<div id='ficha-tabs'><nav class='mini'>"
-      + TABS.map(function (t) { return "<button data-tab='" + t.id + "' class='act'>" + t.label + "</button>"; }).join("")
+      + TABS.map(function (t, i) { return "<button data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
       + "</nav></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
     return html;
   }
@@ -2704,6 +2705,121 @@
     return "<span class='chip gris'>" + esc(v) + "</span>";
   }
   function fichaTab(id, f) {
+    if (id === "genealogia") {
+      var g = f.genealogia_3g || {};
+      var cons = g.consanguinidad || f.consanguinidad || {};
+      var hg = "";
+
+      // 1. Título y Semáforo de Consanguinidad
+      hg += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+        + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("dna") + "Árbol Genealógico & Trazabilidad (3G)</h3>"
+        + "</div>";
+
+      var cClase = cons.clase || (cons.consanguineo ? "rojo" : (cons.evaluable ? "verde" : "gris"));
+      var cIcon = cons.consanguineo ? icon("alert", 16) : (cons.evaluable ? icon("shieldCheck", 16) : icon("circleEmpty", 16));
+      var cTxt = cons.detalle || (cons.consanguineo ? "Cruzamiento consanguíneo detectado" : (cons.evaluable ? "0.0% Consanguinidad en 3G" : "No evaluable"));
+
+      hg += "<div class='card' style='padding:12px 14px; margin-bottom:14px; display:flex; align-items:center; gap:10px; border-left:4px solid var(--" + (cClase === "verde" ? "color-verde-txt" : (cClase === "rojo" ? "color-rojo-txt" : "borde-fuerte")) + ");'>"
+        + "<div style='font-size:20px;'>" + cIcon + "</div>"
+        + "<div style='flex:1; font-size:13px;'>"
+        + "<b>Control de Consanguinidad Parental:</b> <span class='chip " + cClase + "'>" + esc(cTxt) + "</span>"
+        + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:3px;'>Regla zootécnica de 3 generaciones antes de autorizar cruzamiento o servicio de monta/I.A.</div>"
+        + "</div>"
+        + "</div>";
+
+      // Helper nodo animal
+      function nodoAnimal(an, label, icono) {
+        if (!an || !an.tag) {
+          return "<div style='background:var(--superficie); border:1px dashed var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12px; color:var(--texto-suave);'>"
+            + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:2px;'>" + icono + " " + esc(label) + "</div>"
+            + "<div>Desconocido / Sin Registro</div>"
+            + "</div>";
+        }
+        var nom = an.nombre ? " · " + esc(an.nombre) : "";
+        var rz = an.raza ? " [" + esc(an.raza) + "]" : "";
+        var click = "onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(an.tag) + "\");'";
+        return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
+          + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
+          + "<div><a href='#' class='ficha-link' " + click + " style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span></div>"
+          + "</div>";
+      }
+
+      // 2. Pedigree Diagram
+      hg += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
+        + "<h4 style='margin-top:0;'>" + icon("gitBranch", 16) + "Pedigree Estructurado (3 Generaciones)</h4>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:14px; margin-top:10px;'>"
+
+        // Línea Paterna
+        + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐂 LÍNEA PATERNA</div>"
+        + nodoAnimal(f.padre, "Padre", "🐂")
+        + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
+        + nodoAnimal(f.abuelo_pat || g.abuelo_pat, "Abuelo Paterno", "🐂")
+        + (g.bisabuelos && g.bisabuelos.pat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_pat_p, "Bisabuelo (PP)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuela_pat || g.abuela_pat, "Abuela Paterna", "🐄")
+        + (g.bisabuelos && g.bisabuelos.pat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_mat_m, "Bisabuela (PM)", "🧬") + "</div>" : "")
+        + "</div>"
+        + "</div>"
+
+        // Línea Materna
+        + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐄 LÍNEA MATERNA</div>"
+        + nodoAnimal(f.madre, "Madre", "🐄")
+        + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
+        + nodoAnimal(f.abuelo_mat || g.abuelo_mat, "Abuelo Materno", "🐂")
+        + (g.bisabuelos && g.bisabuelos.mat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_pat_p, "Bisabuelo (MP)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuela_mat || g.abuela_mat, "Abuela Materna", "🐄")
+        + (g.bisabuelos && g.bisabuelos.mat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_mat_m, "Bisabuela (MM)", "🧬") + "</div>" : "")
+        + "</div>"
+        + "</div>"
+
+        + "</div></div>";
+
+      // 3. Descendencia / Crías Registradas
+      var crias = (f.crias && f.crias.length) ? f.crias : ((g.crias && g.crias.length) ? g.crias : (f.partos || []));
+      hg += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
+        + "<h4 style='margin-top:0; display:flex; align-items:center; gap:6px;'>" + icon("cowCalf", 18) + "Descendencia & Crías Registradas (" + crias.length + ")</h4>";
+
+      if (crias.length) {
+        hg += "<div style='display:flex; flex-direction:column; gap:8px; margin-top:10px;'>";
+        crias.forEach(function (c) {
+          var cTag = c.cria_tag || c.tag || "Sin arete";
+          var cNom = c.nombre ? " (" + esc(c.nombre) + ")" : "";
+          var cSx = c.sexo_cria || c.sexo || "S/D";
+          var cFec = fechaCorta(c.fecha_parto || c.fecha || c.fecha_nacimiento) || "S/D";
+          var cEst = String(c.estado_cria || c.estado || "VIVO").toUpperCase();
+          var estChip = cEst === "MUERTO" ? "<span class='chip rojo'>Muerto</span>" : "<span class='chip verde'>Vivo</span>";
+          var pNac = c.peso_nacimiento ? " · " + c.peso_nacimiento + " kg" : "";
+
+          var linkTag = cTag !== "Sin arete"
+            ? "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(cTag) + "\");' style='font-size:14px; font-weight:bold;'>🐮 " + esc(cTag) + "</a>"
+            : "<span style='color:var(--texto-suave);'>🐮 Sin arete</span>";
+
+          hg += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:10px 12px;'>"
+            + "<div>" + linkTag + " <span style='font-size:13px; color:var(--texto);'>" + cNom + "</span> <span class='meta' style='font-size:12px;'>· " + esc(cSx) + " · Nac: <b>" + esc(cFec) + "</b>" + pNac + "</span></div>"
+            + "<div>" + estChip + "</div>"
+            + "</div>";
+        });
+        hg += "</div>";
+      } else {
+        hg += "<p class='aviso' style='margin:8px 0;'>" + icon("info", 14) + "No tiene crías descendientes registradas en la base de datos.</p>";
+      }
+      hg += "</div>";
+
+      // 4. Vista de Texto Resumido (Telegram / WhatsApp)
+      var txtArbol = (g.texto_arbol || "").trim();
+      if (txtArbol) {
+        hg += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>"
+          + "<h4 style='margin:0; font-size:13px;'>" + icon("notes", 15) + "Formato de Texto Compartible (Telegram / WhatsApp)</h4>"
+          + "<button type='button' class='tema-btn' onclick='var pre=this.closest(\".card\").querySelector(\"pre\"); if(pre){navigator.clipboard.writeText(pre.innerText).then(function(){alert(\"Árbol copiado al portapapeles\");});}' style='font-size:11px; padding:4px 8px;'>" + icon("copy", 12) + "Copiar Árbol</button>"
+          + "</div>"
+          + "<pre style='background:var(--fondo); border:1px solid var(--borde); border-radius:6px; padding:10px; font-size:11.5px; line-height:1.45; overflow-x:auto; margin:0; font-family:var(--font-mono); white-space:pre-wrap;'>" + esc(txtArbol) + "</pre>"
+          + "</div>";
+      }
+
+      return hg;
+    }
     if (id === "repro") {
       var h = "";
       h += "<h4>Partos registrados</h4>" + tabla(f.partos, [
@@ -2804,8 +2920,11 @@
 
     // 3. Tarjeta de Identificación & Genealogía
     h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
-      + "<h4>" + icon("dna") + "Identificación & Genealogía</h4>"
-      + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:8px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
+      + "<h4 style='margin:0;'>" + icon("dna") + "Identificación & Genealogía</h4>"
+      + "<button type='button' class='tema-btn' onclick='if(window.abrirTabFicha)window.abrirTabFicha(\"genealogia\");' style='font-size:12px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;'>" + icon("gitBranch", 13) + "Ver Pedigree 3G</button>"
+      + "</div>"
+      + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:10px;'>"
       + "<div><span style='color:var(--texto-suave);'>Arete / Tag:</span> <b>" + esc(f.tag) + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Nombre:</span> <b>" + esc(f.nombre || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Sexo:</span> <b>" + esc(f.sexo || "S/D") + "</b></div>"
@@ -2829,7 +2948,45 @@
     }
     h += "<div><span style='color:var(--texto-suave);'>Padre / Toro:</span> " + padreHtml + "</div>";
 
-    h += "</div></div>";
+    // Abuelos Paternos & Maternos
+    var g = f.genealogia_3g || {};
+    var abPatTxt = (f.abuelo_pat && f.abuelo_pat.tag ? f.abuelo_pat.tag : (g.abuelo_pat && g.abuelo_pat.tag ? g.abuelo_pat.tag : "S/D"))
+      + " / " + (f.abuela_pat && f.abuela_pat.tag ? f.abuela_pat.tag : (g.abuela_pat && g.abuela_pat.tag ? g.abuela_pat.tag : "S/D"));
+    var abMatTxt = (f.abuelo_mat && f.abuelo_mat.tag ? f.abuelo_mat.tag : (g.abuelo_mat && g.abuelo_mat.tag ? g.abuelo_mat.tag : "S/D"))
+      + " / " + (f.abuela_mat && f.abuela_mat.tag ? f.abuela_mat.tag : (g.abuela_mat && g.abuela_mat.tag ? g.abuela_mat.tag : "S/D"));
+
+    h += "<div><span style='color:var(--texto-suave);'>Abuelos Pat.:</span> <b>" + esc(abPatTxt) + "</b></div>";
+    h += "<div><span style='color:var(--texto-suave);'>Abuelos Mat.:</span> <b>" + esc(abMatTxt) + "</b></div>";
+
+    h += "</div>";
+
+    // Descendencia / Crías registradas directamente en la tarjeta de Identificación
+    var criasGen = (f.crias && f.crias.length) ? f.crias : ((g.crias && g.crias.length) ? g.crias : (f.partos || []));
+    if (criasGen.length) {
+      h += "<div style='margin-top:12px; padding-top:10px; border-top:1px solid var(--borde);'>"
+        + "<div style='font-size:12.5px; font-weight:600; margin-bottom:6px; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+        + icon("cowCalf", 16) + "Descendencia / Crías Registradas (" + criasGen.length + "):</div>"
+        + "<div style='display:flex; flex-wrap:wrap; gap:6px;'>";
+      criasGen.forEach(function (c) {
+        var cTag = c.cria_tag || c.tag || "Sin arete";
+        var cSx = c.sexo_cria || c.sexo || "";
+        var cFec = fechaCorta(c.fecha_parto || c.fecha || c.fecha_nacimiento);
+        var chipTxt = "🐮 " + esc(cTag) + (cSx ? " (" + esc(cSx) + ")" : "") + (cFec ? " [" + esc(cFec) + "]" : "");
+        if (cTag !== "Sin arete") {
+          h += "<a href='#' class='ficha-link chip verde' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(cTag) + "\");' style='text-decoration:none; font-size:12px; padding:3px 8px; font-weight:bold;'>" + chipTxt + "</a>";
+        } else {
+          h += "<span class='chip gris' style='font-size:12px; padding:3px 8px;'>" + chipTxt + "</span>";
+        }
+      });
+      h += "</div></div>";
+    }
+
+    h += "<div style='margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<button type='button' class='btn-guardar-manga' onclick='if (window.abrirTabFicha) window.abrirTabFicha(\"genealogia\");' style='font-size:12.5px; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;'>"
+      + icon("dna", 15) + "Abrir Árbol Genealógico (3G) Completo & Consanguinidad</button>"
+      + "</div>";
+
+    h += "</div>";
 
     // 4. Tarjeta Estado Reproductivo Actual
     h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
@@ -3034,8 +3191,13 @@
     var inp = q("#f-tag");
     if (inp) inp.value = tag;
     destino.click();
-  }
   window.abrirFichaDesdeTag = abrirFichaDesdeTag;
+  window.abrirTabFicha = function (tabId) {
+    var nav = document.getElementById("ficha-tabs");
+    if (!nav) return;
+    var btn = nav.querySelector("button[data-tab='" + tabId + "']");
+    if (btn) btn.click();
+  };
   function vincularTagsFicha(root) {
     if (!root) return;
     if (!qa("nav > button").length) return; // solo en el dashboard con navegación

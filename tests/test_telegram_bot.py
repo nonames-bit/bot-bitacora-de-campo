@@ -834,4 +834,27 @@ def test_formatear_deteccion_potrero_gps_fuera():
     assert "No se registr" in resp
 
 
+def test_comando_arbol_genealogico_registrado():
+    import pathlib
+    content = pathlib.Path("src/server/telegram_bot.py").read_text(encoding="utf-8")
+    assert 'CommandHandler(["arbol", "genealogia", "pedigree", "trazabilidad"], cmd_arbol_genealogico)' in content
+
+
+def test_formatear_genealogia_3g_con_crias_y_consanguinidad(db):
+    from src.server.formatters import formatear_genealogia_animal_tab
+    db.registrar_animal("MAMA", sexo="Hembra")
+    db.registrar_animal("PAPA", sexo="Macho")
+    db.registrar_animal("VACA", sexo="Hembra", madre_tag="MAMA", padre_tag="PAPA")
+    db.registrar_animal("HIJO", sexo="Macho", madre_tag="VACA")
+    db.registrar_parto("VACA", "2026-03-22", id_cria_tag="HIJO", sexo_cria="Macho")
+
+    txt = formatear_genealogia_animal_tab(db, "VACA")
+    assert "ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)" in txt
+    assert "PAPA" in txt
+    assert "MAMA" in txt
+    assert "Consanguinidad Parental:" in txt
+    assert "HIJO" in txt
+
+
+
 

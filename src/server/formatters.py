@@ -423,6 +423,7 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
     padre_str = "Desconocido"
     p_abuelo_p = "Desconocido"
     p_abuela_p = "Desconocido"
+    bisabuelos_p: list[str] = []
     if animal["padre_id"]:
         p_row = db.get_animal(animal["padre_id"])
         if p_row:
@@ -432,14 +433,31 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
                 ap = db.get_animal(p_row["padre_id"])
                 if ap:
                     p_abuelo_p = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+                    if ap["padre_id"]:
+                        bpp = db.get_animal(ap["padre_id"])
+                        if bpp:
+                            bisabuelos_p.append(f"Bisabuelo Pat. (PP): {bpp['tag']} [{bpp['raza'] or 'S/D'}]")
+                    if ap["madre_id"]:
+                        bpm = db.get_animal(ap["madre_id"])
+                        if bpm:
+                            bisabuelos_p.append(f"Bisabuela Pat. (PM): {bpm['tag']} [{bpm['raza'] or 'S/D'}]")
             if p_row["madre_id"]:
                 am = db.get_animal(p_row["madre_id"])
                 if am:
                     p_abuela_p = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+                    if am["padre_id"]:
+                        bmp = db.get_animal(am["padre_id"])
+                        if bmp:
+                            bisabuelos_p.append(f"Bisabuelo Pat. (MP): {bmp['tag']} [{bmp['raza'] or 'S/D'}]")
+                    if am["madre_id"]:
+                        bmm = db.get_animal(am["madre_id"])
+                        if bmm:
+                            bisabuelos_p.append(f"Bisabuela Pat. (MM): {bmm['tag']} [{bmm['raza'] or 'S/D'}]")
 
     madre_str = "Desconocida"
     m_abuelo_m = "Desconocido"
     m_abuela_m = "Desconocida"
+    bisabuelos_m: list[str] = []
     if animal["madre_id"]:
         m_row = db.get_animal(animal["madre_id"])
         if m_row:
@@ -449,40 +467,91 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
                 ap = db.get_animal(m_row["padre_id"])
                 if ap:
                     m_abuelo_m = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+                    if ap["padre_id"]:
+                        bpp = db.get_animal(ap["padre_id"])
+                        if bpp:
+                            bisabuelos_m.append(f"Bisabuelo Mat. (PP): {bpp['tag']} [{bpp['raza'] or 'S/D'}]")
+                    if ap["madre_id"]:
+                        bpm = db.get_animal(ap["madre_id"])
+                        if bpm:
+                            bisabuelos_m.append(f"Bisabuela Mat. (PM): {bpm['tag']} [{bpm['raza'] or 'S/D'}]")
             if m_row["madre_id"]:
                 am = db.get_animal(m_row["madre_id"])
                 if am:
                     m_abuela_m = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+                    if am["padre_id"]:
+                        bmp = db.get_animal(am["padre_id"])
+                        if bmp:
+                            bisabuelos_m.append(f"Bisabuelo Mat. (MP): {bmp['tag']} [{bmp['raza'] or 'S/D'}]")
+                    if am["madre_id"]:
+                        bmm = db.get_animal(am["madre_id"])
+                        if bmm:
+                            bisabuelos_m.append(f"Bisabuela Mat. (MM): {bmm['tag']} [{bmm['raza'] or 'S/D'}]")
 
     crias = db.query(
-        "SELECT a.tag, a.nombre, a.sexo, a.fecha_nacimiento, p.fecha FROM partos p "
-        "LEFT JOIN animales a ON a.id_animal = p.id_cria "
-        "WHERE p.vaca_id = ? AND (p.id_cria IS NULL OR p.id_cria != ?) "
-        "ORDER BY p.fecha DESC",
-        (aid, aid),
+        """
+        SELECT a.tag, a.nombre, a.sexo, a.fecha_nacimiento, p.fecha
+        FROM animales a
+        LEFT JOIN partos p ON p.id_cria = a.id_animal
+        WHERE a.madre_id = ? OR a.padre_id = ?
+           OR (p.vaca_id = ? AND a.id_animal IS NOT NULL)
+        GROUP BY a.id_animal
+        ORDER BY COALESCE(p.fecha, a.fecha_nacimiento) DESC, a.id_animal DESC
+        """,
+        (aid, aid, aid),
+    )
+    partos_sin_cria = db.query(
+        "SELECT 'Sin arete' AS tag, NULL AS nombre, sexo_cria AS sexo, NULL AS fecha_nacimiento, fecha "
+        "FROM partos WHERE vaca_id = ? AND id_cria IS NULL ORDER BY fecha DESC",
+        (aid,),
     )
 
     lineas = [
         "🌳 <b>ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)</b>",
-        f"🐄 <b>Animal:</b> <b>{tag_str}{nom_txt}</b> · {raza}",
+        f"🐄 <b>Genealogía de {tag_str}{nom_txt}</b> · {raza}",
         "────────────────────────────────────────",
         f"🐂 <b>PADRE:</b> {padre_str}",
         f"   ├── 🐂 Abuelo Pat.: {p_abuelo_p}",
         f"   └── 🐄 Abuela Pat.: {p_abuela_p}",
+    ]
+    if bisabuelos_p:
+        for b in bisabuelos_p:
+            lineas.append(f"       └── 🧬 {b}")
+
+    lineas.extend([
         "",
         f"🐄 <b>MADRE:</b> {madre_str}",
         f"   ├── 🐂 Abuelo Mat.: {m_abuelo_m}",
         f"   └── 🐄 Abuela Mat.: {m_abuela_m}",
-        "────────────────────────────────────────",
-    ]
+    ])
+    if bisabuelos_m:
+        for b in bisabuelos_m:
+            lineas.append(f"       └── 🧬 {b}")
 
-    if crias:
-        lineas.append(f"🍼 <b>Descendencia / Crías Registradas ({len(crias)}):</b>")
-        for c in crias[:6]:
+    lineas.append("────────────────────────────────────────")
+    if animal["madre_id"] and animal["padre_id"]:
+        try:
+            es_consang = db.verificar_consanguinidad(animal["madre_id"], animal["padre_id"])
+            if es_consang:
+                lineas.append("🧬 <b>Consanguinidad Parental:</b> ⚠️ POSITIVA (padres emparentados en 3G)")
+            else:
+                lineas.append("🧬 <b>Consanguinidad Parental:</b> ✅ 0.0% (sin parentesco en 3G)")
+        except Exception:
+            lineas.append("🧬 <b>Consanguinidad Parental:</b> ℹ️ No evaluable")
+    else:
+        lineas.append("🧬 <b>Consanguinidad Parental:</b> ℹ️ No evaluable (registro incompleto)")
+    lineas.append("────────────────────────────────────────")
+
+    todas_crias = list(crias) + list(partos_sin_cria)
+    if todas_crias:
+        plural_partos = "partos registrados" if len(todas_crias) != 1 else "parto registrado"
+        lineas.append(f"🍼 <b>Descendencia / Crías Registradas ({len(todas_crias)} {plural_partos}):</b>")
+        for c in todas_crias[:8]:
             c_tag = c["tag"] or "Sin arete"
             c_nom = f" ({c['nombre']})" if c["nombre"] else ""
             c_sx = f" · {c['sexo'].lower()}" if c["sexo"] else ""
-            c_f = f" [{c['fecha'] or c['fecha_nacimiento']}]" if (c["fecha"] or c["fecha_nacimiento"]) else ""
+            fec = c["fecha"] or c["fecha_nacimiento"]
+            c_f = f" [{fec}]" if fec else ""
             lineas.append(f"• 🐮 <b>{c_tag}</b>{c_nom}{c_sx}{c_f}")
     else:
         lineas.append("🍼 <i>No tiene crías descendientes registradas.</i>")

@@ -829,3 +829,27 @@ def test_login_incluye_manifest_y_boton_instalar(client):
     assert 'rel="manifest"' in html
     assert 'id="box-instalar-login"' in html
     assert 'btn-instalar-login' in html
+
+
+def test_ficha_genealogia_3g_y_crias(client, db_file):
+    from src.db.database import Database
+    db = Database(db_file)
+    db.registrar_animal("MADRE_01", sexo="Hembra")
+    db.registrar_animal("TORO_01", sexo="Macho")
+    db.registrar_animal("VACA_TEST", sexo="Hembra", madre_tag="MADRE_01", padre_tag="TORO_01")
+    db.registrar_animal("CRIA_01", sexo="Macho", madre_tag="VACA_TEST", padre_tag="TORO_01")
+    db.registrar_parto("VACA_TEST", "2026-03-22", id_cria_tag="CRIA_01", sexo_cria="Macho")
+
+    r = client.get("/api/ficha/VACA_TEST")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["existe"] is True
+    assert "genealogia_3g" in d
+    g = d["genealogia_3g"]
+    assert g["padre"]["tag"] == "TORO_01"
+    assert g["madre"]["tag"] == "MADRE_01"
+    assert len(g["crias"]) >= 1
+    assert any(c.get("tag") == "CRIA_01" or c.get("cria_tag") == "CRIA_01" for c in g["crias"])
+    assert "consanguinidad" in g
+    assert "texto_arbol" in g
+    assert "ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)" in g["texto_arbol"]

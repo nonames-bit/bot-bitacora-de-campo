@@ -801,6 +801,61 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
+    async def cmd_arbol_genealogico(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            args = context.args if context and context.args else []
+            if args:
+                tag = str(args[0]).strip()
+                msg = formatear_genealogia_animal_tab(db, tag)
+                try:
+                    await update.message.reply_text(
+                        msg, parse_mode="HTML", reply_markup=crear_teclado_animal_detalle(tag)
+                    )
+                except Exception:
+                    await update.message.reply_text(msg, reply_markup=crear_teclado_animal_detalle(tag))
+            else:
+                ejemplos = db.query(
+                    """
+                    SELECT a.tag FROM animales a
+                    WHERE a.madre_id IS NOT NULL OR a.padre_id IS NOT NULL
+                    ORDER BY a.id_animal DESC LIMIT 6
+                    """
+                )
+                tags = [r["tag"] for r in ejemplos] if ejemplos else ["A007", "JA238"]
+                kb = []
+                fila = []
+                for t in tags:
+                    fila.append(InlineKeyboardButton(f"🌳 {t}", callback_data=f"animal:geneal:{t}"))
+                    if len(fila) == 2:
+                        kb.append(fila)
+                        fila = []
+                if fila:
+                    kb.append(fila)
+                kb.append([InlineKeyboardButton("🔍 Buscar Otro Animal", callback_data="cmd:buscar_animal")])
+                kb.append([InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal")])
+
+                texto = (
+                    "🌳 <b>ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)</b>\n\n"
+                    "El módulo de trazabilidad y genética zootécnica verifica automáticamente el árbol genealógico "
+                    "en 3 generaciones (padres, abuelos, bisabuelos), las crías registradas y la consanguinidad parental.\n\n"
+                    "💡 <b>Cómo usar:</b>\n"
+                    "• Escriba: <code>/arbol &lt;arete&gt;</code> (ej: <code>/arbol A007</code> o <code>/arbol JA238</code>)\n"
+                    "• O seleccione uno de los animales con genealogía a continuación:"
+                )
+                await update.message.reply_text(
+                    texto, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(kb)
+                )
+        except Exception as e:
+            logger.error("Error en cmd_arbol_genealogico: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
     async def cmd_reprod_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -3309,6 +3364,7 @@ def construir_application(
     app.add_handler(CommandHandler("sos", cmd_sos))
     app.add_handler(CommandHandler(["poblacion", "piramide", "edades"], cmd_poblacion))
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
+    app.add_handler(CommandHandler(["arbol", "genealogia", "pedigree", "trazabilidad"], cmd_arbol_genealogico))
     app.add_handler(CommandHandler(["reproduccion", "reprod", "reproduccion_menu"], cmd_reprod_menu))
     app.add_handler(CommandHandler(["pajuela_stock", "pajuelas", "stock_pajuelas"], cmd_pajuela_stock))
     app.add_handler(CommandHandler(["pajuela_add", "pajuela_agregar"], cmd_pajuela_add))
