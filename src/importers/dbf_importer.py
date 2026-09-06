@@ -343,7 +343,8 @@ def import_animales(db: Database, records, causas: dict) -> dict:
 
     nuevas_muertes = 0
     duplicadas_muertes = 0
-    nuevas_ventas_aprox = 0
+    nuevas_ventas = 0
+    ventas_fecha_aproximada = 0
     fecha_import_hoy = iso(hoy())
     nota_fecha_aprox = (
         "Fecha aproximada: SG (Software Ganadero) marcó este animal como {estado} en el "
@@ -367,9 +368,16 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             if p_id != aid:
                 db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ? AND (padre_id IS NULL OR padre_id = ?)",
                            (p_id, aid, aid))
-        # Muerte: TIPO == 'M' con fecha de muerte y causa.
+        # FECMUERTE es, pese al nombre, el campo genérico de "fecha de baja"
+        # que SG llena para TIPO 'M' (muerte) y también 'V' (venta) -- no es
+        # exclusivo de muertes. Confirmado inspeccionando un respaldo real:
+        # animales con TIPO='V' traen FECMUERTE poblado con la fecha real de
+        # venta (coincide con el informe de indicadores de ventas de SG).
+        fecha_baja_raw = r.get("FECMUERTE")
+
+        # Muerte: TIPO == 'M' con fecha de baja y causa.
         if (r.get("TIPO") or "").strip() == "M":
-            fecmuerte_raw = r.get("FECMUERTE")
+            fecmuerte_raw = fecha_baja_raw
             causa_cod = (r.get("CAU") or "").strip()
             causa = causas.get(causa_cod) or causa_cod or None
             if fecmuerte_raw:
@@ -409,25 +417,38 @@ def import_animales(db: Database, records, causas: dict) -> dict:
                     )
                     nuevas_muertes += 1
 
-        # Venta: TIPO == 'V' sin fecha en el respaldo de SG -- igual que con
-        # muertes, sin esto la venta solo queda como animales.estado='VENDIDO',
-        # sin ningún evento fechado que la haga visible en "Últimos Eventos"
-        # ni en reportes por periodo.
+        # Venta: TIPO == 'V'. Sin esto la venta solo queda como
+        # animales.estado='VENDIDO', sin ningún evento fechado que la haga
+        # visible en "Últimos Eventos" ni en reportes por periodo. Usa la
+        # fecha real (FECMUERTE) cuando SG la trae; si no, aproxima con la
+        # fecha de esta importación.
         if estado_nuevo == "VENDIDO" and estado_previo != "VENDIDO":
             existe_venta = db.query_one(
                 "SELECT 1 FROM movimientos WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA' LIMIT 1",
                 (aid,),
             )
             if not existe_venta:
-                db.registrar_movimiento(
-                    animal_tag=tag, fecha=fecha_import_hoy, tipo_movimiento="VENTA",
-                    notas=nota_fecha_aprox.format(estado="VENDIDO"),
-                )
-                nuevas_ventas_aprox += 1
+                destino = (r.get("VENDIDOA") or "").strip() or None
+                valor = r.get("VALOR") or None
+                if fecha_baja_raw:
+                    db.registrar_movimiento(
+                        animal_tag=tag, fecha=fecha_baja_raw, tipo_movimiento="VENTA",
+                        procedencia_destino=destino, precio=valor,
+                        notas=(r.get("MOTIVO") or "").strip() or None,
+                    )
+                else:
+                    db.registrar_movimiento(
+                        animal_tag=tag, fecha=fecha_import_hoy, tipo_movimiento="VENTA",
+                        procedencia_destino=destino, precio=valor,
+                        notas=nota_fecha_aprox.format(estado="VENDIDO"),
+                    )
+                    ventas_fecha_aproximada += 1
+                nuevas_ventas += 1
     return {
         "animales": {
             "nuevos": nuevos_animales, "duplicados": duplicados_animales,
-            "ventas_aprox": nuevas_ventas_aprox,
+            "ventas_registradas": nuevas_ventas,
+            "ventas_fecha_aproximada": ventas_fecha_aproximada,
         },
         "muertes": {"nuevos": nuevas_muertes, "duplicados": duplicadas_muertes},
     }

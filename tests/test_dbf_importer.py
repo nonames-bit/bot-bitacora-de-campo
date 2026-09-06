@@ -110,7 +110,7 @@ def test_import_animales_y_muertes(db):
          "MADRE": "", "PADRE": "", "TIPO": "M", "FECMUERTE": "20260507",
          "CAU": "19", "MOTIVO": "se rodo"},
     ], causas)
-    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0, "ventas_aprox": 0}
+    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0, "ventas_registradas": 0, "ventas_fecha_aproximada": 0}
     assert conteos["muertes"] == {"nuevos": 1, "duplicados": 0}
     animal = db.get_animal("47")
     assert animal["sexo"] == "Hembra"
@@ -145,9 +145,10 @@ def test_import_venta_sin_fecha_crea_movimiento_aproximado(db):
     un movimiento VENTA usando la fecha de la importación como aproximación."""
     base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
             "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
-            "FECMUERTE": "", "CAU": "", "MOTIVO": ""}
+            "FECMUERTE": "", "VENDIDOA": "", "VALOR": None, "CAU": "", "MOTIVO": ""}
     conteos = import_animales(db, [{**base, "CODANI": "V089", "TIPO": "V"}], {})
-    assert conteos["animales"]["ventas_aprox"] == 1
+    assert conteos["animales"]["ventas_registradas"] == 1
+    assert conteos["animales"]["ventas_fecha_aproximada"] == 1
 
     mov = db.query_one(
         "SELECT m.* FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id WHERE a.tag = 'V089'"
@@ -159,12 +160,37 @@ def test_import_venta_sin_fecha_crea_movimiento_aproximado(db):
 
     # Reimportar el mismo backup no debe duplicar el movimiento de venta.
     conteos2 = import_animales(db, [{**base, "CODANI": "V089", "TIPO": "V"}], {})
-    assert conteos2["animales"]["ventas_aprox"] == 0
+    assert conteos2["animales"]["ventas_registradas"] == 0
     n_ventas = db.query_one(
         "SELECT COUNT(*) AS n FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id "
         "WHERE a.tag = 'V089' AND UPPER(m.tipo_movimiento) = 'VENTA'"
     )
     assert n_ventas["n"] == 1
+
+
+def test_import_venta_con_fecmuerte_usa_fecha_real_de_sg(db):
+    """FECMUERTE es, pese al nombre, el campo genérico de "fecha de baja" que
+    SG llena también para TIPO='V' -- confirmado en un respaldo real (el
+    informe de indicadores de ventas de SG agrupa por esa fecha). Si viene
+    poblado, debe usarse tal cual (fecha real), no la fecha de importación."""
+    base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
+            "CAU": "", "MOTIVO": ""}
+    conteos = import_animales(db, [
+        {**base, "CODANI": "V090", "TIPO": "V", "FECMUERTE": "20260903",
+         "VENDIDOA": "Frigorifico X", "VALOR": 1500000.0},
+    ], {})
+    assert conteos["animales"]["ventas_registradas"] == 1
+    assert conteos["animales"]["ventas_fecha_aproximada"] == 0
+
+    mov = db.query_one(
+        "SELECT m.* FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id WHERE a.tag = 'V090'"
+    )
+    assert mov is not None
+    assert mov["fecha"] == "2026-09-03"
+    assert mov["procedencia_destino"] == "Frigorifico X"
+    assert mov["precio"] == 1500000.0
+    assert "aproximada" not in (mov["notas"] or "").lower()
 
 
 def test_import_muerte_sin_fecmuerte_crea_muerte_aproximada(db):

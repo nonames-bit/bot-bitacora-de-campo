@@ -1883,13 +1883,13 @@ def formatear_reporte_importacion(conteos: dict) -> str:
         lineas.append("")
         lineas.append(f"⚠️ <b>{len(duplicados_geneticos)} posible(s) animal(es) duplicado(s)</b> por genealogía (misma madre/padre/fecha de nacimiento bajo tags distintos). Use /duplicados para ver el detalle.")
 
-    ventas_aprox = (conteos.get("animales") or {}).get("ventas_aprox")
-    if ventas_aprox:
+    info_animales = conteos.get("animales") or {}
+    ventas_registradas = info_animales.get("ventas_registradas")
+    ventas_aprox = info_animales.get("ventas_fecha_aproximada")
+    if ventas_registradas:
         lineas.append("")
-        lineas.append(
-            f"💰 <b>{ventas_aprox} venta(s)</b> detectada(s) en este backup sin fecha exacta en SG -- "
-            "se registraron con la fecha de hoy como aproximación para que aparezcan en el tablero."
-        )
+        detalle_aprox = f" ({ventas_aprox} sin fecha exacta en SG, aproximadas a hoy)" if ventas_aprox else ""
+        lineas.append(f"💰 <b>{ventas_registradas} venta(s)</b> nueva(s) detectada(s) en este backup{detalle_aprox}.")
 
     return "\n".join(lineas)
 
