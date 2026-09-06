@@ -32,7 +32,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v34: Instalación directa como App en pantalla de inicio (Android, iPhone iOS y PC) con manifest enriquecido y guía táctil.
 // v37: Sección interactiva de últimos eventos en tablero y solución de colores en pirámide de edades para Sol de Campo.
 // v38: Fix de clics rotos por el CSP (script-src 'self') en árbol genealógico, crías, feed de eventos y exportar CSV -- de onclick inline a delegación de eventos.
-var CACHE = "pwa-ja-v38"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v39: Fix navegación de ficha en página standalone /ficha/<tag> (apuntaba al contenedor #vista inexistente en vez de #ficha).
+var CACHE = "pwa-ja-v39"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

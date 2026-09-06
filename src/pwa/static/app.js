@@ -3253,10 +3253,16 @@
     if (!tag) return;
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
     if (!destino) {
-      // Si estamos en la página standalone /ficha/<tag>
-      if (typeof abrirFicha === "function") {
-        abrirFicha(tag, vista, false, true);
+      // Si estamos en la página standalone /ficha/<tag> (usa #ficha, no #vista)
+      var destinoStandalone = vista || document.getElementById("ficha");
+      if (typeof abrirFicha === "function" && destinoStandalone) {
+        abrirFicha(tag, destinoStandalone, false, true);
         try { window.history.pushState(null, "", "/ficha/" + encodeURIComponent(tag)); } catch (e) {}
+        try {
+          document.title = "Ficha " + tag + " · Bitácora JA";
+          var tituloTag = document.querySelector(".marca-titulo b");
+          if (tituloTag) tituloTag.textContent = tag;
+        } catch (e) {}
       } else {
         window.location = "/ficha/" + encodeURIComponent(tag);
       }
