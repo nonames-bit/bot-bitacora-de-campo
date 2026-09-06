@@ -1525,14 +1525,42 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 disk = psutil.disk_usage(ruta_disco)
                 info_vps["ram_total_mb"] = mem.total // (1024 * 1024)
                 info_vps["ram_used_mb"] = mem.used // (1024 * 1024)
-                info_vps["ram_pct"] = mem.percent
+                info_vps["ram_pct"] = round(mem.percent, 1)
                 info_vps["disk_total_gb"] = round(disk.total / (1024**3), 1)
                 info_vps["disk_used_gb"] = round(disk.used / (1024**3), 1)
-                info_vps["disk_pct"] = disk.percent
+                info_vps["disk_pct"] = round(disk.percent, 1)
                 proc = psutil.Process(os.getpid())
                 info_vps["proc_ram_mb"] = round(proc.memory_info().rss / (1024 * 1024), 1)
             except Exception:
-                pass
+                # Fallback sin dependencias externas (Linux /proc/meminfo y os.statvfs)
+                try:
+                    if os.path.exists("/proc/meminfo"):
+                        mem_info = {}
+                        with open("/proc/meminfo", "r", encoding="utf-8") as mf:
+                            for line in mf:
+                                parts = line.split(":")
+                                if len(parts) == 2:
+                                    k = parts[0].strip()
+                                    v = parts[1].strip().split()[0]
+                                    mem_info[k] = int(v)  # kB
+                        if "MemTotal" in mem_info and "MemAvailable" in mem_info:
+                            tot_mb = mem_info["MemTotal"] // 1024
+                            avail_mb = mem_info["MemAvailable"] // 1024
+                            used_mb = max(0, tot_mb - avail_mb)
+                            info_vps["ram_total_mb"] = tot_mb
+                            info_vps["ram_used_mb"] = used_mb
+                            info_vps["ram_pct"] = round((used_mb / tot_mb) * 100, 1) if tot_mb else 0.0
+
+                    if hasattr(os, "statvfs"):
+                        st = os.statvfs("/")
+                        total_gb = round((st.f_blocks * st.f_frsize) / (1024**3), 1)
+                        avail_gb = round((st.f_bavail * st.f_frsize) / (1024**3), 1)
+                        used_gb = round(max(0.0, total_gb - avail_gb), 1)
+                        info_vps["disk_total_gb"] = total_gb
+                        info_vps["disk_used_gb"] = used_gb
+                        info_vps["disk_pct"] = round((used_gb / total_gb) * 100, 1) if total_gb else 0.0
+                except Exception:
+                    pass
 
             tam_bytes = os.path.getsize(db_path) if os.path.isfile(db_path) else 0
             tam_mb = round(tam_bytes / (1024 * 1024), 2)
@@ -1560,23 +1588,67 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if _rol_actual() != "OWNER":
             return jsonify({"error": "Acceso denegado. Se requiere rol OWNER (Propietario)."}), 403
 
-        lineas = []
-        candidatos_log = [
-            os.path.join(RAIZ_PROYECTO, "data", "copias_import.log"),
-            os.path.join(RAIZ_PROYECTO, "data", "bitacora.log"),
-            os.path.join(RAIZ_PROYECTO, "bitacora.log"),
-        ]
+        import subprocess
+        canal = str(request.args.get("canal", "todos")).lower().strip()
+        try:
+            limite = min(300, max(20, int(request.args.get("n", 100))))
+        except Exception:
+            limite = 100
+
+        lineas: list[str] = []
+
+        # 1. En Linux / VPS: intentar capturar journalctl de los servicios systemd
+        if sys.platform != "win32" and shutil.which("journalctl"):
+            try:
+                cmd = ["journalctl", "-n", str(limite), "--no-pager"]
+                if canal == "telegram":
+                    cmd.extend(["-u", "bitacora-bot"])
+                elif canal == "pwa":
+                    cmd.extend(["-u", "bitacora-pwa"])
+                elif canal == "copias":
+                    cmd = None
+                else:  # "todos"
+                    cmd.extend(["-u", "bitacora-bot", "-u", "bitacora-pwa"])
+
+                if cmd:
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+                    if res.returncode == 0 and res.stdout:
+                        lineas = [l.strip() for l in res.stdout.splitlines() if l.strip()]
+            except Exception as e:
+                logger.warning("Error ejecutando journalctl: %s", e)
+
+        # 2. Agregar o consultar archivos de log físicos
+        candidatos_log: list[str] = []
+        if canal in ("copias", "todos"):
+            candidatos_log.append(os.path.join(RAIZ_PROYECTO, "data", "copias_import.log"))
+        if canal in ("telegram", "todos"):
+            candidatos_log.extend([
+                os.path.join(RAIZ_PROYECTO, "data", "bot.log"),
+                os.path.join(RAIZ_PROYECTO, "bot.log"),
+                os.path.join(RAIZ_PROYECTO, "data", "telegram.log"),
+            ])
+        if canal in ("pwa", "todos"):
+            candidatos_log.extend([
+                os.path.join(RAIZ_PROYECTO, "data", "bitacora.log"),
+                os.path.join(RAIZ_PROYECTO, "bitacora.log"),
+            ])
+
         for c in candidatos_log:
             if os.path.isfile(c):
                 try:
                     with open(c, "r", encoding="utf-8", errors="replace") as f:
-                        sub_lineas = f.readlines()[-60:]
-                        lineas.extend([l.strip() for l in sub_lineas])
+                        sub_lineas = [l.strip() for l in f.readlines()[-limite:] if l.strip()]
+                        if canal == "todos" and lineas:
+                            lineas.extend(sub_lineas[-25:])
+                        else:
+                            lineas.extend(sub_lineas)
                 except Exception:
                     pass
+
         if not lineas:
-            lineas = ["No hay archivos de logs registrados recientemente en data/."]
-        return jsonify({"logs": lineas[-80:], "rol": "OWNER"})
+            lineas = [f"Sin registros recientes disponibles para el canal '{canal}'."]
+
+        return jsonify({"logs": lineas[-limite:], "canal": canal, "total": len(lineas), "rol": "OWNER"})
 
     @app.post("/api/gps/potrero")
     def api_gps_potrero():

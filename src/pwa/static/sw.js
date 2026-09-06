@@ -26,7 +26,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v28: Formateo enriquecido y tablas monospaciadas en Asistente IA y dictado por voz con copiado rápido.
 // v29: Reparación de endpoint de reporte PDF general, ficha técnica animal zootécnica ejecutiva y tarjeta QR completa A4.
 // v30: Visor Lightbox interactivo con zoom táctil y descarga para imágenes de ficha animal y gráficos.
-var CACHE = "pwa-ja-v30"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v31: Métricas de RAM/Disco en vivo para VPS, selector multi-canal de logs (Telegram, PWA, Copias) y auto-recarga de usuarios.
+var CACHE = "pwa-ja-v31"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

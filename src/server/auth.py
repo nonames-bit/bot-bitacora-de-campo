@@ -61,6 +61,23 @@ class Auth:
                 raise ValueError(f"Usuario inválido en {self.users_file}: {u}")
 
         self.usuarios = datos
+        try:
+            self._ultimo_mtime = os.path.getmtime(self.users_file)
+        except Exception:
+            pass
+
+    def _recargar_si_cambio(self) -> None:
+        """Recarga la lista de usuarios si users.json fue modificado en disco por otro proceso (ej. PWA)."""
+        try:
+            if os.path.exists(self.users_file):
+                mtime = os.path.getmtime(self.users_file)
+                if getattr(self, "_ultimo_mtime", None) != mtime:
+                    with _LOCK:
+                        mtime_check = os.path.getmtime(self.users_file)
+                        if getattr(self, "_ultimo_mtime", None) != mtime_check:
+                            self._cargar_sin_lock()
+        except Exception as e:
+            logger.debug("Error comprobando mtime de users.json: %s", e)
 
     def guardar(self) -> None:
         """Persiste la lista actual de usuarios en el archivo JSON (bajo candado)."""
@@ -88,6 +105,10 @@ class Auth:
                 tmp_path = f.name
             os.replace(tmp_path, self.users_file)
             tmp_path = None
+            try:
+                self._ultimo_mtime = os.path.getmtime(self.users_file)
+            except Exception:
+                pass
         finally:
             if tmp_path is not None and os.path.exists(tmp_path):
                 try:
@@ -97,6 +118,7 @@ class Auth:
 
     def es_autorizado(self, user_id: int) -> bool:
         """Verifica si el usuario está registrado en el sistema."""
+        self._recargar_si_cambio()
         try:
             uid = int(user_id)
         except (ValueError, TypeError):
@@ -112,6 +134,7 @@ class Auth:
 
     def rol_de(self, user_id: int) -> Optional[str]:
         """Devuelve el rol normalizado (OWNER, ADMIN, TRABAJADOR) o None si no existe."""
+        self._recargar_si_cambio()
         try:
             uid = int(user_id)
         except (ValueError, TypeError):
@@ -124,6 +147,7 @@ class Auth:
 
     def puede_consultar(self, user_id: int) -> bool:
         """Verifica permiso de consulta y registro básico (OWNER, ADMIN, TRABAJADOR)."""
+        self._recargar_si_cambio()
         rol = self.rol_de(user_id)
         if rol in ("OWNER", "ADMIN", "TRABAJADOR"):
             return True
@@ -156,6 +180,7 @@ class Auth:
 
     def autenticar_pin(self, pin: str) -> Optional[dict[str, Any]]:
         """Busca un usuario por su PIN numérico y devuelve sus datos normalizados si coincide."""
+        self._recargar_si_cambio()
         if not pin:
             return None
         pin_limpio = str(pin).strip()
@@ -275,4 +300,5 @@ class Auth:
 
     def listar_usuarios(self) -> list[dict[str, Any]]:
         """Devuelve una copia de la lista de usuarios."""
+        self._recargar_si_cambio()
         return [dict(u) for u in self.usuarios]

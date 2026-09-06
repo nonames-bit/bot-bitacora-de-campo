@@ -248,13 +248,40 @@ def construir_application(
                 else:
                     raise
 
+    async def cmd_mi_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            uid = update.effective_user.id
+            nombre = update.effective_user.first_name or "Usuario"
+            rol = auth.rol_de(uid) if auth.es_autorizado(uid) else "No registrado"
+            msg = (
+                f"🆔 <b>Información de Identidad Telegram</b>\n\n"
+                f"• <b>Nombre:</b> {html.escape(nombre)}\n"
+                f"• <b>ID Telegram:</b> <code>{uid}</code>\n"
+                f"• <b>Rol en Finca:</b> {html.escape(rol)}\n\n"
+                f"<i>Toca el número para copiarlo y enviárselo al Administrador u Owner para que te registre en la PWA.</i>"
+            )
+            await update.message.reply_text(msg, parse_mode="HTML")
+        except Exception as e:
+            logger.error("Error en cmd_mi_id: %s", e, exc_info=True)
+
     async def cmd_start_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
                 return
             user_id = update.effective_user.id
             if not auth.es_autorizado(user_id):
-                await update.message.reply_text("⛔ No autorizado.")
+                nombre_u = update.effective_user.first_name or "Usuario"
+                await update.message.reply_text(
+                    f"⛔ <b>Acceso no registrado</b>\n\n"
+                    f"Hola, {html.escape(nombre_u)}.\n"
+                    f"Tu <b>ID numérico de Telegram</b> es:\n"
+                    f"👉 <code>{user_id}</code> (toca para copiar)\n\n"
+                    f"Por favor entrégale este ID al Administrador u Owner de la finca para que lo registre en la sección <b>Usuarios</b> de la PWA (o con /agregar_usuario).\n\n"
+                    f"Una vez registrado, vuelve a presionar /start.",
+                    parse_mode="HTML",
+                )
                 return
             rol = auth.rol_de(user_id)
             texto_menu = texto_menu_principal(rol)
@@ -3113,6 +3140,7 @@ def construir_application(
     app = ApplicationBuilder().token(token).build()
 
     # Handlers de comandos
+    app.add_handler(CommandHandler(["id", "mi_id", "miid"], cmd_mi_id))
     app.add_handler(CommandHandler(["start", "menu"], cmd_start_menu))
     app.add_handler(CommandHandler(["help", "ayuda", "comandos"], cmd_ayuda_completa))
     app.add_handler(CommandHandler(["guia", "preguntar", "chat", "preguntas_guia"], cmd_guia_chat))

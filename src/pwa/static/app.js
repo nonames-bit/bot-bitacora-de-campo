@@ -1155,10 +1155,18 @@
     var h = "<h3>" + icon("settings", 20) + "Servidor VPS & Sistema Ganadería JA</h3>"
       + "<p class='aviso'>Panel de control ejecutivo y métricas de infraestructura en vivo. Acceso restringido al Propietario (OWNER).</p>";
 
+    var ramTxt = (vps.ram_pct != null && vps.ram_pct !== "") ? vps.ram_pct + "%" : "—";
+    var ramSub = (vps.ram_total_mb) ? "RAM (" + (vps.ram_used_mb || 0) + "/" + vps.ram_total_mb + " MB)" : "RAM VPS";
+    var ramClase = vps.ram_pct >= 85 ? "alerta" : (vps.ram_pct > 0 ? "ok" : "");
+
+    var diskTxt = (vps.disk_pct != null && vps.disk_pct !== "") ? vps.disk_pct + "%" : "—";
+    var diskSub = (vps.disk_total_gb) ? "Disco (" + (vps.disk_used_gb || 0) + "/" + vps.disk_total_gb + " GB)" : "Disco VPS";
+    var diskClase = vps.disk_pct >= 85 ? "alerta" : (vps.disk_pct > 0 ? "ok" : "");
+
     h += "<div class='kpis'>"
-      + kpi((vps.ram_pct != null ? vps.ram_pct + "%" : "—"), "RAM VPS (" + (vps.ram_used_mb || 0) + "/" + (vps.ram_total_mb || 0) + " MB)")
-      + kpi((vps.disk_pct != null ? vps.disk_pct + "%" : "—"), "Disco (" + (vps.disk_used_gb || 0) + "/" + (vps.disk_total_gb || 0) + " GB)")
-      + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base de Datos SQLite")
+      + kpi(ramTxt, ramSub, ramClase)
+      + kpi(diskTxt, diskSub, diskClase)
+      + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
       + kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo SG", "ok")
       + "</div>";
 
@@ -1166,36 +1174,59 @@
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + esc(d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
-    h += "<div style='display:flex; justify-content:space-between; align-items:center; margin-top:20px;'>"
-      + "<h4>" + icon("clipboard", 16) + "Visor de Logs del Servidor (Últimas 80 líneas)</h4>"
-      + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("refresh", 14) + "Refrescar Logs</button>"
-      + "</div>"
-      + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:360px; overflow-y:auto; line-height:1.4;'>Cargando logs del servidor...</pre>";
+    // Visor de Logs con selector de canal (Todos, Telegram, PWA, Copias SG)
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
+      + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
+      + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
+      + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>🌐 Todos</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>🤖 Telegram</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>🐮 PWA Web</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='copias' style='font-size:11.5px; padding:4px 9px;'>📁 Copias SG</button>"
+      + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:11.5px; padding:4px 10px; margin-left:6px;'>" + icon("refresh", 13) + "Refrescar</button>"
+      + "</div></div>"
+      + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
 
     return h;
   }
 
   function bindSistema() {
-    function cargarLogs() {
+    var _canalLogsActual = "todos";
+
+    function cargarLogs(canal) {
+      if (canal) _canalLogsActual = canal;
       var visor = document.getElementById("visor-logs");
       if (!visor) return;
-      visor.textContent = "Cargando logs...";
-      fetch("/api/logs").then(function (r) { return r.json(); })
+      visor.textContent = "Cargando logs [" + _canalLogsActual + "]...";
+
+      qa(".btn-canal-log").forEach(function (b) {
+        if (b.getAttribute("data-canal") === _canalLogsActual) b.classList.add("act");
+        else b.classList.remove("act");
+      });
+
+      fetch("/api/logs?canal=" + encodeURIComponent(_canalLogsActual) + "&n=100")
+        .then(function (r) { return r.json(); })
         .then(function (d) {
-          if (d && d.logs) {
+          if (d && d.logs && d.logs.length) {
             visor.textContent = d.logs.join("\n");
             visor.scrollTop = visor.scrollHeight;
           } else {
-            visor.textContent = "Sin logs disponibles.";
+            visor.textContent = "Sin logs registrados recientemente para este canal.";
           }
         }).catch(function (err) {
           visor.textContent = "Error al obtener logs: " + err.message;
         });
     }
 
-    cargarLogs();
+    cargarLogs(_canalLogsActual);
+
     var btnRef = document.getElementById("btn-refrescar-logs");
-    if (btnRef) btnRef.addEventListener("click", cargarLogs);
+    if (btnRef) btnRef.addEventListener("click", function () { cargarLogs(_canalLogsActual); });
+
+    qa(".btn-canal-log").forEach(function (b) {
+      b.addEventListener("click", function () {
+        cargarLogs(b.getAttribute("data-canal"));
+      });
+    });
   }
 
   /* ---------- Sistema de Avatares & Niveles (Level 1, 2, 3) ---------- */

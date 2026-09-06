@@ -24,6 +24,7 @@ qrcode[pil]>=7.4
 # PWA en producción: servidor WSGI multi-hilo (waitress). Sin él, la PWA cae
 # al servidor de desarrollo de Flask (solo para local, no exponer a internet).
 waitress>=3.0
+psutil>=5.9.0
 
 # OCR de aretes/fotos (Etapa C / fotos del bot) — opcional; sin ello la
 # detección degrada con elegancia a sidecar/manual:
