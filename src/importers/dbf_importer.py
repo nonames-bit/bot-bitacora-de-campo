@@ -18,7 +18,7 @@ from typing import Iterator, Optional
 from ..db.database import Database
 from ..engine.growth_engine import gmd
 from ..engine.reproductive_engine import fecha_estimada_parto
-from ..utils import iso, to_date
+from ..utils import hoy, iso, to_date
 
 logger = logging.getLogger(__name__)
 
@@ -319,12 +319,16 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             sexo = None
 
         existente = db.animal_id(tag)
+        estado_previo = None
         if existente is None:
             nuevos_animales += 1
         else:
             duplicados_animales += 1
+            fila_previa = db.get_animal(existente)
+            estado_previo = fila_previa["estado"] if fila_previa else None
 
         codpot = (r.get("CODPOT") or "").strip() or None
+        estado_nuevo = _estado_desde_tipo(r.get("TIPO"), codpot=codpot)
         db.registrar_animal(
             tag=tag,
             nombre=(r.get("NOMANI") or "").strip() or None,
@@ -332,15 +336,22 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             raza=(r.get("TIPORAZA") or "").strip() or None,
             fecha_nacimiento=r.get("FECNACE"),
             potrero=codpot,
-            estado=_estado_desde_tipo(r.get("TIPO"), codpot=codpot),
+            estado=estado_nuevo,
             notas=(r.get("OBS") or "").strip() or None,
         )
-        tags.append((tag, r))
+        tags.append((tag, r, estado_previo, estado_nuevo))
 
     nuevas_muertes = 0
     duplicadas_muertes = 0
+    nuevas_ventas_aprox = 0
+    fecha_import_hoy = iso(hoy())
+    nota_fecha_aprox = (
+        "Fecha aproximada: SG (Software Ganadero) marcó este animal como {estado} en el "
+        "respaldo importado, pero ese registro no trae la fecha exacta -- se usó la fecha "
+        "de esta importación como referencia."
+    )
     # Segunda pasada: enlazar madre/padre ya presentes (evitando autorreferencias).
-    for tag, r in tags:
+    for tag, r, estado_previo, estado_nuevo in tags:
         madre = (r.get("MADRE") or "").strip()
         padre = (r.get("PADRE") or "").strip()
         aid = db.animal_id(tag)
@@ -357,30 +368,67 @@ def import_animales(db: Database, records, causas: dict) -> dict:
                 db.execute("UPDATE animales SET padre_id = ? WHERE id_animal = ? AND (padre_id IS NULL OR padre_id = ?)",
                            (p_id, aid, aid))
         # Muerte: TIPO == 'M' con fecha de muerte y causa.
-        if (r.get("TIPO") or "").strip() == "M" and r.get("FECMUERTE"):
-            fec = iso(r.get("FECMUERTE"))
-            if fec is not None:
-                existe = db.query_one(
-                    "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha = ? LIMIT 1",
-                    (aid, fec),
-                )
+        if (r.get("TIPO") or "").strip() == "M":
+            fecmuerte_raw = r.get("FECMUERTE")
+            causa_cod = (r.get("CAU") or "").strip()
+            causa = causas.get(causa_cod) or causa_cod or None
+            if fecmuerte_raw:
+                fec = iso(fecmuerte_raw)
+                if fec is not None:
+                    existe = db.query_one(
+                        "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha = ? LIMIT 1",
+                        (aid, fec),
+                    )
+                else:
+                    existe = db.query_one(
+                        "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha IS NULL LIMIT 1",
+                        (aid,),
+                    )
+                if existe:
+                    duplicadas_muertes += 1
+                else:
+                    db.registrar_muerte(
+                        animal_tag=tag, fecha=fecmuerte_raw,
+                        causa_presunta=causa,
+                        notas=(r.get("MOTIVO") or "").strip() or None,
+                    )
+                    nuevas_muertes += 1
             else:
-                existe = db.query_one(
-                    "SELECT 1 FROM muertes WHERE animal_id = ? AND fecha IS NULL LIMIT 1",
-                    (aid,),
+                # SG marcó el animal como muerto pero el respaldo no trae
+                # FECMUERTE: sin esto, la muerte nunca queda registrada como
+                # evento fechado (solo animales.estado='MUERTO', invisible
+                # para cualquier feed/reporte ordenado por fecha).
+                existe = db.query_one("SELECT 1 FROM muertes WHERE animal_id = ? LIMIT 1", (aid,))
+                if existe:
+                    duplicadas_muertes += 1
+                else:
+                    db.registrar_muerte(
+                        animal_tag=tag, fecha=fecha_import_hoy,
+                        causa_presunta=causa,
+                        notas=(nota_fecha_aprox.format(estado="MUERTO") + " " + (r.get("MOTIVO") or "").strip()).strip(),
+                    )
+                    nuevas_muertes += 1
+
+        # Venta: TIPO == 'V' sin fecha en el respaldo de SG -- igual que con
+        # muertes, sin esto la venta solo queda como animales.estado='VENDIDO',
+        # sin ningún evento fechado que la haga visible en "Últimos Eventos"
+        # ni en reportes por periodo.
+        if estado_nuevo == "VENDIDO" and estado_previo != "VENDIDO":
+            existe_venta = db.query_one(
+                "SELECT 1 FROM movimientos WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA' LIMIT 1",
+                (aid,),
+            )
+            if not existe_venta:
+                db.registrar_movimiento(
+                    animal_tag=tag, fecha=fecha_import_hoy, tipo_movimiento="VENTA",
+                    notas=nota_fecha_aprox.format(estado="VENDIDO"),
                 )
-            if existe:
-                duplicadas_muertes += 1
-            else:
-                causa_cod = (r.get("CAU") or "").strip()
-                db.registrar_muerte(
-                    animal_tag=tag, fecha=r.get("FECMUERTE"),
-                    causa_presunta=causas.get(causa_cod) or causa_cod or None,
-                    notas=(r.get("MOTIVO") or "").strip() or None,
-                )
-                nuevas_muertes += 1
+                nuevas_ventas_aprox += 1
     return {
-        "animales": {"nuevos": nuevos_animales, "duplicados": duplicados_animales},
+        "animales": {
+            "nuevos": nuevos_animales, "duplicados": duplicados_animales,
+            "ventas_aprox": nuevas_ventas_aprox,
+        },
         "muertes": {"nuevos": nuevas_muertes, "duplicados": duplicadas_muertes},
     }
 

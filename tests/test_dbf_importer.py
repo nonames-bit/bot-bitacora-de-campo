@@ -110,7 +110,7 @@ def test_import_animales_y_muertes(db):
          "MADRE": "", "PADRE": "", "TIPO": "M", "FECMUERTE": "20260507",
          "CAU": "19", "MOTIVO": "se rodo"},
     ], causas)
-    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0}
+    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0, "ventas_aprox": 0}
     assert conteos["muertes"] == {"nuevos": 1, "duplicados": 0}
     animal = db.get_animal("47")
     assert animal["sexo"] == "Hembra"
@@ -136,6 +136,58 @@ def test_import_animales_estado_desde_tipo(db):
                  "4": "OTRO", "5": "ACTIVO", "6": "ACTIVO"}
     for tag, estado in esperados.items():
         assert db.get_animal(tag)["estado"] == estado, f"tag {tag}"
+
+
+def test_import_venta_sin_fecha_crea_movimiento_aproximado(db):
+    """SG marca TIPO='V' sin ninguna fecha de venta en el respaldo -- sin un
+    evento fechado, la venta queda invisible para el tablero de "Últimos
+    Eventos" y para cualquier reporte por periodo. El importador debe crear
+    un movimiento VENTA usando la fecha de la importación como aproximación."""
+    base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
+            "FECMUERTE": "", "CAU": "", "MOTIVO": ""}
+    conteos = import_animales(db, [{**base, "CODANI": "V089", "TIPO": "V"}], {})
+    assert conteos["animales"]["ventas_aprox"] == 1
+
+    mov = db.query_one(
+        "SELECT m.* FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id WHERE a.tag = 'V089'"
+    )
+    assert mov is not None
+    assert mov["tipo_movimiento"] == "VENTA"
+    assert mov["fecha"] is not None
+    assert "aproximada" in (mov["notas"] or "").lower()
+
+    # Reimportar el mismo backup no debe duplicar el movimiento de venta.
+    conteos2 = import_animales(db, [{**base, "CODANI": "V089", "TIPO": "V"}], {})
+    assert conteos2["animales"]["ventas_aprox"] == 0
+    n_ventas = db.query_one(
+        "SELECT COUNT(*) AS n FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id "
+        "WHERE a.tag = 'V089' AND UPPER(m.tipo_movimiento) = 'VENTA'"
+    )
+    assert n_ventas["n"] == 1
+
+
+def test_import_muerte_sin_fecmuerte_crea_muerte_aproximada(db):
+    """Igual que con ventas: TIPO='M' sin FECMUERTE debe dejar un evento
+    fechado (aproximado) en vez de solo cambiar animales.estado."""
+    base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
+            "FECMUERTE": "", "CAU": "19", "MOTIVO": "se rodo"}
+    causas = {"19": "ACCIDENTE"}
+    conteos = import_animales(db, [{**base, "CODANI": "M001", "TIPO": "M"}], causas)
+    assert conteos["muertes"] == {"nuevos": 1, "duplicados": 0}
+
+    muerte = db.query_one(
+        "SELECT mu.* FROM muertes mu JOIN animales a ON a.id_animal = mu.animal_id WHERE a.tag = 'M001'"
+    )
+    assert muerte is not None
+    assert muerte["fecha"] is not None
+    assert muerte["causa_presunta"] == "ACCIDENTE"
+    assert "aproximada" in (muerte["notas"] or "").lower()
+
+    # Reimportar no debe duplicar la muerte.
+    conteos2 = import_animales(db, [{**base, "CODANI": "M001", "TIPO": "M"}], causas)
+    assert conteos2["muertes"] == {"nuevos": 0, "duplicados": 1}
 
 
 def test_import_partos(db):
