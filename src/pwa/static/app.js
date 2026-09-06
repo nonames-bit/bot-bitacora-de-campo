@@ -3317,8 +3317,115 @@
     });
   }
 
+  /* ---------- Instalación de la Aplicación (PWA Standalone) ---------- */
+  function setupInstalacionApp() {
+    var deferredPrompt = null;
+    var btnInstalar = document.getElementById("btn-instalar-app");
+    var modalInstalar = document.getElementById("modal-instalar-app");
+    var cuerpoGuia = document.getElementById("instalar-cuerpo-guia");
+    var btnCerrar = document.getElementById("btn-cerrar-instalar");
+    var btnEntendido = document.getElementById("btn-entendido-instalar");
+
+    var esStandalone = window.matchMedia("(display-mode: standalone)").matches 
+      || window.navigator.standalone 
+      || document.referrer.indexOf("android-app://") !== -1;
+    var esIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+
+    function cerrarModalGuia() {
+      if (modalInstalar) modalInstalar.style.display = "none";
+    }
+
+    if (btnCerrar) btnCerrar.addEventListener("click", cerrarModalGuia);
+    if (btnEntendido) btnEntendido.addEventListener("click", cerrarModalGuia);
+    if (modalInstalar) {
+      modalInstalar.addEventListener("click", function (e) {
+        if (e.target === modalInstalar) cerrarModalGuia();
+      });
+    }
+
+    // Si ya está corriendo como app instalada (standalone), ocultar botón
+    if (esStandalone) {
+      if (btnInstalar) btnInstalar.style.display = "none";
+      return;
+    }
+
+    // En iOS o navegadores estándar, mostrar botón de instalación en el header
+    if (btnInstalar) {
+      btnInstalar.style.display = "inline-flex";
+    }
+
+    // Captura de evento de instalación nativa (Chrome, Edge, Brave, Android)
+    window.addEventListener("beforeinstallprompt", function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      if (btnInstalar) {
+        btnInstalar.style.display = "inline-flex";
+      }
+    });
+
+    window.addEventListener("appinstalled", function () {
+      deferredPrompt = null;
+      if (btnInstalar) btnInstalar.style.display = "none";
+    });
+
+    if (btnInstalar) {
+      btnInstalar.addEventListener("click", function () {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function (choice) {
+            if (choice && choice.outcome === "accepted") {
+              if (btnInstalar) btnInstalar.style.display = "none";
+            }
+            deferredPrompt = null;
+          });
+        } else if (esIos) {
+          if (cuerpoGuia) {
+            cuerpoGuia.innerHTML = 
+              "<div class='guia-pasos-box'>" +
+                "<p class='guia-intro'>Instala <b>Bitácora JA</b> en tu iPhone o iPad para usarla a pantalla completa y sin conexión:</p>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>1</div>" +
+                  "<div class='paso-txt'>Toca el botón <b>Compartir</b> <svg class='svg-icon inline' viewBox='0 0 24 24' width='16' height='16' stroke='currentColor' stroke-width='2' fill='none'><path d='M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8'/><polyline points='16 6 12 2 8 6'/><line x1='12' y1='2' x2='12' y2='15'/></svg> en la barra inferior de Safari.</div>" +
+                "</div>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>2</div>" +
+                  "<div class='paso-txt'>Desliza la lista de opciones y toca <b>'Agregar a la pantalla de inicio'</b> ➕.</div>" +
+                "</div>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>3</div>" +
+                  "<div class='paso-txt'>Toca <b>'Agregar'</b> en la esquina superior derecha. ¡Quedará con el logo oficial en tu inicio!</div>" +
+                "</div>" +
+              "</div>";
+          }
+          if (modalInstalar) modalInstalar.style.display = "flex";
+        } else {
+          if (cuerpoGuia) {
+            cuerpoGuia.innerHTML = 
+              "<div class='guia-pasos-box'>" +
+                "<p class='guia-intro'>Instala <b>Bitácora JA</b> como aplicación nativa en tu dispositivo:</p>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>1</div>" +
+                  "<div class='paso-txt'>Toca los <b>tres puntos (⋮)</b> del menú arriba a la derecha en Chrome o Edge.</div>" +
+                "</div>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>2</div>" +
+                  "<div class='paso-txt'>Selecciona la opción <b>'Instalar aplicación'</b> o <b>'Agregar a la pantalla principal'</b>.</div>" +
+                "</div>" +
+                "<div class='paso-item'>" +
+                  "<div class='paso-num'>3</div>" +
+                  "<div class='paso-txt'>Confirma tocando <b>'Instalar'</b>. Se abrirá sola a pantalla completa sin barra de direcciones.</div>" +
+                "</div>" +
+              "</div>";
+          }
+          if (modalInstalar) modalInstalar.style.display = "flex";
+        }
+      });
+    }
+  }
+
   // Inicializar visor lightbox para fichas y gráficos en toda la app
   setupLightboxVisor();
+  setupInstalacionApp();
 
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";

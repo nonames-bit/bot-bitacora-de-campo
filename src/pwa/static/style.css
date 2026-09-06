@@ -1510,3 +1510,87 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 .cap-foto-box:hover {
   border-color: var(--verde-marca);
 }
+
+/* Botón de Instalación PWA en Header */
+.btn-instalar {
+  background: var(--verde-marca, #2F5233) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.2) !important;
+  border-radius: 8px;
+  font-weight: 600;
+  gap: 6px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  transition: transform .15s ease, opacity .15s ease, background .15s ease;
+}
+.btn-instalar:hover {
+  opacity: 0.94;
+  transform: translateY(-1px);
+}
+.btn-instalar .txt-instalar {
+  font-size: 12px;
+}
+@media (max-width: 420px) {
+  .btn-instalar .txt-instalar {
+    display: none;
+  }
+  .btn-instalar {
+    padding: 6px 8px;
+  }
+}
+
+/* Modal Guía de Instalación Móvil (iOS / Genérico) */
+.instalar-modal {
+  max-width: 420px;
+  width: 92%;
+  border-radius: 14px;
+}
+.instalar-cuerpo {
+  padding: 16px 20px;
+}
+.guia-pasos-box {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.guia-intro {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--texto-secundario, #666);
+  line-height: 1.45;
+}
+.paso-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--superficie, rgba(0,0,0,0.03));
+  border: 1px solid var(--borde, rgba(0,0,0,0.08));
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.paso-num {
+  background: var(--verde-marca, #2F5233);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.paso-txt {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--texto, #222);
+}
+.paso-txt .inline {
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0 2px;
+  color: var(--verde-marca, #2F5233);
+}
+

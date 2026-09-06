@@ -785,4 +785,22 @@ def test_telemetria_gps_ping_y_rutas(tmp_path):
     assert r_sync.get_json()["procesados"] == 1
 
 
+def test_manifest_pwa_instalable(client):
+    r = client.get("/manifest.json")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["name"] == "Bitácora JA"
+    assert data["short_name"] == "Bitácora JA"
+    assert data["display"] == "standalone"
+    assert data["start_url"] == "/?source=pwa"
+    assert len(data["icons"]) >= 2
+    assert any(i.get("purpose") == "maskable" for i in data["icons"])
 
+
+def test_login_incluye_manifest_y_boton_instalar(client):
+    r = client.get("/login")
+    assert r.status_code == 200
+    html = r.get_data(as_text=True)
+    assert 'rel="manifest"' in html
+    assert 'id="box-instalar-login"' in html
+    assert 'btn-instalar-login' in html

@@ -67,6 +67,7 @@ from .formatters import (
     formatear_balance_forrajero_panel,
     formatear_clima_panel,
     formatear_despacho_matutino,
+    formatear_deteccion_potrero_gps,
     formatear_diagnosticos_recientes,
     formatear_duplicados_geneticos,
     formatear_estado_servidor,
@@ -153,7 +154,8 @@ def construir_application(
     """Construye y configura la Application de Telegram con todos los handlers."""
     try:
         from telegram import (InlineKeyboardButton, InlineKeyboardMarkup,
-                              Update)
+                              KeyboardButton, ReplyKeyboardMarkup,
+                              ReplyKeyboardRemove, Update)
         from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
                                   CommandHandler, ContextTypes, MessageHandler,
                                   filters)
@@ -334,6 +336,9 @@ def construir_application(
                 await update.message.reply_text("⛔ No autorizado.")
                 return
             _tocar_actividad(user_id, update.effective_user.first_name or "")
+            if (update.message.text or "").strip() in ("❌ Cancelar", "Cancelar"):
+                await update.message.reply_text("✅ Cancelado.", reply_markup=ReplyKeyboardRemove())
+                return
             bot_engine = Bot(db)
             raw_text = update.message.text
             respuesta = bot_engine.procesar_texto(raw_text, user_id=user_id)
@@ -1333,6 +1338,11 @@ def construir_application(
                 ],
                 [
                     InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                ],
+                [
+                    InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
+                ],
+                [
                     InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                 ],
             ])
@@ -1362,6 +1372,9 @@ def construir_application(
                     InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
                 ],
                 [
+                    InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
+                ],
+                [
                     InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                 ],
             ])
@@ -1371,6 +1384,99 @@ def construir_application(
                 await update.message.reply_text(msg, reply_markup=teclado_p)
         except Exception as e:
             logger.error("Error en cmd_ocupacion: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def _enviar_pedido_ubicacion(destinatario) -> None:
+        """Envía el pedido de ubicación GPS con teclado de respuesta (request_location)."""
+        texto = (
+            "📍 <b>Comparte tu ubicación</b> para saber en qué potrero estás.\n"
+            "Toca el botón 👇 y el sistema detectará el potrero y guardará la ronda."
+        )
+        teclado_ubic = ReplyKeyboardMarkup(
+            [
+                [KeyboardButton("📍 Enviar mi ubicación", request_location=True)],
+                [KeyboardButton("❌ Cancelar")],
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+        try:
+            await destinatario.reply_text(texto, parse_mode="HTML", reply_markup=teclado_ubic)
+        except Exception:
+            await destinatario.reply_text(texto, reply_markup=teclado_ubic)
+
+    async def cmd_aqui(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
+            await _enviar_pedido_ubicacion(update.message)
+        except Exception as e:
+            logger.error("Error en cmd_aqui: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def handle_location(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            if not update.effective_user or not update.message or not update.message.location:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
+            lat = update.message.location.latitude
+            lon = update.message.location.longitude
+            nombre_u = update.effective_user.first_name or ""
+            try:
+                det = db.detectar_potrero_gps(lat, lon)
+            except Exception as e:
+                logger.error("Error en detectar_potrero_gps: %s", e, exc_info=True)
+                await update.message.reply_text(f"❌ Error: {e}")
+                return
+            if det is None:
+                msg = formatear_deteccion_potrero_gps(None, usuario_nombre=nombre_u)
+                try:
+                    await update.message.reply_text(msg, parse_mode="HTML")
+                except Exception:
+                    await update.message.reply_text(msg)
+                try:
+                    await update.message.reply_text("✅ Listo.", reply_markup=ReplyKeyboardRemove())
+                except Exception:
+                    pass
+                return
+            try:
+                db.registrar_ronda_campo(
+                    user_id=user_id,
+                    usuario_nombre=nombre_u,
+                    lat=lat,
+                    lon=lon,
+                    potrero_id=det["id"],
+                    potrero_nombre=det["nombre"],
+                    punto_control="telegram",
+                    notas="Ubicación compartida por Telegram",
+                )
+                ronda_ok = True
+            except Exception as e:
+                logger.warning("No se pudo registrar ronda_campo GPS: %s", e)
+                ronda_ok = False
+            msg = formatear_deteccion_potrero_gps(det, usuario_nombre=nombre_u)
+            try:
+                await update.message.reply_text(msg, parse_mode="HTML")
+            except Exception:
+                await update.message.reply_text(msg)
+            try:
+                pie = "✅ Ronda guardada." if ronda_ok else "⚠️ No se pudo guardar la ronda."
+                await update.message.reply_text(pie, reply_markup=ReplyKeyboardRemove())
+            except Exception:
+                pass
+        except Exception as e:
+            logger.error("Error en handle_location: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -2475,6 +2581,9 @@ def construir_application(
                         InlineKeyboardButton("🌾 Balance Forrajero", callback_data="cmd:balance_forrajero"),
                     ],
                     [
+                        InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                     ],
                 ])
@@ -2527,6 +2636,9 @@ def construir_application(
                         InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
                     ],
                     [
+                        InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                     ],
                 ])
@@ -2548,6 +2660,9 @@ def construir_application(
                     [
                         InlineKeyboardButton("📊 Existencias", callback_data="cmd:potreros_sg"),
                         InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
+                    ],
+                    [
+                        InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
                     ],
                     [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
@@ -2572,6 +2687,9 @@ def construir_application(
                         InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
                     ],
                     [
+                        InlineKeyboardButton("📍 GPS / ¿En qué potrero estoy?", callback_data="cmd:pedir_ubicacion"),
+                    ],
+                    [
                         InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
                     ],
                 ])
@@ -2580,6 +2698,15 @@ def construir_application(
                         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_p)
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_p)
+
+            elif data == "cmd:pedir_ubicacion":
+                await query.answer()
+                if not auth.puede_administrar(user_id):
+                    if query.message:
+                        await query.message.reply_text("⛔ No autorizado.")
+                    return
+                if query.message:
+                    await _enviar_pedido_ubicacion(query.message)
 
             elif data == "cmd:status":
                 await query.answer()
@@ -3202,6 +3329,7 @@ def construir_application(
     app.add_handler(CommandHandler(["historial", "consulta", "ficha", "info", "vaca", "animal"], cmd_historial))
     app.add_handler(CommandHandler("potreros", cmd_potreros))
     app.add_handler(CommandHandler(["ocupacion", "rotacion"], cmd_ocupacion))
+    app.add_handler(CommandHandler(["aqui", "ubicacion", "donde_estoy", "estoy"], cmd_aqui))
     app.add_handler(CommandHandler("animales", cmd_animales))
     app.add_handler(CommandHandler(["foto", "fotos"], cmd_fotos))
     app.add_handler(CommandHandler(["grafico", "grafica", "curva"], cmd_grafico))
@@ -3222,6 +3350,7 @@ def construir_application(
 
     # Handlers de callbacks y mensajes
     app.add_handler(CallbackQueryHandler(handle_callback_query))
+    app.add_handler(MessageHandler(filters.LOCATION, handle_location))
     app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))

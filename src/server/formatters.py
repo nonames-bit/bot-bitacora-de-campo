@@ -2520,4 +2520,52 @@ def formatear_ndvi_panel(db, limite: int = 10) -> str:
     return "\n".join(lineas)
 
 
+def formatear_deteccion_potrero_gps(
+    det: Optional[dict],
+    usuario_nombre: str = "",
+    punto: str = "telegram",
+    fecha: Optional[str] = None,
+    hora: Optional[str] = None,
+) -> str:
+    """Genera el mensaje HTML del resultado de detectar el potrero por GPS (Telegram/PWA)."""
+    from datetime import datetime
+
+    ahora = datetime.now()
+    fecha_txt = fecha or ahora.strftime("%Y-%m-%d")
+    hora_txt = hora or ahora.strftime("%H:%M")
+    quien = f" · 👤 {_esc(usuario_nombre)}" if usuario_nombre else ""
+    if not det:
+        return (
+            "📍 <b>Ubicación recibida</b>, pero estás <b>fuera del área de los potreros</b> de la finca.\n"
+            f"🕒 <i>{_esc(fecha_txt)} {_esc(hora_txt)}{quien}</i>\n"
+            "No se registró ninguna ronda."
+        )
+    nombre = _esc(det.get("nombre") or det.get("codigo") or "Potrero")
+    dentro = bool(det.get("dentro"))
+    try:
+        dist_m = float(det.get("distancia_m") or 0.0)
+    except (TypeError, ValueError):
+        dist_m = 0.0
+    area = det.get("area_has")
+    try:
+        area_txt = f"{float(area):.1f} ha" if area is not None else "S/D"
+    except (TypeError, ValueError):
+        area_txt = "S/D"
+    if dentro or dist_m <= 0:
+        ubic_txt = "✅ <b>Estás DENTRO del potrero</b>"
+    else:
+        ubic_txt = f"📏 Estás <b>a {dist_m:.0f} m del lindero</b> de este potrero"
+    lineas = [
+        "📍 <b>¿En qué potrero estoy? — Detección GPS</b>",
+        f"🌿 <b>Potrero:</b> <b>{nombre}</b>",
+        f"• {ubic_txt}",
+        f"• <b>Área:</b> {area_txt}",
+        f"🕒 <i>{_esc(fecha_txt)} {_esc(hora_txt)}{quien}</i> · 📌 <i>{_esc(punto)}</i>",
+        "✅ <i>Ronda guardada en la bitácora de campo.</i>",
+        "────────────────────────────────────────",
+        "💡 <i>Puedes ver la ocupación con /ocupacion</i>",
+    ]
+    return "\n".join(lineas)
+
+
 

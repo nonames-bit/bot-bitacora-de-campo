@@ -818,4 +818,20 @@ def test_existencias_potreros_nota_animales_sin_potrero(db):
     assert "sin potrero asignado" in resp
 
 
+def test_formatear_deteccion_potrero_gps_dentro():
+    from src.server.formatters import formatear_deteccion_potrero_gps
+    det = {"id": 1, "nombre": "Potrero Norte", "codigo": "N-01", "area_has": 5.2, "distancia_m": 0.0, "dentro": True}
+    resp = formatear_deteccion_potrero_gps(det, usuario_nombre="Juan", fecha="2026-09-06", hora="10:30")
+    assert "Potrero Norte" in resp
+    assert "DENTRO" in resp
+    assert "/ocupacion" in resp
+
+
+def test_formatear_deteccion_potrero_gps_fuera():
+    from src.server.formatters import formatear_deteccion_potrero_gps
+    resp = formatear_deteccion_potrero_gps(None, usuario_nombre="Juan", fecha="2026-09-06", hora="10:30")
+    assert "fuera" in resp.lower()
+    assert "No se registr" in resp
+
+
 

@@ -216,7 +216,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **571 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **575 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -408,7 +408,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Estrictamente opcional**: los registros de partos (crías), aplicaciones de medicamentos/drogas, muertes/necropsia, traslados o pesajes se guardan normalmente con o sin foto adjunta.
     - **Compresión client-side con `<canvas>`**: reducción inteligente a máximo 1200px y calidad JPEG 0.82 (~140-200 KB) garantizando compatibilidad con la cola offline `outbox` en `IndexedDB` y subida ultrarrápida.
     - **Sincronización y persistencia dual**: procesamiento automático en `POST /api/sync`, guardado físico en `media/` y registro en tabla SQLite `fotos` con auto-vinculación cruzada en partos (tanto a la cría como a la madre) para consulta inmediata en la ficha del animal.
-- [x] Suite de pruebas con pytest: **571 pruebas en verde** (100% pasando).
+  - **Instalación Directa como App en Celular y PC (PWA Standalone) sobre HTTPS (`ganaderiaja.duckdns.org`)**:
+    - **Instalación en 1 toque**: botón táctil `[ 📲 Instalar App ]` integrado en el encabezado y en la pantalla de inicio de sesión (`/login`), permitiendo agregar la app directamente a la pantalla de inicio del teléfono con el logo oficial de Ganadería JA.
+    - **Experiencia Nativa Standalone**: apertura a pantalla completa sin barra de URL ni pestañas del navegador, persistencia de sesión y soporte offline integral con `ServiceWorker` (`pwa-ja-v34`).
+    - **Diferenciación inteligente por plataforma**: disparo de diálogo oficial en Android (`beforeinstallprompt`) y PC Chrome/Edge; despliegue de guía modal ilustrada paso a paso en iPhone/iPad (Safari iOS: *Compartir ⎋* $\rightarrow$ *"Agregar a la pantalla de inicio ➕"*); y ocultación automática cuando la app ya corre instalada.
+    - **Manifest PWA enriquecido**: `id`, `start_url` con tracking `?source=pwa`, orientación `portrait-primary`, colores institucionales e iconos adaptativos maskable.
+- [x] Suite de pruebas con pytest: **575 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
