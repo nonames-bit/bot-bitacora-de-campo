@@ -796,19 +796,146 @@
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     }
 
+    var hintFoto = "Foto de respaldo en campo";
+    if (tipo === "parto") {
+      hintFoto = "Foto de la cría recién nacida, ubre o condición de la madre";
+    } else if (tipo === "muerte") {
+      hintFoto = "Foto del animal fallecido, necropsia o causa de muerte";
+    } else if (tipo === "tratamiento") {
+      hintFoto = "Foto del frasco/lote de medicamento, receta o zona tratada";
+    } else if (tipo === "pesaje") {
+      hintFoto = "Foto del animal en báscula, arete o condición corporal";
+    } else if (tipo === "celo") {
+      hintFoto = "Foto de manifestación de celo (moco, monta, comportamiento)";
+    } else if (tipo === "servicio") {
+      hintFoto = "Foto de la pajuela, catálogo del toro o procedimiento IA";
+    } else if (tipo === "traslado") {
+      hintFoto = "Foto del lote o potrero de destino";
+    } else if (tipo === "leche") {
+      hintFoto = "Foto del tanque o medidor de leche";
+    }
+
+    h += "<div class='cap-foto-box' style='margin-top:12px; padding:12px; border:1.5px dashed var(--borde-fuerte); border-radius:8px; background:var(--superficie);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;'>"
+      + "<div>"
+      + "<div style='font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>"
+      + icon("camera", 15)
+      + "Foto del Evento <span style='font-size:11px; font-weight:normal; color:var(--texto-suave);'>(Opcional)</span>"
+      + "</div>"
+      + "<small style='font-size:11px; color:var(--texto-suave); display:block; margin-top:2px;'>" + esc(hintFoto) + "</small>"
+      + "</div>"
+      + "<div style='display:flex; gap:8px; align-items:center;'>"
+      + "<input type='file' id='cap-foto-input' accept='image/*' capture='environment' style='display:none;'>"
+      + "<button type='button' id='btn-elegir-foto' class='tema-btn' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+      + icon("camera", 13) + " Tomar o Subir Foto"
+      + "</button>"
+      + "</div>"
+      + "</div>"
+      + "<div id='cap-foto-preview-wrap' style='display:none; margin-top:10px; padding-top:10px; border-top:1px solid var(--borde-fuerte); align-items:center; gap:12px;'>"
+      + "<img id='cap-foto-preview' src='' alt='Vista previa' style='width:64px; height:64px; object-fit:cover; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+      + "<div style='flex:1; min-width:140px;'>"
+      + "<div id='cap-foto-nombre' style='font-size:12px; font-weight:700; word-break:break-all;'>foto.jpg</div>"
+      + "<div id='cap-foto-tam' style='font-size:11px; color:var(--texto-suave);'>Optimizada</div>"
+      + "</div>"
+      + "<button type='button' id='btn-quitar-foto' class='tema-btn' style='color:var(--color-rojo-txt); font-size:11.5px; padding:4px 9px; cursor:pointer;'>" + icon("xmark", 12) + " Quitar</button>"
+      + "</div>"
+      + "</div>";
+
     return h;
   }
 
   function bindCaptura() {
     var cCampos = document.getElementById("captura-campos");
-    if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+    var _fotoActual = null;
+
+    function bindFotoCaptura() {
+      var btnElegir = document.getElementById("btn-elegir-foto");
+      var fileInp = document.getElementById("cap-foto-input");
+      var preWrap = document.getElementById("cap-foto-preview-wrap");
+      var preImg = document.getElementById("cap-foto-preview");
+      var preNom = document.getElementById("cap-foto-nombre");
+      var preTam = document.getElementById("cap-foto-tam");
+      var btnQuitar = document.getElementById("btn-quitar-foto");
+
+      if (btnElegir && fileInp) {
+        btnElegir.addEventListener("click", function () {
+          fileInp.click();
+        });
+      }
+
+      if (btnQuitar) {
+        btnQuitar.addEventListener("click", function () {
+          _fotoActual = null;
+          if (fileInp) fileInp.value = "";
+          if (preWrap) preWrap.style.display = "none";
+          if (preImg) preImg.src = "";
+        });
+      }
+
+      if (fileInp) {
+        fileInp.addEventListener("change", function () {
+          var file = fileInp.files && fileInp.files[0];
+          if (!file) return;
+
+          var reader = new FileReader();
+          reader.onload = function (ev) {
+            var img = new Image();
+            img.onload = function () {
+              var maxDim = 1200;
+              var width = img.width;
+              var height = img.height;
+              if (width > maxDim || height > maxDim) {
+                if (width > height) {
+                  height = Math.round((height * maxDim) / width);
+                  width = maxDim;
+                } else {
+                  width = Math.round((width * maxDim) / height);
+                  height = maxDim;
+                }
+              }
+
+              var canvas = document.createElement("canvas");
+              canvas.width = width;
+              canvas.height = height;
+              var ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, width, height);
+
+              var compressedB64 = canvas.toDataURL("image/jpeg", 0.82);
+              var tamKb = Math.round((compressedB64.length * 3) / 4 / 1024);
+
+              _fotoActual = {
+                base64: compressedB64,
+                nombre: file.name || ("foto_" + _tipoCapturaActual + ".jpg"),
+                tam_kb: tamKb
+              };
+
+              if (preImg) preImg.src = compressedB64;
+              if (preNom) preNom.textContent = _fotoActual.nombre;
+              if (preTam) preTam.textContent = "Optimizada (" + tamKb + " KB) · Lista para adjuntar";
+              if (preWrap) preWrap.style.display = "flex";
+            };
+            img.src = ev.target.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    }
+
+    if (cCampos) {
+      cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+      bindFotoCaptura();
+    }
 
     qa("button[data-cap-tipo]").forEach(function (b) {
       b.addEventListener("click", function () {
         qa("button[data-cap-tipo]").forEach(function (x) { x.classList.remove("act"); });
         b.classList.add("act");
         _tipoCapturaActual = b.getAttribute("data-cap-tipo");
-        if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+        _fotoActual = null;
+        if (cCampos) {
+          cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+          bindFotoCaptura();
+        }
         var fTag = document.getElementById("cap-tag");
         if (fTag) fTag.focus();
       });
@@ -863,16 +990,27 @@
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
         }
 
+        // Adjuntar foto opcional
+        if (_fotoActual && _fotoActual.base64) {
+          payload.foto_base64 = _fotoActual.base64;
+          payload.foto_nombre = _fotoActual.nombre;
+        }
+
         var feed = document.getElementById("captura-feedback");
 
         function mostrarExito(online) {
           enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
+          var fotoTxt = payload.foto_base64 ? " 📸 (con foto adjunta)" : "";
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
-              + (online ? "✅ Evento registrado en el servidor." : "💾 Evento guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+              + (online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
           }
+          _fotoActual = null;
           form.reset();
-          if (cCampos) cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+          if (cCampos) {
+            cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+            bindFotoCaptura();
+          }
           actualizarBadges();
         }
 

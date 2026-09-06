@@ -214,7 +214,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **551 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **571 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -401,7 +401,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Endpoint `/api/reporte.pdf` reparado**: integración completa de períodos (`semanal` -> 7d, `quincenal` -> 15d, `mensual` -> 30d) con generación robusta y descarga directa.
     - **Dashboard de Ficha Animal en PWA enriquecido**: 4 tarjetas KPI (Potrero Actual, Edad Zootécnica exacta, Último Peso/GMD, Estado de Retiro Sanitario), Identificación completa, Genealogía con enlaces interactivos a madre y padre, Estado reproductivo vivo (condición, FEP, días abiertos post-parto), alerta roja destacada de retiro sanitario con desglose de fármacos, y registro de movimientos recientes entre potreros.
     - **Ficha Técnica Zootécnica QR en PDF (A4 Landscape)**: Formato apaisado de alta densidad de datos generado con código QR vectorial ReportLab que enlaza directamente a la ficha web interactiva en vivo, incluyendo fotografía/placeholder oficial, cuadro genealógico, tabla de pesajes/GMD, historial reproductivo/partos y semáforo sanitario de inocuidad.
-- [x] Suite de pruebas con pytest: **570 pruebas en verde** (100% pasando).
+  - **Captura Fotográfica Opcional de Campo en Captura Rápida PWA**:
+    - Botón de cámara táctil integrado en Captura Rápida (`capture="environment"` / selector de archivos) con vista previa instantánea, miniatura, botón de descarte y textos contextuales según el evento.
+    - **Estrictamente opcional**: los registros de partos (crías), aplicaciones de medicamentos/drogas, muertes/necropsia, traslados o pesajes se guardan normalmente con o sin foto adjunta.
+    - **Compresión client-side con `<canvas>`**: reducción inteligente a máximo 1200px y calidad JPEG 0.82 (~140-200 KB) garantizando compatibilidad con la cola offline `outbox` en `IndexedDB` y subida ultrarrápida.
+    - **Sincronización y persistencia dual**: procesamiento automático en `POST /api/sync`, guardado físico en `media/` y registro en tabla SQLite `fotos` con auto-vinculación cruzada en partos (tanto a la cría como a la madre) para consulta inmediata en la ficha del animal.
+- [x] Suite de pruebas con pytest: **571 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

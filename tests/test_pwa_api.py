@@ -460,6 +460,81 @@ def test_api_sync_solo_confirma_ids_ok_de_eventos_realmente_guardados(client):
     assert d["errores"]  # el fallo queda reportado, no silenciado
 
 
+def test_api_sync_con_foto_opcional(client, db_file):
+    import base64
+    from src.db.database import Database
+
+    # Bytes mínimos de imagen JPEG en base64
+    fake_img = base64.b64encode(b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9").decode("utf-8")
+    b64_data = f"data:image/jpeg;base64,{fake_img}"
+
+    eventos = [
+        # 1. Parto con foto opcional
+        {
+            "tipo": "parto",
+            "id_local": "loc_parto_foto",
+            "fecha": "2026-09-02",
+            "payload": {
+                "vaca_tag": "47",
+                "id_cria_tag": "CRIA_99",
+                "sexo_cria": "HEMBRA",
+                "estado_cria": "VIVO",
+                "peso_nacimiento": 34.0,
+                "notas": "Cría vigorosa",
+                "foto_base64": b64_data,
+            }
+        },
+        # 2. Tratamiento con foto opcional
+        {
+            "tipo": "tratamiento",
+            "id_local": "loc_trat_foto",
+            "fecha": "2026-09-02",
+            "payload": {
+                "animal_tag": "47",
+                "producto": "Penicilina L.A.",
+                "dosis": "15 ml",
+                "via": "IM",
+                "dias_retiro_leche": 3,
+                "foto_base64": b64_data,
+            }
+        },
+        # 3. Muerte con foto opcional
+        {
+            "tipo": "muerte",
+            "id_local": "loc_muerte_foto",
+            "fecha": "2026-09-02",
+            "payload": {
+                "animal_tag": "CRIA_99",
+                "causa_presunta": "Timpanismo agudo",
+                "foto_base64": b64_data,
+            }
+        },
+        # 4. Evento sin foto (opcionalidad garantizada)
+        {
+            "tipo": "pesaje",
+            "id_local": "loc_sin_foto",
+            "fecha": "2026-09-02",
+            "payload": {
+                "animal_tag": "47",
+                "peso_kg": 475.0,
+            }
+        }
+    ]
+
+    r = client.post("/api/sync", json={"eventos": eventos})
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["procesados"] == 4
+
+    db = Database(db_file)
+    fotos_cria = db.fotos_de("CRIA_99")
+    assert len(fotos_cria) >= 1
+    fotos_vaca = db.fotos_de("47")
+    assert len(fotos_vaca) >= 1
+    db.close()
+
+
 def test_api_manga_pesaje_calcula_gmd(client, db_file):
     # Registrar pesaje previo
     d = Database(db_file)

@@ -1498,4 +1498,15 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   transform: scale(1.01);
 }
 
-
+/* Captura Rápida: Foto Opcional de Campo */
+.cap-foto-box {
+  background: var(--superficie);
+  border: 1.5px dashed var(--borde-fuerte);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+  transition: border-color .15s ease, background .15s ease;
+}
+.cap-foto-box:hover {
+  border-color: var(--verde-marca);
+}

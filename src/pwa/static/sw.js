@@ -28,7 +28,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v30: Visor Lightbox interactivo con zoom táctil y descarga para imágenes de ficha animal y gráficos.
 // v31: Métricas de RAM/Disco en vivo para VPS, selector multi-canal de logs (Telegram, PWA, Copias) y auto-recarga de usuarios.
 // v32: Logo oficial Ganadería JA, desvinculación de SG y monitor de presencia de usuarios en vivo (exclusivo OWNER).
-var CACHE = "pwa-ja-v32"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v33: Captura de foto opcional en eventos de campo (partos/crías, tratamientos y muertes) con compresión client-side.
+var CACHE = "pwa-ja-v33"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

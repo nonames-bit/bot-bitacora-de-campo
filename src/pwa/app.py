@@ -1189,6 +1189,80 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             logger.exception("Error al eliminar usuario")
             return jsonify({"error": str(e)}), 400
 
+    def _guardar_foto_evento(db_inst, payload: dict, tipo: str, fecha: str, uid_user: Optional[int]) -> Optional[int]:
+        """Procesa y almacena una foto adjunta (opcional) enviada en base64 desde la captura rápida."""
+        foto_b64 = payload.get("foto_base64")
+        if not foto_b64 or not isinstance(foto_b64, str):
+            return None
+        try:
+            import base64
+            import uuid
+
+            if "," in foto_b64:
+                foto_b64 = foto_b64.split(",", 1)[1]
+            raw_bytes = base64.b64decode(foto_b64)
+            if not raw_bytes:
+                return None
+
+            media_dir_abs = os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT) if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
+            os.makedirs(media_dir_abs, exist_ok=True)
+
+            # Determinar el tag del animal involucrado
+            tag_asoc = None
+            if tipo == "parto":
+                tag_asoc = payload.get("id_cria_tag") or payload.get("vaca_tag") or payload.get("tag")
+            elif tipo in ("tratamiento", "muerte", "pesaje", "traslado"):
+                tag_asoc = payload.get("animal_tag") or payload.get("tag")
+            elif tipo in ("celo", "servicio"):
+                tag_asoc = payload.get("vaca_tag") or payload.get("tag")
+            else:
+                tag_asoc = payload.get("animal_tag") or payload.get("vaca_tag") or payload.get("tag")
+
+            tag_clean = re.sub(r"[^A-Za-z0-9_-]+", "_", str(tag_asoc or "campo"))
+            ts = int(time.time())
+            rnd = uuid.uuid4().hex[:6]
+            fname = f"cap_{tipo}_{tag_clean}_{ts}_{rnd}.jpg"
+            dest_file = os.path.join(media_dir_abs, fname)
+            with open(dest_file, "wb") as f:
+                f.write(raw_bytes)
+
+            ruta_rel = os.path.join("media", fname).replace("\\", "/")
+            caption_txt = f"Captura {tipo.capitalize()} · {tag_asoc or ''}".strip()
+            if tipo == "parto":
+                caption_txt = f"Parto: cría {payload.get('id_cria_tag') or 'S/D'} (madre {payload.get('vaca_tag') or 'S/D'})".strip()
+            elif tipo == "tratamiento":
+                caption_txt = f"Tratamiento: {payload.get('producto') or ''} ({tag_asoc or ''})".strip()
+            elif tipo == "muerte":
+                caption_txt = f"Muerte: {payload.get('causa_presunta') or ''} ({tag_asoc or ''})".strip()
+
+            fid = db_inst.registrar_foto(
+                ruta=ruta_rel,
+                animal_tag=tag_asoc,
+                fecha=fecha,
+                caption=caption_txt,
+                user_id=uid_user,
+                notas=f"Captura rápida en campo ({tipo}): {payload.get('notas') or payload.get('diagnostico') or ''}".strip(),
+            )
+
+            # Para parto, si se especificaron cría y madre, vincular también a la madre
+            if tipo == "parto" and payload.get("id_cria_tag") and payload.get("vaca_tag") and str(payload.get("id_cria_tag")) != str(payload.get("vaca_tag")):
+                try:
+                    db_inst.registrar_foto(
+                        ruta=ruta_rel,
+                        animal_tag=payload.get("vaca_tag"),
+                        fecha=fecha,
+                        caption=caption_txt,
+                        user_id=uid_user,
+                        notas=f"Parto madre {payload.get('vaca_tag')} de la cría {payload.get('id_cria_tag')}",
+                    )
+                except Exception:
+                    pass
+
+            return fid
+        except Exception as err:
+            logger.exception("Error al guardar foto adjunta de captura: %s", err)
+            return None
+
     @app.post("/api/sync")
     def api_sync():
         datos = request.get_json(silent=True) or {}
@@ -1199,14 +1273,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         db_sync = _db(db_path)
         procesados = 0
         errores = []
-        # IDs locales (los de la cola IndexedDB del cliente) que sí se
-        # guardaron -- el cliente solo debe borrar de su cola offline los
-        # eventos confirmados aquí. Antes se borraba TODA la cola con solo
-        # un HTTP 200 de la petición, aunque un evento individual fallara
-        # (ej. tag inexistente): el evento fallido desaparecía de la cola
-        # local sin haberse guardado en el servidor -- pérdida de datos de
-        # campo silenciosa, sobre todo durante la sincronización automática
-        # en segundo plano (sin aviso visible al usuario).
         ids_ok = []
         uid = session.get("user_id")
 
@@ -1231,6 +1297,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1243,6 +1310,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             evento=payload.get("evento") or "PESAJE",
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1259,6 +1327,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             diagnostico=payload.get("diagnostico"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1272,6 +1341,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             motivo=payload.get("motivo"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1283,6 +1353,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1298,6 +1369,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             estado=payload.get("estado"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1309,6 +1381,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1318,6 +1391,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             litros=payload.get("litros"),
                             notas=payload.get("notas"),
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
@@ -1334,6 +1408,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             punto_control=payload.get("punto_control"),
                             notas=payload.get("notas"),
                         )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
