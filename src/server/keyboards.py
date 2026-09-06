@@ -116,9 +116,9 @@ def crear_teclado_admin(rol: Optional[str] = None) -> InlineKeyboardMarkup:
         ],
         [
             # Composición Genética (razas del hato) vive dentro de Población &
-            # KPIs SG — no se repite aquí como atajo aparte para no tener dos
+            # Demografía — no se repite aquí como atajo aparte para no tener dos
             # caminos distintos a la misma pantalla.
-            InlineKeyboardButton("📊 Población & KPIs SG", callback_data="cmd:poblacion"),
+            InlineKeyboardButton("📊 Población & Demografía", callback_data="cmd:poblacion"),
             InlineKeyboardButton("📷 Galería Fotos", callback_data="cmd:fotos"),
         ],
         [
@@ -520,7 +520,7 @@ def crear_teclado_clima() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("🔄 Ocupación Voisin", callback_data="panel_grafico:ocupacion"),
-            InlineKeyboardButton("🌿 Potreros SG", callback_data="cmd:potreros"),
+            InlineKeyboardButton("🌿 Ocupación Potreros", callback_data="cmd:potreros"),
         ],
         [
             InlineKeyboardButton("🗺️ Mapa de Potreros", callback_data="panel_grafico:mapa_potreros"),

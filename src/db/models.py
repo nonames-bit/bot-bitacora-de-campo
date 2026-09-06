@@ -321,6 +321,18 @@ CREATE TABLE IF NOT EXISTS telemetria_gps (
 CREATE INDEX IF NOT EXISTS idx_telemetria_fecha ON telemetria_gps(fecha);
 CREATE INDEX IF NOT EXISTS idx_telemetria_usuario ON telemetria_gps(user_id);
 CREATE INDEX IF NOT EXISTS idx_telemetria_potrero ON telemetria_gps(potrero_id);
+
+CREATE TABLE IF NOT EXISTS usuarios_presencia (
+    user_id TEXT PRIMARY KEY,
+    nombre TEXT,
+    rol TEXT,
+    canal TEXT,
+    ip TEXT,
+    ultima_actividad TEXT,
+    detalles TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_presencia_actividad ON usuarios_presencia(ultima_actividad);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -330,7 +342,7 @@ TABLAS = [
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
-    "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps",
+    "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
 ]
 
 

@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#1C1E21">
 <meta name="description" content="Tablero ejecutivo Ganadería JA">
 <link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/favicon.png" type="image/png">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -17,7 +18,7 @@
 <body>
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
-  <span class="marca-titulo"><img src="/static/favicon.svg" class="logo-ja" alt="Logo Ganadería JA" width="24" height="24"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
+  <span class="marca-titulo"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="28" height="28"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
     <button id="btn-sync" class="tema-btn" title="Cola offline de eventos" aria-label="Sincronizar cola"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg><span id="sync-count" class="nav-badge" style="display:none">0</span></button>
@@ -63,7 +64,7 @@
 <div id="modal-chat" class="modal-overlay" style="display:none">
   <div class="modal-contenido chat-modal">
     <div class="modal-header">
-      <span style="display:inline-flex; align-items:center; gap:8px;"><img src="/static/favicon.svg" class="logo-ja" alt="Logo Ganadería JA" width="20" height="20"><b>Asistente IA · Ganadería JA</b></span>
+      <span style="display:inline-flex; align-items:center; gap:8px;"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="22" height="22"><b>Asistente IA · Ganadería JA</b></span>
       <button class="modal-cerrar" id="btn-cerrar-chat">✕</button>
     </div>
     <div id="chat-historial" class="chat-cuerpo">

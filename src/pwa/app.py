@@ -701,6 +701,16 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if request is None or request.endpoint in _RUTAS_PUBLICAS:
             return None
         if session.get("autenticado"):
+            try:
+                db_inst = _db(db_path)
+                uid = session.get("user_id") or session.get("nombre")
+                nom = session.get("nombre") or ""
+                rol = session.get("rol") or "TRABAJADOR"
+                ip = _cliente_ip()
+                db_inst.registrar_presencia(user_id=uid, nombre=nom, rol=rol, canal="PWA", ip=ip)
+                db_inst.close()
+            except Exception:
+                pass
             return None
         if request.path.startswith("/api/") or request.path.startswith("/media/"):
             return jsonify({"error": "No autenticado. Inicie sesión en /login."}), 401
@@ -937,10 +947,94 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 for u in usuarios:
                     if str(u.get("rol", "")).strip().upper() == "OWNER":
                         u["pin"] = "****"
+
+            # EXCLUSIVO OWNER: adjuntar presencia en vivo
+            if rol == "OWNER":
+                try:
+                    db_u = _db(db_path)
+                    presencias = db_u.obtener_usuarios_presencia()
+                    db_u.close()
+                except Exception:
+                    presencias = {}
+                for u in usuarios:
+                    uid = str(u.get("user_id"))
+                    p = presencias.get(uid, {})
+                    u["online_info"] = {
+                        "en_linea": p.get("en_linea", False),
+                        "estado": p.get("estado", "offline"),
+                        "canal": p.get("canal", ""),
+                        "ip": p.get("ip", ""),
+                        "ultima_actividad": p.get("ultima_actividad", ""),
+                        "hace_texto": p.get("hace_texto", "Nunca"),
+                    }
             return jsonify({"ok": True, "usuarios": usuarios, "mi_rol": rol})
         except Exception as e:
             logger.exception("Error al listar usuarios")
             return jsonify({"error": f"Error al leer usuarios: {e}"}), 500
+
+    @app.get("/api/usuarios/online")
+    def api_usuarios_online():
+        """Consulta de usuarios conectados en vivo (EXCLUSIVO OWNER)."""
+        rol = _rol_actual()
+        if rol != "OWNER":
+            return jsonify({"error": "Acceso denegado. Solo el rol OWNER puede ver usuarios conectados."}), 403
+
+        db_inst = _db(db_path)
+        try:
+            presencias = db_inst.obtener_usuarios_presencia()
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            auth_inst = Auth(users_file)
+            usuarios = auth_inst.listar_usuarios()
+
+            resultado = []
+            en_linea_cnt = 0
+            for u in usuarios:
+                uid = str(u.get("user_id"))
+                p = presencias.get(uid, {})
+                en_linea = p.get("en_linea", False)
+                if en_linea:
+                    en_linea_cnt += 1
+                resultado.append({
+                    "user_id": u.get("user_id"),
+                    "nombre": u.get("nombre"),
+                    "rol": u.get("rol"),
+                    "telegram_id": u.get("telegram_id"),
+                    "avatar": u.get("avatar"),
+                    "en_linea": en_linea,
+                    "estado": p.get("estado", "offline"),
+                    "canal": p.get("canal", ""),
+                    "ip": p.get("ip", ""),
+                    "ultima_actividad": p.get("ultima_actividad", ""),
+                    "hace_texto": p.get("hace_texto", "Nunca"),
+                })
+            return jsonify({
+                "ok": True,
+                "total": len(resultado),
+                "en_linea_count": en_linea_cnt,
+                "usuarios": resultado,
+            })
+        finally:
+            db_inst.close()
+
+    @app.route("/api/heartbeat", methods=["GET", "POST"])
+    def api_heartbeat():
+        """Latido para mantener activo el estado de conexión en la PWA."""
+        if not session.get("autenticado"):
+            return jsonify({"error": "No autenticado"}), 401
+        try:
+            db_inst = _db(db_path)
+            uid = session.get("user_id") or session.get("nombre")
+            nom = session.get("nombre") or ""
+            rol = session.get("rol") or "TRABAJADOR"
+            ip = _cliente_ip()
+            db_inst.registrar_presencia(user_id=uid, nombre=nom, rol=rol, canal="PWA", ip=ip)
+            db_inst.close()
+        except Exception:
+            pass
+        return jsonify({"ok": True})
 
     @app.post("/api/usuarios")
     def api_guardar_usuario():
@@ -1567,10 +1661,16 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             row_a = db_inst.query_one("SELECT COUNT(*) as n FROM animales WHERE estado = 'ACTIVO'")
             row_tot = db_inst.query_one("SELECT COUNT(*) as n FROM animales")
             termo = db_inst.query_one("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC LIMIT 1")
+            try:
+                presencias = db_inst.obtener_usuarios_presencia()
+                en_linea_cnt = sum(1 for p in presencias.values() if p.get("en_linea"))
+            except Exception:
+                en_linea_cnt = 0
 
             return jsonify({
                 "texto": texto_sistema,
                 "vps": info_vps,
+                "en_linea_count": en_linea_cnt,
                 "db": {
                     "path": db_path,
                     "tam_mb": tam_mb,

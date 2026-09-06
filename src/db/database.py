@@ -1926,3 +1926,109 @@ class Database:
             })
         return resumen
 
+    # ------------------------------------------------------------------ #
+    # Presencia y usuarios en línea en tiempo real
+    # ------------------------------------------------------------------ #
+    def registrar_presencia(
+        self,
+        user_id: int | str,
+        nombre: str = "",
+        rol: str = "",
+        canal: str = "PWA",
+        ip: str = "",
+        detalles: str = "",
+    ) -> None:
+        """Registra o actualiza el latido/actividad de un usuario (para presencia en vivo)."""
+        if not user_id:
+            return
+        now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        self._ensure_presencia_table()
+        sql = """
+            INSERT INTO usuarios_presencia (user_id, nombre, rol, canal, ip, ultima_actividad, detalles)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                nombre = CASE WHEN excluded.nombre != '' THEN excluded.nombre ELSE usuarios_presencia.nombre END,
+                rol = CASE WHEN excluded.rol != '' THEN excluded.rol ELSE usuarios_presencia.rol END,
+                canal = excluded.canal,
+                ip = CASE WHEN excluded.ip != '' THEN excluded.ip ELSE usuarios_presencia.ip END,
+                ultima_actividad = excluded.ultima_actividad,
+                detalles = CASE WHEN excluded.detalles != '' THEN excluded.detalles ELSE usuarios_presencia.detalles END
+        """
+        try:
+            self.execute(sql, (str(user_id), nombre, rol, canal, ip, now_iso, detalles))
+        except Exception as e:
+            logger.debug("Error al registrar presencia de usuario %s: %s", user_id, e)
+
+    def _ensure_presencia_table(self) -> None:
+        try:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS usuarios_presencia (
+                    user_id TEXT PRIMARY KEY,
+                    nombre TEXT,
+                    rol TEXT,
+                    canal TEXT,
+                    ip TEXT,
+                    ultima_actividad TEXT,
+                    detalles TEXT
+                )
+            """)
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_presencia_actividad ON usuarios_presencia(ultima_actividad)")
+        except Exception:
+            pass
+
+    def obtener_usuarios_presencia(self) -> dict[str, dict]:
+        """Devuelve un mapa {str(user_id): info_presencia} con cálculo de estado en línea."""
+        self._ensure_presencia_table()
+        try:
+            filas = self.query_all("SELECT * FROM usuarios_presencia")
+        except Exception as e:
+            logger.debug("Error al consultar usuarios_presencia: %s", e)
+            return {}
+
+        now = datetime.utcnow()
+        res = {}
+        for r in filas:
+            uid = str(r["user_id"])
+            act_str = r["ultima_actividad"] or ""
+            en_linea = False
+            estado = "offline"
+            segundos_diff = 999999
+            hace_texto = "Nunca"
+
+            if act_str:
+                try:
+                    limpio = act_str.replace("Z", "")
+                    dt_act = datetime.fromisoformat(limpio)
+                    segundos_diff = max(0, int((now - dt_act).total_seconds()))
+                    if segundos_diff <= 300:  # 5 minutos
+                        en_linea = True
+                        estado = "online"
+                        hace_texto = "En línea ahora" if segundos_diff < 60 else f"Hace {segundos_diff // 60}m"
+                    elif segundos_diff <= 1800:  # 30 minutos
+                        estado = "reciente"
+                        hace_texto = f"Hace {segundos_diff // 60}m"
+                    elif segundos_diff < 86400:  # 24 horas
+                        horas = segundos_diff // 3600
+                        hace_texto = f"Hace {horas}h"
+                    else:
+                        dias = segundos_diff // 86400
+                        hace_texto = f"Hace {dias}d"
+                except Exception:
+                    pass
+
+            res[uid] = {
+                "user_id": r["user_id"],
+                "nombre": r["nombre"] or "",
+                "rol": r["rol"] or "",
+                "canal": r["canal"] or "PWA",
+                "ip": r["ip"] or "",
+                "ultima_actividad": act_str,
+                "en_linea": en_linea,
+                "estado": estado,
+                "segundos_desde": segundos_diff,
+                "hace_texto": hace_texto,
+                "detalles": r["detalles"] or "",
+            }
+        return res
+
+

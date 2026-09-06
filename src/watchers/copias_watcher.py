@@ -108,9 +108,9 @@ def formatear_reporte_copias(
     detalle_error = _conteos_tienen_error(conteos)
 
     if modo_html:
-        titulo = "📦 <b>Software Ganadero — Auto-Import Exitoso</b>"
+        titulo = "📦 <b>Auto-Import Exitoso de Respaldo</b>"
         if detalle_error:
-            titulo = "⚠️ <b>Software Ganadero — Auto-Import con errores</b>"
+            titulo = "⚠️ <b>Auto-Import de Respaldo con errores</b>"
         lineas = [
             titulo,
             f"📁 Archivo: <code>{nombre_archivo}</code>{dur_str}",

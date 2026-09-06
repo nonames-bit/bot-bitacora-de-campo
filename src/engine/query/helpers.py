@@ -324,7 +324,7 @@ def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
     cuerpo = "\n".join(pre_lines)
     cuerpo_escapado = html.escape(cuerpo)
     return (
-        "📊 <b>Resumen General de Inventario (SG)</b>\n"
+        "📊 <b>Resumen General de Inventario</b>\n"
         f"<pre>\n{cuerpo_escapado}\n</pre>"
     )
 
@@ -451,9 +451,9 @@ def contar_animales_sin_potrero(db: Database) -> int:
 
 
 def formatear_tabla_potreros_sg(filas_potreros: list[dict], sin_potrero: int = 0) -> str:
-    """Formatea la tabla de inventario por potreros exacta a la de Software Ganadero (potreros.jpg)."""
+    """Formatea la tabla de inventario por potreros exacta a la de la finca."""
     if not filas_potreros:
-        return "📍 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>\n\nNo hay potreros con animales activos actualmente."
+        return "📍 <b>[01-JA] GANADERIA-JA · Existencias por Potreros</b>\n\nNo hay potreros con animales activos actualmente."
 
     tot_ch = sum(p["ch"] for p in filas_potreros)
     tot_hl = sum(p["hl"] for p in filas_potreros)
@@ -500,7 +500,7 @@ def formatear_tabla_potreros_sg(filas_potreros: list[dict], sin_potrero: int = 0
 
     cuerpo_escapado = html.escape("\n".join(lines))
     msg = [
-        "🌿 <b>[01-JA] GANADERIA-JA · Existencias por Potreros (SG)</b>",
+        "🌿 <b>[01-JA] GANADERIA-JA · Existencias por Potreros</b>",
         f"<pre>\n{cuerpo_escapado}\n</pre>",
         "<i>Leyenda: CH: Cría hembra | HL: Hemb. levante | NV: Nov. vientre | VP: Vaca parida | VS: Vaca seca | CM: Cría macho | ML: Mac. levante | MC: Macho ceba | RP: Reproductor | Tot: Total activos</i>",
     ]

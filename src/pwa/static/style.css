@@ -181,14 +181,15 @@ header {
   box-shadow: 0 1px 4px var(--sombra);
 }
 .logo-ja {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
   display: inline-block;
   vertical-align: middle;
   flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  margin-right: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  margin-right: 4px;
 }
 header b {
   font-size: 15px;

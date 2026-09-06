@@ -357,7 +357,7 @@ def test_formatear_animales_sg_brackets_y_filtro_activos(db):
 
     resp = formatear_animales(db, hoy=hoy)
 
-    assert "Resumen General de Inventario (SG)" in resp
+    assert "Resumen General de Inventario" in resp
     assert "<pre>" in resp
     assert "</pre>" in resp
     assert "Hembras &lt;1 año" in resp or "Hembras <1 año" in resp
@@ -508,7 +508,7 @@ def test_formatear_estado_servidor(db, tmp_path):
     # Regresión real: sin registro explícito de importaciones de Software
     # Ganadero, no había forma de confirmar "¿ya está usando el backup de
     # hoy?" salvo adivinar por la fecha de modificación del .db.
-    assert "Último backup SG importado" in resp
+    assert "Último backup importado" in resp
     assert "Nunca" in resp
 
     db.registrar_import_sg("Datos20260830.Zip", {"animales": {"nuevos": 5, "duplicados": 1}})

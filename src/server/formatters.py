@@ -651,7 +651,7 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
         "📊 <b>TABLERO POBLACIONAL & KPIs ZOOTÉCNICOS</b>",
         f"🏷️ <i>Finca: 01-JA-GANADERIA-JA · Total: {activos} Cabezas</i>",
         "────────────────────────────────────────",
-        "🐄 <b>ESTRUCTURA DE POBLACIÓN (SG):</b>",
+        "🐄 <b>ESTRUCTURA DE POBLACIÓN:</b>",
         f"• 🥛 <b>Vacas Totales:</b> {tot_vacas} ({tot_vp} paridas · {tot_vs} secas)",
         f"• 🤰 <b>Novillas de Vientre:</b> {tot_nv}",
         f"• 🍼 <b>Crías (&lt;1a):</b> {tot_crias} ({tot_ch} hembras · {tot_cm} machos)",
@@ -659,7 +659,7 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
         f"• 📈 <b>Levante/Ceba Machos (1-2a):</b> {tot_ml + tot_mc}",
         f"• 🐂 <b>Toros / Reproductores:</b> {tot_rep}",
         "────────────────────────────────────────",
-        "🎂 <b>PIRÁMIDE POR RANGOS DE EDAD (SG):</b>",
+        "🎂 <b>PIRÁMIDE POR RANGOS DE EDAD:</b>",
         f"• 0 a 1 Año:   <b>{hb['menor_1'] + mb['menor_1']}</b> animales (♀ {hb['menor_1']} · ♂ {mb['menor_1']})",
         f"• 1 a 2 Años:  <b>{hb['1_2'] + mb['1_2']}</b> animales (♀ {hb['1_2']} · ♂ {mb['1_2']})",
         f"• 2 a 4 Años:  <b>{hb['2_4']}</b> hembras",
@@ -690,7 +690,7 @@ def formatear_genetica_panel(db: Database) -> str:
     total_activos = sum(r["total"] for r in filas)
 
     lineas = [
-        "🧬 <b>COMPOSICIÓN GENÉTICA & RAZAS (SG)</b>",
+        "🧬 <b>COMPOSICIÓN GENÉTICA & RAZAS</b>",
         f"🏷️ <i>Hato Activo: {total_activos} Cabezas</i>",
         "────────────────────────────────────────",
     ]
@@ -711,7 +711,7 @@ def formatear_genetica_panel(db: Database) -> str:
         lineas.append(f"• <b>{rz_nom}</b> (<code>{rz_cod}</code>): <b>{cnt}</b> ({pct:.1f}%)")
 
     lineas.append("────────────────────────────────────────")
-    lineas.append("💡 <i>Software Ganadero registra cruces de Holstein, Gyr, Ayrshire y Pardo Suizo.</i>")
+    lineas.append("💡 <i>El registro incluye cruces de Holstein, Gyr, Ayrshire y Pardo Suizo.</i>")
     return "\n".join(lineas)
 
 
@@ -1183,7 +1183,7 @@ def formatear_estado_servidor(
         f"• <b>Archivo:</b> {db_path or 'data/bitacora.db'} ({size_str})",
         f"• <b>Registros:</b> {_fmt_es_co(total_animales)} animales · {_fmt_es_co(total_eventos)} eventos históricos",
         f"• <b>Última sincronización / Backup:</b> {ts_str}",
-        f"• <b>Último backup SG importado:</b> {import_str}",
+        f"• <b>Último backup importado:</b> {import_str}",
         "",
         f"👥 <b>USUARIOS AUTORIZADOS ({len(usuarios)}):</b>",
         f"• 👑 Dueño (OWNER): <b>{n_owner}</b>",
@@ -1198,15 +1198,37 @@ def formatear_estado_servidor(
     return "\n".join(salida)
 
 
-def formatear_usuarios(auth: Auth) -> str:
-    """Genera la lista de usuarios registrados con sus roles."""
+def formatear_usuarios(auth: Auth, presencias: Optional[dict] = None) -> str:
+    """Genera la lista de usuarios registrados con sus roles y estado de conexión en vivo (si es OWNER)."""
     usuarios = auth.listar_usuarios()
     if not usuarios:
         return "No hay usuarios registrados en el sistema."
 
-    lineas = [f"👥 Usuarios registrados ({len(usuarios)}):"]
+    lineas = [f"👥 <b>Usuarios registrados ({len(usuarios)}):</b>"]
+    if presencias is not None:
+        en_linea_cnt = sum(1 for u in usuarios if presencias.get(str(u.get("user_id")), {}).get("en_linea"))
+        lineas.append(f"🟢 <i>Usuarios en línea ahora: {en_linea_cnt}</i>")
+    lineas.append("────────────────────────────────────────")
+
     for u in usuarios:
-        lineas.append(f"• ID: {u.get('user_id')} | {u.get('nombre', 'Sin nombre')} | Rol: {u.get('rol')}")
+        uid = str(u.get("user_id"))
+        nom = u.get("nombre", "Sin nombre")
+        rol = u.get("rol", "TRABAJADOR")
+        tg = u.get("telegram_id")
+        tg_txt = f" · TG: <code>{tg}</code>" if tg else ""
+
+        info_linea = f"• ID: <b>{uid}</b> | <b>{nom}</b> | Rol: <code>{rol}</code>{tg_txt}"
+        if presencias is not None:
+            p = presencias.get(uid, {})
+            if p.get("en_linea"):
+                canal = p.get("canal", "PWA")
+                info_linea += f"\n  └─ 🟢 <b>En línea</b> ({canal} · {p.get('hace_texto', 'activo')})"
+            elif p.get("estado") == "reciente":
+                canal = p.get("canal", "PWA")
+                info_linea += f"\n  └─ 🟡 <b>Reciente</b> ({canal} · {p.get('hace_texto')})"
+            else:
+                info_linea += f"\n  └─ ⚪ <i>Desconectado ({p.get('hace_texto', 'Sin registro')})</i>"
+        lineas.append(info_linea)
     return "\n".join(lineas)
 
 
@@ -1221,10 +1243,10 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/ficha [tag]</code> o <code>/consulta [tag]</code> — Ficha interactiva con pestañas\n"
             "• <code>/alertas</code> — Semáforo de partos, secados, destetes y retiros\n"
             "• <code>/guia</code> — Cómo hacer preguntas al chat en lenguaje natural\n"
-            "• <code>/potreros</code> — Matriz SG de potreros y rotación Voisin\n"
+            "• <code>/potreros</code> — Matriz de potreros y rotación Voisin\n"
             "• <code>/ocupacion</code> — Días de ocupación y descanso de praderas\n"
             "• <code>/medicamentos</code> — Panel de fármacos y retiros activos\n"
-            "• <code>/poblacion</code> — Pirámide de edades y brackets SG\n"
+            "• <code>/poblacion</code> — Pirámide de edades y categorías\n"
             "• <code>/genetica</code> — Composición racial y cruces del hato\n"
             "• <code>/fotos [tag]</code> — Galería fotográfica del ganado\n"
             "• <code>/grafico [tag]</code> — Curva de crecimiento (peso vs edad)\n"
@@ -1241,11 +1263,11 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/status</code> — Tablero zootécnico ejecutivo de la finca\n"
             "• <code>/sistema</code> — Métricas del servidor VPS y base SQLite\n"
             "• <code>/reporte</code> — Generar reporte semanal en PDF\n"
-            "• <code>/exportar</code> — Descargar backup ZIP para Software Ganadero\n"
+            "• <code>/exportar</code> — Descargar backup del sistema (paquete ZIP)\n"
             "• <code>/importar</code> — Instrucciones para importar backup DBF\n"
             "• <code>/confirmar_importar</code> — Procesar backup subido\n"
             "• <code>/descartar_backup</code> — Eliminar backup pendiente\n"
-            "• <code>/usuarios</code> — Lista de usuarios registrados\n"
+            "• <code>/usuarios</code> — Lista de usuarios y estado en vivo\n"
             "• <code>/agregar_usuario [ID] [ROL] [Nombre]</code> — Dar de alta\n"
             "• <code>/quitar_usuario [ID]</code> — Revocar acceso\n"
             "• <code>/logs</code> — Ver últimas líneas del registro del sistema\n"
@@ -1267,7 +1289,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "Si el problema es grande (muchos registros dañados, no solo uno), eso ya "
             "no es para el chat: pide que restauren el respaldo automático de anoche "
             "desde el VPS (scripts/restaurar_backup.sh) — esa es la otra red de "
-            "seguridad, separada del respaldo de Software Ganadero.\n\n"
+            "seguridad, separada del respaldo general.\n\n"
             "🏠 <i>Toca /menu o /start para abrir el panel táctil interactivo.</i>"
         )
     if rol == "ADMIN":
@@ -1279,10 +1301,10 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/ficha [tag]</code> o <code>/consulta [tag]</code> — Ficha interactiva con pestañas\n"
             "• <code>/alertas</code> — Semáforo de partos, secados, destetes y retiros\n"
             "• <code>/guia</code> — Cómo hacer preguntas al chat en lenguaje natural\n"
-            "• <code>/potreros</code> — Matriz SG de potreros y rotación Voisin\n"
+            "• <code>/potreros</code> — Matriz de potreros y rotación Voisin\n"
             "• <code>/ocupacion</code> — Días de ocupación y descanso de praderas\n"
             "• <code>/medicamentos</code> — Panel de fármacos y retiros activos\n"
-            "• <code>/poblacion</code> — Pirámide de edades y brackets SG\n"
+            "• <code>/poblacion</code> — Pirámide de edades y categorías\n"
             "• <code>/genetica</code> — Composición racial y cruces del hato\n"
             "• <code>/fotos [tag]</code> — Galería fotográfica del ganado\n"
             "• <code>/grafico [tag]</code> — Curva de crecimiento (peso vs edad)\n"
@@ -1291,7 +1313,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "⚙️ <b>2. Informes y Sincronización:</b>\n"
             "• <code>/status</code> — Tablero zootécnico ejecutivo de la finca\n"
             "• <code>/reporte</code> — Generar reporte semanal en PDF\n"
-            "• <code>/exportar</code> — Descargar backup ZIP para Software Ganadero\n"
+            "• <code>/exportar</code> — Descargar backup del sistema (paquete ZIP)\n"
             "• <code>/importar</code> — Instrucciones para importar backup DBF\n"
             "• <code>/confirmar_importar</code> — Procesar backup subido\n"
             "• <code>/descartar_backup</code> — Eliminar backup pendiente\n"
@@ -1667,7 +1689,7 @@ def formatear_duplicados_geneticos(grupos: list[dict]) -> str:
     if len(grupos) > 15:
         lineas.append(f"<i>... y {len(grupos) - 15} grupo(s) más.</i>")
     lineas.append("")
-    lineas.append("<i>Revise cuál tag es el correcto en Software Ganadero antes de decidir cuál conservar.</i>")
+    lineas.append("<i>Revise cuál tag es el correcto en los registros antes de decidir cuál conservar.</i>")
     return "\n".join(lineas)
 
 
@@ -1749,7 +1771,7 @@ def formatear_reporte_importacion(conteos: dict) -> str:
 def formatear_instrucciones_importar() -> str:
     """Devuelve las instrucciones para subir un backup mediante Telegram o SSH."""
     return (
-        "📦 Para importar un backup de Software Ganadero:\n\n"
+        "📦 Para importar un backup del sistema:\n\n"
         "1. Envíame el archivo .zip directamente por este chat como documento.\n"
         "2. Te confirmaré la recepción y responderás /confirmar_importar para procesarlo.\n"
         "3. Si deseas cancelarlo antes de procesar, usa /descartar_backup.\n\n"

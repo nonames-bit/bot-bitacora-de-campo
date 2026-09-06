@@ -420,7 +420,7 @@ def generar_ficha_qr_individual(
     c.drawString(x0 + 130, y_hdr + 22, "·  FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL")
 
     c.setFont("Helvetica", 8)
-    c.drawString(x0 + 12, y_hdr + 9, "BITÁCORA DE CAMPO  |  REGISTRO OFICIAL DE SOFTWARE GANADERO (SG)")
+    c.drawString(x0 + 12, y_hdr + 9, "BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA")
 
     c.setFont("Helvetica-Bold", 10)
     pot_nom = str(ficha.get("potrero") or "Sin potrero asignado").upper()
@@ -435,7 +435,7 @@ def generar_ficha_qr_individual(
     c.line(x0 + 10, y0 + 20, x0 + cw - 10, y0 + 20)
     c.setFillColor(colors.HexColor("#666666"))
     c.setFont("Helvetica", 7.5)
-    c.drawString(x0 + 12, y0 + 7, "Ganadería JA · Control Zootécnico Integral · Datos sincronizados con base de datos Software Ganadero")
+    c.drawString(x0 + 12, y0 + 7, "Ganadería JA · Control Zootécnico Integral · Datos sincronizados del hato ganadero")
     c.drawRightString(x0 + cw - 12, y0 + 7, f"ID Sistema: #{aid} · Tag: {an_tag} · Documento Oficial de Campo")
 
     # 4. Columna Izquierda: Tarjeta de Identificación, QR y Foto

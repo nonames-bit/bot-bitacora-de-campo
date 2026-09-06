@@ -145,6 +145,18 @@ class Auth:
                 return str(u.get("rol", "")).strip().upper()
         return None
 
+    def obtener_usuario(self, user_id: int | str) -> Optional[dict]:
+        """Devuelve una copia del diccionario del usuario coincidente por user_id o telegram_id."""
+        self._recargar_si_cambio()
+        try:
+            uid = int(user_id)
+        except (ValueError, TypeError):
+            return None
+        for u in self.usuarios:
+            if u.get("user_id") == uid or u.get("telegram_id") == uid:
+                return dict(u)
+        return None
+
     def puede_consultar(self, user_id: int) -> bool:
         """Verifica permiso de consulta y registro básico (OWNER, ADMIN, TRABAJADOR)."""
         self._recargar_si_cambio()

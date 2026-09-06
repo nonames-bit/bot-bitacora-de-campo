@@ -360,7 +360,7 @@ def generar_pdf(
         img = Image(logo_path, width=20 * mm, height=20 * mm)
         texto_enc = [
             Paragraph("GANADERÍA JA", estilo_titulo),
-            Paragraph(f"Bitácora de Campo Zootécnico & Software Ganadero (SG) · Generado: {fecha_hoy.isoformat()}", estilo_subtitulo),
+            Paragraph(f"Bitácora de Campo Zootécnico · Sistema Ganadería JA · Generado: {fecha_hoy.isoformat()}", estilo_subtitulo),
             Paragraph(f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}", estilo_normal),
         ]
         enc_table = Table([[img, texto_enc]], colWidths=[24 * mm, 146 * mm])
@@ -388,10 +388,10 @@ def generar_pdf(
         estilo_normal,
     ))
 
-    # Existencias por potrero (Software Ganadero SG)
+    # Existencias por potrero
     potreros_sg = datos.get("potreros_sg", [])
     if potreros_sg:
-        story.append(Paragraph("Existencias por potrero (Software Ganadero)", estilo_seccion))
+        story.append(Paragraph("Existencias por Potrero", estilo_seccion))
         tabla_pot_datos = [["Potrero", "CH", "HL", "NV", "VP", "VS", "CM", "ML", "MC", "Rep", "Total"]]
         for p in potreros_sg:
             def v(n: int) -> str: return str(n) if n > 0 else "-"

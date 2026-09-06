@@ -27,7 +27,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v29: Reparación de endpoint de reporte PDF general, ficha técnica animal zootécnica ejecutiva y tarjeta QR completa A4.
 // v30: Visor Lightbox interactivo con zoom táctil y descarga para imágenes de ficha animal y gráficos.
 // v31: Métricas de RAM/Disco en vivo para VPS, selector multi-canal de logs (Telegram, PWA, Copias) y auto-recarga de usuarios.
-var CACHE = "pwa-ja-v31"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v32: Logo oficial Ganadería JA, desvinculación de SG y monitor de presencia de usuarios en vivo (exclusivo OWNER).
+var CACHE = "pwa-ja-v32"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -36,6 +37,8 @@ var PRECACHE = [
   "/static/style.css",
   "/static/app.js",
   "/static/favicon.svg",
+  "/static/favicon.png",
+  "/static/logo.jpg",
   "/static/icon-192.png",
   "/static/icon-512.png",
   "/static/fonts/geist-sans-latin-400-normal.woff2",

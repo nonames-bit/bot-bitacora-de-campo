@@ -293,7 +293,7 @@
       + kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : "")
       + kpi(d.terneros_menor_12m, "Crías <12m") + "</div>";
     h += grafico("waterfall_inventario", "Movimientos del hato (entradas/salidas)");
-    h += "<h4>" + icon("chartLine") + "Brackets de edad (Software Ganadero)</h4>";
+    h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
     h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Nro</th><th>Distrib.</th><th>Acum.</th></tr>";
     (d.filas || []).forEach(function (f) {
       h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.acum) + "%</td></tr>";
@@ -1167,21 +1167,22 @@
       + kpi(ramTxt, ramSub, ramClase)
       + kpi(diskTxt, diskSub, diskClase)
       + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
-      + kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo SG", "ok")
+      + kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo", "ok")
+      + (d.en_linea_count !== undefined ? kpi(String(d.en_linea_count), "Usuarios en Línea", d.en_linea_count > 0 ? "ok" : "") : "")
       + "</div>";
 
     h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + esc(d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
-    // Visor de Logs con selector de canal (Todos, Telegram, PWA, Copias SG)
+    // Visor de Logs con selector de canal (Todos, Telegram, PWA, Copias)
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>🌐 Todos</button>"
       + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>🤖 Telegram</button>"
       + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>🐮 PWA Web</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='copias' style='font-size:11.5px; padding:4px 9px;'>📁 Copias SG</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='copias' style='font-size:11.5px; padding:4px 9px;'>📁 Copias de Seguridad</button>"
       + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:11.5px; padding:4px 10px; margin-left:6px;'>" + icon("refresh", 13) + "Refrescar</button>"
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
@@ -1275,6 +1276,28 @@
     var h = "<h3>" + icon("users") + "Gestión de Personal & Accesos (Niveles 1, 2, 3)</h3>"
       + "<p class='aviso'>Control de acceso basado en roles por niveles. Define el nombre, nivel de jerarquía, PIN de acceso de 4 dígitos, ID local secuencial, ID de Telegram y foto/avatar representativo.</p>";
 
+    // Tarjeta Monitor en Vivo (Exclusivo OWNER)
+    if (miRol === "OWNER") {
+      var enLineaCount = usuarios.filter(function (u) {
+        return u.online_info && u.online_info.en_linea;
+      }).length;
+      h += "<div class='card' style='padding:14px 18px; margin-bottom:16px; background:linear-gradient(135deg, rgba(22,163,74,0.08), rgba(37,99,235,0.06)); border:1px solid var(--borde-fuerte); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;'>"
+        + "<div>"
+        + "<div style='display:flex; align-items:center; gap:8px;'>"
+        + "<span style='display:inline-block; width:10px; height:10px; border-radius:50%; background:" + (enLineaCount > 0 ? "#16a34a" : "#9ca3af") + "; box-shadow:" + (enLineaCount > 0 ? "0 0 8px #16a34a" : "none") + ";'></span>"
+        + "<b style='font-size:14.5px;'>Monitor de Conexión en Vivo (Exclusivo OWNER)</b>"
+        + "</div>"
+        + "<div style='font-size:12.5px; color:var(--texto-suave); margin-top:3px;'>"
+        + (enLineaCount === 1 ? "<b>1 usuario en línea ahora</b>" : "<b>" + enLineaCount + " usuarios en línea ahora</b>")
+        + " · Monitoreo confidencial de presencia por Web PWA y Telegram Bot."
+        + "</div>"
+        + "</div>"
+        + "<div>"
+        + "<button type='button' id='btn-refrescar-usuarios' class='tema-btn' style='font-size:12px; padding:6px 14px;'>" + icon("refresh", 13) + " Actualizar Estados</button>"
+        + "</div>"
+        + "</div>";
+    }
+
     // Tarjeta 1: Formulario Agregar / Modificar Usuario
     h += "<div class='card' style='padding:18px; margin-bottom:16px;'>"
       + "<h4>" + icon("pin") + "Crear o Modificar Usuario</h4>"
@@ -1358,6 +1381,7 @@
         + "<tr>"
         + "<th>Usuario / Foto</th>"
         + "<th>Nivel de Acceso</th>"
+        + (miRol === "OWNER" ? "<th>Conexión en Vivo</th>" : "")
         + "<th>ID Local</th>"
         + "<th>ID Telegram</th>"
         + "<th>PIN</th>"
@@ -1378,8 +1402,37 @@
           + "<div><b style='font-size:13.5px;'>" + esc(u.nombre || "Sin nombre") + "</b></div>"
           + "</div>"
           + "</td>"
-          + "<td><span class='chip " + nv.chip + "' style='font-weight:700;'>" + nv.badge + " · " + esc(rolU) + "</span></td>"
-          + "<td><span style='font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--texto);'>#" + esc(u.user_id) + "</span></td>"
+          + "<td><span class='chip " + nv.chip + "' style='font-weight:700;'>" + nv.badge + " · " + esc(rolU) + "</span></td>";
+
+        if (miRol === "OWNER") {
+          var oi = u.online_info || {};
+          var chipClase = "gris";
+          var dotColor = "#9ca3af";
+          var estadoLabel = "Desconectado";
+          if (oi.estado === "online") {
+            chipClase = "verde";
+            dotColor = "#16a34a";
+            estadoLabel = "En línea";
+          } else if (oi.estado === "reciente") {
+            chipClase = "amarillo";
+            dotColor = "#d97706";
+            estadoLabel = "Reciente";
+          }
+          var canalBadge = oi.canal ? (" (" + esc(oi.canal) + ")") : "";
+          var detalleTxt = oi.hace_texto ? esc(oi.hace_texto) : "Nunca";
+
+          h += "<td>"
+            + "<div style='display:flex; flex-direction:column; gap:3px;'>"
+            + "<span class='chip " + chipClase + "' style='font-size:11px; font-weight:700; display:inline-flex; align-items:center; gap:5px; width:fit-content;'>"
+            + "<span style='width:7px; height:7px; border-radius:50%; background:" + dotColor + "; display:inline-block;'></span>"
+            + estadoLabel + canalBadge
+            + "</span>"
+            + "<small style='font-size:11px; color:var(--texto-suave);'>" + detalleTxt + (oi.ip ? " · <span style='font-family:var(--font-mono); font-size:10px;'>" + esc(oi.ip) + "</span>" : "") + "</small>"
+            + "</div>"
+            + "</td>";
+        }
+
+        h += "<td><span style='font-family:var(--font-mono); font-weight:700; font-size:13px; color:var(--texto);'>#" + esc(u.user_id) + "</span></td>"
           + "<td>" + (u.telegram_id ? "<code style='background:var(--superficie); padding:2px 6px; border-radius:4px; font-size:12px; font-family:var(--font-mono);'>" + esc(u.telegram_id) + "</code>" : "<span style='color:var(--texto-suave); font-size:12px;'>—</span>") + "</td>"
           + "<td><code style='background:var(--superficie); padding:3px 8px; border-radius:4px; border:1px solid var(--borde-fuerte); font-size:14px; font-weight:bold; letter-spacing:1px;'>" + esc(u.pin || "—") + "</code></td>"
           + "<td>";
@@ -1416,6 +1469,13 @@
     var uidInp = document.getElementById("usr-uid");
     var tgIdInp = document.getElementById("usr-telegram-id");
     var btnCancelar = document.getElementById("btn-cancelar-edit-usr");
+    var btnRefrescarUsr = document.getElementById("btn-refrescar-usuarios");
+
+    if (btnRefrescarUsr) {
+      btnRefrescarUsr.addEventListener("click", function () {
+        cargar(true);
+      });
+    }
 
     function seleccionarAvatar(avKey) {
       if (!avKey) avKey = "vaquero";
@@ -2282,7 +2342,7 @@
       + "<div><span style='color:var(--texto-suave);'>Sexo:</span> <b>" + esc(f.sexo || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Raza:</span> <b>" + esc(f.raza || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Color / Pelo:</span> <b>" + esc(f.color || "S/D") + "</b></div>"
-      + "<div><span style='color:var(--texto-suave);'>Categoría SG:</span> <b>" + esc(f.categoria_sg || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Categoría:</span> <b>" + esc(f.categoria_sg || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Fecha Nacimiento:</span> <b>" + esc(fechaCorta(f.fecha_nacimiento) || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Peso al Nacer:</span> <b>" + (f.peso_nacimiento ? f.peso_nacimiento + " kg" : "S/D") + "</b></div>";
 
@@ -3137,6 +3197,17 @@
     setInterval(function () {
       enviarTelemetriaSilenciosa("latido_periodico");
     }, 180000);
+    // Latido de presencia en vivo de usuario (cada 60 segundos con pestaña activa)
+    setInterval(function () {
+      if (!document.hidden && navigator.onLine) {
+        fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
+      }
+    }, 60000);
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && navigator.onLine) {
+        fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
+      }
+    });
     // Primer refresco de badges y cola offline al reconectar tras estar sin señal.
     window.addEventListener("online", function () {
       actualizarBadges();

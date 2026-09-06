@@ -248,6 +248,21 @@ def construir_application(
                 else:
                     raise
 
+    def _tocar_actividad(user_id: Optional[int], nombre_alt: str = "") -> None:
+        if not user_id:
+            return
+        try:
+            u = auth.obtener_usuario(user_id)
+            if u:
+                uid = u.get("user_id", user_id)
+                nom = u.get("nombre", nombre_alt) or nombre_alt
+                rol = u.get("rol", "TRABAJADOR")
+                db.registrar_presencia(user_id=uid, nombre=nom, rol=rol, canal="Telegram", detalles=f"tg_id:{user_id}")
+            elif nombre_alt:
+                db.registrar_presencia(user_id=user_id, nombre=nombre_alt, rol="TRABAJADOR", canal="Telegram", detalles=f"tg_id:{user_id}")
+        except Exception:
+            pass
+
     async def cmd_mi_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -283,6 +298,7 @@ def construir_application(
                     parse_mode="HTML",
                 )
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             rol = auth.rol_de(user_id)
             texto_menu = texto_menu_principal(rol)
             teclado = crear_teclado_principal(rol)
@@ -317,6 +333,7 @@ def construir_application(
             if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             bot_engine = Bot(db)
             raw_text = update.message.text
             respuesta = bot_engine.procesar_texto(raw_text, user_id=user_id)
@@ -396,6 +413,7 @@ def construir_application(
             if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             voice = update.message.voice or update.message.audio
             if not voice:
                 return
@@ -435,6 +453,7 @@ def construir_application(
             if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             photos = update.message.photo
             if not photos:
                 return
@@ -552,11 +571,12 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
 
             doc = update.message.document
             file_name = doc.file_name or ""
             if not file_name.lower().endswith(".zip"):
-                await update.message.reply_text("⚠️ Por favor envía un archivo .zip con el backup de Software Ganadero.")
+                await update.message.reply_text("⚠️ Por favor envía un archivo .zip con el backup del sistema.")
                 return
 
             file_size = doc.file_size or 0
@@ -1192,7 +1212,7 @@ def construir_application(
                     "Uso: /renombrar_animal <tag_viejo> <tag_nuevo>\n"
                     "Ej. /renombrar_animal A090-6 B234\n\n"
                     "Úselo cuando una cría tenía el código temporal que asigna "
-                    "Software Ganadero al nacer y ya le pusieron la chapeta "
+                    "el registro al nacer y ya le pusieron la chapeta "
                     "definitiva: conserva todo el historial ya registrado."
                 )
                 return
@@ -1303,11 +1323,12 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             arg_potrero = " ".join(context.args).strip() if context.args else None
             msg = formatear_potreros(db, potrero=arg_potrero)
             teclado_p = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                    InlineKeyboardButton("📊 Existencias", callback_data="cmd:potreros_sg"),
                     InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
                 ],
                 [
@@ -1332,11 +1353,12 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
             qe = QueryEngine(db)
             msg = qe.responder("dias de ocupacion")
             teclado_p = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                    InlineKeyboardButton("📊 Existencias", callback_data="cmd:potreros_sg"),
                     InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
                 ],
                 [
@@ -1478,8 +1500,11 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            msg = formatear_usuarios(auth)
-            await update.message.reply_text(msg)
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
+            es_owner = auth.es_owner(user_id)
+            presencias = db.obtener_usuarios_presencia() if es_owner else None
+            msg = formatear_usuarios(auth, presencias=presencias)
+            await update.message.reply_text(msg, parse_mode="HTML")
         except Exception as e:
             logger.error("Error en cmd_usuarios: %s", e, exc_info=True)
             if update.message:
@@ -1703,6 +1728,7 @@ def construir_application(
             if not auth.puede_administrar(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name or "")
 
             from ..exporters import (
                 export_csv_zip,
@@ -1714,7 +1740,7 @@ def construir_application(
             parsed = parsear_args_exportar(context.args)
             if parsed is None:
                 await update.message.reply_text(
-                    "Uso: /exportar (DBF/Software Ganadero por defecto) · /exportar csv · /exportar json"
+                    "Uso: /exportar (DBF por defecto) · /exportar csv · /exportar json"
                 )
                 return
 
@@ -1726,7 +1752,7 @@ def construir_application(
             if formato == "dbf":
                 ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
                 zip_generado = export_zip(db, ruta_zip)
-                desc = "📦 Exportación para Software Ganadero SG (8 tablas DBF)."
+                desc = "📦 Exportación en formato DBF (8 tablas)."
             elif formato == "csv":
                 ruta_zip = os.path.join(exports_dir, f"bitacora_csv_{hoy_str}.zip")
                 zip_generado = export_csv_zip(db, ruta_zip)
@@ -1738,7 +1764,7 @@ def construir_application(
             else:
                 ruta_zip = os.path.join(exports_dir, f"Datos_Export_{hoy_str}.Zip")
                 zip_generado = export_zip(db, ruta_zip)
-                desc = "📦 Exportación para Software Ganadero SG."
+                desc = "📦 Exportación de datos del sistema."
 
             with open(zip_generado, "rb") as f:
                 contenido = f.read()
@@ -1893,6 +1919,7 @@ def construir_application(
             if not auth.es_autorizado(user_id):
                 await query.answer("⛔ No autorizado.", show_alert=True)
                 return
+            _tocar_actividad(user_id, update.effective_user.first_name if update.effective_user else "")
 
             data = query.data
             if data.startswith("noop") or data.startswith("section:"):
@@ -2047,7 +2074,7 @@ def construir_application(
                             await query.message.reply_document(
                                 document=contenido,
                                 filename=os.path.basename(ruta_zip),
-                                caption="📦 Backup exportado en formato ZIP para Software Ganadero (TP/SG).",
+                                caption="📦 Backup exportado en formato ZIP con las tablas del sistema.",
                             )
                 except Exception as eexp:
                     logger.error("Error al exportar en callback: %s", eexp)
@@ -2060,10 +2087,11 @@ def construir_application(
                     if query.message:
                         await query.message.reply_text("⛔ Solo el propietario (OWNER) puede ver la lista de usuarios.")
                     return
-                msg = formatear_usuarios(auth)
+                presencias = db.obtener_usuarios_presencia() if auth.es_owner(user_id) else None
+                msg = formatear_usuarios(auth, presencias=presencias)
                 teclado_u = crear_teclado_sistema_detalle()
                 if query.message:
-                    await query.message.reply_text(msg, reply_markup=teclado_u)
+                    await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_u)
 
             elif data == "cmd:logs":
                 await query.answer()
@@ -2518,7 +2546,7 @@ def construir_application(
                 msg = qe.responder("dias de ocupacion")
                 teclado_p = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                        InlineKeyboardButton("📊 Existencias", callback_data="cmd:potreros_sg"),
                         InlineKeyboardButton("🌿 Potreros Listos", callback_data="cmd:potreros_listos"),
                     ],
                     [
@@ -2540,7 +2568,7 @@ def construir_application(
                 msg = formatear_potreros(db)
                 teclado_p = InlineKeyboardMarkup([
                     [
-                        InlineKeyboardButton("📊 Existencias SG", callback_data="cmd:potreros_sg"),
+                        InlineKeyboardButton("📊 Existencias", callback_data="cmd:potreros_sg"),
                         InlineKeyboardButton("⏳ Días Ocupación", callback_data="cmd:ocupacion"),
                     ],
                     [

@@ -6,6 +6,7 @@
 <title>Ficha {{ tag }} · Bitácora JA</title>
 <meta name="theme-color" content="#2F5233">
 <link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/favicon.png" type="image/png">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/static/icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
@@ -16,7 +17,7 @@
 <body data-tag="{{ tag }}">
 <div id="barra-red">📡 Sin conexión — mostrando datos guardados. Reconectando…</div>
 <header>
-  <span><a href="/">← Tablero</a> · 🐮 Ficha <b>{{ tag }}</b></span>
+  <span class="marca-titulo"><a href="/" style="text-decoration:none; color:inherit; display:inline-flex; align-items:center; gap:6px;"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="22" height="22">← Tablero</a> · 🐮 Ficha <b>{{ tag }}</b></span>
   <span class="acciones">
     <button id="btn-tema" class="tema-btn" title="Cambiar tema" aria-label="Cambiar tema">☀️</button>
     <a href="/logout" class="salir">Salir</a>

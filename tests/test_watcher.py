@@ -190,7 +190,7 @@ def test_watcher_formatear_reportes():
     assert "• animales: 2 nuevos, 10 duplicados" in txt
 
     html = formatear_reporte_copias(conteos, "Datos20260824.Zip", duracion_s=1.2, modo_html=True)
-    assert "<b>Software Ganadero — Auto-Import Exitoso</b>" in html
+    assert "<b>Auto-Import Exitoso de Respaldo</b>" in html
     assert "<code>Datos20260824.Zip</code>" in html
     assert "<b>3 nuevos</b>, 15 duplicados" in html
 
