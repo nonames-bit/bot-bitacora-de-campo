@@ -34,7 +34,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v38: Fix de clics rotos por el CSP (script-src 'self') en árbol genealógico, crías, feed de eventos y exportar CSV -- de onclick inline a delegación de eventos.
 // v39: Fix navegación de ficha en página standalone /ficha/<tag> (apuntaba al contenedor #vista inexistente en vez de #ficha).
 // v40: Botón de ayuda movido al header con ?, navegación directa a ficha desde eventos/crías con scroll suave, icono SVG para crías y retiro de columna Acción.
-var CACHE = "pwa-ja-v40"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v41: Quita los 2 botones "Ver Pedigree 3G" / "Abrir Árbol Genealógico" duplicados en la tarjeta de Identificación -- la pestaña "Genealogía (3G)" ya es el único acceso.
+var CACHE = "pwa-ja-v41"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

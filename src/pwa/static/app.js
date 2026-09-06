@@ -2994,12 +2994,10 @@
       + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
       + "</div>";
 
-    // 3. Tarjeta de Identificación & Genealogía
+    // 3. Tarjeta de Identificación & Genealogía (el pedigree completo vive en
+    // la pestaña "Genealogía (3G)" -- sin botones duplicados hacia lo mismo)
     h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
-      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
       + "<h4 style='margin:0;'>" + icon("dna") + "Identificación & Genealogía</h4>"
-      + "<button type='button' class='tema-btn' data-ir-tab='genealogia' style='font-size:12px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;'>" + icon("gitBranch", 13) + "Ver Pedigree 3G</button>"
-      + "</div>"
       + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:10px;'>"
       + "<div><span style='color:var(--texto-suave);'>Arete / Tag:</span> <b>" + esc(f.tag) + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Nombre:</span> <b>" + esc(f.nombre || "S/D") + "</b></div>"
@@ -3056,11 +3054,6 @@
       });
       h += "</div></div>";
     }
-
-    h += "<div style='margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;'>"
-      + "<button type='button' class='btn-guardar-manga' data-ir-tab='genealogia' style='font-size:12.5px; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;'>"
-      + icon("dna", 15) + "Abrir Árbol Genealógico (3G) Completo & Consanguinidad</button>"
-      + "</div>";
 
     h += "</div>";
 
