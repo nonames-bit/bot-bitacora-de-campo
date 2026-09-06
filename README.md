@@ -425,7 +425,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Monitoreo de Sincronización de Backups SG**: Tarjeta ejecutiva con el último archivo procesado (`Datos20260831.Zip`), fecha y tiempo relativo ("hace X días"), desglose de registros nuevos incorporados vs existentes verificados (idempotencia), semáforo de salud de sincronización e historial de backups anteriores (`import_sg_historial`).
     - **Bitácora de Auditoría de Actividad de Campo**: Registro cronológico de eventos ingresados por mayordomos, administradores y personal de corral (partos, pesajes con GMD, tratamientos sanitarios con retiros, traslados, celos, servicios), con avatar temático del responsable, canal de origen (PWA, Telegram o SG), fecha/hora exacta, enlace directo a ficha animal y filtros táctiles por grupo (`[ Todos ]`, `[ 🤠 Trabajadores ]`, `[ 🛡️ Administradores ]`, `[ 📁 Software Ganadero ]`).
     - **Preservación Robusta de Identidad**: Corrección en `auth.py` y `api_guardar_usuario` para evitar que la edición de perfiles o PINs en la PWA desvincule el `telegram_id` del bot.
-- [x] Suite de pruebas con pytest: **577 pruebas en verde** (100% pasando).
+  - **Feed de Eventos en Tablero Principal, Iconografía SVG y Navegación Táctil (2026-09-06)**:
+    - **Registro Cronológico en Vivo**: Panel de últimos 25 eventos del hato (partos, muertes, ventas, traslados, pesajes con GMD, tratamientos y servicios/IA) en el Tablero principal.
+    - **Navegación Táctica Inmediata**: Clic directo en cualquier arete o cría para saltar al instante a la ficha técnica del animal con scroll superior automático y delegación de eventos compatible con CSP.
+    - **Iconografía Unificada SVG**: Reemplazo de emojis por iconos vectoriales Lucide nativos (`COW_HEAD` e icono dedicado para terneros/crías `CALF_HEAD`).
+    - **Botón de Ayuda en Encabezado**: Reubicación del centro de ayuda como icono `?` en el encabezado superior junto al asistente de chat, liberando espacio en la barra de navegación principal.
+    - **Retiro de Columna Redundante**: Supresión de la columna "Acción" en la tabla de eventos para una visualización más limpia y espaciosa en teléfonos móviles.
+- [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
