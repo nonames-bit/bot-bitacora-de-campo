@@ -36,7 +36,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v40: Botón de ayuda movido al header con ?, navegación directa a ficha desde eventos/crías con scroll suave, icono SVG para crías y retiro de columna Acción.
 // v41: Quita los 2 botones "Ver Pedigree 3G" / "Abrir Árbol Genealógico" duplicados en la tarjeta de Identificación -- la pestaña "Genealogía (3G)" ya es el único acceso.
 // v42: Icono de cría adaptado fielmente de la vaquita favorita con frente redondeada tierna sin cuernos e icono de parto con Vaca Madre + Cría juntas en estilo idéntico.
-var CACHE = "pwa-ja-v42"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v43: Selector de temas en /ficha/<tag>, botones de Asistente IA (Chat) y Ayuda en header de ficha, e icono SVG Lucide de vaca sin emojis.
+var CACHE = "pwa-ja-v43"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

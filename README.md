@@ -431,6 +431,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Iconografía Unificada SVG**: Reemplazo de emojis y dibujos antiguos por iconos vectoriales derivados 100% de la vaquita canónica (`COW_HEAD`): `CALF_HEAD` con frente redondeada tierna sin cuernos para crías y `PARTO_HEADS` con Vaca Madre + Cría juntas compartiendo el mismo diseño exacto.
     - **Botón de Ayuda en Encabezado**: Reubicación del centro de ayuda como icono `?` en el encabezado superior junto al asistente de chat, liberando espacio en la barra de navegación principal.
     - **Retiro de Columna Redundante**: Supresión de la columna "Acción" en la tabla de eventos para una visualización más limpia y espaciosa en teléfonos móviles.
+  - **Ficha Animal Standalone (`/ficha/<tag>`) Unificada (2026-09-06)**:
+    - **Selector de Temas Visuales Activo**: Dropdown con los 4 temas visuales (`Verde Campestre`, `Sol de Campo`, `Claro Editorial`, `Modo Oscuro`) sincronizado con `localStorage`.
+    - **Iconografía SVG Canónica**: Sustitución del emoji residual `🐮` por el icono SVG Lucide de vaca (`COW_HEAD`) en la ruta de navegación.
+    - **Herramientas de Encabezado**: Integración de Asistente IA (modal de chat zootécnico interactivo con sugerencias contextuales para el animal consultado) y botón de Ayuda con redirección a `/?v=ayuda`.
+    - **Caché y Service Worker `v43`**: Actualización de versión para forzar la recarga limpia de assets en navegadores móviles y escritorio.
 - [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

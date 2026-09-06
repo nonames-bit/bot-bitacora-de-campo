@@ -3717,6 +3717,10 @@
     var btnAyuda = document.getElementById("btn-ayuda");
     if (!btnAyuda) return;
     btnAyuda.addEventListener("click", function () {
+      if (fb) {
+        window.location = "/?v=ayuda";
+        return;
+      }
       qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
       actual = "ayuda";
       var barraFiltros = document.getElementById("barra-filtros");
@@ -3850,6 +3854,14 @@
     var tag = params.get("tag");
     // Alias: la vista de población se unificó dentro de Inventario.
     if (v === "poblacion") v = "inventario";
+    if (v === "ayuda") {
+      qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
+      actual = "ayuda";
+      var barraFiltros = document.getElementById("barra-filtros");
+      if (barraFiltros) barraFiltros.style.display = "none";
+      cargar(true);
+      return;
+    }
     if (pot && q("#f-potrero")) q("#f-potrero").value = pot;
     if (tag && q("#f-tag")) q("#f-tag").value = tag;
     if (!v && (pot || tag)) v = pot ? "tablero" : "ficha";
@@ -4078,6 +4090,8 @@
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";
     abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
+    setupChatModal();
+    setupHeaderAyuda();
   } else {
     setupSyncOffline();
     setupChatModal();
