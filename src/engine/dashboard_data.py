@@ -125,6 +125,90 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         logger.error("seccion por_potrero fallo", exc_info=True)
         errores["por_potrero"] = str(e)
         por_potrero = []
+
+    try:
+        query_eventos = """
+            SELECT * FROM (
+                SELECT 'PARTO' AS tipo, p.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       COALESCE(c.tag, '') AS detalle_tag,
+                       CASE WHEN p.sexo_cria IS NOT NULL THEN 'Cría ' || p.sexo_cria ELSE 'Parto registrado' END ||
+                       CASE WHEN p.peso_nacimiento IS NOT NULL THEN ' (' || ROUND(p.peso_nacimiento, 1) || ' kg)' ELSE '' END AS descripcion,
+                       COALESCE(p.notas, p.estado_cria, '') AS notas, p.id AS id
+                FROM partos p
+                JOIN animales a ON a.id_animal = p.vaca_id
+                LEFT JOIN animales c ON c.id_animal = p.id_cria
+
+                UNION ALL
+
+                SELECT 'MUERTE' AS tipo, m.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       COALESCE(m.causa_presunta, 'Muerte registrada') AS descripcion,
+                       COALESCE(m.notas, '') AS notas, m.id AS id
+                FROM muertes m
+                JOIN animales a ON a.id_animal = m.animal_id
+
+                UNION ALL
+
+                SELECT COALESCE(mo.tipo_movimiento, 'VENTA') AS tipo, mo.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       COALESCE(mo.procedencia_destino, 'Movimiento registrado') ||
+                       CASE WHEN mo.precio IS NOT NULL AND mo.precio > 0 THEN ' · $' || ROUND(mo.precio, 0) ELSE '' END AS descripcion,
+                       COALESCE(mo.notas, '') AS notas, mo.id AS id
+                FROM movimientos mo
+                JOIN animales a ON a.id_animal = mo.animal_id
+
+                UNION ALL
+
+                SELECT 'TRASLADO' AS tipo, t.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       COALESCE(po.nombre, po.codigo, 'Origen') || ' ➔ ' || COALESCE(pd.nombre, pd.codigo, 'Destino') AS descripcion,
+                       COALESCE(t.motivo, '') AS notas, t.id AS id
+                FROM traslados t
+                JOIN animales a ON a.id_animal = t.animal_id
+                LEFT JOIN potreros po ON po.id = t.potrero_origen
+                LEFT JOIN potreros pd ON pd.id = t.potrero_destino
+
+                UNION ALL
+
+                SELECT 'PESAJE' AS tipo, pe.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       pe.peso_kg || ' kg' ||
+                       CASE WHEN pe.gmd_calculada IS NOT NULL AND pe.gmd_calculada > 0
+                            THEN ' (+' || ROUND(pe.gmd_calculada * 1000, 0) || ' g/d)'
+                            ELSE '' END AS descripcion,
+                       COALESCE(pe.evento, '') AS notas, pe.id AS id
+                FROM pesajes pe
+                JOIN animales a ON a.id_animal = pe.animal_id
+
+                UNION ALL
+
+                SELECT 'TRATAMIENTO' AS tipo, tr.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       tr.producto || CASE WHEN tr.dosis IS NOT NULL THEN ' ' || tr.dosis ELSE '' END AS descripcion,
+                       COALESCE(tr.diagnostico, '') AS notas, tr.id AS id
+                FROM tratamientos tr
+                JOIN animales a ON a.id_animal = tr.animal_id
+
+                UNION ALL
+
+                SELECT 'SERVICIO' AS tipo, s.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       COALESCE(s.tipo_servicio, 'Servicio/IA') ||
+                       CASE WHEN s.toro_pajilla IS NOT NULL THEN ' · ' || s.toro_pajilla ELSE '' END AS descripcion,
+                       COALESCE(s.estado, '') AS notas, s.id AS id
+                FROM servicios s
+                JOIN animales a ON a.id_animal = s.vaca_id
+            )
+            WHERE fecha IS NOT NULL AND TRIM(fecha) != ''
+            ORDER BY fecha DESC, id DESC
+            LIMIT 25
+        """
+        eventos_recientes = _filas_dict(db.query(query_eventos))
+    except Exception as e:
+        logger.error("seccion eventos_recientes fallo", exc_info=True)
+        errores["eventos_recientes"] = str(e)
+        eventos_recientes = []
+
     out = {
         "activos": activos,
         "hembras": hembras,
@@ -135,6 +219,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "retiros_activos": retiros,
         "por_potrero": por_potrero,
         "potrero_filtro": potrero,
+        "eventos_recientes": eventos_recientes,
     }
     if errores:
         out["errores"] = errores

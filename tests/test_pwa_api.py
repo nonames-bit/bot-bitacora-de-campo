@@ -117,6 +117,8 @@ def test_import_app_y_tablero_lectura(client):
     d = r.get_json()
     assert d["activos"] == 1  # estricto ACTIVO: 47 sí, 99 no
     assert "por_potrero" in d
+    assert "eventos_recientes" in d
+    assert isinstance(d["eventos_recientes"], list)
 
 
 def test_repro_fep_30d_excluye_fechas_pasadas(db_file):

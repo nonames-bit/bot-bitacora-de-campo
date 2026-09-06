@@ -139,6 +139,75 @@
       + kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : "") + "</div>";
     h += erroresHtml(d);
     h += grafico("evolucion", "Evolución del rebaño") + grafico("categorias", "Categorías del hato");
+
+    // Últimos Eventos de la Finca (Partos, Muertes, Ventas, Traslados, Pesajes...)
+    var eventos = d.eventos_recientes || [];
+    h += "<div class='card' style='padding:16px; margin-top:16px; margin-bottom:16px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:6px;'>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("calendar", 17) + "Últimos Eventos de la Finca (Partos, Muertes, Ventas...)</h4>"
+      + "<span class='meta' style='font-size:12px; font-weight:600;'>" + eventos.length + " eventos recientes</span>"
+      + "</div>"
+      + "<p class='aviso' style='margin:4px 0 12px 0; font-size:12.5px;'>Registro cronológico de actividad del hato. Toca cualquier arete o cría para abrir su ficha técnica inmediata.</p>";
+
+    if (!eventos.length) {
+      h += vacio("No hay eventos recientes registrados.");
+    } else {
+      h += "<div class='tabla-scroll'><table>"
+        + "<tr>"
+        + "<th>Tipo Evento</th>"
+        + "<th>Fecha</th>"
+        + "<th>Animal / Arete</th>"
+        + "<th>Detalle de la Actividad</th>"
+        + "<th>Acción</th>"
+        + "</tr>";
+
+      eventos.forEach(function (ev) {
+        var tipo = String(ev.tipo || "").toUpperCase();
+        var chipHtml = "";
+        if (tipo === "PARTO") {
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("cowCalf", 13) + " Parto</span>";
+        } else if (tipo === "MUERTE") {
+          chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("skull", 13) + " Muerte</span>";
+        } else if (tipo === "VENTA" || tipo === "DESCARTE" || tipo === "COMPRA") {
+          chipHtml = "<span class='chip ambar' style='font-weight:700;'>" + icon("truck", 13) + " " + esc(tipo) + "</span>";
+        } else if (tipo === "TRASLADO") {
+          chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("grass", 13) + " Traslado</span>";
+        } else if (tipo === "PESAJE") {
+          chipHtml = "<span class='chip gris' style='font-weight:700;'>" + icon("scale", 13) + " Pesaje</span>";
+        } else if (tipo === "TRATAMIENTO") {
+          chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("pill", 13) + " Tratamiento</span>";
+        } else if (tipo === "SERVICIO") {
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("sperm", 13) + " Inseminación</span>";
+        } else {
+          chipHtml = "<span class='chip gris'>" + esc(tipo) + "</span>";
+        }
+
+        var nomHtml = ev.nombre ? (" <small style='color:var(--texto-suave); font-weight:normal;'>(" + esc(ev.nombre) + ")</small>") : "";
+        var linkAnimal = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-size:13.5px; font-weight:bold;'>🐮 " + esc(ev.tag) + "</a>" + nomHtml;
+
+        var detalleExtra = "";
+        if (ev.detalle_tag) {
+          detalleExtra = "<div style='margin-top:3px;'><small style='color:var(--texto-suave);'>Cría: </small><a href='#' class='ficha-link chip verde' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.detalle_tag) + "\");' style='font-size:11px; padding:2px 6px; font-weight:bold; text-decoration:none;'>🍼 " + esc(ev.detalle_tag) + "</a></div>";
+        }
+
+        var descHtml = "<b>" + esc(ev.descripcion || "") + "</b>";
+        if (ev.notas && String(ev.notas).trim() && String(ev.notas).trim() !== String(ev.descripcion).trim()) {
+          descHtml += "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(ev.notas) + "</div>";
+        }
+
+        h += "<tr>"
+          + "<td>" + chipHtml + "</td>"
+          + "<td><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
+          + "<td>" + linkAnimal + detalleExtra + "</td>"
+          + "<td>" + descHtml + "</td>"
+          + "<td><button type='button' class='tema-btn' onclick='if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-size:11px; padding:4px 8px; white-space:nowrap;'>" + icon("search", 11) + " Ver Ficha</button></td>"
+          + "</tr>";
+      });
+
+      h += "</table></div>";
+    }
+    h += "</div>";
+
     h += "<h4>" + icon("grass") + "Distribución por potrero (toca para filtrar)</h4>";
     if (!d.por_potrero || !d.por_potrero.length) {
       h += vacio("Ningún potrero con animales.");

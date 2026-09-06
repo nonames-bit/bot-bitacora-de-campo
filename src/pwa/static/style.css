@@ -67,6 +67,10 @@
   --color-azul-bg: #E1F3FE;
   --color-azul-txt: #1F6C9F;
 
+  --piramide-hembra: #2e7d32;
+  --piramide-macho: #1976d2;
+  --piramide-pista: #e8ede6;
+
   --sombra: rgba(0, 0, 0, 0.015);
   --sombra-activa: rgba(0, 0, 0, 0.03);
 }
@@ -104,6 +108,10 @@
   --color-azul-bg: #E1F3FE;
   --color-azul-txt: #1F6C9F;
 
+  --piramide-hembra: #2e7d32;
+  --piramide-macho: #1976d2;
+  --piramide-pista: #e8ede6;
+
   --sombra: rgba(0, 0, 0, 0.01);
   --sombra-activa: rgba(0, 0, 0, 0.02);
 }
@@ -140,6 +148,10 @@
   --color-gris-txt: #A0A0A0;
   --color-azul-bg: #16283D;
   --color-azul-txt: #8FBCFF;
+
+  --piramide-hembra: #4ade80;
+  --piramide-macho: #60a5fa;
+  --piramide-pista: #263328;
 
   --sombra: rgba(0, 0, 0, 0.3);
   --sombra-activa: rgba(0, 0, 0, 0.4);
@@ -884,21 +896,22 @@ button:active {
 }
 .pir-pista {
   height: 14px;
-  background: var(--borde);
+  background: var(--piramide-pista, #e8ede6);
+  border: 1px solid var(--borde);
   border-radius: 999px;
   overflow: hidden;
   min-width: 40px;
 }
 .pir-pista.der .pir-barra { margin-left: auto; }
 .pir-barra { display: block; height: 100%; border-radius: 999px; min-width: 2px; }
-.pir-barra.hembra { background: var(--color-verde-txt); }
-.pir-barra.macho { background: var(--color-azul-txt); }
+.pir-barra.hembra { background: var(--piramide-hembra, #2e7d32); }
+.pir-barra.macho { background: var(--piramide-macho, #1976d2); }
 .pir-banda { text-align: center; font-size: 12px; line-height: 1.3; color: var(--texto); white-space: nowrap; }
 .pir-banda small { color: var(--texto-suave); font-family: var(--font-mono); font-size: 10px; }
 .pir-leyenda { display: flex; gap: 14px; justify-content: center; font-size: 11px; color: var(--texto-suave); margin-top: 4px; }
 .pir-leyenda span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; }
-.pir-leyenda .lh::before { background: var(--color-verde-txt); }
-.pir-leyenda .lm::before { background: var(--color-azul-txt); }
+.pir-leyenda .lh::before { background: var(--piramide-hembra, #2e7d32); }
+.pir-leyenda .lm::before { background: var(--piramide-macho, #1976d2); }
 @media (max-width: 480px) {
   .pir-pista { height: 11px; }
   .pir-banda { font-size: 11px; }
@@ -956,6 +969,9 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   --color-azul-txt: #000000;
   --color-gris-bg: #E0E0E0;
   --color-gris-txt: #000000;
+  --piramide-hembra: #15803d;
+  --piramide-macho: #1d4ed8;
+  --piramide-pista: #f1f5f9;
   --sombra: none;
   --sombra-activa: none;
 }
