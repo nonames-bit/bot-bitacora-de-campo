@@ -91,6 +91,7 @@ implementado todavía.
 | Foto (OCR arete y medicamentos) | ✅ | ✅ | ✅ |
 | `/historial <tag>` / `/consulta <tag>` | ✅ | ✅ | ✅ |
 | `/fotos` / `/foto <tag>` | ✅ | ✅ | ✅ |
+| `/aqui` / botón 📍 (GPS: detecta el potrero donde estás) | ✅ | ✅ | ✅ |
 | `/graficos` (4 categorías zootécnicas) | ✅ | ✅ | — |
 | `/potreros` / `/potreros sg` | ✅ | ✅ | — |
 | `/ocupacion` / `/rotacion` (Voisin) | ✅ | ✅ | — |
@@ -116,7 +117,7 @@ implementado todavía.
   y ejecución del evento o consulta), `/consulta <tag>` / `/historial <tag>` (ficha zootécnica
   completa del animal con entrega automática de fotografía y curva láctea/peso), **foto** (con detección OCR de tag y medicamento en frasco;
   se guardan en `media/` y en la base SQLite) y `/fotos [tag]` para
-  consultar imágenes de los animales.
+  consultar imágenes de los animales, y `/aqui` / botón `📍 GPS` (comparte tu ubicación y el bot detecta en qué potrero estás y guarda la ronda, visible en la auditoría del dueño).
 - **OWNER y ADMIN:** `/graficos` (panel interactivo de gráficos en 4 categorías: Hato, Reproducción, Pasturas y Leche con vista detalle simplificada), `/potreros` y `/potreros sg` (matriz exacta de existencias por potrero de Software Ganadero),
   `/ocupacion` / `/rotacion` (días de pastoreo y descanso Voisin con semáforo), `/alertas`,
   `/animales`, `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF institucional con logo `GANADERÍA JA`),
@@ -413,7 +414,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Experiencia Nativa Standalone**: apertura a pantalla completa sin barra de URL ni pestañas del navegador, persistencia de sesión y soporte offline integral con `ServiceWorker` (`pwa-ja-v34`).
     - **Diferenciación inteligente por plataforma**: disparo de diálogo oficial en Android (`beforeinstallprompt`) y PC Chrome/Edge; despliegue de guía modal ilustrada paso a paso en iPhone/iPad (Safari iOS: *Compartir ⎋* $\rightarrow$ *"Agregar a la pantalla de inicio ➕"*); y ocultación automática cuando la app ya corre instalada.
     - **Manifest PWA enriquecido**: `id`, `start_url` con tracking `?source=pwa`, orientación `portrait-primary`, colores institucionales e iconos adaptativos maskable.
-- [x] Suite de pruebas con pytest: **575 pruebas en verde** (100% pasando).
+  - **Centro de Ayuda PWA, Asistencia IA de Sistema y Nuevos SVGs Zootécnicos**:
+    - **Pestaña de Ayuda (`<button data-v="ayuda">`)**: Centro de guías operativas en la navegación principal con tarjetas ilustradas sobre: 1) Cómo instalar la app (pestañas Android, iPhone/iPad y PC con botón de instalación directo), 2) Funcionamiento en potrero sin internet (cola local `IndexedDB` y sincronización automática), 3) Trabajo en manga y pesaje continuo (GMD en vivo, cursor ágil y tratamientos en lote), 4) Captura rápida con fotos ligeras, 5) Dictado por voz con Whisper, y 6) Asistente IA con preguntas frecuentes.
+    - **Asistente IA con Soporte de la App**: `QueryEngine` entrenado para responder en lenguaje natural preguntas sobre el funcionamiento del sistema (`_ayuda_instalar_app`, `_ayuda_modo_offline`, `_ayuda_manga_pesaje`, `_ayuda_general_sistema`) con chips de sugerencias rápidas en el modal de chat.
+    - **Nuevos SVGs Zootécnicos Nativos**: Sustitución de calavera humana por **calavera de vaca (`cowSkull`)** con cuernos curvados hacia afuera y arriba para eventos de muerte/descarte; e icono de **vaca con cría / ternero (`cowCalf`)** para eventos de parto y maternidad bovina.
+- [x] Suite de pruebas con pytest: **576 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

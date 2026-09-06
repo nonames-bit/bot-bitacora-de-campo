@@ -78,8 +78,11 @@
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
       // Lucide oficiales (ISC/MIT): gestación y diagnóstico
       egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
+      cowCalf: '<path d="M2 5c-.5-1.5 1-2.5 2.5-2 1 .5 1.5 1.5 2 2.5M8 5.5c.5-1 1.5-2 2.5-2.5 1.5-.5 2.5.5 2 2.5"/><path d="M5 5c0-2-1-3-2-3.5M9.5 5c0-2 1-3 2-3.5"/><path d="M6.5 5.5h2"/><path d="M3.5 6.5C3.5 10 4.5 13 6 14h3c1.5-1 2.5-4 2.5-7.5"/><path d="M5 13.5c0 1.5 1 2.5 2.5 2.5s2.5-1 2.5-2.5"/><path d="M5.5 9v.5M9.5 9v.5M6 16.5V21M9 16.5V21"/><path d="M13 13c-.4-1 .6-1.8 1.6-1.5.8.3 1.2 1 1.5 1.8M18 13.3c.3-.8 1-1.5 1.8-1.8 1-.4 1.8.4 1.4 1.8"/><path d="M16 13.3h2"/><path d="M14.2 14c0 2.5.8 4.5 2 5.2h1.6c1.2-.7 2-2.7 2-5.2"/><path d="M15.2 18.5c0 1 .7 1.8 1.8 1.8s1.8-.8 1.8-1.8"/><path d="M15.5 15.5v.5M18.5 15.5v.5"/>',
+      parto: '<path d="M2 5c-.5-1.5 1-2.5 2.5-2 1 .5 1.5 1.5 2 2.5M8 5.5c.5-1 1.5-2 2.5-2.5 1.5-.5 2.5.5 2 2.5"/><path d="M5 5c0-2-1-3-2-3.5M9.5 5c0-2 1-3 2-3.5"/><path d="M6.5 5.5h2"/><path d="M3.5 6.5C3.5 10 4.5 13 6 14h3c1.5-1 2.5-4 2.5-7.5"/><path d="M5 13.5c0 1.5 1 2.5 2.5 2.5s2.5-1 2.5-2.5"/><path d="M5.5 9v.5M9.5 9v.5M6 16.5V21M9 16.5V21"/><path d="M13 13c-.4-1 .6-1.8 1.6-1.5.8.3 1.2 1 1.5 1.8M18 13.3c.3-.8 1-1.5 1.8-1.8 1-.4 1.8.4 1.4 1.8"/><path d="M16 13.3h2"/><path d="M14.2 14c0 2.5.8 4.5 2 5.2h1.6c1.2-.7 2-2.7 2-5.2"/><path d="M15.2 18.5c0 1 .7 1.8 1.8 1.8s1.8-.8 1.8-1.8"/><path d="M15.5 15.5v.5M18.5 15.5v.5"/>',
+      help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>',
-      // Espermatozoide (IA) — IconPark 'sperm' (Apache-2.0), dibujo clásico:
+      // Espermatozoide (IA) — IconPark \'sperm\' (Apache-2.0), dibujo clásico:
       // cabeza ovalada + flagelo con cola ondulada. Coordenadas 48 → escala .5.
       sperm: '<g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g>',
       // Copo de nieve (frío criogénico N₂) — Lucide ISC
@@ -92,7 +95,9 @@
       testTube: '<rect x="6" y="2" width="4" height="20" rx="1.5"/><rect x="14" y="2" width="4" height="20" rx="1.5"/><line x1="6" y1="6" x2="10" y2="6"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="6" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="18" y2="11"/><line x1="6" y1="16" x2="10" y2="16"/><line x1="14" y1="16" x2="18" y2="16"/>',
       pajuelas: '<rect x="6" y="2" width="4" height="20" rx="1.5"/><rect x="14" y="2" width="4" height="20" rx="1.5"/><line x1="6" y1="6" x2="10" y2="6"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="6" y1="11" x2="10" y2="11"/><line x1="14" y1="11" x2="18" y2="11"/><line x1="6" y1="16" x2="10" y2="16"/><line x1="14" y1="16" x2="18" y2="16"/>',
       flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
-      skull: '<circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/>',
+      // Calavera de vaca (cráneo bovino con cuernos curvados hacia afuera y arriba)
+      skull: '<path d="M8.5 8C4.5 7 2 5 2 2c1.5 2.5 4.5 4.5 7 4.5h6c2.5 0 5.5-2 7-4.5 0 3-2.5 5-6.5 6"/><path d="M8.5 8C6 9.5 6 12 8.5 14l1 7h5l1-7c2.5-2 2.5-4.5 0-6"/><circle cx="8" cy="11" r="1.2"/><circle cx="16" cy="11" r="1.2"/><path d="M12 15v3m-1.5 0h3"/>',
+      cowSkull: '<path d="M8.5 8C4.5 7 2 5 2 2c1.5 2.5 4.5 4.5 7 4.5h6c2.5 0 5.5-2 7-4.5 0 3-2.5 5-6.5 6"/><path d="M8.5 8C6 9.5 6 12 8.5 14l1 7h5l1-7c2.5-2 2.5-4.5 0-6"/><circle cx="8" cy="11" r="1.2"/><circle cx="16" cy="11" r="1.2"/><path d="M12 15v3m-1.5 0h3"/>',
       corral: '<path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/>',
       manga: '<path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/>',
       // Cápsula/pastilla (tratamientos) — Lucide ISC
@@ -711,14 +716,14 @@
   var _tipoCapturaActual = "parto";
   function renderCaptura() {
     var tipos = [
-      { id: "parto", nom: "Parto", ico: "egg" },
+      { id: "parto", nom: "Parto", ico: "cowCalf" },
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
-      { id: "muerte", nom: "Muerte / Descarte", ico: "skull" }
+      { id: "muerte", nom: "Muerte / Descarte", ico: "cowSkull" }
     ];
 
     var h = "<h3>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>";
@@ -1034,6 +1039,184 @@
           }).catch(function () {
             encolarOffline(_tipoCapturaActual, payload, fecha).then(function () { mostrarExito(false); });
           });
+      });
+    }
+  }
+
+  /* ---------- Sección de Ayuda & Guía Operativa ---------- */
+  var _tabAyudaInstalar = "android";
+  function renderAyuda() {
+    var h = "<h3>" + icon("help") + "Centro de Ayuda & Guía de Uso</h3>";
+    h += "<p class='aviso'>Aprende a instalar la aplicación en tu celular, operar en el potrero sin internet, registrar pesajes continuos y aprovechar la Inteligencia Artificial de la bitácora.</p>";
+
+    h += "<div class='ayuda-grid'>";
+
+    // Tarjeta 1: Instalación de la App
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("download", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>📲 Cómo Instalar la App en tu Celular o PC</h4>"
+      + "<small style='color:var(--texto-suave);'>Instálala como aplicación nativa, pantalla completa y sin barra de navegador</small>"
+      + "</div>"
+      + "</div>"
+      + "<div class='ayuda-tabs-row' style='margin-top:12px;'>"
+      + "<button type='button' class='btn-punto " + (_tabAyudaInstalar === "android" ? "act" : "") + "' data-ayuda-tab='android' style='font-size:12px; padding:6px 12px;'>Android (Chrome)</button>"
+      + "<button type='button' class='btn-punto " + (_tabAyudaInstalar === "ios" ? "act" : "") + "' data-ayuda-tab='ios' style='font-size:12px; padding:6px 12px;'>iPhone / iPad (iOS)</button>"
+      + "<button type='button' class='btn-punto " + (_tabAyudaInstalar === "pc" ? "act" : "") + "' data-ayuda-tab='pc' style='font-size:12px; padding:6px 12px;'>Computador (Chrome/Edge)</button>"
+      + "</div>"
+      + "<div id='ayuda-tab-cuerpo' style='margin-top:10px; font-size:13px; line-height:1.5;'>";
+
+    if (_tabAyudaInstalar === "android") {
+      h += "<p><b>En tu teléfono o tablet Android:</b></p>"
+        + "<ol style='padding-left:18px; margin:6px 0;'>"
+        + "<li>Toca el botón verde <b>'Instalar App'</b> en la barra superior o usa el botón de abajo.</li>"
+        + "<li>Si no aparece, abre el menú de tres puntos (<b>⋮</b>) arriba a la derecha en Chrome.</li>"
+        + "<li>Selecciona <b>'Instalar aplicación'</b> o <b>'Agregar a la pantalla principal'</b>.</li>"
+        + "<li>Confirma en <b>'Instalar'</b>. ¡Listo! Se creará el icono de <i>Bitácora JA</i> junto a tus demás aplicaciones.</li>"
+        + "</ol>"
+        + "<div style='margin-top:10px;'><button type='button' id='btn-ayuda-disparar-instalar' class='tema-btn' style='background:var(--color-verde-btn, #2e7d32); color:#fff; font-weight:bold; font-size:13px; padding:8px 14px; border-radius:6px; cursor:pointer;'>" + icon("download", 15) + "Instalar Bitácora Ganadera Ahora</button></div>";
+    } else if (_tabAyudaInstalar === "ios") {
+      h += "<p><b>En iPhone o iPad (usando Safari):</b></p>"
+        + "<ol style='padding-left:18px; margin:6px 0;'>"
+        + "<li>Abre <b>Safari</b> e ingresa a <code>https://ganaderiaja.duckdns.org/</code>.</li>"
+        + "<li>Toca el botón <b>Compartir</b> (el icono de un cuadro con una flecha hacia arriba <b>⎋</b> en la barra inferior de Safari).</li>"
+        + "<li>Desplaza hacia abajo en la lista y toca <b>'Agregar al inicio'</b> (o <i>'Add to Home Screen'</i> <b>+</b>).</li>"
+        + "<li>Toca <b>'Agregar'</b> arriba a la derecha. La app se abrirá sin barras ni pestañas de navegador, como app nativa.</li>"
+        + "</ol>";
+    } else {
+      h += "<p><b>En Windows, Mac o Linux (Chrome / Edge):</b></p>"
+        + "<ol style='padding-left:18px; margin:6px 0;'>"
+        + "<li>En la barra de direcciones de tu navegador, haz clic en el icono de instalación <b>(+)</b> o monitor con flecha.</li>"
+        + "<li>O abre el menú (<b>⋮</b> o <b>…</b>) y selecciona <b>'Instalar Bitácora Ganadera JA'</b>.</li>"
+        + "<li>Se abrirá en su propia ventana independiente con acceso directo en tu escritorio.</li>"
+        + "</ol>";
+    }
+
+    h += "</div></div>";
+
+    // Tarjeta 2: Modo Offline Real
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("cloud", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>📶 Modo Offline Real (Sin Cobertura Celular)</h4>"
+      + "<small style='color:var(--texto-suave);'>Trabaja con total confianza en el potrero o la manga</small>"
+      + "</div>"
+      + "</div>"
+      + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
+      + "<p>La Bitácora está equipada con tecnología <b>PWA Offline Real</b>:</p>"
+      + "<ul style='padding-left:18px; margin:6px 0;'>"
+      + "<li><b>Guardado local inmediato:</b> Todos los pesajes, partos, celos, traslados y drogas aplicadas se guardan en tu celular mediante <i>IndexedDB</i>, aunque estés en modo avión o sin señal.</li>"
+      + "<li><b>Indicador de estado:</b> El icono de nube en la barra superior muestra el estado de la conexión y la cantidad de registros pendientes por subir.</li>"
+      + "<li><b>Sincronización automática:</b> Al regresar a la casa de la finca o recuperar datos móviles, la app envía automáticamente todos los registros acumulados al servidor sin perder nada.</li>"
+      + "</ul>"
+      + "</div></div>";
+
+    // Tarjeta 3: Manga y Pesaje Continuo
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("scale", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>⚖️ Trabajo en Manga & Pesaje Continuo</h4>"
+      + "<small style='color:var(--texto-suave);'>Flujo rápido para jornadas de pesaje de hato completo</small>"
+      + "</div>"
+      + "</div>"
+      + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
+      + "<p>Diseñado para no frenar el paso de los animales en el corral:</p>"
+      + "<ol style='padding-left:18px; margin:6px 0;'>"
+      + "<li>Entra en la pestaña <b>'Manga'</b>.</li>"
+      + "<li>Escribe el arete/tag (o léelo por RFID/código de barras) y digita el peso en kg.</li>"
+      + "<li>Pulsa <b>Enter</b> o 'Guardar Pesaje'. Al instante verás la <b>GMD (Ganancia Media Diaria)</b> calculada contra el pesaje anterior del animal.</li>"
+      + "<li>El cursor vuelve automáticamente al campo de arete listo para el siguiente animal de la manga.</li>"
+      + "<li>También puedes registrar tratamientos grupales (desparasitante, vacunas, vitaminas) aplicados a toda la jornada.</li>"
+      + "</ol>"
+      + "</div></div>";
+
+    // Tarjeta 4: Captura Rápida & Fotos
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("camera", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>📸 Captura Rápida & Respaldo Fotográfico</h4>"
+      + "<small style='color:var(--texto-suave);'>Eventos zootécnicos con foto de evidencia opcional</small>"
+      + "</div>"
+      + "</div>"
+      + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
+      + "<p>En la pestaña <b>'Captura'</b> tienes botones directos para cada evento:</p>"
+      + "<ul style='padding-left:18px; margin:6px 0;'>"
+      + "<li><b>" + icon("cowCalf", 14) + "Partos:</b> Registra arete de la madre, nuevo arete de la cría, sexo, peso al nacer y foto del ternero.</li>"
+      + "<li><b>" + icon("syringe", 14) + "Tratamientos:</b> Producto, dosis, vía y control automático de días de retiro para leche y carne.</li>"
+      + "<li><b>" + icon("cowSkull", 14) + "Muerte / Descarte:</b> Causa presunta, notas de necropsia y foto de respaldo.</li>"
+      + "<li><b>" + icon("flame", 14) + "Celo / " + icon("sperm", 14) + "Servicio IA:</b> Horario AM-PM, código de pajuela/toro e inseminador.</li>"
+      + "<li><b>Fotos ligeras:</b> Las fotos tomadas se optimizan automáticamente a menos de 150 KB para no consumir memoria ni datos en campo.</li>"
+      + "</ul>"
+      + "</div></div>";
+
+    // Tarjeta 5: Dictado por Voz (Whisper)
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("mic", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>🎙️ Dictado por Voz con Inteligencia Artificial</h4>"
+      + "<small style='color:var(--texto-suave);'>Registra novedades hablando naturalmente mientras caminas</small>"
+      + "</div>"
+      + "</div>"
+      + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
+      + "<p>Si tienes las manos ocupadas en el corral:</p>"
+      + "<ol style='padding-left:18px; margin:6px 0;'>"
+      + "<li>Entra en la pestaña <b>'Voz'</b> y presiona el micrófono.</li>"
+      + "<li>Habla claro, por ejemplo: <i>'Ayer parió la vaca 47 ternero macho vivo de 34 kilos'</i> o <i>'Pesé la novilla 102 con 380 kilos'</i>.</li>"
+      + "<li>El motor de transcripción e IA zootécnica estructurará el registro automáticamente para que solo confirmes con un toque.</li>"
+      + "</ol>"
+      + "</div></div>";
+
+    // Tarjeta 6: Asistente IA & Preguntas Frecuentes
+    h += "<div class='card ayuda-card'>"
+      + "<div class='ayuda-card-header'>"
+      + "<div class='ayuda-badge-ico'>" + icon("chat", 20) + "</div>"
+      + "<div>"
+      + "<h4 style='margin:0;'>🤖 Asistente Zootécnico IA & Chat</h4>"
+      + "<small style='color:var(--texto-suave);'>Pregunta sobre tus animales o sobre el funcionamiento de la app</small>"
+      + "</div>"
+      + "</div>"
+      + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
+      + "<p>Toca el botón flotante verde <b>🤖</b> abajo a la derecha en cualquier momento:</p>"
+      + "<ul style='padding-left:18px; margin:6px 0;'>"
+      + "<li><b>Preguntas de hato:</b> <i>'¿Cuántas vacas activas hay en Guayabal?'</i>, <i>'¿Quiénes están en retiro de leche?'</i>, <i>'Ficha del toro GUZ-01'</i>.</li>"
+      + "<li><b>Preguntas de la aplicación:</b> <i>'¿Cómo instalo la app?'</i>, <i>'¿Cómo funciona sin internet?'</i>, <i>'¿Cómo peso en la manga?'</i>.</li>"
+      + "<li>El asistente responderá de inmediato con datos en vivo o explicaciones paso a paso.</li>"
+      + "</ul>"
+      + "</div></div>";
+
+    h += "</div>"; // fin ayuda-grid
+    return h;
+  }
+
+  function bindAyuda() {
+    var tabs = qa("button[data-ayuda-tab]");
+    tabs.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        _tabAyudaInstalar = btn.getAttribute("data-ayuda-tab") || "android";
+        var vistaEl = document.getElementById("vista");
+        if (vistaEl) {
+          montarVista(vistaEl, renderAyuda(), false);
+          bindAyuda();
+        }
+      });
+    });
+
+    var btnInstalar = document.getElementById("btn-ayuda-disparar-instalar");
+    if (btnInstalar) {
+      btnInstalar.addEventListener("click", function () {
+        var topBtn = document.getElementById("btn-instalar-app");
+        if (topBtn && topBtn.style.display !== "none") {
+          topBtn.click();
+        } else if (window.__pwaInstallPrompt) {
+          window.__pwaInstallPrompt.prompt();
+        } else {
+          alert("Para instalar en Android: abre el menú ⋮ de Chrome y selecciona 'Instalar aplicación' o 'Agregar a la pantalla principal'.");
+        }
       });
     }
   }
@@ -2958,6 +3141,15 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
+      }
+      return;
+    }
+
+    if (actual === "ayuda") {
+      if (!animar) return; // En polling silencioso no resetear ayuda
+      if (vista) {
+        montarVista(vista, renderAyuda(), animar);
+        bindAyuda();
       }
       return;
     }

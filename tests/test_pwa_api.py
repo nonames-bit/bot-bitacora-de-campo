@@ -574,6 +574,29 @@ def test_api_preguntar_lenguaje_natural(client):
     assert "Guayabal" in d["respuesta"] or "47" in d["respuesta"] or "vaca" in d["respuesta"].lower()
 
 
+def test_api_preguntar_ayuda_sistema(client):
+    # Consulta sobre instalación
+    r1 = client.post("/api/preguntar", json={"pregunta": "¿Cómo instalo la app en mi celular?"})
+    assert r1.status_code == 200
+    d1 = r1.get_json()
+    assert d1["ok"] is True
+    assert "Android" in d1["respuesta"] and "Safari" in d1["respuesta"]
+
+    # Consulta sobre funcionamiento sin internet (offline)
+    r2 = client.post("/api/preguntar", json={"pregunta": "¿Cómo funciona la bitácora sin internet?"})
+    assert r2.status_code == 200
+    d2 = r2.get_json()
+    assert d2["ok"] is True
+    assert "IndexedDB" in d2["respuesta"] or "offline" in d2["respuesta"].lower()
+
+    # Consulta sobre pesajes en manga
+    r3 = client.post("/api/preguntar", json={"pregunta": "¿Cómo se pesa ganado en la manga?"})
+    assert r3.status_code == 200
+    d3 = r3.get_json()
+    assert d3["ok"] is True
+    assert "GMD" in d3["respuesta"] or "Manga" in d3["respuesta"]
+
+
 def test_api_gps_potrero_y_rondas(client):
     # Coordenadas dentro del polígono de prueba Guayabal (-74.065, 3.395)
     r = client.post("/api/gps/potrero", json={"lat": 3.395, "lon": -74.065})

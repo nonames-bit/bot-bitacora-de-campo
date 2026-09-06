@@ -88,6 +88,16 @@ class QueryEngine(
         # señal más estricta en vez del `tag` crudo.
         tag_con_digito = bool(tag) and any(c.isdigit() for c in tag)
 
+        # 0. Consultas de ayuda sobre el uso del sistema, instalación o modo offline
+        if re.search(r"\b(?:como\s+(?:se\s+)?instal[ao]|como\s+instalar|instalar\s+app|instalar\s+la\s+app|instalacion|como\s+(?:se\s+)?descarg[ao]|descargar\s+app)\b", t):
+            return self._ayuda_instalar_app()
+        if re.search(r"\b(?:sin\s+internet|sin\s+conexion|modo\s+offline|offline|fuera\s+de\s+linea|como\s+funciona\s+sin\s+senal|sin\s+senal)\b", t):
+            return self._ayuda_modo_offline()
+        if re.search(r"\b(?:como\s+(?:se\s+)?pesa[rn]?|pesaje\s+en\s+manga|manga\s+corral|pesar\s+ganado|pesar\s+animales|pesar\s+en\s+la\s+manga|pesar\s+en\s+manga|pesaje\s+manga|pesajes?\s+continuos?)\b", t) and not tag_con_digito:
+            return self._ayuda_manga_pesaje()
+        if re.search(r"\b(?:ayuda|como\s+funciona|que\s+puedes\s+hacer|que\s+puedo\s+preguntar|manual|guia|tutorial)\b", t) and not tag_con_digito:
+            return self._ayuda_general_sistema()
+
         # 1. Ubicación y potrero del animal (ej. "¿en qué potrero está patricia?", "¿dónde está la vaca 47?")
         if (
             re.search(r"\b(?:donde\s+esta|donde\s+anda|donde\s+se\s+encuentra|en\s+que\s+potrero|ubicacion)\b", t)
@@ -444,6 +454,54 @@ class QueryEngine(
                 if score > mejor_score:
                     mejor_campo, mejor_score = campo, score
         return mejor_campo if mejor_score >= 0.5 else None
+
+    def _ayuda_instalar_app(self) -> str:
+        return (
+            "📲 <b>Cómo Instalar Bitácora JA como App en tu Celular o PC:</b>\n\n"
+            "Bitácora JA funciona como una aplicación nativa completa con icono oficial y pantalla completa:\n\n"
+            "🤖 <b>En Android (Chrome / Brave / Edge):</b>\n"
+            "1. Toca el botón verde <b>[ 📲 Instalar App ]</b> en la barra superior o en la pantalla de PIN.\n"
+            "2. O toca los <b>tres puntos (⋮)</b> del navegador y elige <i>'Instalar aplicación'</i> o <i>'Agregar a la pantalla principal'</i>.\n"
+            "3. Confirma tocando <b>Instalar</b>. ¡Quedará con el logo de Ganadería JA!\n\n"
+            "🍏 <b>En iPhone / iPad (Safari iOS):</b>\n"
+            "1. Toca el botón <b>Compartir (⎋)</b> en la barra inferior de Safari.\n"
+            "2. Desliza hacia abajo y elige <b>'Agregar a la pantalla de inicio' (➕)</b>.\n"
+            "3. Toca <b>Agregar</b> arriba a la derecha.\n\n"
+            "💻 <b>En PC (Chrome / Edge):</b>\n"
+            "• Haz clic en el icono de instalación en la barra de direcciones o en el botón superior.\n\n"
+            "<i>Ventaja: Abre a pantalla completa sin barra de navegador, guarda datos en potrero sin internet y se actualiza sola.</i>"
+        )
+
+    def _ayuda_modo_offline(self) -> str:
+        return (
+            "📶 <b>Cómo Funciona el Modo Sin Conexión (Offline en Potrero):</b>\n\n"
+            "La aplicación está diseñada para trabajar en potreros profundos sin señal celular:\n\n"
+            "1. <b>Guardado en Cola Local:</b> Al registrar un pesaje, parto, tratamiento, traslado o muerte sin internet, el sistema lo guarda de inmediato en la memoria de tu celular (IndexedDB).\n"
+            "2. <b>Indicador de Conexión:</b> En la barra superior verás el icono de nube con el número de eventos pendientes por subir.\n"
+            "3. <b>Sincronización Automática:</b> En cuanto el teléfono vuelve a tener señal 4G o WiFi en la casa/oficina, todos los eventos se envían automáticamente al servidor central.\n"
+            "4. <b>Sincronización Manual:</b> Puedes tocar el botón de la nube en la barra superior en cualquier momento para forzar el envío."
+        )
+
+    def _ayuda_manga_pesaje(self) -> str:
+        return (
+            "⚖️ <b>Cómo Usar el Modo Manga de Corral:</b>\n\n"
+            "Diseñado para pesaje continuo y tratamientos en serie en el corral:\n\n"
+            "1. <b>Pestaña 'Manga Corral':</b> Entra desde la barra de navegación inferior.\n"
+            "2. <b>Pesaje Rápido:</b> Digita el tag/arete o escanéalo con bastón RFID. Digita el peso en kg y pulsa <b>Guardar Pesaje</b>.\n"
+            "3. <b>Cálculo en Vivo de GMD:</b> La pantalla te muestra al instante la Ganancia Media Diaria (g/día) comparada con el último pesaje y un semáforo (verde=ganando peso, rojo=perdiendo peso).\n"
+            "4. <b>Tratamiento en Lote:</b> En la sección inferior puedes seleccionar un potrero completo y aplicar un medicamento a todos los animales con un solo clic, calculando los días de retiro de leche y carne."
+        )
+
+    def _ayuda_general_sistema(self) -> str:
+        return (
+            "🐮 <b>Asistente de Campo · Ganadería JA</b>\n\n"
+            "Puedes consultarme sobre cualquier tema de la finca:\n\n"
+            "• <b>Animales & Fichas:</b> <i>'¿en qué potrero está la 47?'</i>, <i>'¿cuándo parió patricia?'</i>, <i>'¿quién es la madre de la 26?'</i>\n"
+            "• <b>Inventario & Hato:</b> <i>'¿cuántas vacas hay en ordeño?'</i>, <i>'¿cuánto ganado hay en Guayabal?'</i>, <i>'total hato'</i>\n"
+            "• <b>Sanidad & Retiro:</b> <i>'¿qué animales están en retiro de leche?'</i>, <i>'¿la vaca 47 tiene retiro?'</i>\n"
+            "• <b>Pasturas & Voisin:</b> <i>'¿qué potreros tienen más reposo?'</i>, <i>'¿qué potreros están ocupados?'</i>\n"
+            "• <b>Uso de la App:</b> <i>'¿cómo instalo la app?'</i>, <i>'¿cómo funciona sin internet?'</i>, <i>'¿cómo pesar en manga?'</i>"
+        )
 
     def _ayuda(self, texto: str = "") -> str:
         t = texto.strip() if texto else ""

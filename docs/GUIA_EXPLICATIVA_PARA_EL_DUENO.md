@@ -173,7 +173,7 @@ Viven en `src/server/users.json` (este archivo **no** se sube a GitHub, solo exi
 | Tablero visual con 10 vistas | | ✅ | |
 | Funciona sin internet (offline real) | | ✅ | |
 | Manga de corral (pesaje continuo + Bluetooth) | | ✅ | |
-| GPS / geolocalización de rondas | | ✅ | |
+| GPS / geolocalización de rondas | ✅ (a demanda: /aqui, ronda manual) | ✅ (automático + telemetría silenciosa) | |
 | Gestión de usuarios por pantalla visual, ficha QR, autocompletar | | ✅ | |
 
 En resumen: **Telegram es para el campo rápido, la PWA es para la oficina y el análisis.** Los dos leen y escriben en el mismo cuaderno.
@@ -320,7 +320,7 @@ El ciclo completo:
 
 ## 8. 📍 ¿Cómo funciona el GPS en el sistema?
 
-El GPS **vive solo en la PWA** (la app web del celular). El bot de Telegram **no usa GPS**. Los 20 potreros de la finca tienen su dibujo exacto guardado en la base de datos (columna `geom_wkt_4326`, cargada del proyecto QGIS de la finca).
+El GPS **vive sobre todo en la PWA** (la app web del celular), y **AHORA el bot de Telegram TAMBIÉN puede usar GPS de forma puntual**: con el comando `/aqui` o el botón 📍 del panel de potreros, el trabajador comparte su ubicación una vez y el bot le dice en qué potrero está y guarda la ronda. Los 20 potreros de la finca tienen su dibujo exacto guardado en la base de datos (columna `geom_wkt_4326`, cargada del proyecto QGIS de la finca).
 
 El GPS sirve para 3 cosas:
 
@@ -476,6 +476,37 @@ Qué muestra por operario:
 
 Hay un tercer latido, cada **60 segundos** (solo con la pestaña abierta y con internet), al endpoint `/api/heartbeat`, que actualiza la tabla `usuarios_presencia`: quién está conectado, desde qué canal (PWA o Telegram), IP y última actividad. **No guarda coordenadas.** Solo lo ve el OWNER. Sirve para saber *"¿quién está conectado ahora?"*, no *"¿dónde está?"*.
 
+### 📱 GPS desde Telegram (nuevo)
+
+En el panel de potreros del bot hay un botón **"📍 GPS / ¿En qué potrero estoy?"**, y también existe el comando **`/aqui`**. El trabajador lo toca, Telegram le muestra el botón **"📍 Enviar mi ubicación"**, la comparte una vez, y el bot le responde en qué potrero está (usa los mismos mapas de la finca).
+
+Esa consulta **queda registrada como "ronda"** (punto de control `telegram`) y el dueño la puede ver en la auditoría, igual que las rondas de la PWA.
+
+| | 📱 Telegram (nuevo) | 🌐 PWA |
+|---|---|---|
+| ¿Cómo se comparte la ubicación? | El operario la envía a mano cada vez | Automático en segundo plano |
+| ¿Rastrea solo cada 3 minutos sin tocar nada? | No (Telegram no lo permite) | Sí (telemetría silenciosa) |
+| ¿Detecta el potrero con los mapas de la finca? | ✅ Sí | ✅ Sí |
+| ¿Guarda la ronda para el dueño? | ✅ Sí (punto de control `telegram`) | ✅ Sí |
+
+Cómo funciona, paso a paso:
+
+```
+trabajador escribe /aqui
+        │
+        ▼
+toca 📍 Enviar mi ubicación
+        │
+        ▼
+Telegram manda lat/lon al bot
+        │
+        ▼
+bot consulta los mapas de la finca
+        │
+        ▼
+responde "📍 Estás en JA26" y guarda la ronda
+```
+
 ---
 
 ## 9. 📚 Glosario breve
@@ -532,3 +563,4 @@ Esta guía es un documento vivo que se actualiza conforme el proyecto avanza. Cu
 |---|---|---|
 | 2026-09-06 | v1.0 | Creación inicial de la guía con 8 secciones (PWA, NDVI, SQLite/fotos/usuarios, Telegram vs PWA, arquitectura completa, despliegue local→GitHub→VPS, glosario). |
 | 2026-09-06 | v1.1 | Nueva sección 8: GPS (rondas manuales, telemetría silenciosa y auditoría de rutas para el dueño) con esquemas visuales. |
+| 2026-09-06 | v1.2 | Actualización: GPS ahora también disponible en Telegram (/aqui y botón 📍 en potreros); aclarada la diferencia con la telemetría automática de la PWA. |

@@ -30,7 +30,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v32: Logo oficial Ganadería JA, desvinculación de SG y monitor de presencia de usuarios en vivo (exclusivo OWNER).
 // v33: Captura de foto opcional en eventos de campo (partos/crías, tratamientos y muertes) con compresión client-side.
 // v34: Instalación directa como App en pantalla de inicio (Android, iPhone iOS y PC) con manifest enriquecido y guía táctil.
-var CACHE = "pwa-ja-v34"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v35: Centro de Ayuda PWA interactivo, soporte asistido en chat IA, calavera bovina y vaca con cría SVGs.
+var CACHE = "pwa-ja-v35"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
