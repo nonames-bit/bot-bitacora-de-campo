@@ -48,13 +48,17 @@
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
   // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
   var COW_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
-  // Cabeza de cría / ternero / becerro (estilo Lucide: orejas caídas tiernas, sin cuernos, ojos curiosos y hocico)
-  var CALF_HEAD = '<path d="M5 8.5C3 7 1.5 8 1.5 10c0 1.8 1.5 2.8 3.5 2.5"/><path d="M19 8.5C21 7 22.5 8 22.5 10c0 1.8-1.5 2.8-3.5 2.5"/><path d="M5 9c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5c0 3.5-1.5 6.5-3.5 8.5L15 21H9l-.5-3.5C6.5 15.5 5 12.5 5 9z"/><circle cx="9" cy="10.5" r="1"/><circle cx="15" cy="10.5" r="1"/><path d="M9.5 16h5a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 18v-.5A1.5 1.5 0 0 1 9.5 16z"/><circle cx="10.5" cy="17.8" r=".5"/><circle cx="13.5" cy="17.8" r=".5"/>';
+  // Cabeza de cría / ternero (adaptación directa de la vaquita favorita: misma silueta, ojos y hocico, pero con frente redondeada sin cuernos de adulto)
+  var CALF_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3C20.5 3.8 18 4.2 16.2 4.9a10 10 0 0 0-8.4 0C6 4.2 3.5 3.8 2 5c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
+  // Evento de Parto / Maternidad: Vaca Madre (izquierda) + Cría (derecha), ambas con el estilo idéntico de la vaquita favorita
+  var PARTO_HEADS = '<g transform="translate(-1.5, 1) scale(0.68)" stroke-width="2.3">' + COW_HEAD + '</g><g transform="translate(10.5, 7.5) scale(0.53)" stroke-width="2.6">' + CALF_HEAD + '</g>';
   function icon(name, size) {
     var paths = {
       cow: COW_HEAD,
       calf: CALF_HEAD,
       cria: CALF_HEAD,
+      cowCalf: PARTO_HEADS,
+      parto: PARTO_HEADS,
       grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
@@ -82,8 +86,6 @@
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
       // Lucide oficiales (ISC/MIT): gestación y diagnóstico
       egg: '<path d="M12 2C8 2 4 8 4 14a8 8 0 0 0 16 0c0-6-4-12-8-12"/>',
-      cowCalf: '<path d="M2 5c-.5-1.5 1-2.5 2.5-2 1 .5 1.5 1.5 2 2.5M8 5.5c.5-1 1.5-2 2.5-2.5 1.5-.5 2.5.5 2 2.5"/><path d="M5 5c0-2-1-3-2-3.5M9.5 5c0-2 1-3 2-3.5"/><path d="M6.5 5.5h2"/><path d="M3.5 6.5C3.5 10 4.5 13 6 14h3c1.5-1 2.5-4 2.5-7.5"/><path d="M5 13.5c0 1.5 1 2.5 2.5 2.5s2.5-1 2.5-2.5"/><path d="M5.5 9v.5M9.5 9v.5M6 16.5V21M9 16.5V21"/><path d="M13 13c-.4-1 .6-1.8 1.6-1.5.8.3 1.2 1 1.5 1.8M18 13.3c.3-.8 1-1.5 1.8-1.8 1-.4 1.8.4 1.4 1.8"/><path d="M16 13.3h2"/><path d="M14.2 14c0 2.5.8 4.5 2 5.2h1.6c1.2-.7 2-2.7 2-5.2"/><path d="M15.2 18.5c0 1 .7 1.8 1.8 1.8s1.8-.8 1.8-1.8"/><path d="M15.5 15.5v.5M18.5 15.5v.5"/>',
-      parto: '<path d="M2 5c-.5-1.5 1-2.5 2.5-2 1 .5 1.5 1.5 2 2.5M8 5.5c.5-1 1.5-2 2.5-2.5 1.5-.5 2.5.5 2 2.5"/><path d="M5 5c0-2-1-3-2-3.5M9.5 5c0-2 1-3 2-3.5"/><path d="M6.5 5.5h2"/><path d="M3.5 6.5C3.5 10 4.5 13 6 14h3c1.5-1 2.5-4 2.5-7.5"/><path d="M5 13.5c0 1.5 1 2.5 2.5 2.5s2.5-1 2.5-2.5"/><path d="M5.5 9v.5M9.5 9v.5M6 16.5V21M9 16.5V21"/><path d="M13 13c-.4-1 .6-1.8 1.6-1.5.8.3 1.2 1 1.5 1.8M18 13.3c.3-.8 1-1.5 1.8-1.8 1-.4 1.8.4 1.4 1.8"/><path d="M16 13.3h2"/><path d="M14.2 14c0 2.5.8 4.5 2 5.2h1.6c1.2-.7 2-2.7 2-5.2"/><path d="M15.2 18.5c0 1 .7 1.8 1.8 1.8s1.8-.8 1.8-1.8"/><path d="M15.5 15.5v.5M18.5 15.5v.5"/>',
       help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
       stethoscope: '<path d="M11 2v2"/><path d="M5 2v2"/><path d="M5 3H4a2 2 0 0 0-2 2v4a6 6 0 0 0 12 0V5a2 2 0 0 0-2-2h-1"/><path d="M8 15a6 6 0 0 0 12 0v-3"/><circle cx="20" cy="10" r="2"/>',
       // Espermatozoide (IA) — IconPark \'sperm\' (Apache-2.0), dibujo clásico:
