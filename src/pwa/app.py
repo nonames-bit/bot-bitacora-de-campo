@@ -676,11 +676,20 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def _rol_actual() -> Optional[str]:
         if session is None:
             return None
+        uid = session.get("user_id")
+        if uid is not None:
+            try:
+                int_uid = int(uid)
+                rol_json = _rol_de(int_uid, users_file)
+                if not rol_json:
+                    return None
+                return rol_json
+            except (ValueError, TypeError):
+                pass
         rol_sesion = session.get("rol")
         if rol_sesion:
             return str(rol_sesion).strip().upper()
-        uid = session.get("user_id")
-        return _rol_de(uid, users_file) if uid else None
+        return None
 
     def _usuario_actual() -> dict[str, Any]:
         if session is None:
@@ -701,13 +710,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if request is None or request.endpoint in _RUTAS_PUBLICAS:
             return None
         if session.get("autenticado"):
+            uid = session.get("user_id")
+            if uid is not None:
+                try:
+                    int_uid = int(uid)
+                    if not _rol_de(int_uid, users_file):
+                        session.clear()
+                        if request.path.startswith("/api/") or request.path.startswith("/media/"):
+                            return jsonify({"error": "Sesión inválida o usuario revocado."}), 401
+                        return redirect("/login")
+                except (ValueError, TypeError):
+                    pass
             try:
                 db_inst = _db(db_path)
-                uid = session.get("user_id") or session.get("nombre")
+                uid_pres = uid or session.get("nombre")
                 nom = session.get("nombre") or ""
                 rol = session.get("rol") or "TRABAJADOR"
                 ip = _cliente_ip()
-                db_inst.registrar_presencia(user_id=uid, nombre=nom, rol=rol, canal="PWA", ip=ip)
+                db_inst.registrar_presencia(user_id=uid_pres, nombre=nom, rol=rol, canal="PWA", ip=ip)
                 db_inst.close()
             except Exception:
                 pass

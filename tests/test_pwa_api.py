@@ -721,6 +721,27 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     assert info["avatar"] == "veterinaria"
     assert info["rol"] == "ADMIN"
 
+    # 1. Desvincular Telegram ID (enviar telegram_id: null o vacío en edición)
+    vet_uid = res_data["user_id"]
+    r_desvincular_tg = c_owner.post("/api/usuarios", json={
+        "user_id": vet_uid,
+        "nombre": "Dra. Veterinaria",
+        "rol": "ADMIN",
+        "pin": "9999",
+        "telegram_id": None,
+        "avatar": "veterinaria"
+    })
+    assert r_desvincular_tg.status_code == 200
+    assert r_desvincular_tg.get_json()["usuario"]["telegram_id"] is None
+
+    # 2. Verificar que la sesión activa de c_vet se revoca inmediatamente al ser eliminado
+    r_del_vet = c_owner.post(f"/api/usuarios/{vet_uid}/eliminar")
+    assert r_del_vet.status_code == 200
+
+    # Próximo request de c_vet debe ser rechazado con 401 porque el usuario ya no existe en users.json
+    r_vet_revocado = c_vet.get("/api/usuario")
+    assert r_vet_revocado.status_code == 401
+
 
 def test_telemetria_gps_ping_y_rutas(tmp_path):
     users_data = [

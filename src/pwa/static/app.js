@@ -2008,8 +2008,13 @@
         }
 
         var payload = { nombre: nombre, rol: rol, pin: pin, avatar: avatar };
-        if (uidVal) payload.user_id = parseInt(uidVal, 10);
-        if (tgIdVal) payload.telegram_id = parseInt(tgIdVal, 10);
+        if (editIdInp.value) {
+          payload.user_id = parseInt(editIdInp.value, 10);
+          payload.telegram_id = tgIdVal ? parseInt(tgIdVal, 10) : null;
+        } else {
+          if (uidVal) payload.user_id = parseInt(uidVal, 10);
+          if (tgIdVal) payload.telegram_id = parseInt(tgIdVal, 10);
+        }
 
         if (feed) feed.innerHTML = "<div class='aviso'>Guardando usuario...</div>";
 
