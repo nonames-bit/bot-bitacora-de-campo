@@ -48,9 +48,13 @@
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
   // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
   var COW_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
+  // Cabeza de cría / ternero / becerro (estilo Lucide: orejas caídas tiernas, sin cuernos, ojos curiosos y hocico)
+  var CALF_HEAD = '<path d="M5 8.5C3 7 1.5 8 1.5 10c0 1.8 1.5 2.8 3.5 2.5"/><path d="M19 8.5C21 7 22.5 8 22.5 10c0 1.8-1.5 2.8-3.5 2.5"/><path d="M5 9c0-3.3 3-5.5 7-5.5s7 2.2 7 5.5c0 3.5-1.5 6.5-3.5 8.5L15 21H9l-.5-3.5C6.5 15.5 5 12.5 5 9z"/><circle cx="9" cy="10.5" r="1"/><circle cx="15" cy="10.5" r="1"/><path d="M9.5 16h5a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5h-5A1.5 1.5 0 0 1 8 18v-.5A1.5 1.5 0 0 1 9.5 16z"/><circle cx="10.5" cy="17.8" r=".5"/><circle cx="13.5" cy="17.8" r=".5"/>';
   function icon(name, size) {
     var paths = {
       cow: COW_HEAD,
+      calf: CALF_HEAD,
+      cria: CALF_HEAD,
       grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
@@ -158,7 +162,6 @@
         + "<th>Fecha</th>"
         + "<th>Animal / Arete</th>"
         + "<th>Detalle de la Actividad</th>"
-        + "<th>Acción</th>"
         + "</tr>";
 
       eventos.forEach(function (ev) {
@@ -183,11 +186,11 @@
         }
 
         var nomHtml = ev.nombre ? (" <small style='color:var(--texto-suave); font-weight:normal;'>(" + esc(ev.nombre) + ")</small>") : "";
-        var linkAnimal = "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(ev.tag) + "\" style='font-size:13.5px; font-weight:bold;'>🐮 " + esc(ev.tag) + "</a>" + nomHtml;
+        var linkAnimal = "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(ev.tag) + "\" style='font-size:13.5px; font-weight:bold; display:inline-flex; align-items:center; gap:5px; text-decoration:none;'>" + icon("cow", 15) + "<span>" + esc(ev.tag) + "</span></a>" + nomHtml;
 
         var detalleExtra = "";
         if (ev.detalle_tag) {
-          detalleExtra = "<div style='margin-top:3px;'><small style='color:var(--texto-suave);'>Cría: </small><a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(ev.detalle_tag) + "\" style='font-size:11px; padding:2px 6px; font-weight:bold; text-decoration:none;'>🍼 " + esc(ev.detalle_tag) + "</a></div>";
+          detalleExtra = "<div style='margin-top:4px;'><small style='color:var(--texto-suave); margin-right:4px;'>Cría:</small><a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(ev.detalle_tag) + "\" style='font-size:11.5px; padding:2px 7px; font-weight:bold; text-decoration:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("calf", 13) + "<span>" + esc(ev.detalle_tag) + "</span></a></div>";
         }
 
         var descHtml = "<b>" + esc(ev.descripcion || "") + "</b>";
@@ -200,7 +203,6 @@
           + "<td><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
           + "<td>" + linkAnimal + detalleExtra + "</td>"
           + "<td>" + descHtml + "</td>"
-          + "<td><button type='button' class='tema-btn' data-ir-ficha=\"" + esc(ev.tag) + "\" style='font-size:11px; padding:4px 8px; white-space:nowrap;'>" + icon("search", 11) + " Ver Ficha</button></td>"
           + "</tr>";
       });
 
@@ -2690,7 +2692,7 @@
           b.style.display = "none";
         }
       });
-      if (permitidas.indexOf(actual) === -1) {
+      if (permitidas.indexOf(actual) === -1 && actual !== "ayuda") {
         irAVista("captura");
         cargar();
       }
@@ -2866,8 +2868,8 @@
           var pNac = c.peso_nacimiento ? " · " + c.peso_nacimiento + " kg" : "";
 
           var linkTag = cTag !== "Sin arete"
-            ? "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(cTag) + "\" style='font-size:14px; font-weight:bold;'>🐮 " + esc(cTag) + "</a>"
-            : "<span style='color:var(--texto-suave);'>🐮 Sin arete</span>";
+            ? "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(cTag) + "\" style='font-size:14px; font-weight:bold; display:inline-flex; align-items:center; gap:5px; text-decoration:none;'>" + icon("calf", 14) + "<span>" + esc(cTag) + "</span></a>"
+            : "<span style='color:var(--texto-suave); display:inline-flex; align-items:center; gap:5px;'>" + icon("calf", 14) + "<span>Sin arete</span></span>";
 
           hg += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:10px 12px;'>"
             + "<div>" + linkTag + " <span style='font-size:13px; color:var(--texto);'>" + cNom + "</span> <span class='meta' style='font-size:12px;'>· " + esc(cSx) + " · Nac: <b>" + esc(cFec) + "</b>" + pNac + "</span></div>"
@@ -3045,11 +3047,11 @@
         var cTag = c.cria_tag || c.tag || "Sin arete";
         var cSx = c.sexo_cria || c.sexo || "";
         var cFec = fechaCorta(c.fecha_parto || c.fecha || c.fecha_nacimiento);
-        var chipTxt = "🐮 " + esc(cTag) + (cSx ? " (" + esc(cSx) + ")" : "") + (cFec ? " [" + esc(cFec) + "]" : "");
+        var chipTxt = "<b>" + esc(cTag) + "</b>" + (cSx ? " (" + esc(cSx) + ")" : "") + (cFec ? " [" + esc(cFec) + "]" : "");
         if (cTag !== "Sin arete") {
-          h += "<a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(cTag) + "\" style='text-decoration:none; font-size:12px; padding:3px 8px; font-weight:bold;'>" + chipTxt + "</a>";
+          h += "<a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(cTag) + "\" style='text-decoration:none; font-size:12px; padding:3px 8px; font-weight:bold; display:inline-flex; align-items:center; gap:5px;'>" + icon("calf", 13) + "<span>" + chipTxt + "</span></a>";
         } else {
-          h += "<span class='chip gris' style='font-size:12px; padding:3px 8px;'>" + chipTxt + "</span>";
+          h += "<span class='chip gris' style='font-size:12px; padding:3px 8px; display:inline-flex; align-items:center; gap:5px;'>" + icon("calf", 13) + "<span>" + chipTxt + "</span></span>";
         }
       });
       h += "</div></div>";
@@ -3251,6 +3253,9 @@
   var _CAB_NO_CLICK = /potrero|fecha|categor[ií]a|raza|c[óo]digo|banda|toro|bracket|peso/i;
   function abrirFichaDesdeTag(tag) {
     if (!tag) return;
+    tag = String(tag).trim();
+    if (!tag) return;
+
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
     if (!destino) {
       // Si estamos en la página standalone /ficha/<tag> (usa #ficha, no #vista)
@@ -3268,9 +3273,23 @@
       }
       return;
     }
+
     var inp = q("#f-tag");
     if (inp) inp.value = tag;
-    destino.click();
+
+    qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
+    destino.classList.add("act");
+    actual = "ficha";
+
+    var barraFiltros = document.getElementById("barra-filtros");
+    if (barraFiltros) barraFiltros.style.display = "";
+
+    if (typeof abrirFicha === "function" && vista) {
+      abrirFicha(tag, vista, true, true);
+    } else {
+      cargar(true);
+    }
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
   }
   window.abrirFichaDesdeTag = abrirFichaDesdeTag;
   window.abrirTabFicha = function (tabId) {
@@ -3699,6 +3718,19 @@
     });
   }
 
+  function setupHeaderAyuda() {
+    var btnAyuda = document.getElementById("btn-ayuda");
+    if (!btnAyuda) return;
+    btnAyuda.addEventListener("click", function () {
+      qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
+      actual = "ayuda";
+      var barraFiltros = document.getElementById("barra-filtros");
+      if (barraFiltros) barraFiltros.style.display = "none";
+      cargar(true);
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+    });
+  }
+
   qa("nav > button").forEach(function (b) {
     b.addEventListener("click", function () {
       qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
@@ -4057,6 +4089,7 @@
     setupVozModal();
     crearBadgesNav();
     setupCampana();
+    setupHeaderAyuda();
     actualizarBadges();
     actualizarContadorSync();
     enviarTelemetriaSilenciosa("apertura_app");
