@@ -559,6 +559,15 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
     return "\n".join(lineas)
 
 
+def html_telegram_a_texto_compartible(texto: str) -> str:
+    """Convierte el HTML de parse_mode="HTML" (<b>, <i>) del bot a *negrita*/_cursiva_
+    estilo WhatsApp, para paneles pensados para copiar y pegar a mano en un chat
+    (donde <b>/<i> no se interpretan y quedarían literales)."""
+    texto = re.sub(r"<b>(.*?)</b>", r"*\1*", texto, flags=re.DOTALL)
+    texto = re.sub(r"<i>(.*?)</i>", r"_\1_", texto, flags=re.DOTALL)
+    return texto
+
+
 def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
     """Genera el panel central de alertas zootécnicas y tareas pendientes de la finca."""
     if hoy is None:

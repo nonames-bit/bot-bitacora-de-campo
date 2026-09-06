@@ -686,14 +686,17 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     except Exception:
         logger.error("seccion consanguinidad fallo", exc_info=True)
 
-    # Texto ASCII del árbol (idéntico a Telegram)
+    # Texto ASCII del árbol para copiar y pegar a mano en Telegram/WhatsApp.
+    # formatear_genealogia_animal_tab() devuelve HTML (<b>/<i>) porque el bot lo
+    # envía con parse_mode="HTML" vía la API; aquí se convierte a *negrita*/_cursiva_
+    # estilo WhatsApp, porque un chat manual no interpreta esas etiquetas HTML.
     try:
-        from ..server.formatters import formatear_genealogia_animal_tab
-        texto_arbol = formatear_genealogia_animal_tab(db, an["tag"])
+        from ..server.formatters import formatear_genealogia_animal_tab, html_telegram_a_texto_compartible
+        texto_arbol = html_telegram_a_texto_compartible(formatear_genealogia_animal_tab(db, an["tag"]))
     except Exception:
         try:
-            from src.server.formatters import formatear_genealogia_animal_tab
-            texto_arbol = formatear_genealogia_animal_tab(db, an["tag"])
+            from src.server.formatters import formatear_genealogia_animal_tab, html_telegram_a_texto_compartible
+            texto_arbol = html_telegram_a_texto_compartible(formatear_genealogia_animal_tab(db, an["tag"]))
         except Exception:
             texto_arbol = ""
 
