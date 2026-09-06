@@ -428,7 +428,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Feed de Eventos en Tablero Principal, Iconografía SVG y Navegación Táctil (2026-09-06)**:
     - **Registro Cronológico en Vivo**: Panel de últimos 25 eventos del hato (partos, muertes, ventas, traslados, pesajes con GMD, tratamientos y servicios/IA) en el Tablero principal.
     - **Navegación Táctica Inmediata**: Clic directo en cualquier arete o cría para saltar al instante a la ficha técnica del animal con scroll superior automático y delegación de eventos compatible con CSP.
-    - **Iconografía Unificada SVG**: Reemplazo de emojis por iconos vectoriales Lucide nativos (`COW_HEAD` e icono dedicado para terneros/crías `CALF_HEAD`).
+    - **Iconografía Unificada SVG**: Reemplazo de emojis y dibujos antiguos por iconos vectoriales derivados 100% de la vaquita canónica (`COW_HEAD`): `CALF_HEAD` con frente redondeada tierna sin cuernos para crías y `PARTO_HEADS` con Vaca Madre + Cría juntas compartiendo el mismo diseño exacto.
     - **Botón de Ayuda en Encabezado**: Reubicación del centro de ayuda como icono `?` en el encabezado superior junto al asistente de chat, liberando espacio en la barra de navegación principal.
     - **Retiro de Columna Redundante**: Supresión de la columna "Acción" en la tabla de eventos para una visualización más limpia y espaciosa en teléfonos móviles.
 - [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando).
