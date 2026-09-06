@@ -318,7 +318,167 @@ El ciclo completo:
 
 ---
 
-## 8. 📚 Glosario breve
+## 8. 📍 ¿Cómo funciona el GPS en el sistema?
+
+El GPS **vive solo en la PWA** (la app web del celular). El bot de Telegram **no usa GPS**. Los 20 potreros de la finca tienen su dibujo exacto guardado en la base de datos (columna `geom_wkt_4326`, cargada del proyecto QGIS de la finca).
+
+El GPS sirve para 3 cosas:
+
+1. **Saber en qué potrero está usted parado** (detección automática).
+2. **Registrar rondas e inspecciones manuales** (saladero, bebedero, cerca, recorrido).
+3. **Auditar rutas de trabajo** (solo el dueño ve por dónde anduvo cada operario).
+
+### El mapa de la finca visto por el sistema
+
+Así "ve" el sistema su finca: cada potrero es un cuadro con su nombre, y el 📍 es usted:
+
+```
++----------------------------------------------+
+|  +---------------+  +---------------------+  |
+|  |  OLEGARIO I   |  |        JA26         |  |
+|  |               |  |                     |  |
+|  |  pasto verde  |  |   📍 USTED AQUÍ     |  |
+|  |               |  |      X              |  |
+|  +---------------+  +----------+----------+  |
+|         ~~~~~ RÍO / CAMINO ~~~~~            |
+|  +----------------------+                   |
+|  |      PATRICIA        |   ──→ "¿En qué   |  |
+|  |                      |        potrero    |  |
+|  |  saladero ●  cerca # |        estoy?"    |  |
+|  +----------------------+                   |
++----------------------------------------------+
+```
+
+Usted se para en un punto, el celular manda su coordenada (latitud/longitud) y el sistema responde: *"estás en JA26"*.
+
+### ¿Cómo sabe en qué potrero estoy? (3 intentos en cascada)
+
+La función se llama `detectar_potrero_gps(lat, lon)`. Hace esto:
+
+```
+📍 Punto GPS (lat, lon) del celular
+     │
+     ▼
+Paso 1 ¿Está DENTRO del polígono de un potrero? ──SÍ──▶ ✅ Potrero exacto
+     │NO
+     ▼
+Paso 2 ¿Está a menos de 150 m de un potrero? ──SÍ──▶ ✅ Potrero más cercano (borde/saladero)
+     │NO
+     ▼
+Paso 3 ¿Está a menos de 300 m del centro de un potrero? ──SÍ──▶ ✅ Aproximado
+     │NO
+     ▼
+❌ Fuera de la finca → NO se registra (evita basura GPS)
+```
+
+En palabras simples:
+
+| Paso | Qué hace | Ejemplo |
+|---|---|---|
+| 1. Dentro exacto | Revisa con la librería `shapely` si el punto cae DENTRO del dibujo del potrero | Usted en mitad de JA26 → "JA26" |
+| 2. Borde cercano (150 m) | Si quedó en el borde (saladero, bebedero, cerca) por error del GPS, busca el potrero más cercano hasta 150 metros | Usted en el saladero del lindero → igual lo ubica |
+| 3. Respaldo (300 m) | Si `shapely` no está disponible, mide al centro del potrero hasta 300 metros | Modo de emergencia, aproximado |
+| ❌ Fuera | Si está a más de 300 m de todo (pueblo, carretera) → **no guarda nada** | Evita registrar cuando el operario salió de la finca |
+
+### Los 2 tipos de registro GPS
+
+| | 🚶 Ronda manual | 🛰️ Telemetría silenciosa |
+|---|---|---|
+| **Quién lo dispara** | El operario (cualquier rol) | El sistema solo, sin tocar nada |
+| **Cómo** | Toca un botón en la app y elige: saladero, bebedero, cerca, recorrido o inspección + notas opcionales | El navegador pide la ubicación en segundo plano, sin avisar ni molestar |
+| **Cuándo** | Cuando él decide ("pasé por el saladero") | Al abrir la app, al pesar, al capturar, y cada 3 minutos |
+| **Para qué sirve** | Probar "yo estuve aquí, revisé esto" | Reconstruir la ruta del día para auditoría |
+| **Dónde se guarda** | Tabla `rondas_campo` (quién, fecha+hora, coordenadas, potrero autodetectado, tipo, notas). Se lista y exporta a CSV | Tabla `telemetria_gps` (lo mismo + precisión ±m y qué evento originó el punto) |
+
+### Momentos automáticos de la telemetría silenciosa
+
+- 📱 Al abrir la app → evento `apertura_app`
+- ⚖️ Al guardar cada pesaje en la manga de corral → evento `pesaje_manga`
+- 📸 Al hacer una captura rápida de evento → evento `captura_<tipo>` (ej. `captura_parto`, `captura_celo`)
+- ⏱️ Latido periódico cada 3 minutos → evento `latido_periodico`
+
+Dos garantías:
+
+- **Falla en silencio:** si no hay señal GPS o el usuario apagó la ubicación, no sale ningún error ni molestia.
+- **Funciona sin internet:** si el teléfono está sin señal, el punto se guarda en la cola del navegador (IndexedDB) y se sincroniza al recuperar señal. Un punto fuera de la finca se descarta y se anota en el log.
+
+### 👑 El panel del dueño (Auditoría de Rutas y Telemetría de Campo)
+
+Es una pantalla **exclusiva del OWNER**. Filtra por fecha y por cada operario muestra su jornada:
+
+```
+JUAN (mayordomo) — 2026-09-06
+07:00 POTRERO A  ➔  08:15 POTRERO C  ➔  09:40 BEBEDERO  ➔  11:05 MANGA
+|________________|___________________|__________________|___________
+inicio 07:00     14 puntos GPS       3 potreros         fin 11:05
+```
+
+Qué muestra por operario:
+
+- Horario de **inicio y fin** del día.
+- **Total de puntos GPS** registrados.
+- **Línea de tiempo** de potreros visitados con la hora de cada entrada (ej. `07:00 POTRERO A ➔ 08:15 POTRERO C ➔ 09:40 BEBEDERO`).
+- Desglose de cada punto: **latitud/longitud (6 decimales)**, precisión **±m**, evento origen.
+- Botón **🗺️ Abrir Mapa** en cada punto: abre Google Maps en esa coordenada exacta.
+- **Exportación a CSV** (se abre en Excel).
+
+🔒 Seguridad: el API `/api/telemetria/rutas` devuelve **403 Prohibido** si el rol no es OWNER. Los trabajadores y admins no ven este panel.
+
+### Mapa general: de punta a punta
+
+```
+ [Satélites GPS]
+       │ (lat, lon)
+       ▼
+┌──────────────┐  permiso ubicación   ┌──────────────────┐
+│  CELULAR del │ ───────────────────▶ │  NAVEGADOR PWA   │
+│  operario    │  (1) manual: botón   │  app.js          │
+└──────────────┘  (2) silencioso:     │  + cola offline  │
+                  fondo + cada 3 min  │  (IndexedDB)     │
+                  (3) presencia:      └────────┬─────────┘
+                   latido 60 s (sin GPS)       │ API /sync, /api/heartbeat
+                                               ▼
+                                      ┌──────────────────┐
+                                      │  SERVIDOR Flask  │
+                                      │  src/pwa/app.py  │
+                                      │  valida contra   │
+                                      │  polígonos QGIS  │
+                                      └────────┬─────────┘
+                                               ▼
+                                      ┌──────────────────┐
+                                      │  SQLite          │
+                                      │  rondas_campo    │◀── (1) manual
+                                      │  telemetria_gps  │◀── (2) silencioso
+                                      │  usuarios_       │◀── (3) presencia
+                                      │   presencia      │    (sin coords)
+                                      └────────┬─────────┘
+                                               ▼
+                                      ┌──────────────────┐
+                                      │  PANEL OWNER     │
+                                      │  Auditoría de    │
+                                      │  Rutas + CSV     │
+                                      └──────────────────┘
+```
+
+### Ejemplo real, paso a paso 🐄
+
+> 🌅 **6:50 AM.** Don Juan abre la app en el corral → se guarda un punto silencioso `apertura_app` en OLEGARIO I.
+>
+> 🚶 **7:30 AM.** Camina al saladero de JA26, toca *"Registrar ronda → saladero → 'sal lleno, cerca buena'"* → queda en `rondas_campo` con potrero JA26 autodetectado.
+>
+> ⚖️ **9:00 AM.** Pesa 20 novillos en la manga → cada pesaje guarda un `pesaje_manga` silencioso sin que él haga nada.
+>
+> 📵 **10:00 AM.** Se queda sin señal en PATRICIA → los puntos se encolan en el teléfono y suben solos a las 11:00 cuando vuelve la señal.
+>
+> 🌙 **7:00 PM.** Usted, el dueño, abre *"Auditoría de Rutas"*, filtra hoy + Juan, y ve: `06:50 OLEGARIO I ➔ 07:30 JA26 (saladero) ➔ 09:00 MANGA ➔ 10:15 PATRICIA`. Toca 🗺️ en un punto raro, Google Maps le muestra que sí estuvo en el bebedero. Exporta a CSV para el archivo. ✅
+
+### ⚠️ Aclaración: la presencia en vivo NO es GPS
+
+Hay un tercer latido, cada **60 segundos** (solo con la pestaña abierta y con internet), al endpoint `/api/heartbeat`, que actualiza la tabla `usuarios_presencia`: quién está conectado, desde qué canal (PWA o Telegram), IP y última actividad. **No guarda coordenadas.** Solo lo ve el OWNER. Sirve para saber *"¿quién está conectado ahora?"*, no *"¿dónde está?"*.
+
+---
+
+## 9. 📚 Glosario breve
 
 | Término | Qué es (1-2 líneas) |
 |---|---|
@@ -354,10 +514,15 @@ El ciclo completo:
 | Proxy reverso | Eso que hace nginx: usted habla con nginx y él habla con la app escondida. |
 | TLS / certbot | Candado HTTPS (certificado gratis de Let's Encrypt que se renueva solo). |
 | Staging | Copia de pruebas (`/root/bitacora-staging` + `@pruebasgan_bot`) para ensayar sin riesgo. |
+| GPS | Sistema de satélites que dice dónde está el celular (latitud/longitud). |
+| Polígono | Dibujo del potrero en el mapa, hecho de coordenadas conectadas. |
+| Geocerca | Cerca virtual: el sistema sabe si un punto GPS está dentro o fuera de un potrero. |
+| Latido (heartbeat) | Señal periódica del teléfono al servidor para decir "sigo conectado". |
+| CSV | Archivo de tabla sencillo que se abre en Excel para guardar registros. |
 
 ---
 
-## 9. 📝 Historial de actualizaciones de esta guía
+## 10. 📝 Historial de actualizaciones de esta guía
 
 Esta guía es un documento vivo que se actualiza conforme el proyecto avanza. Cuando se complete una fase del roadmap, se agregue una función, se cambie una ruta, IP, dominio o comando de despliegue, o el dueño pida aclarar un concepto, esta guía se edita para reflejarlo.
 
@@ -366,3 +531,4 @@ Esta guía es un documento vivo que se actualiza conforme el proyecto avanza. Cu
 | Fecha | Versión | Cambio realizado |
 |---|---|---|
 | 2026-09-06 | v1.0 | Creación inicial de la guía con 8 secciones (PWA, NDVI, SQLite/fotos/usuarios, Telegram vs PWA, arquitectura completa, despliegue local→GitHub→VPS, glosario). |
+| 2026-09-06 | v1.1 | Nueva sección 8: GPS (rondas manuales, telemetría silenciosa y auditoría de rutas para el dueño) con esquemas visuales. |
