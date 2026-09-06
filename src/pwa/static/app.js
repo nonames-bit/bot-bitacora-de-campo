@@ -1563,6 +1563,96 @@
   };
 
   /* ---------- Asistente IA (Chat Natural) ---------- */
+  function formatearMensajeChat(raw) {
+    if (!raw) return "";
+    var str = String(raw);
+
+    // 1. Extraer bloques <pre>...</pre> para proteger su formateo monoespaciado
+    var pres = [];
+    str = str.replace(/<pre(?:\s+[^>]*)?>([\s\S]*?)<\/pre>/gi, function (_, contenido) {
+      var dec = contenido
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+      var seguro = esc(dec.trim());
+      pres.push(
+        "<div class='chat-pre-wrap'>" +
+          "<button class='btn-pre-copy' type='button' title='Copiar tabla'>📋 Copiar</button>" +
+          "<pre>" + seguro + "</pre>" +
+        "</div>"
+      );
+      return "___PRE_BLOCK_" + (pres.length - 1) + "___";
+    });
+
+    // 2. Extraer bloques <code>...</code>
+    var codes = [];
+    str = str.replace(/<code(?:\s+[^>]*)?>([\s\S]*?)<\/code>/gi, function (_, contenido) {
+      var dec = contenido
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&");
+      codes.push("<code>" + esc(dec) + "</code>");
+      return "___CODE_BLOCK_" + (codes.length - 1) + "___";
+    });
+
+    // 3. Extraer enlaces seguros <a href="...">...</a>
+    var links = [];
+    str = str.replace(/<a\s+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function (_, url, texto) {
+      var safeUrl = /^https?:\/\//i.test(url) || url.charAt(0) === "/" ? esc(url) : "#";
+      links.push("<a href='" + safeUrl + "' target='_blank' rel='noopener noreferrer'>" + esc(texto) + "</a>");
+      return "___LINK_BLOCK_" + (links.length - 1) + "___";
+    });
+
+    // 4. Proteger tags seguros de formato HTML: <b>, <strong>, <i>, <em>, <u>, <s>
+    str = str
+      .replace(/<\/?b>/gi, function (m) { return m.toLowerCase() === "<b>" ? "___B_OPEN___" : "___B_CLOSE___"; })
+      .replace(/<\/?strong>/gi, function (m) { return m.toLowerCase() === "<strong>" ? "___B_OPEN___" : "___B_CLOSE___"; })
+      .replace(/<\/?i>/gi, function (m) { return m.toLowerCase() === "<i>" ? "___I_OPEN___" : "___I_CLOSE___"; })
+      .replace(/<\/?em>/gi, function (m) { return m.toLowerCase() === "<em>" ? "___I_OPEN___" : "___I_CLOSE___"; })
+      .replace(/<\/?u>/gi, function (m) { return m.toLowerCase() === "<u>" ? "___U_OPEN___" : "___U_CLOSE___"; })
+      .replace(/<\/?s>/gi, function (m) { return m.toLowerCase() === "<s>" ? "___S_OPEN___" : "___S_CLOSE___"; });
+
+    // 5. Escapar todo el texto restante para neutralizar inyecciones XSS
+    str = esc(str);
+
+    // 6. Restaurar tags de formato seguro
+    str = str
+      .replace(/___B_OPEN___/g, "<b>")
+      .replace(/___B_CLOSE___/g, "</b>")
+      .replace(/___I_OPEN___/g, "<i>")
+      .replace(/___I_CLOSE___/g, "</i>")
+      .replace(/___U_OPEN___/g, "<u>")
+      .replace(/___U_CLOSE___/g, "</u>")
+      .replace(/___S_OPEN___/g, "<s>")
+      .replace(/___S_CLOSE___/g, "</s>");
+
+    // 7. Formato Markdown común (**negrita**, *cursiva*, `código`)
+    str = str
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>")
+      .replace(/(^|[^\w])\*([^*\n]+)\*([^\w]|$)/g, "$1<b>$2</b>$3")
+      .replace(/(^|[^\w])_([^_\n]+)_([^\w]|$)/g, "$1<i>$2</i>$3")
+      .replace(/`([^`\n]+)`/g, "<code>$1</code>");
+
+    // 8. Convertir saltos de línea a <br> fuera de <pre>
+    str = str.replace(/\n/g, "<br>");
+    str = str.replace(/<br>(<div class='chat-pre-wrap'>)/g, "$1").replace(/(<\/div>)<br>/g, "$1");
+
+    // 9. Restaurar enlaces, codes y pres protegidos
+    str = str.replace(/___LINK_BLOCK_(\d+)___/g, function (_, idx) {
+      return links[parseInt(idx, 10)] || "";
+    });
+    str = str.replace(/___CODE_BLOCK_(\d+)___/g, function (_, idx) {
+      return codes[parseInt(idx, 10)] || "";
+    });
+    str = str.replace(/___PRE_BLOCK_(\d+)___/g, function (_, idx) {
+      return pres[parseInt(idx, 10)] || "";
+    });
+
+    return str;
+  }
+
   function setupChatModal() {
     var btnChat = document.getElementById("btn-chat");
     var modal = document.getElementById("modal-chat");
@@ -1587,6 +1677,21 @@
     modal.addEventListener("click", function (e) {
       if (e.target === modal) modal.style.display = "none";
     });
+
+    if (hist) {
+      hist.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".btn-pre-copy") : null;
+        if (!btn) return;
+        var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
+        if (pre && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
+            var old = btn.textContent;
+            btn.textContent = "✓ Copiado";
+            setTimeout(function () { btn.textContent = old; }, 1800);
+          });
+        }
+      });
+    }
 
     qa(".chip-sug", modal).forEach(function (chip) {
       chip.addEventListener("click", function () {
@@ -1621,7 +1726,7 @@
         }).then(function (r) { return r.json(); })
           .then(function (d) {
             var resp = d.respuesta || d.error || "Sin respuesta.";
-            var formateada = esc(resp).replace(/\n/g, "<br>");
+            var formateada = formatearMensajeChat(resp);
             if (botPlaceholder) botPlaceholder.innerHTML = formateada;
             if (hist) hist.scrollTop = hist.scrollHeight;
           }).catch(function (err) {
@@ -1689,7 +1794,7 @@
               if (data.ok) {
                 if (estado) estado.textContent = "Nota procesada con éxito.";
                 resBox.innerHTML = "<b>Transcripción:</b> <i>\"" + esc(data.transcripcion) + "\"</i><br><br>"
-                  + "<b>Respuesta del Bot:</b><br>" + esc(data.respuesta || "Registrado.");
+                  + "<b>Respuesta del Bot:</b><br>" + formatearMensajeChat(data.respuesta || "Registrado.");
                 if (btnAccion) btnAccion.innerHTML = icon("mic", 14) + "Grabar Otra Nota";
                 actualizarBadges();
               } else {
@@ -1729,6 +1834,21 @@
           _mediaRecorder.stop();
         } else {
           btnMic.click();
+        }
+      });
+    }
+
+    if (resBox) {
+      resBox.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".btn-pre-copy") : null;
+        if (!btn) return;
+        var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
+        if (pre && navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
+            var old = btn.textContent;
+            btn.textContent = "✓ Copiado";
+            setTimeout(function () { btn.textContent = old; }, 1800);
+          });
         }
       });
     }

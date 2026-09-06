@@ -37,7 +37,7 @@
 /* Tema 1: Verde Campestre (Por Defecto - Identidad Ganadera) */
 :root, :root[data-theme="green"] {
   --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'JetBrains Mono', monospace;
   --theme-name: "Verde Campestre";
 
   --fondo: #F3F7F3;
@@ -74,7 +74,7 @@
 /* Tema 2: Claro Editorial (Limpio y Minimalista) */
 :root[data-theme="light"] {
   --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'JetBrains Mono', monospace;
   --theme-name: "Claro Editorial";
 
   --fondo: #FBFBFA;
@@ -111,7 +111,7 @@
 /* Tema 3: Modo Oscuro (Elegante con Accentos Verdes) */
 :root[data-theme="dark"] {
   --font-base: 'Geist Sans', 'SF Pro Display', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Sans', 'SF Mono', 'JetBrains Mono', monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'JetBrains Mono', monospace;
   --theme-name: "Modo Oscuro";
 
   --fondo: #121212;
@@ -932,7 +932,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 /* --- Tema 4: Sol de Campo (Alto Contraste para luz solar directa) --- */
 :root[data-theme="sun"] {
   --font-base: 'Geist Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: 'Geist Sans', monospace;
+  --font-mono: ui-monospace, 'SF Mono', 'Menlo', 'Consolas', 'JetBrains Mono', monospace;
   --theme-name: "Sol de Campo";
   --fondo: #FFFFFF;
   --superficie: #FFFFFF;
@@ -1052,27 +1052,85 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-height: 220px;
-  max-height: 380px;
+  gap: 12px;
+  min-height: 250px;
+  max-height: 520px;
+}
+.modal-contenido.chat-modal {
+  max-width: 580px;
+  width: 96%;
+  max-height: 90vh;
 }
 .chat-msg {
-  padding: 9px 13px;
-  border-radius: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
   font-size: 13.5px;
-  line-height: 1.4;
-  max-width: 85%;
+  line-height: 1.45;
+  max-width: 88%;
+  word-break: break-word;
 }
 .chat-msg.bot {
-  background: var(--fondo);
+  background: var(--superficie);
   color: var(--texto);
   align-self: flex-start;
-  border: 1px solid var(--borde);
+  border: 1px solid var(--borde-fuerte);
+  max-width: 98%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 .chat-msg.user {
   background: var(--verde-marca);
   color: #fff;
   align-self: flex-end;
+}
+.chat-pre-wrap {
+  position: relative;
+  margin: 8px 0;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--fondo);
+}
+.btn-pre-copy {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  color: var(--texto-suave);
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0.85;
+  transition: opacity .15s ease, background .15s ease;
+}
+.btn-pre-copy:hover {
+  opacity: 1;
+  background: var(--verde-marca-pastel);
+  color: var(--texto);
+}
+.chat-msg pre {
+  margin: 0;
+  padding: 28px 12px 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.4;
+  overflow-x: auto;
+  white-space: pre;
+  -webkit-overflow-scrolling: touch;
+  color: var(--texto);
+}
+.chat-msg code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.06);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+:root[data-theme="dark"] .chat-msg code {
+  background: rgba(255, 255, 255, 0.1);
 }
 .chat-sugerencias {
   display: flex;

@@ -393,7 +393,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Gestión Interactiva de Usuarios, Niveles (Level 1, 2, 3) & Avatares**: Módulo administrativo en PWA para ADMIN y OWNER (`/api/usuarios`) con jerarquía estricta por niveles (Level 1 OWNER, Level 2 ADMIN, Level 3 TRABAJADOR), IDs locales y de Telegram enlazados, selector de foto/avatar temático con estilo Ganadería JA, campo de nombre espacioso y PIN de 4 dígitos con validación de colisiones.
   - **Mejoras Visuales & UX Editorial**: Iconografía vectorial SVG Lucide (manga corral, celo, muerte, pajuelas francesas), logotipo oficial de Ganadería JA y soporte de `safe-area-inset-top` para pantallas móviles con notch.
   - **Autenticación por PIN & 3 Roles RBAC**: Login por PIN de 4 dígitos individual con permisos estrictos (`TRABAJADOR` para captura en campo, `ADMIN` para gestión zootécnica y reportes PDF/Excel, y `OWNER` con acceso exclusivo a panel de métricas VPS, SQLite WAL y visor de logs en vivo).
-  - **Inteligencia & Voz**: Asistente zootécnico en lenguaje natural (`QueryEngine`) integrado en la PWA y dictado por voz directo (`MediaRecorder` + Whisper) para procesamiento de notas sin teclear.
+  - **Inteligencia, Voz & Tablas de Inventario SG**: Asistente zootécnico en lenguaje natural (`QueryEngine`) integrado en la PWA con formateo enriquecido seguro, tablas de inventario en bloques monoespaciados (`<pre>`) con scroll táctil horizontal y botón de copiado al portapapeles (`📋 Copiar`), y dictado por voz directo (`MediaRecorder` + Whisper) para notas sin teclear.
   - **Tema "☀️ Sol de Campo"**: Modo de alto contraste en blanco y negro puro para legibilidad bajo sol directo en potrero.
 - [x] Suite de pruebas con pytest: **566 pruebas en verde** (100% pasando).
 
