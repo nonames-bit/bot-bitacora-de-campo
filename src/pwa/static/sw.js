@@ -24,7 +24,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v26: Niveles de acceso (Level 1, 2, 3), IDs locales y Telegram, campo nombre ampliado y avatares temáticos.
 // v27: Eliminación de parpadeos y skeletons en auto-refresco en segundo plano y carga inicial fluida.
 // v28: Formateo enriquecido y tablas monospaciadas en Asistente IA y dictado por voz con copiado rápido.
-var CACHE = "pwa-ja-v28"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v29: Reparación de endpoint de reporte PDF general, ficha técnica animal zootécnica ejecutiva y tarjeta QR completa A4.
+var CACHE = "pwa-ja-v29"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

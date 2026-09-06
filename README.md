@@ -395,7 +395,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Autenticación por PIN & 3 Roles RBAC**: Login por PIN de 4 dígitos individual con permisos estrictos (`TRABAJADOR` para captura en campo, `ADMIN` para gestión zootécnica y reportes PDF/Excel, y `OWNER` con acceso exclusivo a panel de métricas VPS, SQLite WAL y visor de logs en vivo).
   - **Inteligencia, Voz & Tablas de Inventario SG**: Asistente zootécnico en lenguaje natural (`QueryEngine`) integrado en la PWA con formateo enriquecido seguro, tablas de inventario en bloques monoespaciados (`<pre>`) con scroll táctil horizontal y botón de copiado al portapapeles (`📋 Copiar`), y dictado por voz directo (`MediaRecorder` + Whisper) para notas sin teclear.
   - **Tema "☀️ Sol de Campo"**: Modo de alto contraste en blanco y negro puro para legibilidad bajo sol directo en potrero.
-- [x] Suite de pruebas con pytest: **566 pruebas en verde** (100% pasando).
+  - **Ficha Zootécnica Ejecutiva & Tarjeta QR Completa A4**:
+    - **Endpoint `/api/reporte.pdf` reparado**: integración completa de períodos (`semanal` -> 7d, `quincenal` -> 15d, `mensual` -> 30d) con generación robusta y descarga directa.
+    - **Dashboard de Ficha Animal en PWA enriquecido**: 4 tarjetas KPI (Potrero Actual, Edad Zootécnica exacta, Último Peso/GMD, Estado de Retiro Sanitario), Identificación completa con categoría SG, Genealogía con enlaces interactivos a madre y padre, Estado reproductivo vivo (condición, FEP, días abiertos post-parto), alerta roja destacada de retiro sanitario con desglose de fármacos, y registro de movimientos recientes entre potreros.
+    - **Ficha Técnica Zootécnica QR en PDF (A4 Landscape)**: Formato apaisado de alta densidad de datos generado con código QR vectorial ReportLab que enlaza directamente a la ficha web interactiva en vivo, incluyendo fotografía/placeholder oficial, cuadro genealógico, tabla de pesajes/GMD, historial reproductivo/partos y semáforo sanitario de inocuidad.
+- [x] Suite de pruebas con pytest: **570 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

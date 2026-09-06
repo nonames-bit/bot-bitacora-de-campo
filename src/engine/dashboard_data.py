@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 from datetime import date, timedelta
+import re
 from typing import Any, Optional
 
 try:
@@ -381,7 +382,8 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         if errores:
             out["errores"] = errores
         return out
-    an = db.get_animal(aid)
+    raw_an = db.get_animal(aid)
+    an = dict(raw_an) if raw_an else {}
     base: dict[str, Any] = {"existe": True, "tag": an["tag"], "nombre": an["nombre"],
             "sexo": an["sexo"], "raza": an["raza"],
             "fecha_nacimiento": an["fecha_nacimiento"], "estado": an["estado"],
@@ -476,6 +478,184 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         logger.error("seccion controles_leche fallo", exc_info=True)
         errores["controles_leche"] = str(e)
         base["controles_leche"] = []
+
+    # --- Secciones enriquecidas para Ficha Zootécnica y Tarjeta QR ---
+    hoy_date = date.today()
+    hoy_iso = hoy_date.isoformat()
+
+    # 1. Potrero actual
+    potrero_nom = "Sin potrero asignado"
+    if an.get("potrero_id"):
+        try:
+            p_row = db.query_one("SELECT id, nombre, codigo FROM potreros WHERE id = ?", (an["potrero_id"],))
+            if p_row:
+                potrero_nom = p_row["nombre"] or p_row["codigo"] or f"Potrero #{an['potrero_id']}"
+        except Exception as e:
+            logger.error("seccion potrero fallo", exc_info=True)
+            errores["potrero"] = str(e)
+    base["potrero"] = potrero_nom
+    base["potrero_id"] = an.get("potrero_id")
+
+    # 2. Genealogía
+    madre_dict = None
+    if an.get("madre_id"):
+        try:
+            m = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["madre_id"],))
+            if m:
+                madre_dict = {"id_animal": m["id_animal"], "tag": m["tag"], "nombre": m["nombre"], "raza": m["raza"]}
+        except Exception as e:
+            logger.error("seccion madre fallo", exc_info=True)
+    base["madre"] = madre_dict
+
+    padre_dict = None
+    if an.get("padre_id"):
+        try:
+            p = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["padre_id"],))
+            if p:
+                padre_dict = {"id_animal": p["id_animal"], "tag": p["tag"], "nombre": p["nombre"], "raza": p["raza"]}
+        except Exception as e:
+            logger.error("seccion padre fallo", exc_info=True)
+    base["padre"] = padre_dict
+
+    # 3. Edad zootécnica y días
+    f_nac = to_date_safe(an.get("fecha_nacimiento"))
+    edad_str = "S/D"
+    edad_dias = None
+    if f_nac:
+        edad_dias = max(0, (hoy_date - f_nac).days)
+        try:
+            from .query.helpers import formatear_edad_zootecnica
+            edad_str = formatear_edad_zootecnica(f_nac, hoy_date)
+        except Exception:
+            edad_str = f"{edad_dias} días"
+    base["edad_str"] = edad_str
+    base["edad_dias"] = edad_dias
+
+    # 4. Categoría Zootécnica SG
+    categoria_sg = "Sin clasificar"
+    s_raw = str(an.get("sexo") or "").strip().lower()
+    es_macho = bool(s_raw.startswith("m") or s_raw in ("macho", "toro", "ternero", "novillo", "buey"))
+    if es_hembra:
+        if edad_dias is not None:
+            if edad_dias < 365:
+                categoria_sg = "Hembras <1 año (Ternera)"
+            elif edad_dias < 730:
+                categoria_sg = "Hembras 1-2 años (Novilla levante)"
+            elif edad_dias < 1460:
+                categoria_sg = "Hembras 2-4 años (Novilla vientre)"
+            elif edad_dias <= 2921:
+                categoria_sg = "Hembras 4-8 años (Vaca adulta)"
+            elif edad_dias <= 3651:
+                categoria_sg = "Hembras 8-10 años"
+            else:
+                categoria_sg = "Hembras >10 años"
+        else:
+            categoria_sg = "Hembra adulta"
+    elif es_macho:
+        txt_info = f"{an.get('nombre') or ''} {an.get('notas') or ''} {an.get('tag') or ''}".upper()
+        if re.search(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b", txt_info) or (edad_dias is not None and edad_dias >= 913):
+            categoria_sg = "Reproductor (Toro)"
+        elif edad_dias is not None:
+            if edad_dias < 365:
+                categoria_sg = "Machos <1 año (Ternero)"
+            elif edad_dias < 730:
+                categoria_sg = "Machos 1-2 años (Novillo)"
+            else:
+                categoria_sg = "Machos >2 años"
+        else:
+            categoria_sg = "Macho"
+    base["categoria_sg"] = categoria_sg
+
+    # 5. Desempeño ponderal
+    ultimo_peso = None
+    if base.get("pesajes") and len(base["pesajes"]) > 0:
+        p0 = base["pesajes"][0]
+        ultimo_peso = {
+            "peso_kg": p0.get("peso_kg"),
+            "fecha": p0.get("fecha"),
+            "gmd": p0.get("gmd_calculada"),
+        }
+    base["ultimo_peso"] = ultimo_peso
+
+    peso_nac = None
+    try:
+        p_cria = db.query_one(
+            "SELECT peso_nacimiento FROM partos WHERE id_cria = ? AND peso_nacimiento IS NOT NULL LIMIT 1",
+            (aid,)
+        )
+        if p_cria and p_cria["peso_nacimiento"] is not None:
+            peso_nac = float(p_cria["peso_nacimiento"])
+    except Exception:
+        pass
+    base["peso_nacimiento"] = peso_nac
+
+    # 6. Retiros sanitarios activos
+    retiros_activos = []
+    try:
+        ret_rows = db.query(
+            """SELECT producto, dosis, fecha_fin_retiro_leche, fecha_fin_retiro_carne
+               FROM tratamientos
+               WHERE animal_id = ?
+                 AND ((fecha_fin_retiro_leche IS NOT NULL AND fecha_fin_retiro_leche >= ?)
+                   OR (fecha_fin_retiro_carne IS NOT NULL AND fecha_fin_retiro_carne >= ?))
+               ORDER BY fecha DESC""", (aid, hoy_iso, hoy_iso)
+        )
+        retiros_activos = _filas_dict(ret_rows)
+    except Exception as e:
+        logger.error("seccion retiros_activos fallo", exc_info=True)
+    base["retiros_activos"] = retiros_activos
+    base["en_retiro"] = len(retiros_activos) > 0
+
+    # 7. Resumen reproductivo
+    estado_repro = "Sin datos reproductivos"
+    dias_abiertos = None
+    if es_hembra:
+        ult_diag = base["diagnosticos"][0] if base.get("diagnosticos") else None
+        ult_serv = base.get("ultimo_servicio")
+        ult_parto = base.get("ultimo_parto")
+
+        f_parto_d = to_date_safe(ult_parto["fecha"]) if ult_parto and ult_parto.get("fecha") else None
+        if f_parto_d:
+            dias_abiertos = max(0, (hoy_date - f_parto_d).days)
+
+        if ult_diag and str(ult_diag.get("resultado") or "").upper() in ("PREÑADA", "PREGNANT", "POSITIVO"):
+            fep_str = f" (FEP: {str(ult_serv['fep_calculada'])[:10]})" if ult_serv and ult_serv.get("fep_calculada") else ""
+            estado_repro = f"🟢 Gestante / Preñada{fep_str}"
+        elif ult_serv and ult_serv.get("fep_calculada"):
+            f_serv_d = to_date_safe(ult_serv.get("fecha"))
+            if not f_parto_d or (f_serv_d and f_serv_d >= f_parto_d):
+                toro_str = f" · {ult_serv.get('toro_pajilla') or ''}".strip()
+                estado_repro = f"🟡 Inseminada / Servida{toro_str} (FEP: {str(ult_serv['fep_calculada'])[:10]})"
+            elif f_parto_d:
+                estado_repro = f"⚪ Abierta / Vacía ({dias_abiertos} días post-parto)"
+        elif f_parto_d:
+            estado_repro = f"⚪ Abierta / Vacía ({dias_abiertos} días post-parto)"
+        elif edad_dias and edad_dias >= 730:
+            estado_repro = "⚪ Novilla de vientre (apta para servicio)"
+        elif edad_dias and edad_dias < 730:
+            estado_repro = "⚪ Ternera / Novilla de levante"
+        else:
+            estado_repro = "Hembra activa"
+    elif es_macho:
+        estado_repro = "Macho reproductor" if "Reproductor" in categoria_sg else "Macho activo"
+    base["estado_repro"] = estado_repro
+    base["dias_abiertos"] = dias_abiertos
+
+    # 8. Traslados de potrero recientes
+    try:
+        t_rows = db.query(
+            """SELECT t.fecha, t.motivo, po.nombre AS origen, pd.nombre AS destino
+               FROM traslados t
+               LEFT JOIN potreros po ON po.id = t.potrero_origen
+               LEFT JOIN potreros pd ON pd.id = t.potrero_destino
+               WHERE t.animal_id = ?
+               ORDER BY t.fecha DESC, t.id DESC LIMIT 4""", (aid,)
+        )
+        base["traslados"] = _filas_dict(t_rows)
+    except Exception as e:
+        logger.error("seccion traslados fallo", exc_info=True)
+        base["traslados"] = []
+
     if errores:
         base["errores"] = errores
     return base

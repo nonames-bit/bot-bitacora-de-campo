@@ -2088,13 +2088,44 @@
       + "</div>";
   }
   function fichaHtml(f, showIdent) {
-    var head = "<div class='ficha-head'>";
+    var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
-      head += "<img class='avatar' src='" + esc(f.fotos[0].url) + "' alt='foto' onerror='this.style.display=\"none\"'>";
+      head += "<img class='avatar' src='" + esc(f.fotos[0].url) + "' alt='foto' style='width:64px; height:64px; border-radius:8px; object-fit:cover;' onerror='this.style.display=\"none\"'>";
+    } else {
+      head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0;'>" + icon("cow", 32) + "</div>";
     }
-    head += "<div class='datos'><b>" + icon("cow") + esc(f.tag) + " " + esc(f.nombre || "") + "</b><br>"
-      + "<span class='meta'>" + esc(f.sexo || "") + " · " + esc(f.raza || "S/D") + " · " + esc(f.estado || "") + "</span><br>"
-      + "<span class='meta'>Nac: " + esc(fechaCorta(f.fecha_nacimiento) || "S/D") + "</span></div></div>";
+    var estadoChip = "";
+    var stUpper = String(f.estado || "").toUpperCase();
+    if (stUpper === "ACTIVO") estadoChip = "<span class='chip verde'>ACTIVO</span>";
+    else if (stUpper === "VENDIDO" || stUpper === "DESCARTADO") estadoChip = "<span class='chip ambar'>" + esc(f.estado) + "</span>";
+    else if (stUpper === "MUERTO") estadoChip = "<span class='chip rojo'>MUERTO</span>";
+    else if (f.estado) estadoChip = "<span class='chip gris'>" + esc(f.estado) + "</span>";
+
+    var potChip = f.potrero ? "<span class='chip gris' style='margin-left:4px;'>" + icon("grass", 13) + esc(f.potrero) + "</span>" : "";
+    var catChip = f.categoria_sg ? "<span class='chip gris' style='margin-left:4px;'>" + esc(f.categoria_sg) + "</span>" : "";
+    var retiroChip = f.en_retiro ? "<span class='chip rojo' style='margin-left:4px; font-weight:bold;'>" + icon("alert", 13) + "EN RETIRO</span>" : "";
+
+    head += "<div class='datos' style='flex:1; min-width:0;'>"
+      + "<div style='display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:4px;'>"
+      + "<b style='font-size:18px; letter-spacing:-0.02em;'>" + esc(f.tag) + (f.nombre ? " · " + esc(f.nombre) : "") + "</b>"
+      + estadoChip + retiroChip
+      + "</div>"
+      + "<div style='display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;'>"
+      + potChip + catChip
+      + "</div>"
+      + "<span class='meta' style='font-size:12px; color:var(--texto-suave);'>"
+      + esc(f.sexo || "") + " · " + esc(f.raza || "S/D")
+      + (f.edad_str ? " · <b>" + esc(f.edad_str) + "</b>" : (f.fecha_nacimiento ? " · Nac: " + esc(fechaCorta(f.fecha_nacimiento)) : ""))
+      + "</span>"
+      + "</div>";
+
+    head += "<div style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
+      + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
+      + icon("filePdf", 15) + "Ficha PDF</a>"
+      + "</div>";
+
+    head += "</div>";
+
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
     html += "<div id='ficha-tabs'><nav class='mini'>"
       + TABS.map(function (t) { return "<button data-tab='" + t.id + "' class='act'>" + t.label + "</button>"; }).join("")
@@ -2174,16 +2205,119 @@
         + "/grafico/peso' alt='Curva de peso' loading='lazy' onerror='this.style.display=\"none\"'></div>";
       return h2;
     }
-    var fotos = "";
+    // Tab "general"
+    var h = "";
+
+    // 1. Alerta de Retiro Sanitario si está en período de retiro
+    if (f.en_retiro && f.retiros_activos && f.retiros_activos.length) {
+      h += "<div class='card' style='background:var(--color-rojo-bg); color:var(--color-rojo-txt); border:1px solid var(--color-rojo-txt); padding:12px; border-radius:8px; margin-bottom:14px;'>"
+        + "<div style='font-weight:bold; font-size:14px; margin-bottom:4px;'>" + icon("alert", 16) + "¡ATENCIÓN! Animal en período de retiro sanitario activo</div>"
+        + "<p style='margin:0 0 6px 0; font-size:12.5px;'>No comercializar ni consumir productos de este animal hasta el cumplimiento de los días de retiro reglamentarios:</p>"
+        + "<ul style='margin:0; padding-left:18px; font-size:12px;'>";
+      f.retiros_activos.forEach(function (r) {
+        var det = esc(r.producto || "Fármaco");
+        if (r.dosis) det += " (" + esc(r.dosis) + ")";
+        if (r.fecha_fin_retiro_leche) det += " · <b>Leche hasta:</b> " + esc(r.fecha_fin_retiro_leche);
+        if (r.fecha_fin_retiro_carne) det += " · <b>Carne hasta:</b> " + esc(r.fecha_fin_retiro_carne);
+        h += "<li>" + det + "</li>";
+      });
+      h += "</ul></div>";
+    }
+
+    // 2. Fila de KPIs rápidos
+    var ultPesoTxt = "—";
+    if (f.ultimo_peso && f.ultimo_peso.peso_kg != null) {
+      ultPesoTxt = f.ultimo_peso.peso_kg + " kg";
+    } else if (f.peso_nacimiento != null) {
+      ultPesoTxt = f.peso_nacimiento + " kg (nac)";
+    }
+
+    h += "<div class='kpis' style='margin-bottom:14px;'>"
+      + kpi(f.potrero ? esc(f.potrero) : "Sin asignar", "Potrero Actual")
+      + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad Zootécnica")
+      + kpi(ultPesoTxt, "Último Pesaje")
+      + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
+      + "</div>";
+
+    // 3. Tarjeta de Identificación & Genealogía
+    h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
+      + "<h4>" + icon("dna") + "Identificación & Genealogía</h4>"
+      + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:8px;'>"
+      + "<div><span style='color:var(--texto-suave);'>Arete / Tag:</span> <b>" + esc(f.tag) + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Nombre:</span> <b>" + esc(f.nombre || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Sexo:</span> <b>" + esc(f.sexo || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Raza:</span> <b>" + esc(f.raza || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Color / Pelo:</span> <b>" + esc(f.color || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Categoría SG:</span> <b>" + esc(f.categoria_sg || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Fecha Nacimiento:</span> <b>" + esc(fechaCorta(f.fecha_nacimiento) || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Peso al Nacer:</span> <b>" + (f.peso_nacimiento ? f.peso_nacimiento + " kg" : "S/D") + "</b></div>";
+
+    // Madre con enlace interactivo si existe
+    var madreHtml = "S/D";
+    if (f.madre && f.madre.tag) {
+      madreHtml = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(f.madre.tag) + "\");' title='Ver ficha de la madre'><b>" + esc(f.madre.tag) + "</b> (" + esc(f.madre.nombre || f.madre.raza || "Madre") + ")</a>";
+    }
+    h += "<div><span style='color:var(--texto-suave);'>Madre:</span> " + madreHtml + "</div>";
+
+    // Padre con enlace si existe
+    var padreHtml = "S/D";
+    if (f.padre && f.padre.tag) {
+      padreHtml = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(f.padre.tag) + "\");' title='Ver ficha del padre'><b>" + esc(f.padre.tag) + "</b> (" + esc(f.padre.nombre || f.padre.raza || "Padre") + ")</a>";
+    }
+    h += "<div><span style='color:var(--texto-suave);'>Padre / Toro:</span> " + padreHtml + "</div>";
+
+    h += "</div></div>";
+
+    // 4. Tarjeta Estado Reproductivo Actual
+    h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
+      + "<h4>" + icon("sperm") + "Estado Reproductivo Actual</h4>"
+      + "<div style='font-size:14px; margin:8px 0;'>" + esc(f.estado_repro || "Sin datos") + "</div>";
+    if (f.dias_abiertos != null) {
+      h += "<p class='aviso' style='margin:4px 0;'>" + icon("hourglass", 14) + "Días abiertos (post-parto): <b>" + f.dias_abiertos + " días</b></p>";
+    }
+    if (f.ultimo_servicio && f.ultimo_servicio.fep_calculada) {
+      h += "<p class='aviso' style='margin:4px 0;'>" + icon("calendar", 14) + "Fecha Estimada de Parto (FEP): <b>" + esc(fechaCorta(f.ultimo_servicio.fep_calculada)) + "</b></p>";
+    }
+    h += "</div>";
+
+    // 5. Traslados de potrero recientes
+    if (f.traslados && f.traslados.length) {
+      h += "<h4>" + icon("truck") + "Últimos movimientos de potrero</h4>"
+        + tabla(f.traslados, [
+          ["fecha", "Fecha", "text", function (v) { return esc(fechaCorta(v)); }],
+          ["origen", "Origen", "text", function (v) { return esc(v || "—"); }],
+          ["destino", "Destino", "text", function (v) { return "<b>" + esc(v || "—") + "</b>"; }],
+          ["motivo", "Motivo", "text", function (v) { return esc(v || "Rotación"); }]
+        ], "Sin traslados registrados.");
+    }
+
+    // 6. Tarjeta de Código QR & Ficha Oficial PDF
+    h += "<div class='card' style='padding:16px; margin-top:14px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px;'>"
+      + "<div style='display:flex; gap:16px; align-items:center; flex-wrap:wrap;'>"
+      + "<div style='flex:1; min-width:220px;'>"
+      + "<h4 style='margin-top:0;'>" + icon("camera") + "Código QR & Ficha Técnica Zootécnica</h4>"
+      + "<p style='font-size:12.5px; color:var(--texto-suave); margin:6px 0 12px 0; line-height:1.4;'>"
+      + "El código QR contiene el enlace web directo a la PWA. Al escanearlo con la cámara de cualquier teléfono en el campo o manga, abre de inmediato esta ficha viva e interactiva. "
+      + "Para llevar el registro impreso a la manga o carpeta de potrero, descargue la <b>Ficha Técnica A4 Oficial</b> con semáforos, genealogía y pesajes."
+      + "</p>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap; align-items:center;'>"
+      + "<a class='btn-guardar-manga' style='display:inline-flex; align-items:center; text-decoration:none; font-size:13px; padding:8px 14px;' href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download>"
+      + icon("filePdf", 16) + "Descargar Ficha Técnica PDF</a>"
+      + "<span class='meta' style='font-size:12px;'>Payload: <code>" + esc(f.qr_payload || ("JA://animal/" + f.tag)) + "</code></span>"
+      + "</div></div>"
+      + "</div></div>";
+
+    // 7. Fotos del animal
+    var fotosHtml = "";
     if (f.fotos && f.fotos.length) {
-      fotos = "<div class='fotos-wrap'>" + f.fotos.filter(function (x) { return x.url; })
-        .map(function (x) { return "<img src='" + esc(x.url) + "' alt='foto' loading='lazy' onerror='this.style.display=\"none\"'>"; }).join("") + "</div>";
-    } else { fotos = vacio("Sin fotos para este animal."); }
-    var qr = f.qr_payload ? "<p class='aviso'>QR <code>" + esc(f.qr_payload) + "</code> · <a href='" + esc(f.qr_url || "") + "'>abrir ficha</a></p>" : "";
-    var pdf = (f.qr_url)
-      ? "<p><a class='qr-pdf' href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' download>Descargar tarjeta QR (PDF)</a></p>"
-      : "";
-    return "<h4>General</h4>" + fotos + qr + pdf;
+      fotosHtml = "<div class='fotos-wrap' style='margin-top:8px;'>" + f.fotos.filter(function (x) { return x.url; })
+        .map(function (x) { return "<img src='" + esc(x.url) + "' alt='foto' loading='lazy' style='max-height:160px; border-radius:6px; object-fit:cover;' onerror='this.style.display=\"none\"'>"; }).join("") + "</div>";
+    } else {
+      fotosHtml = vacio("Sin fotos para este animal.");
+    }
+    h += "<h4 style='margin-top:16px;'>" + icon("camera") + "Registro Fotográfico</h4>" + fotosHtml;
+
+    return h;
   }
   function bindTabs(ficha) {
     var nav = document.getElementById("ficha-tabs");
@@ -2317,12 +2451,23 @@
   var _TAG_RE = /^([A-Za-z]{0,4}\d{1,6}(-\d{1,3})?|[A-Za-z]{1,4}-\d{1,6}(-\d{1,3})?|\d{1,4}-\d{1,3}(-\d{1,3})?|[A-Za-z]{1,4}_\d{1,8})$/;
   var _CAB_NO_CLICK = /potrero|fecha|categor[ií]a|raza|c[óo]digo|banda|toro|bracket|peso/i;
   function abrirFichaDesdeTag(tag) {
+    if (!tag) return;
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
-    if (!destino) return; // vista dedicada /ficha/<tag> (QR): sin nav
+    if (!destino) {
+      // Si estamos en la página standalone /ficha/<tag>
+      if (typeof abrirFicha === "function") {
+        abrirFicha(tag, vista, false, true);
+        try { window.history.pushState(null, "", "/ficha/" + encodeURIComponent(tag)); } catch (e) {}
+      } else {
+        window.location = "/ficha/" + encodeURIComponent(tag);
+      }
+      return;
+    }
     var inp = q("#f-tag");
     if (inp) inp.value = tag;
     destino.click();
   }
+  window.abrirFichaDesdeTag = abrirFichaDesdeTag;
   function vincularTagsFicha(root) {
     if (!root) return;
     if (!qa("nav > button").length) return; // solo en el dashboard con navegación

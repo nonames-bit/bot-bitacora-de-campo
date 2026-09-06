@@ -1462,13 +1462,27 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"error": "Se requiere rol ADMIN u OWNER para descargar reportes PDF."}), 403
 
         periodo = request.args.get("periodo") or "semanal"
+        p_lower = str(periodo).lower().strip()
+        dias = 7
+        if p_lower in ("semanal", "7", "7d"):
+            dias = 7
+        elif p_lower in ("quincenal", "15", "15d"):
+            dias = 15
+        elif p_lower in ("mensual", "30", "30d"):
+            dias = 30
+        elif p_lower.isdigit():
+            dias = max(1, int(p_lower))
+
+        os.makedirs(REPORTES_DIR_DEFAULT, exist_ok=True)
+        ruta_salida = os.path.join(REPORTES_DIR_DEFAULT, f"reporte_ja_{periodo}_{int(time.time())}.pdf")
+
         db_rep = _db(db_path)
         try:
             try:
                 from ..reports.pdf_report import generar_pdf
             except ImportError:
                 from src.reports.pdf_report import generar_pdf  # type: ignore
-            ruta = generar_pdf(db_rep, periodo=periodo)
+            ruta = generar_pdf(db_rep, dias=dias, ruta_salida=ruta_salida, periodo=periodo)
             if not ruta or not os.path.isfile(ruta):
                 abort(500)
             nombre_descarga = f"reporte_ganaderia_ja_{periodo}.pdf"

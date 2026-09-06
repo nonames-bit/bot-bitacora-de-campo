@@ -350,15 +350,30 @@ def generar_ficha_qr_individual(
     hoy: Optional[date] = None,
     cache_dir: str = QR_CACHE_DIR,
 ) -> str:
-    """Genera una tarjeta QR única (una por página, formato apaisado A4)
-    para exportar la ficha de UN animal desde la PWA (botón "Descargar QR").
+    """Genera la Ficha Técnica Zootécnica Oficial con Tarjeta QR individual
+    (formato apaisado A4, alta densidad de datos) para exportar la ficha de
+    UN animal desde la PWA (botón 'Descargar tarjeta QR').
 
-    Devuelve la ruta del PDF. Lanza ValueError si el animal no existe o no
-    está ACTIVO.
+    Incluye identificación completa, categoría SG, potrero, genealogía,
+    pesajes y GMD, historial reproductivo, control sanitario de retiros,
+    foto y código QR interactivo de alta resolución.
     """
+    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
+    try:
+        from reportlab.graphics.barcode.qr import QrCodeWidget
+        from reportlab.graphics.shapes import Drawing
+        from reportlab.graphics import renderPDF
+        _TIENE_QR_NATIVO = True
+    except Exception:
+        _TIENE_QR_NATIVO = False
+
+    try:
+        from ..engine.dashboard_data import datos_ficha_animal
+    except (ImportError, ValueError):
+        from src.engine.dashboard_data import datos_ficha_animal  # type: ignore
 
     hoy = hoy or date.today()
     hoy_iso = hoy.isoformat()
@@ -370,10 +385,10 @@ def generar_ficha_qr_individual(
     if animal is None or str(animal["estado"] or "").upper() != "ACTIVO":
         raise ValueError(f"El animal '{tag_clean}' no está ACTIVO.")
     an_tag = str(animal["tag"] or tag_clean)
+
+    ficha = datos_ficha_animal(db, an_tag)
     payload, url = qr_payload(an_tag)
-    potrero = _potrero_display(db, animal)
-    edad = _edad_str(animal, hoy)
-    estado = _estado_repro_retiro(db, aid, hoy_iso)
+    full_url = f"{base_url.rstrip('/')}{url}" if base_url else url
 
     safe = re.sub(r"[^A-Za-z0-9_-]+", "_", an_tag) or "animal"
     ruta = salida or os.path.join("data", "reportes", f"ficha_qr_{safe}_{hoy_iso}.pdf")
@@ -381,65 +396,339 @@ def generar_ficha_qr_individual(
 
     W, H = landscape(A4)
     c = canvas.Canvas(ruta, pagesize=landscape(A4))
-    m = 30
-    cw, ch = W - 2 * m, H - 2 * m - 22
+    m = 22
+    cw = W - 2 * m
+    ch = H - 2 * m
+    x0 = m
+    y0 = m
 
-    # Marco + franja marca.
-    c.setStrokeColor(_COLOR_MARCA)
+    # 1. Borde perimetral exterior
+    c.setStrokeColor(colors.HexColor(_COLOR_MARCA))
     c.setLineWidth(1.4)
-    c.rect(m, m + 20, cw, ch, stroke=1, fill=0)
-    c.setFillColor(_COLOR_MARCA)
-    c.rect(m, m + ch + 20 - 24, cw, 24, stroke=0, fill=1)
-    c.setFillColor("white")
-    c.setFont("Helvetica-Bold", 11)
-    c.drawString(m + 8, m + ch - 16, "GANADERÍA JA · Ficha QR")
-    c.setFont("Helvetica", 9)
-    c.drawRightString(m + cw - 8, m + ch - 16, f"{potrero[:44]} · {hoy_iso}")
+    c.rect(x0, y0, cw, ch, stroke=1, fill=0)
 
-    # Tag grande.
-    c.setFillColor("black")
-    c.setFont("Helvetica-Bold", 34)
-    c.drawString(m + 12, m + ch - 64, an_tag[:20])
+    # 2. Encabezado corporativo
+    h_hdr = 40
+    y_hdr = y0 + ch - h_hdr
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.rect(x0, y_hdr, cw, h_hdr, stroke=0, fill=1)
 
-    # QR (o placeholder).
-    qx, qy, qs = m + 12, m + 30, 160
-    qr_png = _qr_png_path(an_tag, cache_dir)
-    if qr_png and os.path.exists(qr_png):
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(x0 + 12, y_hdr + 22, "GANADERÍA JA")
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x0 + 130, y_hdr + 22, "·  FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL")
+
+    c.setFont("Helvetica", 8)
+    c.drawString(x0 + 12, y_hdr + 9, "BITÁCORA DE CAMPO  |  REGISTRO OFICIAL DE SOFTWARE GANADERO (SG)")
+
+    c.setFont("Helvetica-Bold", 10)
+    pot_nom = str(ficha.get("potrero") or "Sin potrero asignado").upper()
+    c.drawRightString(x0 + cw - 12, y_hdr + 22, f"POTRERO: {pot_nom[:32]}")
+    c.setFont("Helvetica", 8.5)
+    c.setFillColor(colors.HexColor("#C8E6C9"))
+    c.drawRightString(x0 + cw - 12, y_hdr + 9, f"HATO ACTIVO  |  Emisión: {hoy_iso}")
+
+    # 3. Pie de página
+    c.setStrokeColor(colors.HexColor("#CCCCCC"))
+    c.setLineWidth(0.5)
+    c.line(x0 + 10, y0 + 20, x0 + cw - 10, y0 + 20)
+    c.setFillColor(colors.HexColor("#666666"))
+    c.setFont("Helvetica", 7.5)
+    c.drawString(x0 + 12, y0 + 7, "Ganadería JA · Control Zootécnico Integral · Datos sincronizados con base de datos Software Ganadero")
+    c.drawRightString(x0 + cw - 12, y0 + 7, f"ID Sistema: #{aid} · Tag: {an_tag} · Documento Oficial de Campo")
+
+    # 4. Columna Izquierda: Tarjeta de Identificación, QR y Foto
+    col_izq_w = 215
+    col_izq_x = x0 + 10
+    col_izq_y = y0 + 28
+    col_izq_h = y_hdr - col_izq_y - 8
+
+    c.setFillColor(colors.HexColor("#F8FAF8"))
+    c.setStrokeColor(colors.HexColor("#A4C1A8"))
+    c.setLineWidth(1)
+    c.roundRect(col_izq_x, col_izq_y, col_izq_w, col_izq_h, 6, fill=1, stroke=1)
+
+    # Tag y Nombre en caja izquierda
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.setFont("Helvetica-Bold", 24)
+    c.drawString(col_izq_x + 10, col_izq_y + col_izq_h - 30, f"{an_tag[:14]}")
+
+    nom_txt = str(ficha.get("nombre") or "").strip()
+    c.setFont("Helvetica-Bold", 10.5)
+    c.setFillColor(colors.HexColor("#1F2D21"))
+    c.drawString(col_izq_x + 10, col_izq_y + col_izq_h - 46, f"{nom_txt[:24]}" if nom_txt else "Sin nombre registrado")
+
+    # Generar QR
+    qr_size = 142
+    qr_x = col_izq_x + (col_izq_w - qr_size) / 2
+    qr_y = col_izq_y + col_izq_h - 204
+
+    c.setFillColor(colors.white)
+    c.setStrokeColor(colors.HexColor("#DDDDDD"))
+    c.rect(qr_x - 3, qr_y - 3, qr_size + 6, qr_size + 6, fill=1, stroke=1)
+
+    # Dibujar QR (nativo reportlab vector o PNG de fallback)
+    qr_dibujado = False
+    if _TIENE_QR_NATIVO:
         try:
-            c.drawImage(ImageReader(qr_png), qx, qy, width=qs, height=qs)
+            target_qr = full_url if full_url.startswith("http") else (f"{base_url.rstrip('/')}/ficha/{an_tag}" if base_url else f"{payload}\n{url}")
+            qr_w = QrCodeWidget(target_qr)
+            b = qr_w.getBounds()
+            bw = b[2] - b[0]
+            bh = b[3] - b[1]
+            d = Drawing(qr_size, qr_size, transform=[qr_size / bw, 0, 0, qr_size / bh, 0, 0])
+            d.add(qr_w)
+            renderPDF.draw(d, c, qr_x, qr_y)
+            qr_dibujado = True
         except Exception:
-            c.rect(qx, qy, qs, qs)
+            pass
+
+    if not qr_dibujado:
+        qr_png = _qr_png_path(an_tag, cache_dir)
+        if qr_png and os.path.exists(qr_png):
+            try:
+                c.drawImage(ImageReader(qr_png), qr_x, qr_y, width=qr_size, height=qr_size)
+                qr_dibujado = True
+            except Exception:
+                pass
+
+    if not qr_dibujado:
+        c.setFillColor(colors.HexColor("#EEEEEE"))
+        c.rect(qr_x, qr_y, qr_size, qr_size, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor("#333333"))
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(qr_x + qr_size / 2, qr_y + qr_size / 2, f"QR: {an_tag}")
+
+    # Instrucciones QR
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(col_izq_x + col_izq_w / 2, qr_y - 12, "Escanee con la cámara del celular")
+    c.setFont("Helvetica", 6.8)
+    c.setFillColor(colors.HexColor("#444444"))
+    c.drawCentredString(col_izq_x + col_izq_w / 2, qr_y - 22, "Abre la ficha interactiva en la PWA")
+    c.setFont("Helvetica-Oblique", 6.2)
+    c.setFillColor(colors.HexColor("#1F6C9F"))
+    c.drawCentredString(col_izq_x + col_izq_w / 2, qr_y - 32, full_url[:42])
+
+    # Foto del animal (si existe) o recuadro
+    foto_y = col_izq_y + 10
+    foto_h = qr_y - 40 - foto_y
+    foto_w = col_izq_w - 20
+    foto_x = col_izq_x + 10
+    foto_path = buscar_foto_animal(db, an_tag, media_dir=media_dir) if buscar_foto_animal else None
+    if foto_path and os.path.exists(foto_path):
+        try:
+            c.drawImage(ImageReader(foto_path), foto_x, foto_y, width=foto_w, height=foto_h, preserveAspectRatio=True)
+        except Exception:
+            foto_path = None
+    if not foto_path:
+        c.setFillColor(colors.HexColor("#F0F3F0"))
+        c.setStrokeColor(colors.HexColor("#D0DDD1"))
+        c.roundRect(foto_x, foto_y, foto_w, foto_h, 4, fill=1, stroke=1)
+        c.setFillColor(colors.HexColor("#7A8B7C"))
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(foto_x + foto_w / 2, foto_y + foto_h / 2 + 6, "REGISTRO FOTOGRÁFICO")
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(foto_x + foto_w / 2, foto_y + foto_h / 2 - 8, f"Categoría: {str(ficha.get('categoria_sg') or 'Bovino')[:26]}")
+
+    # 5. Columna Derecha: 5 Secciones Técnicas Estructuradas
+    col_der_x = col_izq_x + col_izq_w + 12
+    col_der_w = x0 + cw - 10 - col_der_x
+    y_pos = y_hdr - 6
+
+    def _dibujar_seccion_hdr(titulo, bg_color=_COLOR_MARCA_CLARA, txt_color=_COLOR_MARCA):
+        nonlocal y_pos
+        y_pos -= 16
+        c.setFillColor(colors.HexColor(bg_color))
+        c.rect(col_der_x, y_pos, col_der_w, 16, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor(txt_color))
+        c.setFont("Helvetica-Bold", 8.5)
+        c.drawString(col_der_x + 8, y_pos + 4, titulo)
+        y_pos -= 4
+
+    # --- SECCIÓN 1: IDENTIFICACIÓN Y CATEGORÍA SG ---
+    _dibujar_seccion_hdr("1. IDENTIFICACIÓN Y CATEGORIZACIÓN ZOOTÉCNICA")
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 10, "Sexo:")
+    c.setFont("Helvetica", 8)
+    c.drawString(col_der_x + 38, y_pos - 10, str(ficha.get("sexo") or "S/D"))
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 130, y_pos - 10, "Raza:")
+    c.setFont("Helvetica", 8)
+    c.drawString(col_der_x + 162, y_pos - 10, str(ficha.get("raza") or "S/D"))
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 280, y_pos - 10, "Categoría SG:")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.drawString(col_der_x + 352, y_pos - 10, str(ficha.get("categoria_sg") or "S/D")[:30])
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 24, "Fecha Nac.:")
+    c.setFont("Helvetica", 8)
+    f_nac_str = str(ficha.get("fecha_nacimiento") or "")[:10] or "Sin fecha registrada"
+    c.drawString(col_der_x + 64, y_pos - 24, f_nac_str)
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 190, y_pos - 24, "Edad Zootécnica:")
+    c.setFont("Helvetica", 8)
+    c.drawString(col_der_x + 276, y_pos - 24, str(ficha.get("edad_str") or "S/D")[:34])
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 38, "Potrero Actual:")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.drawString(col_der_x + 78, y_pos - 38, pot_nom[:36])
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 310, y_pos - 38, "Estado Hato:")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor("#2E7D32"))
+    c.drawString(col_der_x + 375, y_pos - 38, "ACTIVO")
+
+    y_pos -= 46
+
+    # --- SECCIÓN 2: GENEALOGÍA Y TRAZABILIDAD ---
+    _dibujar_seccion_hdr("2. GENEALOGÍA Y TRAZABILIDAD")
+    madre = ficha.get("madre") or {}
+    padre = ficha.get("padre") or {}
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 10, "Madre:")
+    c.setFont("Helvetica", 8)
+    m_txt = f"{madre.get('tag') or ''} {('· ' + madre.get('nombre')) if madre.get('nombre') else ''} {('(' + madre.get('raza') + ')') if madre.get('raza') else ''}".strip() or "Sin madre registrada"
+    c.drawString(col_der_x + 46, y_pos - 10, m_txt[:48])
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 280, y_pos - 10, "Padre:")
+    c.setFont("Helvetica", 8)
+    p_txt = f"{padre.get('tag') or ''} {('· ' + padre.get('nombre')) if padre.get('nombre') else ''} {('(' + padre.get('raza') + ')') if padre.get('raza') else ''}".strip() or "Sin padre registrado"
+    c.drawString(col_der_x + 318, y_pos - 10, p_txt[:44])
+
+    y_pos -= 18
+
+    # --- SECCIÓN 3: DESEMPEÑO PONDERAL Y CONTROL DE PESOS ---
+    _dibujar_seccion_hdr("3. DESEMPEÑO PONDERAL Y CONTROL DE PESOS")
+    ult_p = ficha.get("ultimo_peso") or {}
+    peso_nac_v = ficha.get("peso_nacimiento")
+    peso_nac_txt = f"{peso_nac_v:.1f} kg" if peso_nac_v is not None else "S/D"
+
+    ult_p_txt = f"{ult_p.get('peso_kg')} kg ({str(ult_p.get('fecha'))[:10]})" if ult_p.get("peso_kg") else "Sin pesajes"
+    gmd_v = ult_p.get("gmd")
+    gmd_txt = f"{float(gmd_v) * 1000:.0f} g/día" if gmd_v is not None else "—"
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 10, "Peso Nac.:")
+    c.setFont("Helvetica", 8)
+    c.drawString(col_der_x + 60, y_pos - 10, peso_nac_txt)
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 130, y_pos - 10, "Último Peso:")
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 190, y_pos - 10, ult_p_txt)
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 350, y_pos - 10, "GMD Reciente:")
+    c.setFont("Helvetica", 8)
+    c.drawString(col_der_x + 424, y_pos - 10, gmd_txt)
+
+    # Mini tabla pesajes
+    pesajes_list = ficha.get("pesajes") or []
+    if pesajes_list:
+        y_pos -= 22
+        c.setFillColor(colors.HexColor("#F2F5F2"))
+        c.rect(col_der_x + 8, y_pos - 2, col_der_w - 16, 12, fill=1, stroke=0)
+        c.setFillColor(colors.HexColor("#2F5233"))
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(col_der_x + 14, y_pos + 1, "HISTORIAL PESAJES")
+        c.drawString(col_der_x + 160, y_pos + 1, "PESO (KG)")
+        c.drawString(col_der_x + 280, y_pos + 1, "GMD (G/D)")
+        for idx, pes in enumerate(pesajes_list[:2]):
+            y_pos -= 11
+            c.setFillColor(colors.HexColor("#333333"))
+            c.setFont("Helvetica", 7.2)
+            c.drawString(col_der_x + 14, y_pos, str(pes.get("fecha") or "")[:10])
+            c.drawString(col_der_x + 160, y_pos, f"{pes.get('peso_kg')} kg")
+            gmd_item = pes.get("gmd_calculada")
+            gmd_i_txt = f"{float(gmd_item)*1000:.0f} g/d" if gmd_item is not None else "—"
+            c.drawString(col_der_x + 280, y_pos, gmd_i_txt)
+        y_pos -= 6
     else:
-        c.rect(qx, qy, qs, qs)
+        y_pos -= 16
+
+    # --- SECCIÓN 4: ESTADO REPRODUCTIVO Y PARTOS ---
+    _dibujar_seccion_hdr("4. ESTADO REPRODUCTIVO Y PARTOS")
+    est_rep = str(ficha.get("estado_repro") or "Sin datos").replace("🟢", "").replace("🟡", "").replace("⚪", "").strip()
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 10, "Condición:")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.drawString(col_der_x + 60, y_pos - 10, est_rep[:46])
+
+    dias_ab = ficha.get("dias_abiertos")
+    if dias_ab is not None:
+        c.setFillColor(colors.HexColor("#222222"))
+        c.setFont("Helvetica-Bold", 8)
+        c.drawString(col_der_x + 360, y_pos - 10, "Días Abiertos:")
         c.setFont("Helvetica", 8)
-        c.drawCentredString(qx + qs / 2, qy + qs / 2, payload[:40])
+        c.drawString(col_der_x + 428, y_pos - 10, f"{dias_ab} días")
 
-    tx = qx + qs + 18
-    c.setFont("Helvetica", 12)
-    c.drawString(tx, qy + 150, f"Tag: {an_tag[:18]}")
-    c.drawString(tx, qy + 130, f"Edad: {edad[:42]}")
-    c.setFont("Helvetica", 10.5)
-    for i, linea in enumerate(estado[i:i + 60] for i in range(0, len(estado), 60)):
-        if i >= 4:
-            break
-        c.drawString(tx, qy + 108 - i * 16, linea[:60])
+    ult_par = ficha.get("ultimo_parto") or {}
+    ult_ser = ficha.get("ultimo_servicio") or {}
 
-    full_url = f"{base_url.rstrip('/')}{url}" if base_url else url
-    c.setFont("Helvetica", 9)
-    c.drawString(tx, qy + 40, f"QR: {payload[:60]}")
-    c.drawString(tx, qy + 24, f"Web: {full_url[:80]}")
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 24, "Último Parto:")
+    c.setFont("Helvetica", 8)
+    if ult_par and ult_par.get("fecha"):
+        par_txt = f"{str(ult_par.get('fecha'))[:10]} · Cría: {ult_par.get('sexo_cria') or 'S/D'} ({ult_par.get('estado_cria') or 'Vivo'})"
+    else:
+        par_txt = "Sin partos registrados"
+    c.drawString(col_der_x + 68, y_pos - 24, par_txt[:44])
 
-    # Foto mini si existe.
-    try:
-        foto = buscar_foto_animal(db, an_tag, media_dir=media_dir) if buscar_foto_animal else None
-        if foto and os.path.exists(foto):
-            c.drawImage(ImageReader(foto), m + cw - 170, qy, width=158, height=118,
-                        preserveAspectRatio=True)
-    except Exception:
-        pass
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 8, y_pos - 38, "Último Servicio:")
+    c.setFont("Helvetica", 8)
+    if ult_ser and ult_ser.get("fecha"):
+        fep_t = f" · FEP: {str(ult_ser.get('fep_calculada'))[:10]}" if ult_ser.get("fep_calculada") else ""
+        ser_txt = f"{str(ult_ser.get('fecha'))[:10]} ({ult_ser.get('tipo_servicio') or 'IA'} {ult_ser.get('toro_pajilla') or ''}){fep_t}"
+    else:
+        ser_txt = "Sin servicios registrados"
+    c.drawString(col_der_x + 78, y_pos - 38, ser_txt[:52])
 
-    c.setFont("Helvetica-Oblique", 8)
-    c.drawCentredString(W / 2, 12, f"Ficha QR individual · {an_tag} · ACTIVO · {hoy_iso}")
+    y_pos -= 46
+
+    # --- SECCIÓN 5: CONTROL SANITARIO Y TIEMPOS DE RETIRO ---
+    en_ret = bool(ficha.get("en_retiro"))
+    bg_san = "#FDEBEC" if en_ret else _COLOR_MARCA_CLARA
+    txt_san = "#9F2F2D" if en_ret else _COLOR_MARCA
+    titulo_san = "5. CONTROL SANITARIO — ⚠️ ANIMAL EN TIEMPO DE RETIRO" if en_ret else "5. CONTROL SANITARIO — 🟢 LIBRE DE TIEMPO DE RETIRO"
+    _dibujar_seccion_hdr(titulo_san, bg_color=bg_san, txt_color=txt_san)
+
+    ret_act = ficha.get("retiros_activos") or []
+    if ret_act:
+        for r_item in ret_act[:2]:
+            c.setFillColor(colors.HexColor("#B71C1C"))
+            c.setFont("Helvetica-Bold", 7.5)
+            prod = r_item.get("producto") or "Tratamiento"
+            leche_fin = f"Retiro Leche: {r_item.get('fecha_fin_retiro_leche')}" if r_item.get("fecha_fin_retiro_leche") else "Sin retiro leche"
+            carne_fin = f"Retiro Carne: {r_item.get('fecha_fin_retiro_carne')}" if r_item.get("fecha_fin_retiro_carne") else "Sin retiro carne"
+            c.drawString(col_der_x + 8, y_pos - 10, f"• {prod}: {leche_fin} | {carne_fin}")
+            y_pos -= 11
+    else:
+        c.setFillColor(colors.HexColor("#2E7D32"))
+        c.setFont("Helvetica", 8)
+        c.drawString(col_der_x + 8, y_pos - 10, "Este animal NO registra periodos de carencia activos en leche ni carne.")
+        y_pos -= 14
+
     c.save()
     return ruta
 

@@ -232,14 +232,43 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
 # --------------------------------------------------------------------------- #
 # Generación del PDF (reportlab)
 # --------------------------------------------------------------------------- #
-def generar_pdf(db, dias: int, ruta_salida: str, hoy: Optional[date] = None) -> str:
+def generar_pdf(
+    db,
+    dias: int = 7,
+    ruta_salida: Optional[str] = None,
+    hoy: Optional[date] = None,
+    periodo: Optional[str] = None,
+) -> str:
     """Genera un PDF con el reporte de campo y devuelve su ruta.
 
     Usa tipografías base (Helvetica) y texto plano sin emojis. Crea el
     directorio padre de ``ruta_salida`` si no existe.
     """
+    import re
     import shutil
     import tempfile
+    import time
+
+    if periodo:
+        p_lower = str(periodo).lower().strip()
+        if p_lower in ("semanal", "semana", "7d"):
+            dias = 7
+        elif p_lower in ("quincenal", "quincena", "15d"):
+            dias = 15
+        elif p_lower in ("mensual", "mes", "30d"):
+            dias = 30
+        else:
+            try:
+                num = int(re.sub(r"\D", "", p_lower))
+                if num > 0:
+                    dias = num
+            except Exception:
+                pass
+
+    if not ruta_salida:
+        os.makedirs(os.path.join("data", "reportes"), exist_ok=True)
+        hoy_str = (hoy or date.today()).isoformat()
+        ruta_salida = os.path.join("data", "reportes", f"reporte_finca_{dias}d_{hoy_str}_{int(time.time())}.pdf")
 
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
