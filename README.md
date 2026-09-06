@@ -146,8 +146,10 @@ python -m src.main --server
 ```
 
 > 📖 Guías detalladas: [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)
-> (despliegue paso a paso en VPS) y [`docs/TELEGRAM_GUIA_USUARIO.md`](docs/TELEGRAM_GUIA_USUARIO.md)
-> (manual para el personal de campo).
+> (despliegue paso a paso en VPS), [`docs/TELEGRAM_GUIA_USUARIO.md`](docs/TELEGRAM_GUIA_USUARIO.md)
+> (manual para el personal de campo) y
+> [`docs/GUIA_EXPLICATIVA_PARA_EL_DUENO.md`](docs/GUIA_EXPLICATIVA_PARA_EL_DUENO.md)
+> (explicación en lenguaje sencillo de todo el sistema: PWA, NDVI, SQLite, arquitectura y despliegue).
 
 ---
 
