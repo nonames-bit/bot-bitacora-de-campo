@@ -2090,7 +2090,10 @@
   function fichaHtml(f, showIdent) {
     var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
-      head += "<img class='avatar' src='" + esc(f.fotos[0].url) + "' alt='foto' style='width:64px; height:64px; border-radius:8px; object-fit:cover;' onerror='this.style.display=\"none\"'>";
+      head += "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; flex-shrink:0; border-radius:8px; overflow:hidden;'>"
+        + "<img class='avatar zoomable-img' src='" + esc(f.fotos[0].url) + "' alt='Foto principal " + esc(f.tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' onerror='this.parentElement.style.display=\"none\"'>"
+        + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
+        + "</div>";
     } else {
       head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0;'>" + icon("cow", 32) + "</div>";
     }
@@ -2310,12 +2313,17 @@
     // 7. Fotos del animal
     var fotosHtml = "";
     if (f.fotos && f.fotos.length) {
-      fotosHtml = "<div class='fotos-wrap' style='margin-top:8px;'>" + f.fotos.filter(function (x) { return x.url; })
-        .map(function (x) { return "<img src='" + esc(x.url) + "' alt='foto' loading='lazy' style='max-height:160px; border-radius:6px; object-fit:cover;' onerror='this.style.display=\"none\"'>"; }).join("") + "</div>";
+      fotosHtml = "<div class='fotos-wrap' style='margin-top:8px; display:flex; gap:12px; flex-wrap:wrap;'>" + f.fotos.filter(function (x) { return x.url; })
+        .map(function (x, idx) {
+          return "<div class='foto-card' title='Toca para agrandar imagen'>"
+            + "<img class='zoomable-img' src='" + esc(x.url) + "' alt='Foto #" + (idx + 1) + " · " + esc(f.tag) + "' loading='lazy' style='max-height:175px; width:auto; border-radius:8px; object-fit:cover; display:block;' onerror='this.parentElement.style.display=\"none\"'>"
+            + "<div class='zoom-hint'>" + icon("search", 12) + "Agrandar</div>"
+            + "</div>";
+        }).join("") + "</div>";
     } else {
       fotosHtml = vacio("Sin fotos para este animal.");
     }
-    h += "<h4 style='margin-top:16px;'>" + icon("camera") + "Registro Fotográfico</h4>" + fotosHtml;
+    h += "<h4 style='margin-top:16px;'>" + icon("camera") + "Registro Fotográfico (Toca una foto para agrandarla)</h4>" + fotosHtml;
 
     return h;
   }
@@ -2977,6 +2985,112 @@
     }
     cargar();
   }
+
+  /* ---------- Visor Lightbox de Imágenes (Agrandar al dar clic) ---------- */
+  function mostrarLightbox(src, titulo) {
+    if (!src) return;
+    var existente = document.getElementById("lightbox-visor");
+    if (existente && existente.parentNode) existente.parentNode.removeChild(existente);
+
+    var lb = document.createElement("div");
+    lb.id = "lightbox-visor";
+    lb.className = "lightbox-overlay";
+    lb.setAttribute("role", "dialog");
+    lb.setAttribute("aria-label", "Visor de imagen agrandada");
+
+    var tit = titulo || "Fotografía del Animal";
+    var h = "<div class='lightbox-topbar'>"
+      + "<div class='lightbox-titulo'>" + icon("camera", 16) + esc(tit) + "</div>"
+      + "<div class='lightbox-acciones'>"
+      + "<button type='button' id='lb-btn-zoom' class='lightbox-btn' title='Zoom 1.5x'>" + icon("search", 13) + "<span>Zoom</span></button>"
+      + "<a href='" + esc(src) + "' target='_blank' download class='lightbox-btn' title='Descargar / Abrir en pestaña nueva'>" + icon("download", 13) + "<span>Descargar</span></a>"
+      + "<button type='button' id='lb-btn-cerrar' class='lightbox-btn lightbox-btn-cerrar' title='Cerrar (Esc)'>" + icon("xmark", 13) + "<span>Cerrar</span></button>"
+      + "</div></div>"
+      + "<div class='lightbox-img-wrap' id='lb-img-wrap'>"
+      + "<img class='lightbox-img' id='lb-img' src='" + esc(src) + "' alt='" + esc(tit) + "'>"
+      + "</div>"
+      + "<div style='color:rgba(255,255,255,0.7); font-size:11.5px; margin-top:8px;'>Toca la imagen para alternar zoom · Presiona Cerrar o Esc para salir</div>";
+
+    lb.innerHTML = h;
+    document.body.appendChild(lb);
+    document.body.style.overflow = "hidden"; // bloquear scroll del fondo
+
+    function cerrar() {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+      lb.style.opacity = "0";
+      setTimeout(function () { if (lb && lb.parentNode) lb.parentNode.removeChild(lb); }, 150);
+    }
+
+    function onKey(e) {
+      if (e.key === "Escape") cerrar();
+    }
+    window.addEventListener("keydown", onKey);
+
+    var img = lb.querySelector("#lb-img");
+    var btnCerrar = lb.querySelector("#lb-btn-cerrar");
+    var btnZoom = lb.querySelector("#lb-btn-zoom");
+
+    if (btnCerrar) btnCerrar.addEventListener("click", cerrar);
+
+    function toggleZoom(e) {
+      if (e) e.stopPropagation();
+      if (!img) return;
+      img.classList.toggle("zoomed");
+      if (btnZoom) {
+        var isZoomed = img.classList.contains("zoomed");
+        var sp = btnZoom.querySelector("span");
+        if (sp) sp.textContent = isZoomed ? "Alejar" : "Zoom";
+      }
+    }
+
+    if (img) img.addEventListener("click", toggleZoom);
+    if (btnZoom) btnZoom.addEventListener("click", toggleZoom);
+
+    lb.addEventListener("click", function (e) {
+      if (e.target === lb || e.target.id === "lb-img-wrap") {
+        cerrar();
+      }
+    });
+  }
+  window.mostrarLightbox = mostrarLightbox;
+
+  function setupLightboxVisor() {
+    document.addEventListener("click", function (e) {
+      var target = e.target;
+      if (!target) return;
+      var imgEl = null;
+      if (target.tagName === "IMG") {
+        if (target.classList.contains("zoomable-img") ||
+            target.closest(".fotos-wrap") ||
+            target.closest(".foto-card") ||
+            target.closest(".foto-card-mini") ||
+            (target.classList.contains("avatar") && target.closest(".ficha-head")) ||
+            target.closest(".grafico-wrap")) {
+          imgEl = target;
+        }
+      } else {
+        var card = target.closest(".foto-card") || target.closest(".foto-card-mini") || target.closest(".grafico-wrap");
+        if (card) {
+          imgEl = card.querySelector("img");
+        }
+      }
+
+      if (imgEl && imgEl.src) {
+        e.preventDefault();
+        var titulo = imgEl.alt || imgEl.title || "Imagen";
+        var tagAnimal = (window.__ultimaFicha && window.__ultimaFicha.tag) || (document.body.getAttribute("data-tag")) || "";
+        if (tagAnimal && titulo.indexOf(tagAnimal) === -1) {
+          titulo += " · Animal " + tagAnimal;
+        }
+        mostrarLightbox(imgEl.src, titulo);
+      }
+    });
+  }
+
+  // Inicializar visor lightbox para fichas y gráficos en toda la app
+  setupLightboxVisor();
+
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";
     abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
