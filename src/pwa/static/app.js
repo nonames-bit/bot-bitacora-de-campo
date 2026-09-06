@@ -3196,6 +3196,7 @@
     var inp = q("#f-tag");
     if (inp) inp.value = tag;
     destino.click();
+  }
   window.abrirFichaDesdeTag = abrirFichaDesdeTag;
   window.abrirTabFicha = function (tabId) {
     var nav = document.getElementById("ficha-tabs");
