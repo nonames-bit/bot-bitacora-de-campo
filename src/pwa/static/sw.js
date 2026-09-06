@@ -22,7 +22,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v24: SVG manga corral, celo, muerte, pajuelas, logo Ganadería JA y fix safe-area celular.
 // v25: Motor de telemetría GPS silenciosa en segundo plano y auditoría de rutas para OWNER.
 // v26: Niveles de acceso (Level 1, 2, 3), IDs locales y Telegram, campo nombre ampliado y avatares temáticos.
-var CACHE = "pwa-ja-v26"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v27: Eliminación de parpadeos y skeletons en auto-refresco en segundo plano y carga inicial fluida.
+var CACHE = "pwa-ja-v27"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

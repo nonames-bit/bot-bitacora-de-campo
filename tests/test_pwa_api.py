@@ -659,6 +659,16 @@ def test_telemetria_gps_ping_y_rutas(tmp_path):
     assert res_ping["ok"] is True
     assert res_ping["potrero"]["nombre"] == "Guayabal"
 
+    # Ping fuera de la finca es ignorado y no registrado
+    r_fuera = c_trab.post("/api/telemetria/ping", json={
+        "lat": 10.5,
+        "lon": -70.5,
+        "precision_m": 5.0,
+        "evento_origen": "apertura_app"
+    })
+    assert r_fuera.status_code == 200
+    assert r_fuera.get_json()["ignorado"] is True
+
     # 2. Trabajador NO tiene acceso a /api/telemetria/rutas (403)
     r_rutas_trab = c_trab.get("/api/telemetria/rutas")
     assert r_rutas_trab.status_code == 403

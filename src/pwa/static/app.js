@@ -1881,13 +1881,14 @@
   /* ---------- Usuario y Control de Acceso (RBAC) ---------- */
   var usuarioActual = null;
   function cargarUsuario() {
-    fetch("/api/usuario").then(function (r) {
+    return fetch("/api/usuario").then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
     }).then(function (u) {
       usuarioActual = u || {};
       window.__usuarioActual = usuarioActual;
       aplicarRBAC(usuarioActual);
+      return usuarioActual;
     }).catch(function () { /* modo seguro */ });
   }
 
@@ -2247,7 +2248,7 @@
   }
   function abrirFicha(tag, target, showIdent, animar) {
     if (animar === undefined) animar = true;
-    skeleton(target, "ficha");
+    if (animar) skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
       if (!f.existe) {
         if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
@@ -2442,6 +2443,7 @@
     }
 
     if (actual === "manga") {
+      if (!animar) return; // En polling silencioso no resetear la manga
       if (vista) {
         montarVista(vista, renderManga(), animar);
         bindManga();
@@ -2450,6 +2452,7 @@
     }
 
     if (actual === "captura") {
+      if (!animar) return; // En polling silencioso no resetear captura
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
@@ -2458,39 +2461,40 @@
     }
 
     if (actual === "gps") {
-      skeleton(vista, "gps");
+      if (animar) skeleton(vista, "gps");
       var fFecha = _fechaFiltroRutas || (q("#filtro-fecha-rutas") && q("#filtro-fecha-rutas").value) || new Date().toISOString().slice(0, 10);
       fetchJSON("/api/telemetria/rutas?fecha=" + encodeURIComponent(fFecha), function (d) {
         if (!vista) return;
         montarVista(vista, renderGps(d, fFecha), animar);
         bindGps(d, fFecha);
-      }, vista);
+      }, animar ? vista : null);
       return;
     }
 
     if (actual === "sistema") {
-      skeleton(vista, "sistema");
+      if (animar) skeleton(vista, "sistema");
       fetchJSON("/api/sistema", function (d) {
         if (!vista) return;
         montarVista(vista, renderSistema(d), animar);
         bindSistema();
-      }, vista);
+      }, animar ? vista : null);
       return;
     }
 
     if (actual === "usuarios") {
-      skeleton(vista, "usuarios");
+      if (!animar) return; // En polling silencioso no resetear el formulario de usuarios
+      if (animar) skeleton(vista, "usuarios");
       fetchJSON("/api/usuarios", function (d) {
         if (!vista) return;
         montarVista(vista, renderUsuarios(d), animar);
         bindUsuarios(d);
-      }, vista);
+      }, animar ? vista : null);
       return;
     }
 
     var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
     var url = "/api/" + actual + (pot && actual === "tablero" ? "?potrero=" + encodeURIComponent(pot) : "");
-    skeleton(vista, actual);
+    if (animar) skeleton(vista, actual);
     fetchJSON(url, function (d) {
       if (!vista) return;
       var html;
@@ -2504,7 +2508,7 @@
       else if (actual === "genetica") html = renderGenetica(d);
       else if (actual === "agenda") html = renderAgenda(d);
       montarVista(vista, html, animar);
-    }, vista);
+    }, animar ? vista : null);
   }
 
   /* ---------- Badges de contadores en la navegación ---------- */
@@ -2577,7 +2581,6 @@
       qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
       b.classList.add("act");
       actual = b.getAttribute("data-v");
-      enviarTelemetriaSilenciosa("navegacion_" + actual);
       cargar();
       if (VISTAS_BADGE.indexOf(actual) !== -1) {
         // Al abrir la vista, los datos frescos actualizan su badge al instante.
@@ -2591,7 +2594,6 @@
   // saltar a la vista que sabe usar ese campo antes de cargar).
   function irAVista(v) {
     actual = v;
-    enviarTelemetriaSilenciosa("salto_vista_" + v);
     qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
     if (destino) destino.classList.add("act");
@@ -2644,8 +2646,11 @@
   tick();
   setInterval(function () {
     tick();
-    if (document.hidden || navigator.onLine === false || actual === "ficha") { if (!document.hidden) actualizarBadges(); return; }
-    cargar(false); // polling en silencio: sin animación ni count-up
+    if (document.hidden || navigator.onLine === false || actual !== "tablero") {
+      if (!document.hidden) actualizarBadges();
+      return;
+    }
+    cargar(false); // polling en silencio: sin animación ni skeleton, solo en el tablero
     actualizarBadges();
   }, 60000);
 
@@ -2711,7 +2716,6 @@
     var tag = document.body.getAttribute("data-tag") || "";
     abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
   } else {
-    cargarUsuario();
     setupSyncOffline();
     setupChatModal();
     setupVozModal();
@@ -2728,6 +2732,8 @@
       actualizarBadges();
       sincronizarColaOffline(false);
     });
-    arrancarDesdeUrl();
+    cargarUsuario().finally(function () {
+      arrancarDesdeUrl();
+    });
   }
 })();

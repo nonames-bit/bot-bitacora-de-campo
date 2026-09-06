@@ -1842,10 +1842,14 @@ class Database:
         h = hora or datetime.now().strftime("%H:%M:%S")
 
         det = self.detectar_potrero_gps(lat_f, lon_f)
-        pot_id = det["id"] if det else None
-        pot_nom = det["nombre"] if det else None
-        dist_m = det.get("distancia_m", 0.0) if det else None
-        dentro = 1 if det else 0
+        if not det:
+            logger.info("Telemetría GPS descartada: coordenadas (%.6f, %.6f) fuera del perímetro de la finca.", lat_f, lon_f)
+            return None
+
+        pot_id = det["id"]
+        pot_nom = det["nombre"]
+        dist_m = det.get("distancia_m", 0.0)
+        dentro = 1 if det.get("dentro", True) else 0
 
         return self.insert("telemetria_gps", {
             "user_id": user_id,
