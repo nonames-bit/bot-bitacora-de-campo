@@ -192,3 +192,43 @@ def test_auth_telegram_id_y_avatar(tmp_path):
     assert u["avatar"] == "patron"
     assert u["nombre"] == "Don José"
 
+
+def test_auth_actualizar_usuario_preserva_telegram_id(tmp_path):
+    archivo = tmp_path / "users.json"
+    auth = Auth(users_file=str(archivo))
+    auth.agregar_usuario(
+        user_id=1,
+        nombre="Jaime",
+        rol="OWNER",
+        pin="1144",
+        telegram_id=6123051140,
+        avatar="patron"
+    )
+
+    # Actualizar solo nombre y rol sin pasar telegram_id
+    auth.agregar_usuario(
+        user_id=1,
+        nombre="Jaime Actualizado",
+        rol="OWNER",
+        pin="1144",
+    )
+    u = auth.obtener_usuario(1)
+    assert u is not None
+    assert u["nombre"] == "Jaime Actualizado"
+    # Debe preservar el telegram_id
+    assert u["telegram_id"] == 6123051140
+    assert auth.es_autorizado(6123051140) is True
+
+    # Si se pide explícitamente borrar_telegram_id=True
+    auth.agregar_usuario(
+        user_id=1,
+        nombre="Jaime Actualizado",
+        rol="OWNER",
+        pin="1144",
+        borrar_telegram_id=True,
+    )
+    u2 = auth.obtener_usuario(1)
+    assert u2["telegram_id"] is None
+    assert auth.es_autorizado(6123051140) is False
+
+

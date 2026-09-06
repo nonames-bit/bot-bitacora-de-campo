@@ -959,6 +959,46 @@ def formatear_status(
     )
 
 
+def formatear_tablero_sistema(
+    db: Database, auth: Optional[Auth] = None, db_path: Optional[str] = None
+) -> str:
+    """Genera el diagnóstico ejecutivo de infraestructura y sincronización para el rol OWNER."""
+    tam_str = "0 MB"
+    if db_path and db_path != ":memory:" and os.path.exists(db_path):
+        tam_str = f"{os.path.getsize(db_path) / (1024 * 1024):.2f} MB"
+    activos = _contar_activos(db)
+    row_tot = db.query_one("SELECT COUNT(*) as n FROM animales")
+    tot_animales = int(row_tot["n"]) if row_tot else 0
+
+    # Sincronización SG
+    ult_sync = db.ultimo_import_sg()
+    if ult_sync:
+        f_sync = str(ult_sync["fecha_iso"] or "")[:16].replace("T", " ")
+        arch_sync = ult_sync["archivo"] or "backup.zip"
+        nuevos = ult_sync["nuevos"] or 0
+        dup = ult_sync["duplicados"] or 0
+        sync_str = f"{f_sync} ({arch_sync} · +{nuevos} nuevos, {dup} existentes)"
+    else:
+        sync_str = "Sin registro de sincronización previo"
+
+    # Termo
+    termo = db.query_one("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC LIMIT 1")
+    termo_str = f"Última recarga {termo['fecha_recarga']}" if termo else "No configurado"
+
+    # Usuarios
+    n_usr = len(auth.listar_usuarios()) if auth else 0
+
+    return (
+        f"🖥️ <b>Infraestructura & Base de Datos Ganadería JA</b>\n\n"
+        f"• <b>Base de Datos:</b> {html.escape(tam_str)} (Modo WAL activo)\n"
+        f"• <b>Hato Activo:</b> {_fmt_es_co(activos)} animales activos ({_fmt_es_co(tot_animales)} históricos)\n"
+        f"• <b>Sincronización SG:</b> {html.escape(sync_str)}\n"
+        f"• <b>Termo N₂:</b> {html.escape(termo_str)}\n"
+        f"• <b>Usuarios Autorizados:</b> {n_usr} cuentas RBAC configuradas\n\n"
+        f"<i>Panel reservado exclusivamente para la administración y supervisión del Propietario.</i>"
+    )
+
+
 def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     """Genera el Tablero de Control Ejecutivo Zootécnico de la Finca (Hoy / Últimos 7 días / Próximas Alertas)."""
     if hoy is None:

@@ -5,7 +5,7 @@ import logging
 import re
 import sqlite3
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
 from ..utils import add_days, iso, to_date
 from .models import SCHEMA_SQL
@@ -1528,6 +1528,8 @@ class Database:
             """,
             (limite,),
         )
+
+    ultimos_registros_creados = ultimos_registros
 
     def detalle_registro(self, tabla: str, id_registro: int) -> Optional[dict]:
         """Detalle legible de una fila puntual de una tabla de eventos, para

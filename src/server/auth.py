@@ -235,6 +235,7 @@ class Auth:
         pin: Optional[str] = None,
         telegram_id: Optional[int] = None,
         avatar: Optional[str] = None,
+        borrar_telegram_id: bool = False,
     ) -> None:
         """Agrega o actualiza un usuario y persiste los cambios."""
         # Mutación + persistencia como una sola unidad crítica bajo el candado
@@ -262,8 +263,12 @@ class Auth:
                     u["rol"] = rol_norm
                     if pin_norm is not None:
                         u["pin"] = pin_norm
-                    u["telegram_id"] = tg_id_norm
-                    u["avatar"] = avatar_norm
+                    if telegram_id is not None:
+                        u["telegram_id"] = tg_id_norm
+                    elif borrar_telegram_id:
+                        u["telegram_id"] = None
+                    if avatar is not None:
+                        u["avatar"] = avatar_norm
                     self._guardar_sin_lock()
                     logger.info("Usuario actualizado: user_id=%s, nombre=%s, rol=%s", uid, nombre_norm, rol_norm)
                     return

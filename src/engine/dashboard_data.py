@@ -503,7 +503,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             m = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["madre_id"],))
             if m:
                 madre_dict = {"id_animal": m["id_animal"], "tag": m["tag"], "nombre": m["nombre"], "raza": m["raza"]}
-        except Exception as e:
+        except Exception:
             logger.error("seccion madre fallo", exc_info=True)
     base["madre"] = madre_dict
 
@@ -513,7 +513,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             p = db.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE id_animal = ?", (an["padre_id"],))
             if p:
                 padre_dict = {"id_animal": p["id_animal"], "tag": p["tag"], "nombre": p["nombre"], "raza": p["raza"]}
-        except Exception as e:
+        except Exception:
             logger.error("seccion padre fallo", exc_info=True)
     base["padre"] = padre_dict
 
@@ -601,7 +601,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                ORDER BY fecha DESC""", (aid, hoy_iso, hoy_iso)
         )
         retiros_activos = _filas_dict(ret_rows)
-    except Exception as e:
+    except Exception:
         logger.error("seccion retiros_activos fallo", exc_info=True)
     base["retiros_activos"] = retiros_activos
     base["en_retiro"] = len(retiros_activos) > 0
@@ -652,7 +652,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                ORDER BY t.fecha DESC, t.id DESC LIMIT 4""", (aid,)
         )
         base["traslados"] = _filas_dict(t_rows)
-    except Exception as e:
+    except Exception:
         logger.error("seccion traslados fallo", exc_info=True)
         base["traslados"] = []
 

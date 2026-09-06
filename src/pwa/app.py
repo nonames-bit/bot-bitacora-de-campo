@@ -35,7 +35,7 @@ try:
         sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 except Exception:
     pass
-from datetime import date, datetime
+from datetime import date
 import hmac
 import mimetypes
 import secrets
@@ -46,9 +46,9 @@ if _RAIZ_REPO not in sys.path:
     sys.path.insert(0, _RAIZ_REPO)
 
 try:
-    from ..utils import iso, to_date
+    from ..utils import to_date
 except (ImportError, ValueError):
-    from src.utils import iso, to_date  # type: ignore
+    from src.utils import to_date  # type: ignore
 
 # Flask sirve /static con mimetypes.guess_type; .woff2 no viene registrado y
 # se entregaría como application/octet-stream, que algunos navegadores
@@ -1051,11 +1051,14 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         avatar = str(datos.get("avatar") or "").strip() or None
 
         tg_id = None
+        borrar_tg = False
         if tg_id_raw is not None and str(tg_id_raw).strip() != "":
             try:
                 tg_id = int(tg_id_raw)
             except (ValueError, TypeError):
                 return jsonify({"error": "El ID de Telegram debe ser un número entero (ej. 6123051140)."}), 400
+        elif "telegram_id" in datos and (tg_id_raw is None or str(tg_id_raw).strip() == ""):
+            borrar_tg = True
 
         if not nombre:
             return jsonify({"error": "El nombre del usuario es obligatorio."}), 400
@@ -1106,17 +1109,19 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 pin=pin,
                 telegram_id=tg_id,
                 avatar=avatar,
+                borrar_telegram_id=borrar_tg,
             )
+            usr_guardado = auth_inst.obtener_usuario(uid) or {}
             return jsonify({
                 "ok": True,
                 "mensaje": f"Usuario '{nombre}' (Level {1 if rol_nuevo=='OWNER' else 2 if rol_nuevo=='ADMIN' else 3}) guardado exitosamente.",
                 "usuario": {
                     "user_id": uid,
-                    "telegram_id": tg_id,
+                    "telegram_id": usr_guardado.get("telegram_id"),
                     "nombre": nombre,
                     "rol": rol_nuevo,
                     "pin": pin,
-                    "avatar": avatar or ("patron" if rol_nuevo=="OWNER" else "admin" if rol_nuevo=="ADMIN" else "vaquero"),
+                    "avatar": usr_guardado.get("avatar") or ("patron" if rol_nuevo=="OWNER" else "admin" if rol_nuevo=="ADMIN" else "vaquero"),
                 }
             })
         except Exception as e:
@@ -1740,18 +1745,90 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 presencias = db_inst.obtener_usuarios_presencia()
                 en_linea_cnt = sum(1 for p in presencias.values() if p.get("en_linea"))
             except Exception:
+                presencias = {}
                 en_linea_cnt = 0
+
+            # 1. Sincronización Software Ganadero (SG)
+            ult_sync_row = db_inst.ultimo_import_sg()
+            historial_sync_rows = db_inst.query(
+                "SELECT id, fecha_iso, archivo, nuevos, duplicados FROM import_sg_historial ORDER BY id DESC LIMIT 10"
+            )
+            sync_sg = None
+            if ult_sync_row:
+                d_sync = dict(ult_sync_row)
+                f_iso = d_sync.get("fecha_iso")
+                dias_diff = None
+                tiempo_str = "Reciente"
+                if f_iso:
+                    try:
+                        f_d = to_date(f_iso[:10])
+                        if f_d:
+                            diff = (date.today() - f_d).days
+                            dias_diff = diff
+                            if diff == 0:
+                                tiempo_str = "Hoy"
+                            elif diff == 1:
+                                tiempo_str = "Ayer"
+                            else:
+                                tiempo_str = f"Hace {diff} días"
+                    except Exception:
+                        pass
+                d_sync["tiempo_relativo"] = tiempo_str
+                d_sync["dias_desde_sync"] = dias_diff
+                d_sync["al_dia"] = (dias_diff is not None and dias_diff <= 7)
+                sync_sg = {
+                    "ultimo": d_sync,
+                    "historial": [dict(r) for r in (historial_sync_rows or [])],
+                }
+
+            # 2. Auditoría de Actividad Reciente de los Demás Usuarios
+            ult_eventos = db_inst.ultimos_registros(limite=35)
+            actividad_reciente = []
+            for ev in ult_eventos:
+                r_dict = dict(ev)
+                reg_por = r_dict.get("registrado_por")
+                u_info = auth_inst.obtener_usuario(reg_por) if (reg_por and auth_inst) else None
+                if u_info:
+                    r_dict["usuario_nombre"] = u_info.get("nombre", f"Usuario #{reg_por}")
+                    r_dict["usuario_rol"] = u_info.get("rol", "TRABAJADOR")
+                    r_dict["usuario_avatar"] = u_info.get("avatar") or ("patron" if u_info.get("rol") == "OWNER" else "admin" if u_info.get("rol") == "ADMIN" else "vaquero")
+                    r_dict["canal"] = "Telegram" if (isinstance(reg_por, int) and reg_por > 1000000) else "PWA"
+                elif reg_por:
+                    r_dict["usuario_nombre"] = f"Usuario #{reg_por}"
+                    r_dict["usuario_rol"] = "TRABAJADOR"
+                    r_dict["usuario_avatar"] = "vaquero"
+                    r_dict["canal"] = "Telegram" if (isinstance(reg_por, int) and reg_por > 1000000) else "PWA"
+                else:
+                    r_dict["usuario_nombre"] = "Software Ganadero (SG)"
+                    r_dict["usuario_rol"] = "SISTEMA"
+                    r_dict["usuario_avatar"] = "admin"
+                    r_dict["canal"] = "Backup SG"
+
+                c_en = r_dict.get("creado_en") or r_dict.get("fecha")
+                if c_en:
+                    try:
+                        c_clean = str(c_en).replace("T", " ")[:16]
+                        r_dict["fecha_hora_fmt"] = c_clean
+                    except Exception:
+                        r_dict["fecha_hora_fmt"] = str(c_en)
+                else:
+                    r_dict["fecha_hora_fmt"] = "—"
+
+                actividad_reciente.append(r_dict)
 
             return jsonify({
                 "texto": texto_sistema,
                 "vps": info_vps,
                 "en_linea_count": en_linea_cnt,
+                "presencias": list(presencias.values()) if presencias else [],
                 "db": {
                     "path": db_path,
                     "tam_mb": tam_mb,
                     "activos": row_a["n"] if row_a else 0,
                     "total": row_tot["n"] if row_tot else 0,
                 },
+                "sync_sg": sync_sg,
+                "actividad_reciente": actividad_reciente,
                 "termo": dict(termo) if termo else None,
                 "rol": "OWNER",
             })

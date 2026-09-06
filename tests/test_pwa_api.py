@@ -424,6 +424,8 @@ def test_autenticacion_pin_roles_y_usuario(tmp_path, db_file):
     assert r_sis.status_code == 200
     d_sis = r_sis.get_json()
     assert "vps" in d_sis and "db" in d_sis
+    assert "sync_sg" in d_sis
+    assert "actividad_reciente" in d_sis
     assert c.get("/api/logs").status_code == 200
 
 
