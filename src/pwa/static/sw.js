@@ -31,7 +31,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v33: Captura de foto opcional en eventos de campo (partos/crías, tratamientos y muertes) con compresión client-side.
 // v34: Instalación directa como App en pantalla de inicio (Android, iPhone iOS y PC) con manifest enriquecido y guía táctil.
 // v37: Sección interactiva de últimos eventos en tablero y solución de colores en pirámide de edades para Sol de Campo.
-var CACHE = "pwa-ja-v37"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v38: Fix de clics rotos por el CSP (script-src 'self') en árbol genealógico, crías, feed de eventos y exportar CSV -- de onclick inline a delegación de eventos.
+var CACHE = "pwa-ja-v38"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

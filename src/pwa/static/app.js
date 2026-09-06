@@ -41,7 +41,7 @@
   }
   function grafico(tipo, alt) {
     return "<div class='grafico-wrap'><img src='/api/grafico/" + tipo + "' alt='" + esc(alt) +
-      "' loading='lazy' onerror='this.style.display=\"none\"'></div>";
+      "' loading='lazy' data-onerror-hide='self'></div>";
   }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
 
@@ -183,11 +183,11 @@
         }
 
         var nomHtml = ev.nombre ? (" <small style='color:var(--texto-suave); font-weight:normal;'>(" + esc(ev.nombre) + ")</small>") : "";
-        var linkAnimal = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-size:13.5px; font-weight:bold;'>🐮 " + esc(ev.tag) + "</a>" + nomHtml;
+        var linkAnimal = "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(ev.tag) + "\" style='font-size:13.5px; font-weight:bold;'>🐮 " + esc(ev.tag) + "</a>" + nomHtml;
 
         var detalleExtra = "";
         if (ev.detalle_tag) {
-          detalleExtra = "<div style='margin-top:3px;'><small style='color:var(--texto-suave);'>Cría: </small><a href='#' class='ficha-link chip verde' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.detalle_tag) + "\");' style='font-size:11px; padding:2px 6px; font-weight:bold; text-decoration:none;'>🍼 " + esc(ev.detalle_tag) + "</a></div>";
+          detalleExtra = "<div style='margin-top:3px;'><small style='color:var(--texto-suave);'>Cría: </small><a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(ev.detalle_tag) + "\" style='font-size:11px; padding:2px 6px; font-weight:bold; text-decoration:none;'>🍼 " + esc(ev.detalle_tag) + "</a></div>";
         }
 
         var descHtml = "<b>" + esc(ev.descripcion || "") + "</b>";
@@ -200,7 +200,7 @@
           + "<td><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
           + "<td>" + linkAnimal + detalleExtra + "</td>"
           + "<td>" + descHtml + "</td>"
-          + "<td><button type='button' class='tema-btn' onclick='if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-size:11px; padding:4px 8px; white-space:nowrap;'>" + icon("search", 11) + " Ver Ficha</button></td>"
+          + "<td><button type='button' class='tema-btn' data-ir-ficha=\"" + esc(ev.tag) + "\" style='font-size:11px; padding:4px 8px; white-space:nowrap;'>" + icon("search", 11) + " Ver Ficha</button></td>"
           + "</tr>";
       });
 
@@ -359,7 +359,7 @@
   }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var expBtn = "<button type='button' class='tema-btn' onclick='window.__exportarInventario()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
     var h = "<h3>" + icon("cow") + "Inventario y Población" + expBtn + "</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
@@ -468,7 +468,7 @@
     }
     var ret = d.retiros || [];
     if (ret.length) {
-      var expRetBtn = "<button type='button' class='tema-btn' onclick='window.__exportarRetiros()' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar Retiros CSV</button>";
+      var expRetBtn = "<button type='button' class='tema-btn' data-accion='exportar-retiros' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar Retiros CSV</button>";
       h += "<h4>" + icon("alert") + "Retiros sanitarios activos" + expRetBtn + "</h4><div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       ret.forEach(function (r) {
         function c(f, df) {
@@ -2726,7 +2726,7 @@
     var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
       head += "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; flex-shrink:0; border-radius:8px; overflow:hidden;'>"
-        + "<img class='avatar zoomable-img' src='" + esc(f.fotos[0].url) + "' alt='Foto principal " + esc(f.tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' onerror='this.parentElement.style.display=\"none\"'>"
+        + "<img class='avatar zoomable-img' src='" + esc(f.fotos[0].url) + "' alt='Foto principal " + esc(f.tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
         + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
         + "</div>";
     } else {
@@ -2811,7 +2811,7 @@
         }
         var nom = an.nombre ? " · " + esc(an.nombre) : "";
         var rz = an.raza ? " [" + esc(an.raza) + "]" : "";
-        var click = "onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(an.tag) + "\");'";
+        var click = "data-ir-ficha='" + esc(an.tag) + "'";
         return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
           + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
           + "<div><a href='#' class='ficha-link' " + click + " style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span></div>"
@@ -2866,7 +2866,7 @@
           var pNac = c.peso_nacimiento ? " · " + c.peso_nacimiento + " kg" : "";
 
           var linkTag = cTag !== "Sin arete"
-            ? "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(cTag) + "\");' style='font-size:14px; font-weight:bold;'>🐮 " + esc(cTag) + "</a>"
+            ? "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(cTag) + "\" style='font-size:14px; font-weight:bold;'>🐮 " + esc(cTag) + "</a>"
             : "<span style='color:var(--texto-suave);'>🐮 Sin arete</span>";
 
           hg += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:10px 12px;'>"
@@ -2886,7 +2886,7 @@
         hg += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
           + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>"
           + "<h4 style='margin:0; font-size:13px;'>" + icon("notes", 15) + "Formato de Texto Compartible (Telegram / WhatsApp)</h4>"
-          + "<button type='button' class='tema-btn' onclick='var pre=this.closest(\".card\").querySelector(\"pre\"); if(pre){navigator.clipboard.writeText(pre.innerText).then(function(){alert(\"Árbol copiado al portapapeles\");});}' style='font-size:11px; padding:4px 8px;'>" + icon("copy", 12) + "Copiar Árbol</button>"
+          + "<button type='button' class='tema-btn' data-accion='copiar-arbol' style='font-size:11px; padding:4px 8px;'>" + icon("copy", 12) + "Copiar Árbol</button>"
           + "</div>"
           + "<pre style='background:var(--fondo); border:1px solid var(--borde); border-radius:6px; padding:10px; font-size:11.5px; line-height:1.45; overflow-x:auto; margin:0; font-family:var(--font-mono); white-space:pre-wrap;'>" + esc(txtArbol) + "</pre>"
           + "</div>";
@@ -2937,7 +2937,7 @@
       h3 += "<h4>Controles de leche</h4>"
         + tabla(f.controles_leche, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin controles individuales.");
       var img = "<div class='grafico-wrap'><img src='/api/ficha/" + encodeURIComponent(f.tag)
-        + "/grafico/lactancia' alt='Curva de lactancia' loading='lazy' onerror='this.style.display=\"none\"'></div>";
+        + "/grafico/lactancia' alt='Curva de lactancia' loading='lazy' data-onerror-hide='self'></div>";
       h3 += img;
       return h3;
     }
@@ -2955,7 +2955,7 @@
         ], "Sin pesajes registrados.");
       if (ult) h2 += "<p class='aviso'>Último peso: <b>" + esc(ult.peso_kg) + " kg</b> el " + esc(fechaCorta(ult.fecha)) + "</p>";
       h2 += "<div class='grafico-wrap'><img src='/api/ficha/" + encodeURIComponent(f.tag)
-        + "/grafico/peso' alt='Curva de peso' loading='lazy' onerror='this.style.display=\"none\"'></div>";
+        + "/grafico/peso' alt='Curva de peso' loading='lazy' data-onerror-hide='self'></div>";
       return h2;
     }
     // Tab "general"
@@ -2996,7 +2996,7 @@
     h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
       + "<h4 style='margin:0;'>" + icon("dna") + "Identificación & Genealogía</h4>"
-      + "<button type='button' class='tema-btn' onclick='if(window.abrirTabFicha)window.abrirTabFicha(\"genealogia\");' style='font-size:12px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;'>" + icon("gitBranch", 13) + "Ver Pedigree 3G</button>"
+      + "<button type='button' class='tema-btn' data-ir-tab='genealogia' style='font-size:12px; padding:4px 10px; display:inline-flex; align-items:center; gap:4px;'>" + icon("gitBranch", 13) + "Ver Pedigree 3G</button>"
       + "</div>"
       + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:10px;'>"
       + "<div><span style='color:var(--texto-suave);'>Arete / Tag:</span> <b>" + esc(f.tag) + "</b></div>"
@@ -3011,14 +3011,14 @@
     // Madre con enlace interactivo si existe
     var madreHtml = "S/D";
     if (f.madre && f.madre.tag) {
-      madreHtml = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(f.madre.tag) + "\");' title='Ver ficha de la madre'><b>" + esc(f.madre.tag) + "</b> (" + esc(f.madre.nombre || f.madre.raza || "Madre") + ")</a>";
+      madreHtml = "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(f.madre.tag) + "\" title='Ver ficha de la madre'><b>" + esc(f.madre.tag) + "</b> (" + esc(f.madre.nombre || f.madre.raza || "Madre") + ")</a>";
     }
     h += "<div><span style='color:var(--texto-suave);'>Madre:</span> " + madreHtml + "</div>";
 
     // Padre con enlace si existe
     var padreHtml = "S/D";
     if (f.padre && f.padre.tag) {
-      padreHtml = "<a href='#' class='ficha-link' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(f.padre.tag) + "\");' title='Ver ficha del padre'><b>" + esc(f.padre.tag) + "</b> (" + esc(f.padre.nombre || f.padre.raza || "Padre") + ")</a>";
+      padreHtml = "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(f.padre.tag) + "\" title='Ver ficha del padre'><b>" + esc(f.padre.tag) + "</b> (" + esc(f.padre.nombre || f.padre.raza || "Padre") + ")</a>";
     }
     h += "<div><span style='color:var(--texto-suave);'>Padre / Toro:</span> " + padreHtml + "</div>";
 
@@ -3047,7 +3047,7 @@
         var cFec = fechaCorta(c.fecha_parto || c.fecha || c.fecha_nacimiento);
         var chipTxt = "🐮 " + esc(cTag) + (cSx ? " (" + esc(cSx) + ")" : "") + (cFec ? " [" + esc(cFec) + "]" : "");
         if (cTag !== "Sin arete") {
-          h += "<a href='#' class='ficha-link chip verde' onclick='event.preventDefault(); if (window.abrirFichaDesdeTag) window.abrirFichaDesdeTag(\"" + esc(cTag) + "\");' style='text-decoration:none; font-size:12px; padding:3px 8px; font-weight:bold;'>" + chipTxt + "</a>";
+          h += "<a href='#' class='ficha-link chip verde' data-ir-ficha=\"" + esc(cTag) + "\" style='text-decoration:none; font-size:12px; padding:3px 8px; font-weight:bold;'>" + chipTxt + "</a>";
         } else {
           h += "<span class='chip gris' style='font-size:12px; padding:3px 8px;'>" + chipTxt + "</span>";
         }
@@ -3056,7 +3056,7 @@
     }
 
     h += "<div style='margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;'>"
-      + "<button type='button' class='btn-guardar-manga' onclick='if (window.abrirTabFicha) window.abrirTabFicha(\"genealogia\");' style='font-size:12.5px; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;'>"
+      + "<button type='button' class='btn-guardar-manga' data-ir-tab='genealogia' style='font-size:12.5px; padding:7px 14px; display:inline-flex; align-items:center; gap:6px;'>"
       + icon("dna", 15) + "Abrir Árbol Genealógico (3G) Completo & Consanguinidad</button>"
       + "</div>";
 
@@ -3107,7 +3107,7 @@
       fotosHtml = "<div class='fotos-wrap' style='margin-top:8px; display:flex; gap:12px; flex-wrap:wrap;'>" + f.fotos.filter(function (x) { return x.url; })
         .map(function (x, idx) {
           return "<div class='foto-card' title='Toca para agrandar imagen'>"
-            + "<img class='zoomable-img' src='" + esc(x.url) + "' alt='Foto #" + (idx + 1) + " · " + esc(f.tag) + "' loading='lazy' style='max-height:175px; width:auto; border-radius:8px; object-fit:cover; display:block;' onerror='this.parentElement.style.display=\"none\"'>"
+            + "<img class='zoomable-img' src='" + esc(x.url) + "' alt='Foto #" + (idx + 1) + " · " + esc(f.tag) + "' loading='lazy' style='max-height:175px; width:auto; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
             + "<div class='zoom-hint'>" + icon("search", 12) + "Agrandar</div>"
             + "</div>";
         }).join("") + "</div>";
@@ -3273,6 +3273,44 @@
     var btn = nav.querySelector("button[data-tab='" + tabId + "']");
     if (btn) btn.click();
   };
+  // Delegado global de clics para HTML inyectado dinámicamente (innerHTML):
+  // el CSP de producción (script-src 'self', sin unsafe-inline) bloquea
+  // atributos onclick='' inline -- por eso todo lo que se genera con
+  // cadenas HTML usa data-ir-ficha / data-ir-tab / data-accion en vez de
+  // onclick, y un único listener delegado en document los resuelve aquí.
+  document.addEventListener("click", function (e) {
+    var elFicha = e.target.closest("[data-ir-ficha]");
+    if (elFicha) {
+      e.preventDefault();
+      abrirFichaDesdeTag(elFicha.getAttribute("data-ir-ficha"));
+      return;
+    }
+    var elTab = e.target.closest("[data-ir-tab]");
+    if (elTab) {
+      e.preventDefault();
+      window.abrirTabFicha(elTab.getAttribute("data-ir-tab"));
+      return;
+    }
+    var elAcc = e.target.closest("[data-accion]");
+    if (elAcc) {
+      var acc = elAcc.getAttribute("data-accion");
+      if (acc === "exportar-inventario") { if (window.__exportarInventario) window.__exportarInventario(); }
+      else if (acc === "exportar-retiros") { if (window.__exportarRetiros) window.__exportarRetiros(); }
+      else if (acc === "reload") { location.reload(); }
+      else if (acc === "copiar-arbol") {
+        var card = elAcc.closest(".card");
+        var pre = card && card.querySelector("pre");
+        if (pre) navigator.clipboard.writeText(pre.innerText).then(function () { alert("Árbol copiado al portapapeles"); });
+      }
+    }
+  });
+  // "error" no burbujea, así que este delegado necesita fase de captura.
+  document.addEventListener("error", function (e) {
+    var el = e.target;
+    if (!el || el.tagName !== "IMG" || !el.hasAttribute("data-onerror-hide")) return;
+    var objetivo = el.getAttribute("data-onerror-hide") === "parent" ? el.parentElement : el;
+    if (objetivo) objetivo.style.display = "none";
+  }, true);
   function vincularTagsFicha(root) {
     if (!root) return;
     if (!qa("nav > button").length) return; // solo en el dashboard con navegación
@@ -3313,7 +3351,7 @@
     }).then(function (d) { clearTimeout(to); cb(d); })
       .catch(function (e) {
         clearTimeout(to);
-        if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button onclick='location.reload()'>Reintentar</button>";
+        if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
       });
   }
   function abrirFicha(tag, target, showIdent, animar) {
