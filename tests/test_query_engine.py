@@ -839,6 +839,39 @@ def test_existencias_por_potrero_sg(db):
     assert "Totales..." in resp_query
 
 
+def test_calcular_estructura_hato_sg(db):
+    """Estructura del hato a nivel de finca completa (para Inventario en la
+    PWA): mismas 9 categorías SG que existencias por potrero, pero también
+    cuenta animales sin potrero asignado (esa tabla los deja fuera)."""
+    from src.engine.query.helpers import calcular_estructura_hato_sg
+
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2020-01-01")
+    db.registrar_parto("V1", fecha="2026-06-01")  # vaca parida (<305d)
+    db.registrar_animal("V2", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2019-01-01")
+    db.registrar_parto("V2", fecha="2024-01-01")  # vaca seca (>305d desde el parto)
+    db.registrar_animal("N1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2023-01-01")  # novilla vientre
+    db.registrar_animal("T1", sexo="Macho", estado="ACTIVO", nombre="TORO PADRON", fecha_nacimiento="2021-01-01")  # reproductor
+    db.registrar_animal("C1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2026-02-01")  # cría hembra
+    db.registrar_animal("CM1", sexo="Macho", estado="ACTIVO", fecha_nacimiento="2026-03-01")  # cría macho
+    # No debería contar: vendido.
+    db.registrar_animal("V9", sexo="Hembra", estado="VENDIDO", fecha_nacimiento="2020-01-01")
+
+    res = calcular_estructura_hato_sg(db, hoy=date(2026, 8, 28))
+    por_cat = {f["categoria"]: f for f in res["filas"]}
+    assert por_cat["Vaca parida"]["n"] == 1
+    assert por_cat["Vaca seca"]["n"] == 1
+    assert por_cat["Novilla de vientre"]["n"] == 1
+    assert por_cat["Reproductor"]["n"] == 1
+    assert por_cat["Cría hembra"]["n"] == 1
+    assert por_cat["Cría macho"]["n"] == 1
+    assert res["total"] == 6
+    assert res["total_hembras"] == 4
+    assert res["total_machos"] == 2
+    total_pct = sum(f["pct"] for f in res["filas"])
+    assert 99.9 <= total_pct <= 100.1
+    assert res["total_ugg"] > 0
+
+
 def test_dias_ocupacion_y_rotacion(db):
     from src.engine.query_engine import (
         formatear_ocupacion_potreros,

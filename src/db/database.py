@@ -1307,6 +1307,100 @@ class Database:
             "por_toro": por_toro,
         }
 
+    def dias_abiertos_promedio_hato(self, hoy: Optional[date] = None) -> Optional[dict]:
+        """Días abiertos promedio del hato: vacas ACTIVAS paridas cuyo último
+        parto no tiene un servicio posterior registrado (siguen "abiertas"
+        desde ese parto). Misma definición usada en el panel poblacional del
+        bot (``formatear_poblacion_panel``) -- fuente única para que ambos
+        coincidan."""
+        hoy = hoy or date.today()
+        vacas_paridas = self.query(
+            """
+            SELECT a.id_animal FROM partos p
+            JOIN animales a ON a.id_animal = p.vaca_id
+            WHERE a.estado = 'ACTIVO' AND p.fecha IS NOT NULL
+              AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
+            GROUP BY a.id_animal
+            """
+        )
+        dias_lista = []
+        for v in vacas_paridas:
+            p_ult = self.ultimo_parto(v["id_animal"])
+            if not (p_ult and p_ult["fecha"] and to_date(p_ult["fecha"])):
+                continue
+            f_parto = to_date(p_ult["fecha"])
+            s_ult = self.ultimo_servicio(v["id_animal"])
+            if s_ult and s_ult["fecha"] and to_date(s_ult["fecha"]) and to_date(s_ult["fecha"]) >= f_parto:
+                continue
+            dias_lista.append((hoy - f_parto).days)
+        if not dias_lista:
+            return None
+        return {
+            "dias_abiertos_promedio": round(sum(dias_lista) / len(dias_lista)),
+            "n": len(dias_lista),
+        }
+
+    def iep_promedio_hato(self, umbral_max_dias: Optional[int] = 730) -> Optional[dict]:
+        """IEP (Intervalo Entre Partos) promedio del hato: para cada vaca con
+        2+ partos registrados, promedia la diferencia en días entre partos
+        consecutivos (el primer parto de cada vaca no tiene intervalo previo,
+        así que no cuenta). Misma fuente e igual filtro por defecto que
+        ``engine.charts.generar_grafico_iep_boxplot`` (excluye intervalos
+        >730 días -- casi siempre huecos de registro, no gestaciones reales)
+        para que el número acá y el boxplot coincidan."""
+        vacas = self.query(
+            "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL "
+            "AND (id_cria IS NULL OR id_cria != vaca_id)"
+        )
+        intervalos = []
+        for v in vacas:
+            partos = self.query(
+                "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL "
+                "AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY fecha",
+                (v["vaca_id"],),
+            )
+            fechas = [to_date(p["fecha"]) for p in partos if to_date(p["fecha"])]
+            for i in range(1, len(fechas)):
+                dias = (fechas[i] - fechas[i - 1]).days
+                if dias > 0 and (umbral_max_dias is None or dias <= umbral_max_dias):
+                    intervalos.append(dias)
+        if not intervalos:
+            return None
+        return {
+            "iep_promedio_dias": round(sum(intervalos) / len(intervalos)),
+            "n_intervalos": len(intervalos),
+        }
+
+    def edad_primer_parto_promedio_meses(self) -> Optional[dict]:
+        """Edad promedio (meses) al primer parto, para vacas con fecha de
+        nacimiento conocida y al menos un parto registrado. Descarta edades
+        fuera de 12-120 meses (1-10 años) por ser evidentemente fechas mal
+        cargadas, no primeros partos reales."""
+        vacas = self.query(
+            "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL AND fecha IS NOT NULL"
+        )
+        dias_validos = []
+        for v in vacas:
+            vid = v["vaca_id"]
+            a = self.query_one("SELECT fecha_nacimiento FROM animales WHERE id_animal = ?", (vid,))
+            fnac = to_date(a["fecha_nacimiento"]) if a else None
+            if not fnac:
+                continue
+            primer = self.query_one(
+                "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL ORDER BY fecha ASC LIMIT 1",
+                (vid,),
+            )
+            fp = to_date(primer["fecha"]) if primer else None
+            if not fp or fp <= fnac:
+                continue
+            dias = (fp - fnac).days
+            if 365 <= dias <= 3650:
+                dias_validos.append(dias)
+        if not dias_validos:
+            return None
+        meses = sum(dias_validos) / len(dias_validos) / 30.44
+        return {"edad_primer_parto_meses": round(meses, 1), "n": len(dias_validos)}
+
     # ------------------------------------------------------------------ #
     # Termo Criogénico y Pajuelas (Fase 5.1)
     # ------------------------------------------------------------------ #

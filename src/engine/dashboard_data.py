@@ -358,12 +358,47 @@ def datos_reproduccion(db: Database) -> dict:
         logger.error("seccion condicion_corporal_critica fallo", exc_info=True)
         errores["condicion_corporal_critica"] = str(e)
         cc_critica = []
+    try:
+        conc = db.kpis_reproductivos_concepcion()
+    except Exception as e:
+        logger.error("seccion kpis_concepcion fallo", exc_info=True)
+        errores["kpis_concepcion"] = str(e)
+        conc = None
+    try:
+        dias_ab = db.dias_abiertos_promedio_hato(hoy)
+    except Exception as e:
+        logger.error("seccion dias_abiertos fallo", exc_info=True)
+        errores["dias_abiertos"] = str(e)
+        dias_ab = None
+    try:
+        iep = db.iep_promedio_hato()
+    except Exception as e:
+        logger.error("seccion iep fallo", exc_info=True)
+        errores["iep"] = str(e)
+        iep = None
+    try:
+        edad_1p = db.edad_primer_parto_promedio_meses()
+    except Exception as e:
+        logger.error("seccion edad_1er_parto fallo", exc_info=True)
+        errores["edad_1er_parto"] = str(e)
+        edad_1p = None
+
+    kpis = {
+        "iep_promedio_dias": iep["iep_promedio_dias"] if iep else None,
+        "dias_abiertos_promedio": dias_ab["dias_abiertos_promedio"] if dias_ab else None,
+        "dias_abiertos_n": dias_ab["n"] if dias_ab else 0,
+        "servicios_por_concepcion": conc["servicios_por_concepcion"] if conc else None,
+        "tasa_concepcion": conc["tasa_concepcion"] if conc else None,
+        "edad_primer_parto_meses": edad_1p["edad_primer_parto_meses"] if edad_1p else None,
+    }
+
     out: dict[str, Any] = {
         "fep_30d": fep,
         "celos_recientes": celos,
         "diagnosticos": diags,
         "eco_palp_pendientes": pendientes,
         "condicion_corporal_critica": cc_critica,
+        "kpis": kpis,
     }
     if errores:
         out["errores"] = errores
@@ -1390,10 +1425,53 @@ def datos_inventario(db: Database) -> dict:
         "edad_promedio": _edad_promedio_anios(db),
         "gmd_reciente": gmd,
         "por_potrero": _por_potrero(db),
+        "estructura_hato": _estructura_hato(db),
+        "tasa_descarte": _tasa_descarte_anual(db),
     }
     if errores:
         out["errores"] = errores
     return out
+
+
+def _estructura_hato(db: Database) -> dict:
+    """Estructura del hato (9 categorías SG: CH/HL/NV/VP/VS/CM/ML/MC/REP) con
+    % y UGG estimado, para la sección "Estructura del hato" de Inventario."""
+    try:
+        from .query.helpers import calcular_estructura_hato_sg
+        return calcular_estructura_hato_sg(db)
+    except Exception:
+        logger.error("seccion estructura_hato fallo", exc_info=True)
+        return {"filas": [], "total": 0, "total_ugg": 0.0}
+
+
+def _tasa_descarte_anual(db: Database, hoy: Optional[date] = None) -> Optional[dict]:
+    """% de salidas (venta + muerte) del año calendario actual, sobre una base
+    que aproxima el hato de inicio de año (activos actuales + salidas del
+    año) para no necesitar un snapshot histórico que no existe."""
+    hoy = hoy or date.today()
+    try:
+        ano = hoy.year
+        desde = f"{ano}-01-01"
+        ventas = db.query_one(
+            "SELECT COUNT(*) n FROM movimientos WHERE tipo_movimiento = 'VENTA' AND fecha >= ?",
+            (desde,),
+        )["n"]
+        muertes = db.query_one(
+            "SELECT COUNT(*) n FROM muertes WHERE fecha >= ?", (desde,)
+        )["n"]
+        activos = db.query_one("SELECT COUNT(*) n FROM animales WHERE estado = 'ACTIVO'")["n"]
+        salidas = ventas + muertes
+        base = activos + salidas
+        return {
+            "ano": ano,
+            "ventas": ventas,
+            "muertes": muertes,
+            "salidas": salidas,
+            "pct": round(salidas / base * 100, 2) if base else 0.0,
+        }
+    except Exception:
+        logger.error("seccion tasa_descarte fallo", exc_info=True)
+        return None
 
 
 def datos_poblacion(db: Database) -> dict:

@@ -343,6 +343,33 @@ def test_inventario_unificado_incluye_piramide_y_gmd(client):
     assert any(p["potrero"] == "Guayabal" for p in d["por_potrero"])
 
 
+def test_inventario_incluye_estructura_hato_y_tasa_descarte(client):
+    """Estructura del hato (CH/HL/NV/VP/VS/CM/ML/MC/REP con % y UGG) y tasa de
+    descarte anual, replicando en la PWA los reportes de SG pero calculados
+    con datos que sí se alimentan en tiempo real desde el bot."""
+    r = client.get("/api/inventario")
+    d = r.get_json()
+    assert "estructura_hato" in d
+    assert "filas" in d["estructura_hato"]
+    assert d["estructura_hato"]["total"] == d["total_activos"]
+    for fila in d["estructura_hato"]["filas"]:
+        assert fila["ugg"] >= 0
+    assert "tasa_descarte" in d
+    assert "pct" in d["tasa_descarte"]
+
+
+def test_repro_incluye_kpis(client):
+    """IEP, días abiertos, servicios por concepción y tasa de concepción del
+    hato, calculados en el mismo endpoint que ya lista FEP/celos/pendientes."""
+    r = client.get("/api/repro")
+    d = r.get_json()
+    assert "kpis" in d
+    for clave in ("iep_promedio_dias", "dias_abiertos_promedio",
+                  "servicios_por_concepcion", "tasa_concepcion",
+                  "edad_primer_parto_meses"):
+        assert clave in d["kpis"], clave
+
+
 def test_api_poblacion_sigue_disponible_como_alias(client):
     r = client.get("/api/poblacion")
     assert r.status_code == 200

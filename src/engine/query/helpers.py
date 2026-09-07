@@ -429,6 +429,87 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
     return ocupados
 
 
+UGG_FACTOR_SG = {
+    "ch": 0.30, "cm": 0.30,   # crías (macho/hembra) < 1 año
+    "hl": 0.60, "ml": 0.60,   # levante (macho/hembra) 1-2 años
+    "nv": 0.80,               # novilla de vientre
+    "vp": 1.00, "vs": 0.90,   # vaca parida / vaca seca
+    "mc": 0.90,               # macho >2 años no reproductor (ceba/levante adulto)
+    "rep": 1.30,              # reproductor
+}
+ETIQUETAS_SG = {
+    "cm": "Cría macho", "ch": "Cría hembra",
+    "ml": "Levante macho", "hl": "Levante hembra",
+    "nv": "Novilla de vientre", "vp": "Vaca parida", "vs": "Vaca seca",
+    "mc": "Macho de ceba/levante adulto", "rep": "Reproductor",
+}
+
+
+def calcular_estructura_hato_sg(db: Database, hoy: Optional[date] = None) -> dict:
+    """Estructura del hato con las mismas 9 categorías SG que
+    ``calcular_existencias_potreros_sg`` (CH/HL/NV/VP/VS/CM/ML/MC/REP), pero
+    a nivel de finca completa en vez de por potrero -- incluye también los
+    animales sin potrero resoluble, que esa tabla deja fuera por diseño (ver
+    ``contar_animales_sin_potrero``). El UGG (Unidad Gran Ganado) es una
+    equivalencia estándar por categoría, no un cálculo a partir del peso real
+    de cada animal (no hay cobertura de pesajes para todo el hato)."""
+    hoy = hoy or date.today()
+    cont = {k: 0 for k in UGG_FACTOR_SG}
+    animales = db.query(
+        "SELECT id_animal, tag, sexo, fecha_nacimiento, nombre, notas FROM animales WHERE estado = 'ACTIVO'"
+    )
+    for a in animales:
+        aid = a["id_animal"]
+        sexo = (a["sexo"] or "").strip().lower()
+        fnac = to_date(a["fecha_nacimiento"])
+        edad_d = (hoy - fnac).days if fnac else None
+        es_h = bool(sexo.startswith("h") or sexo.startswith("f") or sexo in ("vaca", "novilla", "ternera"))
+        if es_h:
+            if edad_d is not None and edad_d < 365:
+                cont["ch"] += 1
+            elif edad_d is not None and edad_d < 730:
+                cont["hl"] += 1
+            else:
+                p_ult = db.ultimo_parto(aid)
+                if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
+                    dp = (hoy - to_date(p_ult["fecha"])).days
+                    cont["vp" if dp <= 305 else "vs"] += 1
+                else:
+                    cont["nv"] += 1
+        else:
+            nom_m = f"{a['nombre'] or ''} {a['notas'] or ''} {a['tag'] or ''}".upper()
+            if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_d is not None and edad_d >= 1095):
+                cont["rep"] += 1
+            elif edad_d is not None and edad_d < 365:
+                cont["cm"] += 1
+            elif edad_d is not None and edad_d < 730:
+                cont["ml"] += 1
+            else:
+                cont["mc"] += 1
+
+    total = sum(cont.values())
+    filas = []
+    total_ugg = 0.0
+    for k in ("cm", "ch", "ml", "hl", "nv", "vp", "vs", "mc", "rep"):
+        n = cont[k]
+        if n == 0:
+            continue
+        ugg = round(n * UGG_FACTOR_SG[k], 2)
+        total_ugg += ugg
+        filas.append({
+            "categoria": ETIQUETAS_SG[k], "n": n,
+            "pct": round(n / total * 100, 2) if total else 0.0,
+            "ugg": ugg,
+        })
+    return {
+        "filas": filas,
+        "total": total,
+        "total_ugg": round(total_ugg, 2),
+        "total_hembras": cont["ch"] + cont["hl"] + cont["nv"] + cont["vp"] + cont["vs"],
+        "total_machos": cont["cm"] + cont["ml"] + cont["mc"] + cont["rep"],
+    }
+
+
 def contar_animales_sin_potrero(db: Database) -> int:
     """Cuenta animales ACTIVOS cuyo potrero no se puede resolver (ni traslado ni
     potrero_id apuntan a un potrero existente). Explica por qué el total de la

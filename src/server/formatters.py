@@ -704,26 +704,9 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
     tot_crias = tot_ch + tot_cm
 
     # Días abiertos promedio: vacas paridas activas sin servicio posterior al último parto.
-    vacas_paridas = db.query(
-        """
-        SELECT a.id_animal FROM partos p
-        JOIN animales a ON a.id_animal = p.vaca_id
-        WHERE a.estado = 'ACTIVO' AND p.fecha IS NOT NULL
-          AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
-        GROUP BY a.id_animal
-        """
-    )
-    dias_abiertos_lista = []
-    for v in vacas_paridas:
-        p_ult = db.ultimo_parto(v["id_animal"])
-        if not (p_ult and p_ult["fecha"] and to_date(p_ult["fecha"])):
-            continue
-        f_parto = to_date(p_ult["fecha"])
-        s_ult = db.ultimo_servicio(v["id_animal"])
-        if s_ult and s_ult["fecha"] and to_date(s_ult["fecha"]) and to_date(s_ult["fecha"]) >= f_parto:
-            continue  # ya tiene servicio posterior: no está "abierta"
-        dias_abiertos_lista.append((hoy - f_parto).days)
-    dias_abiertos_prom = round(sum(dias_abiertos_lista) / len(dias_abiertos_lista)) if dias_abiertos_lista else None
+    da = db.dias_abiertos_promedio_hato(hoy)
+    dias_abiertos_prom = da["dias_abiertos_promedio"] if da else None
+    n_dias_abiertos = da["n"] if da else 0
 
     lineas = [
         "📊 <b>TABLERO POBLACIONAL & KPIs ZOOTÉCNICOS</b>",
@@ -748,7 +731,7 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
         "📈 <b>INDICADORES REPRODUCTIVOS:</b>",
     ]
     if dias_abiertos_prom is not None:
-        lineas.append(f"• <b>Días Abiertos (promedio del hato):</b> {dias_abiertos_prom} días ({len(dias_abiertos_lista)} vaca(s) sin servicio tras su último parto)")
+        lineas.append(f"• <b>Días Abiertos (promedio del hato):</b> {dias_abiertos_prom} días ({n_dias_abiertos} vaca(s) sin servicio tras su último parto)")
     else:
         lineas.append("• <b>Días Abiertos:</b> sin datos suficientes (no hay vacas paridas activas sin servicio posterior)")
     return "\n".join(lineas)

@@ -245,6 +245,15 @@
   }
   function renderRepro(d) {
     var h = "<h3>" + icon("sperm") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    var k = d.kpis || {};
+    h += "<h4>" + icon("chartBar") + "Indicadores del hato</h4>";
+    h += "<div class='kpis'>"
+      + kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio")
+      + kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : "")
+      + kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción")
+      + kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok")
+      + kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto")
+      + "</div>";
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -593,8 +602,24 @@
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
       + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
       + kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : "")
-      + kpi(d.terneros_menor_12m, "Crías <12m") + "</div>";
+      + kpi(d.terneros_menor_12m, "Crías <12m")
+      + (d.tasa_descarte ? kpi(d.tasa_descarte.pct + "%", "Tasa de descarte " + d.tasa_descarte.ano, d.tasa_descarte.pct > 20 ? "alerta" : "") : "")
+      + "</div>";
     h += grafico("waterfall_inventario", "Movimientos del hato (entradas/salidas)");
+    var eh = d.estructura_hato;
+    h += "<h4>" + icon("cow") + "Estructura del hato</h4>";
+    if (!eh || !eh.filas || !eh.filas.length) {
+      h += vacio("Sin animales activos para clasificar.");
+    } else {
+      h += barrasDeFilas(eh.filas, "pct", "n");
+      h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Cabezas</th><th>%</th><th>UGG (est.)</th></tr>";
+      eh.filas.forEach(function (f) {
+        h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.ugg) + "</td></tr>";
+      });
+      h += "<tr style='font-weight:700;'><td>Total</td><td>" + esc(eh.total) + "</td><td>100%</td><td>" + esc(eh.total_ugg) + "</td></tr>";
+      h += "</table></div>";
+      h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
+    }
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
     h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Nro</th><th>Distrib.</th><th>Acum.</th></tr>";
     (d.filas || []).forEach(function (f) {

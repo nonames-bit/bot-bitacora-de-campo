@@ -607,3 +607,49 @@ def test_resumen_finanzas_ignora_fuera_de_rango(db):
     assert resumen["total_ingresos"] == 200000
 
 
+def test_iep_promedio_hato(db):
+    """Auditoría de SG mostró un IEP de 2,063 días (imposible) por huecos de
+    registro -- el cálculo del bot debe excluir intervalos >730d por defecto
+    para no repetir ese mismo problema."""
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2018-01-01")
+    db.registrar_parto("V1", fecha="2023-01-01")
+    db.registrar_parto("V1", fecha="2024-02-01")  # intervalo real: 396 días
+    db.registrar_animal("V2", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2015-01-01")
+    db.registrar_parto("V2", fecha="2020-01-01")
+    db.registrar_parto("V2", fecha="2026-01-01")  # intervalo de 2192 días: hueco de registro
+
+    res = db.iep_promedio_hato()
+    assert res["n_intervalos"] == 1  # el intervalo de V2 se excluye por >730d
+    assert res["iep_promedio_dias"] == 396
+
+    res_completo = db.iep_promedio_hato(umbral_max_dias=None)
+    assert res_completo["n_intervalos"] == 2
+
+
+def test_iep_promedio_hato_sin_datos(db):
+    assert db.iep_promedio_hato() is None
+
+
+def test_dias_abiertos_promedio_hato(db):
+    from datetime import date
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("V1", fecha="2026-01-01")  # sin servicio posterior: sigue "abierta"
+    db.registrar_animal("V2", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("V2", fecha="2026-01-01")
+    db.registrar_servicio("V2", fecha="2026-03-01")  # ya tiene servicio posterior: no cuenta
+
+    res = db.dias_abiertos_promedio_hato(hoy=date(2026, 9, 1))
+    assert res["n"] == 1
+    assert res["dias_abiertos_promedio"] == 243  # 2026-01-01 -> 2026-09-01
+
+
+def test_edad_primer_parto_promedio_meses(db):
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2024-01-01")
+    db.registrar_parto("V1", fecha="2026-01-01")  # 24 meses exactos
+    db.registrar_parto("V1", fecha="2027-06-01")  # 2do parto: no debe contar de nuevo
+
+    res = db.edad_primer_parto_promedio_meses()
+    assert res["n"] == 1
+    assert 23.5 <= res["edad_primer_parto_meses"] <= 24.5
+
+
