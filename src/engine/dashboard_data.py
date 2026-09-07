@@ -655,7 +655,8 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base: dict[str, Any] = {"existe": True, "tag": an["tag"], "nombre": an["nombre"],
             "sexo": an["sexo"], "raza": an["raza"],
             "fecha_nacimiento": an["fecha_nacimiento"], "estado": an["estado"],
-            "hierro": an.get("hierro"),
+            "hierro": an.get("hierro"), "chip": an.get("chip"), "color": an.get("color"),
+            "notas": an.get("notas"),
             "qr_payload": f"JA://animal/{an['tag']}", "qr_url": f"/ficha/{an['tag']}"}
     try:
         base["ultimo_parto"] = dict(db.ultimo_parto(aid)) if db.ultimo_parto(aid) else None

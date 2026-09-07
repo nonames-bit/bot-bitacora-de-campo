@@ -138,7 +138,8 @@
       target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
       sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M19 3v4"/><path d="M21 5h-4"/>',
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
-      table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>'
+      table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
+      pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -607,6 +608,10 @@
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
     var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var rolInv = window.__usuarioActual && window.__usuarioActual.rol;
+    if (rolInv === "OWNER" || rolInv === "ADMIN") {
+      expBtn = "<button type='button' class='tema-btn' data-accion='crear-animal' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px; margin-right:8px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>" + icon("plus", 14) + "Crear Animal</button>" + expBtn;
+    }
     var h = "<h3>" + icon("cow") + "Inventario y Población" + expBtn + "</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
@@ -3506,9 +3511,14 @@
       + "</span>"
       + "</div>";
 
+    var rolEd = window.__usuarioActual && window.__usuarioActual.rol;
+    var btnEditar = (rolEd === "OWNER" || rolEd === "ADMIN")
+      ? "<button type='button' class='tema-btn' data-accion='editar-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; cursor:pointer;'>" + icon("pencil", 15) + "Editar</button>"
+      : "";
     head += "<div style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
+      + btnEditar
       + "</div>";
 
     head += "</div>";
@@ -4168,6 +4178,8 @@
       if (acc === "exportar-inventario") { if (window.__exportarInventario) window.__exportarInventario(); }
       else if (acc === "exportar-retiros") { if (window.__exportarRetiros) window.__exportarRetiros(); }
       else if (acc === "reload") { location.reload(); }
+      else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
+      else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }
       else if (acc === "copiar-arbol") {
         var card = elAcc.closest(".card");
         var pre = card && card.querySelector("pre");
@@ -4225,14 +4237,103 @@
         if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
       });
   }
+  function mostrarFormularioAnimal(f, tagPrellenado) {
+    var esEdicion = !!(f && f.tag);
+    var overlay = document.getElementById("animal-form-modal");
+    if (overlay) overlay.remove();
+
+    function val(v) { return v == null ? "" : esc(v); }
+    var madreTag = (f && f.madre && f.madre.tag) || "";
+    var padreTag = (f && f.padre && f.padre.tag) || "";
+    var nacimiento = (f && f.fecha_nacimiento) ? String(f.fecha_nacimiento).slice(0, 10) : "";
+
+    function campo(id, etiqueta, valorAttr, extra) {
+      return "<label style='display:block; font-size:12.5px; font-weight:600; margin-bottom:2px;'>" + etiqueta
+        + "<input id='" + id + "' value='" + valorAttr + "'" + (extra || "")
+        + " style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px;'></label>";
+    }
+
+    var html = "<div id='animal-form-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:480px;'>"
+      + "<div class='modal-header'><b>" + icon(esEdicion ? "pencil" : "plus", 15) + (esEdicion ? "Editar Animal " + val(f.tag) : "Crear Animal Nuevo") + "</b>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form'>✕</button></div>"
+      + "<form id='form-animal' style='padding:16px; display:flex; flex-direction:column; gap:10px; max-height:70vh; overflow-y:auto;'>"
+      + campo("an-tag", "Arete / Tag *", val((f && f.tag) || tagPrellenado), esEdicion ? " disabled" : " required autofocus placeholder='ej. 47'")
+      + campo("an-nombre", "Nombre", val(f && f.nombre), " placeholder='ej. Carranga'")
+      + "<label style='display:block; font-size:12.5px; font-weight:600;'>Sexo<select id='an-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px;'>"
+      + "<option value=''>—</option>"
+      + "<option value='Hembra'" + ((f && f.sexo) === "Hembra" ? " selected" : "") + ">Hembra</option>"
+      + "<option value='Macho'" + ((f && f.sexo) === "Macho" ? " selected" : "") + ">Macho</option>"
+      + "</select></label>"
+      + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
+      + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
+      + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
+      + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
+      + campo("an-potrero", "Potrero", val(f && f.potrero), " list='dl-potreros' placeholder='ej. Guayabal'")
+      + campo("an-hierro", "Hierro / Marca a fuego", val(f && f.hierro), " placeholder='ej. JA'")
+      + campo("an-chip", "Chip / RFID", val(f && f.chip), " placeholder='ej. 985...'")
+      + campo("an-color", "Color / Pelo", val(f && f.color), " placeholder='ej. Negro'")
+      + "<label style='display:block; font-size:12.5px; font-weight:600;'>Notas<textarea id='an-notas' rows='2' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px; font-family:inherit;'>" + val(f && f.notas) + "</textarea></label>"
+      + "<p id='animal-form-error' class='aviso' style='display:none;'></p>"
+      + "<button type='submit' class='tema-btn' style='padding:10px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer;'>" + icon("save", 15) + (esEdicion ? "Guardar Cambios" : "Crear Animal") + "</button>"
+      + "</form></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("animal-form-modal");
+    function cerrarModal() { if (ov) ov.remove(); }
+    var btnCerrar = document.getElementById("btn-cerrar-animal-form");
+    if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
+
+    var form = document.getElementById("form-animal");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var tag = (q("#an-tag").value || "").trim();
+      var payload = {
+        nombre: q("#an-nombre").value, sexo: q("#an-sexo").value,
+        raza: q("#an-raza").value, fecha_nacimiento: q("#an-nacimiento").value,
+        madre_tag: q("#an-madre").value, padre_tag: q("#an-padre").value,
+        potrero: q("#an-potrero").value, hierro: q("#an-hierro").value,
+        chip: q("#an-chip").value, color: q("#an-color").value,
+        notas: q("#an-notas").value,
+      };
+      if (!esEdicion) payload.tag = tag;
+      var errorEl = document.getElementById("animal-form-error");
+      var url = esEdicion ? "/api/animal/" + encodeURIComponent(tag) : "/api/animal";
+      var metodo = esEdicion ? "PUT" : "POST";
+      fetch(url, {
+        method: metodo, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      }).then(function (r) { return r.json().then(function (d) { return { status: r.status, body: d }; }); })
+        .then(function (res) {
+          if (res.status >= 200 && res.status < 300 && res.body.ok) {
+            cerrarModal();
+            abrirFicha(tag, vista, true);
+            irAVista("ficha");
+          } else if (errorEl) {
+            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.style.display = "block";
+          }
+        }).catch(function (err) {
+          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+        });
+    });
+  }
   function abrirFicha(tag, target, showIdent, animar) {
     if (animar === undefined) animar = true;
     if (animar) skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
       if (!f.existe) {
+        var rolNf = window.__usuarioActual && window.__usuarioActual.rol;
+        var btnCrearNf = (rolNf === "OWNER" || rolNf === "ADMIN")
+          ? "<button type='button' class='tema-btn' data-accion='crear-animal' data-tag-nuevo='" + esc(tag) + "' style='margin-top:10px; padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center;'>" + icon("plus", 15) + "Crear animal " + esc(tag) + "</button>"
+          : "";
         if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
           + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
-          + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>", animar);
+          + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>"
+          + btnCrearNf, animar);
         return;
       }
       window.__ultimaFicha = f;

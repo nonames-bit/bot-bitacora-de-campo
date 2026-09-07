@@ -53,6 +53,10 @@ class Database:
             cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()]
             if "hierro" not in cols:
                 self.conn.execute("ALTER TABLE animales ADD COLUMN hierro TEXT")
+            if "chip" not in cols:
+                self.conn.execute("ALTER TABLE animales ADD COLUMN chip TEXT")
+            if "color" not in cols:
+                self.conn.execute("ALTER TABLE animales ADD COLUMN color TEXT")
         except Exception:
             pass
         try:
@@ -222,7 +226,8 @@ class Database:
     # ------------------------------------------------------------------ #
     def registrar_animal(self, tag, nombre=None, sexo=None, raza=None,
                          fecha_nacimiento=None, madre_tag=None, padre_tag=None,
-                         potrero=None, estado=None, notas=None, hierro=None) -> int:
+                         potrero=None, estado=None, notas=None, hierro=None,
+                         chip=None, color=None) -> int:
         tag_str = str(tag).strip()
         existente = self.animal_id(tag_str)
 
@@ -245,7 +250,7 @@ class Database:
             nombre=nombre, sexo=sexo, raza=raza,
             fecha_nacimiento=iso(fecha_nacimiento), madre_id=madre_id,
             padre_id=padre_id, potrero_id=potrero_id, estado=estado, notas=notas,
-            hierro=hierro,
+            hierro=hierro, chip=chip, color=color,
         )
         if existente is not None:
             sets = ", ".join(f"{k} = ?" for k, v in campos.items() if v is not None)

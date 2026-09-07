@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS animales (
     potrero_id INTEGER,
     estado TEXT,
     notas TEXT,
-    hierro TEXT
+    hierro TEXT,
+    chip TEXT,
+    color TEXT
 );
 
 CREATE TABLE IF NOT EXISTS partos (

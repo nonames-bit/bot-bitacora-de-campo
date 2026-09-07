@@ -17,6 +17,22 @@ def test_registrar_animal(db):
     assert animal["fecha_nacimiento"] == "2020-01-01"
 
 
+def test_registrar_animal_chip_y_color(db):
+    db.registrar_animal("47", chip="985123456", color="Negro")
+    animal = db.get_animal("47")
+    assert animal["chip"] == "985123456"
+    assert animal["color"] == "Negro"
+
+
+def test_registrar_animal_existente_actualiza_en_vez_de_duplicar(db):
+    aid1 = db.registrar_animal("47", nombre="Original", sexo="Hembra")
+    aid2 = db.registrar_animal("47", nombre="Editada")
+    assert aid1 == aid2
+    animal = db.get_animal("47")
+    assert animal["nombre"] == "Editada"
+    assert animal["sexo"] == "Hembra"  # campo no enviado en la 2da llamada: se conserva
+
+
 def test_resolver_animal_id(db):
     aid = db.registrar_animal("105")
     assert db.animal_id("105") == aid

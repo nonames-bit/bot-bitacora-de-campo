@@ -379,6 +379,72 @@ def test_repro_incluye_kpis(client):
         assert clave in d["kpis"], clave
 
 
+def test_crear_animal_nuevo(client):
+    """Hasta ahora un animal solo se creaba implícitamente al registrar un
+    evento (parto, pesaje, etc.) -- esta es la primera vía para dar de alta
+    un animal directamente, con sus datos maestros, sin pasar por un evento."""
+    r = client.post("/api/animal", json={
+        "tag": "N500", "nombre": "Test Nueva", "sexo": "Hembra", "raza": "I",
+        "fecha_nacimiento": "2024-01-01", "potrero": "Guayabal",
+        "hierro": "JA", "chip": "985123456", "color": "Negro",
+    })
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+
+    ficha = client.get("/api/ficha/N500").get_json()
+    assert ficha["existe"] is True
+    assert ficha["nombre"] == "Test Nueva"
+    assert ficha["chip"] == "985123456"
+    assert ficha["color"] == "Negro"
+
+
+def test_crear_animal_sin_tag_devuelve_400(client):
+    r = client.post("/api/animal", json={"nombre": "Sin tag"})
+    assert r.status_code == 400
+
+
+def test_crear_animal_tag_duplicado_devuelve_409(client):
+    """No debe permitir crear silenciosamente sobre un animal ya existente
+    -- el tag 47 ya está en el fixture db_file. Usar /api/animal/<tag> (PUT)
+    para editar en su lugar."""
+    r = client.post("/api/animal", json={"tag": "47", "nombre": "Otra cosa"})
+    assert r.status_code == 409
+
+
+def test_editar_animal_actualiza_campos(client):
+    r = client.put("/api/animal/47", json={"nombre": "Renombrada", "chip": "111222333"})
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+
+    ficha = client.get("/api/ficha/47").get_json()
+    assert ficha["nombre"] == "Renombrada"
+    assert ficha["chip"] == "111222333"
+
+
+def test_editar_animal_no_existente_devuelve_404(client):
+    r = client.put("/api/animal/NO-EXISTE-999", json={"nombre": "X"})
+    assert r.status_code == 404
+
+
+def test_crear_y_editar_animal_requiere_rol_admin_u_owner(tmp_path, db_file):
+    """Datos maestros del animal (identidad, genealogía) son más sensibles
+    que registrar un evento de campo -- solo ADMIN/OWNER puede crear o editar,
+    igual que la gestión de usuarios."""
+    import json as _json
+    users_json = str(tmp_path / "users_test.json")
+    with open(users_json, "w", encoding="utf-8") as f:
+        _json.dump([{"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"}], f)
+
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+    c = app.test_client()
+    c.post("/login", data={"pin": "7777"})
+
+    r_crear = c.post("/api/animal", json={"tag": "N600", "nombre": "No debería"})
+    assert r_crear.status_code == 403
+    r_editar = c.put("/api/animal/47", json={"nombre": "No debería"})
+    assert r_editar.status_code == 403
+
+
 def test_api_poblacion_sigue_disponible_como_alias(client):
     r = client.get("/api/poblacion")
     assert r.status_code == 200

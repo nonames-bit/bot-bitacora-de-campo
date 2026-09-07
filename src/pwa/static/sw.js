@@ -50,7 +50,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v56: Estructura del hato (SG: cría/levante/novilla/vaca parida-seca/reproductor con % y UGG estimado) en Inventario, e Indicadores reproductivos del hato (IEP, días abiertos, servicios/concepción, tasa de concepción, edad 1er parto) en Reproducción.
 // v57: Integración del Hierro / Marca de fuego de cada animal en ficha técnica (chip de encabezado, tarjeta de identificación, árbol genealógico, reporte PDF y bot).
 // v58: Estructura del hato en Inventario ahora usa una barra única apilada por colores (reemplaza las 8 barras de progreso repetidas); Distribución por raza en Genética ahora es un donut real en vez de barras HTML.
-var CACHE = "pwa-ja-v58"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v59: Crear Animal y Editar Animal (identidad, genealogía, potrero, hierro, chip/RFID, color, notas) directamente en la PWA -- primer paso para dejar de depender de Software Ganadero para el alta/edición del hato. Solo ADMIN/OWNER.
+var CACHE = "pwa-ja-v59"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

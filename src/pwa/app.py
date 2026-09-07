@@ -1162,6 +1162,80 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    def _campo_texto(datos, nombre):
+        v = datos.get(nombre)
+        if v is None:
+            return None
+        v = str(v).strip()
+        return v or None
+
+    @app.post("/api/animal")
+    def api_animal_crear():
+        """Crea un animal nuevo (datos maestros: identidad y genealogía) sin
+        pasar por un evento de campo -- hasta ahora los animales solo se
+        creaban implícitamente al registrar un parto/pesaje/etc."""
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+        datos = request.get_json(silent=True) or {}
+        tag = str(datos.get("tag") or "").strip()
+        if not tag:
+            return jsonify({"ok": False, "error": "El arete/tag es obligatorio."}), 400
+        db_a = _db(db_path)
+        try:
+            if db_a.animal_id(tag) is not None:
+                return jsonify({"ok": False, "error": f"Ya existe un animal con el tag '{tag}'. Use editar en su lugar."}), 409
+            db_a.registrar_animal(
+                tag,
+                nombre=_campo_texto(datos, "nombre"), sexo=_campo_texto(datos, "sexo"),
+                raza=_campo_texto(datos, "raza"), fecha_nacimiento=_campo_texto(datos, "fecha_nacimiento"),
+                madre_tag=_campo_texto(datos, "madre_tag"), padre_tag=_campo_texto(datos, "padre_tag"),
+                potrero=_campo_texto(datos, "potrero"), estado=_campo_texto(datos, "estado") or "ACTIVO",
+                notas=_campo_texto(datos, "notas"), hierro=_campo_texto(datos, "hierro"),
+                chip=_campo_texto(datos, "chip"), color=_campo_texto(datos, "color"),
+            )
+            return jsonify({"ok": True, "tag": tag})
+        except Exception as e:
+            logger.exception("Error al crear animal %s: %s", tag, e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
+    @app.put("/api/animal/<tag>")
+    def api_animal_editar(tag):
+        """Edita los datos maestros de un animal existente (nombre, sexo,
+        raza, nacimiento, padres, potrero, hierro, chip, color, notas). El
+        tag no se puede cambiar aquí (identidad del registro); el estado
+        tampoco -- venta/muerte tienen su propio flujo dedicado en Captura y
+        no deben editarse a mano para no perder la trazabilidad."""
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+        datos = request.get_json(silent=True) or {}
+        db_a = _db(db_path)
+        try:
+            if db_a.animal_id(tag) is None:
+                return jsonify({"ok": False, "error": f"No existe ningún animal con el tag '{tag}'."}), 404
+            db_a.registrar_animal(
+                tag,
+                nombre=_campo_texto(datos, "nombre"), sexo=_campo_texto(datos, "sexo"),
+                raza=_campo_texto(datos, "raza"), fecha_nacimiento=_campo_texto(datos, "fecha_nacimiento"),
+                madre_tag=_campo_texto(datos, "madre_tag"), padre_tag=_campo_texto(datos, "padre_tag"),
+                potrero=_campo_texto(datos, "potrero"),
+                notas=_campo_texto(datos, "notas"), hierro=_campo_texto(datos, "hierro"),
+                chip=_campo_texto(datos, "chip"), color=_campo_texto(datos, "color"),
+            )
+            return jsonify({"ok": True, "tag": tag})
+        except Exception as e:
+            logger.exception("Error al editar animal %s: %s", tag, e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
     @app.get("/api/inventario")
     def api_inventario():
         out = datos_inventario(db_path)
