@@ -532,7 +532,9 @@
     function cerrarModal() { if (ov) ov.remove(); }
     var btnCerrar = document.getElementById("btn-cerrar-fin-detalle");
     if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
-    ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
+    ov.addEventListener("click", function (e) {
+      if (e.target === ov || e.target.closest("[data-ir-ficha]")) cerrarModal();
+    });
   }
 
   function bindFinanzas() {

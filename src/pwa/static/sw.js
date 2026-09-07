@@ -41,9 +41,10 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v45: Digitalización inteligente de recibos/planillas de leche con IA Multimodal (Gemini Vision) y desglose interactivo.
 // v46: Módulo de Finanzas (fase 1) -- libro de ingresos/egresos, resumen de utilidad por año y captura de gastos con foto de factura.
 // v47: Eventos de ventas en tablero con vinculación bidireccional Madre ⇄ Cría, iconos dinámicos y navegación a fichas.
-// v48: Tabla "Movimientos recientes" de Finanzas con animal clicable (icono SVG vaca, sin emoji) hacia su ficha.
 // v49: Modal de detalle por movimiento en Finanzas (fecha/categoría/monto/animal/notas y foto de factura ampliable), y la foto de gasto en Captura ahora queda enlazada al registro de finanzas.
-var CACHE = "pwa-ja-v50"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v50: Sincronización de eventos de venta con trazabilidad de crías.
+// v51: Barra inferior de 5 botones con bottom sheet categorizado para módulos en móviles (cero scroll horizontal) y sincronización con RBAC.
+var CACHE = "pwa-ja-v51"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

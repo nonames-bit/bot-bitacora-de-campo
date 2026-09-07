@@ -302,6 +302,9 @@ nav button.act {
   border-color: var(--verde-marca);
   font-weight: 600;
 }
+nav .nav-btn-mas {
+  display: none !important;
+}
 
 main {
   padding: 20px;
@@ -797,7 +800,10 @@ button:active {
 
 /* --- 3. Responsive y Navegación Móvil Fija Abajo --- */
 @media (max-width: 640px) {
-  main { padding: 12px; }
+  main {
+    padding: 12px;
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
+  }
   header {
     padding: 8px 10px;
     padding-top: calc(8px + env(safe-area-inset-top, 0px));
@@ -835,41 +841,74 @@ button:active {
     bottom: 0;
     left: 0;
     right: 0;
-    z-index: 10;
-    justify-content: flex-start;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    padding: 8px 6px calc(8px + env(safe-area-inset-bottom, 0px));
+    z-index: 100;
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 3px;
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
     background: var(--superficie);
-    border-top: 1px solid var(--borde);
+    border-top: 1px solid var(--borde-fuerte);
     border-bottom: none;
-    box-shadow: 0 -1px 4px var(--sombra);
+    box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+  }
+  nav .nav-secundario {
+    display: none !important;
+  }
+  nav .nav-btn-mas {
+    display: flex !important;
   }
   nav button {
-    flex: 0 0 auto;
-    min-width: 0;
-    padding: 6px 12px;
-    font-size: 11px;
-    border-radius: 6px;
-    border-color: transparent;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 48px;
+    padding: 4px 1px;
+    gap: 2px;
+    border-radius: 8px;
+    border: none;
     background: transparent;
     color: var(--texto-suave);
-    min-height: 32px;
     position: relative;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  }
+  nav button:active {
+    transform: scale(0.96);
+  }
+  nav button .svg-icon {
+    margin: 0;
+    width: 20px;
+    height: 20px;
+    top: 0;
+  }
+  nav button .nav-txt {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    color: inherit;
   }
   nav button .nav-badge {
-    top: -2px;
-    right: 0;
-    font-size: 8.5px;
-    min-width: 14px;
-    height: 14px;
-    line-height: 14px;
+    top: 2px;
+    right: 14%;
+    font-size: 8px;
+    min-width: 13px;
+    height: 13px;
+    line-height: 13px;
+    border-radius: 99px;
   }
   nav button.act {
     background: var(--verde-marca-pastel);
     color: var(--verde-marca);
-    border: 1px solid var(--borde);
+    border: none;
+  }
+  nav button.act .nav-txt {
+    font-weight: 700;
   }
   
   td, th {
@@ -1668,6 +1707,202 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 
 @media (max-width: 600px) {
   .ayuda-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Menú Móvil "Más Módulos" (Bottom Sheet Categorizado)
+   ========================================================================== */
+.sheet-modulos {
+  width: 580px;
+  max-width: 96vw;
+  max-height: 85vh;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  animation: modalScaleIn 0.2s ease-out;
+}
+
+.sheet-handle {
+  display: none;
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--borde-fuerte, #ccc);
+  margin: 8px auto 4px auto;
+}
+
+.sheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modulo-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modulo-seccion-titulo {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--texto-suave);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.modulos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.modulo-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: var(--texto);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  position: relative;
+}
+
+.modulo-item:hover {
+  background: var(--superficie);
+  border-color: var(--verde-marca);
+  transform: translateY(-1px);
+}
+
+.modulo-item:active {
+  transform: scale(0.98);
+}
+
+.modulo-item.act {
+  background: var(--verde-marca-pastel);
+  border-color: var(--verde-marca);
+}
+
+.modulo-item.act .modulo-ico {
+  background: var(--verde-marca);
+  color: #ffffff;
+}
+
+.modulo-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: var(--superficie);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--verde-marca);
+  border: 1px solid var(--borde);
+  transition: all 0.15s ease;
+}
+
+.modulo-ico .svg-icon {
+  margin: 0;
+  width: 20px;
+  height: 20px;
+}
+
+.modulo-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.modulo-info b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--texto);
+  line-height: 1.2;
+}
+
+.modulo-info small {
+  font-size: 10.5px;
+  color: var(--texto-suave);
+  line-height: 1.25;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badge-sheet {
+  background: #d32f2f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+@keyframes sheetSlideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes modalScaleIn {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  #modal-mas-modulos.modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  #modal-mas-modulos .sheet-modulos {
+    width: 100%;
+    max-width: 100%;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+    max-height: 82vh;
+    animation: sheetSlideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    margin: 0;
+  }
+
+  .sheet-handle {
+    display: block;
+  }
+
+  .modulos-grid {
     grid-template-columns: 1fr;
   }
 }
