@@ -5,7 +5,9 @@ estimada de la finca como referencia satelital.
 Fase D del plan geoespacial (ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md): un dato
 de contraste junto al registro manual de `/lluvia`, no un reemplazo. Escribe
 en `monitoreo_satelital_lluvia`. Pensado para correr por cron una vez por
-semana, igual que scripts/actualizar_ndvi_satelital.py.
+semana (el NDVI, en cambio, corre cada 3 días desde 2026-09-07 para aprovechar
+mejor la revisita de ~5 días de Sentinel-2; la lluvia CHIRPS es de referencia
+finca-level y no necesita esa frecuencia).
 
 Uso:
     python scripts/actualizar_lluvia_satelital.py [--db data/bitacora.db]

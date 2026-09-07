@@ -68,7 +68,7 @@ Dos aclaraciones honestas:
 - Si un potrero **no tiene imagen despejada reciente** (muchas nubes o sin mapa cargado), el sistema no inventa: usa una **estimación de respaldo** por días de ocupación y descanso (leyes de Voisin) hasta que llegue la próxima imagen real.
 - También existe **lluvia satelital CHIRPS** (`src/gis/earth_engine_lluvia.py`) como **referencia** a nivel de toda la finca. No reemplaza su pluviómetro físico: la resolución del satélite (~5.5 km) no distingue el microclima de cada sector.
 
-El NDVI real se actualiza con el job semanal `scripts/actualizar_ndvi_satelital.py` (lunes 6:00 AM por cron). La lluvia satelital con `scripts/actualizar_lluvia_satelital.py` (lunes 6:05 AM).
+El NDVI real se actualiza con el job `scripts/actualizar_ndvi_satelital.py` (cada 3 días a las 6:00 AM por cron, desde 2026-09-07; antes era semanal). La lluvia satelital con `scripts/actualizar_lluvia_satelital.py` (semanal, lunes 6:05 AM).
 
 ---
 

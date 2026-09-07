@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""Job semanal: consulta Google Earth Engine y actualiza el NDVI real de los potreros.
+"""Job periódico (cada 3 días): consulta Google Earth Engine y actualiza el
+NDVI real de los potreros.
 
 Reemplaza la simulación de sentinel_ndvi.SentinelNDVI.simular_lecturas_potreros
 escribiendo lecturas reales en monitoreo_satelital_ndvi (Fase C del plan
 geoespacial, ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md). Pensado para correr por
-cron una vez por semana, igual que el despacho matutino (scripts/enviar_despacho.py).
+cron cada 3 días (``0 6 */3 * *``): la revisita de Sentinel-2 es cada ~5 días,
+así que correr cada 3 días maximiza la probabilidad de capturar la imagen
+despejada nueva apenas se publica.
 
 Uso:
     python scripts/actualizar_ndvi_satelital.py [--db data/bitacora.db]

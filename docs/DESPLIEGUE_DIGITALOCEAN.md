@@ -320,9 +320,11 @@ tabla `monitoreo_satelital_ndvi`, calculado por Google Earth Engine sobre
 Sentinel-2 (ver `docs/PLAN_GEO_SATELITAL_6.2_8.2.md`). Esa tabla no se llena
 sola: hay que correr `scripts/actualizar_ndvi_satelital.py` — un job liviano
 (no requiere GPU ni procesa imágenes localmente, todo el cálculo ocurre en los
-servidores de Earth Engine) que conviene programar **una vez por semana** (el
-revisita de Sentinel-2 es cada ~5 días, y en época de lluvias puede tardar más
-en aparecer una imagen despejada).
+servidores de Earth Engine) que se programa **cada 3 días** (desde 2026-09-07;
+antes era semanal). El revisita de Sentinel-2 es cada ~5 días, así que correr
+cada 3 días maximiza la probabilidad de capturar la imagen despejada nueva
+apenas se publica (en época de lluvias puede tardar más en aparecer una imagen
+despejada).
 
 ### 1. Subir la clave de la cuenta de servicio al VPS (una sola vez)
 
@@ -358,18 +360,18 @@ Debe ver una línea `✅` por cada potrero con `geom_wkt_4326` (los 20 códigos
 `A01-A04`/`B01-B02`/`C01-C14` de la Fase B). Si un potrero sale con
 `⚠️ sin imagen Sentinel-2 reciente`, no es un error — simplemente no hubo
 todavía una imagen suficientemente despejada sobre ese potrero en la ventana
-de búsqueda; se resuelve solo en la próxima corrida semanal.
+de búsqueda; se resuelve solo en la próxima corrida.
 
-### 4. Programar el job semanal en cron
+### 4. Programar el job en cron (cada 3 días)
 
 ```bash
 crontab -e
 ```
 
-Agregue esta línea (corre todos los lunes a las 6:00 AM):
+Agregue esta línea (corre cada 3 días a las 6:00 AM — días 1, 4, 7, 10… del mes):
 
 ```
-0 6 * * 1 cd /root/bitacora && /root/bitacora/.venv/bin/python scripts/actualizar_ndvi_satelital.py >> /root/bitacora/bot.log 2>&1
+0 6 */3 * * cd /root/bitacora && /root/bitacora/.venv/bin/python scripts/actualizar_ndvi_satelital.py >> /root/bitacora/bot.log 2>&1
 ```
 
 > ⚠️ El cron no carga `.env` automáticamente como sí hace `source`. Si el
