@@ -49,7 +49,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v55: Información explícita de bajas por venta y muerte en ficha animal (banners destacados con fecha exacta, comprador/precio, causa/diagnóstico, vínculos de venta conjunta madre-cría y tabla consolidada de movimientos).
 // v56: Estructura del hato (SG: cría/levante/novilla/vaca parida-seca/reproductor con % y UGG estimado) en Inventario, e Indicadores reproductivos del hato (IEP, días abiertos, servicios/concepción, tasa de concepción, edad 1er parto) en Reproducción.
 // v57: Integración del Hierro / Marca de fuego de cada animal en ficha técnica (chip de encabezado, tarjeta de identificación, árbol genealógico, reporte PDF y bot).
-var CACHE = "pwa-ja-v57"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v58: Estructura del hato en Inventario ahora usa una barra única apilada por colores (reemplaza las 8 barras de progreso repetidas); Distribución por raza en Genética ahora es un donut real en vez de barras HTML.
+var CACHE = "pwa-ja-v58"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

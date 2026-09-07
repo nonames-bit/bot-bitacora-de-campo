@@ -294,6 +294,7 @@ def _generadores_graficos_pwa():
         "carga_animal": charts.generar_grafico_carga_animal_potrero,
         "evolucion": charts.generar_grafico_evolucion_rebano,
         "categorias": charts.generar_grafico_categorias,
+        "composicion_racial": charts.generar_grafico_composicion_racial,
         "leche_total": charts.generar_grafico_leche_total_hato,
         "eficiencia_lechera": charts.generar_grafico_eficiencia_lechera,
         "reproductivo_hato": charts.generar_grafico_estado_reproductivo_hato,

@@ -583,17 +583,6 @@
   }
 
   /* ---------- Vistas WS-5: Inventario / Población / Genética / Agenda ---------- */
-  function barrasDeFilas(filas, pctKey, nKey) {
-    if (!filas || !filas.length) return vacio("Sin datos.");
-    var h = "";
-    filas.forEach(function (f) {
-      var pct = Math.max(0, Math.min(100, Number(f[pctKey]) || 0));
-      h += "<div class='barra-fila'><span class='et'>" + esc(f.categoria || f.raza) + "</span>"
-        + "<span class='pista'><span class='relleno' style='width:" + pct + "%'></span></span>"
-        + "<span class='num'>" + esc(f[nKey]) + "</span></div>";
-    });
-    return h;
-  }
   var COLORES_HATO_SG = {
     "Cría macho": "#66bb6a", "Cría hembra": "#2e7d32",
     "Levante macho": "#26a69a", "Levante hembra": "#00838f",
@@ -696,8 +685,7 @@
     var h = "<h3>" + icon("dna") + "Composición genética (razas)</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total, "Animales tipificados") + "</div>";
     if (d.filas && d.filas.length) {
-      var porNombre = (d.filas || []).map(function (f) { return { categoria: f.raza_nombre || f.raza, n: f.n, pct: f.pct }; });
-      h += "<h4>" + icon("chartBar") + "Distribución por raza</h4>" + barrasDeFilas(porNombre, "pct", "n");
+      h += "<h4>" + icon("chartBar") + "Distribución por raza</h4>" + grafico("composicion_racial", "Composición genética (razas)");
       h += "<h4>" + icon("chartLine") + "Detalle</h4>" + tabla(d.filas, [["raza_nombre", "Raza"], ["raza", "Código"], ["n", "Cabezas", "num"], ["pct", "% del hato"]], "Sin datos.");
     } else {
       h += vacio("Sin razas registradas en el hato activo.");

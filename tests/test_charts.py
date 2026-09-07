@@ -11,6 +11,7 @@ from src.engine.charts import (
     generar_grafico_aforo_potreros,
     generar_grafico_carga_animal_potrero,
     generar_grafico_categorias,
+    generar_grafico_composicion_racial,
     generar_grafico_dias_abiertos_km,
     generar_grafico_eficiencia_lechera,
     generar_grafico_estado_reproductivo_hato,
@@ -109,6 +110,22 @@ def test_generar_grafico_categorias(db, tmp_path):
 
 def test_generar_grafico_categorias_sin_animales_devuelve_none(db, tmp_path):
     assert generar_grafico_categorias(db, output_dir=str(tmp_path)) is None
+
+
+def test_generar_grafico_composicion_racial(db, tmp_path):
+    """Donut de razas que reemplazó las barras de progreso repetidas en
+    Genética -- pidieron algo visualmente distinto, no la misma barra que
+    Estructura del hato en Inventario."""
+    db.registrar_animal("47", sexo="Hembra", raza="I", estado="ACTIVO")
+    db.registrar_animal("48", sexo="Hembra", raza="I", estado="ACTIVO")
+    db.registrar_animal("49", sexo="Macho", raza="C", estado="ACTIVO")
+    ruta = generar_grafico_composicion_racial(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_composicion_racial_sin_animales_devuelve_none(db, tmp_path):
+    assert generar_grafico_composicion_racial(db, output_dir=str(tmp_path)) is None
 
 
 def test_generar_grafico_gmd_hato(db, tmp_path):

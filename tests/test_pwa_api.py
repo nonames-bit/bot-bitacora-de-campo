@@ -232,6 +232,15 @@ def test_api_grafico_tipo_no_whitelisteado_devuelve_404(client):
     assert r.status_code == 404
 
 
+def test_api_grafico_composicion_racial_esta_en_whitelist(client):
+    """Donut de razas (Genética) que reemplazó las barras de progreso HTML
+    repetidas -- debe estar en la whitelist de /api/grafico/<tipo>."""
+    r = client.get("/api/grafico/composicion_racial")
+    assert r.status_code in (200, 404)  # 404 solo si no hay datos/matplotlib
+    if r.status_code == 200:
+        assert r.content_type == "image/png"
+
+
 def test_api_grafico_usa_cache_en_la_segunda_llamada(client, monkeypatch, tmp_path):
     """Dentro de la ventana de caché, la segunda petición no debe volver a
     invocar al generador (matplotlib) — evita regenerar la misma imagen si

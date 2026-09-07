@@ -618,6 +618,62 @@ def generar_grafico_categorias(db, output_dir: str = "data/reportes",
     return _guardar(fig, output_dir, f"grafico_categorias_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
 
 
+def generar_grafico_composicion_racial(db, output_dir: str = "data/reportes",
+                                       hoy: Optional[date] = None, dpi: int = 130,
+                                       placeholder_si_vacio: bool = False) -> Optional[str]:
+    """Donut de composición racial del hato activo (I/T/C/M de Software
+    Ganadero). Mismo mapa de nombres que ``dashboard_data.datos_genetica`` y
+    ``formatters.formatear_genetica_panel`` -- cada uno consulta la BD por su
+    cuenta (patrón ya establecido en este módulo: los graficadores no
+    dependen de las otras capas para evitar ciclos de import)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    NOMBRES_RAZAS = {
+        "I": "Holstein / Cruce Lechero",
+        "T": "Tricross / Cebú Comercial",
+        "C": "Cebú / Brahman / Gyr",
+        "M": "Mestizo / Doble Propósito",
+        "SIN RAZA": "Sin Clasificar",
+    }
+    rows = db.query(
+        "SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') raza, COUNT(*) n "
+        "FROM animales WHERE estado = 'ACTIVO' GROUP BY raza ORDER BY n DESC"
+    )
+    total = sum(int(r["n"]) for r in rows)
+    if not rows or total == 0:
+        if placeholder_si_vacio:
+            return generar_grafico_placeholder(
+                titulo="Composición Genética (Razas)",
+                subtitulo="No hay animales activos con raza registrada.",
+                output_dir=output_dir,
+                nombre_archivo=f"grafico_composicion_racial_{hoy.isoformat()}.png",
+                hoy=hoy, dpi=dpi,
+            )
+        return None
+
+    etiquetas = [NOMBRES_RAZAS.get(r["raza"], r["raza"]) for r in rows]
+    valores = [int(r["n"]) for r in rows]
+    colores = [_PALETA[i % len(_PALETA)] for i in range(len(valores))]
+
+    fig, ax = plt.subplots(figsize=(7, 6), dpi=dpi)
+    ax.pie(
+        valores, labels=None, autopct=lambda p: f"{p:.1f}%" if p >= 3 else "",
+        colors=colores, startangle=90, pctdistance=0.82,
+        wedgeprops={"width": 0.42, "linewidth": 1.5, "edgecolor": "white"},
+        textprops={"fontsize": 9, "color": "white", "fontweight": "bold"},
+    )
+    ax.text(0, 0, str(total), ha="center", va="center", fontsize=22, fontweight="bold", color=_COLOR_MARCA)
+    ax.text(0, -0.18, "animales", ha="center", va="center", fontsize=9, color=_COLOR_GRIS)
+    leyenda = [f"{et} ({v})" for et, v in zip(etiquetas, valores)]
+    ax.legend(leyenda, loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize=9)
+    _titulo_y_subtitulo(fig, ax, "Composición Genética (Razas)",
+                        f"{total} animales activos al {hoy.isoformat()}")
+    ax.axis("equal")
+
+    return _guardar(fig, output_dir, f"grafico_composicion_racial_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+
+
 def generar_grafico_gmd_hato(db, output_dir: str = "data/reportes",
                              hoy: Optional[date] = None, dpi: int = 130,
                              placeholder_si_vacio: bool = False) -> Optional[str]:
