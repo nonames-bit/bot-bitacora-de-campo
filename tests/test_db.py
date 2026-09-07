@@ -171,6 +171,40 @@ def test_registrar_foto_y_consultas(db):
     assert len(h["fotos"]) == 1
 
 
+def test_fotos_de_no_mezcla_foto_de_otro_animal_cuyo_tag_es_substring(db):
+    """Regresión: la ficha de JA14 mostraba también la foto de su propia
+    cría JA14-7, porque el match difuso (caption/ocr/ruta LIKE '%JA14%')
+    también calza con 'JA14-7'. Una vez que la foto de JA14-7 tiene su
+    propio animal_id, no debe filtrarse en la ficha del padre/madre."""
+    db.registrar_animal("JA14", sexo="Hembra")
+    db.registrar_animal("JA14-7", sexo="Hembra")
+
+    db.registrar_foto("media/ja14.jpg", animal_tag="JA14", fecha="2026-08-01", caption="JA14 en potrero")
+    db.registrar_foto("media/ja14-7.jpg", animal_tag="JA14-7", fecha="2026-08-02", caption="Cria JA14-7 recien nacida")
+
+    fotos_ja14 = db.fotos_de("JA14")
+    assert len(fotos_ja14) == 1
+    assert fotos_ja14[0]["ruta"] == "media/ja14.jpg"
+
+    fotos_cria = db.fotos_de("JA14-7")
+    assert len(fotos_cria) == 1
+    assert fotos_cria[0]["ruta"] == "media/ja14-7.jpg"
+
+
+def test_fotos_de_conserva_match_difuso_solo_para_fotos_huerfanas(db):
+    """Una foto sin animal_id (aun no vinculada) sí debe encontrarse por
+    coincidencia de caption/ocr/ruta, que es el comportamiento original que
+    complementa a vincular_fotos_huerfanas()."""
+    db.registrar_animal("47")
+    db.insert("fotos", {
+        "animal_id": None, "tag": None, "fecha": "2026-08-01",
+        "ruta": "media/huerfana_47.jpg", "caption": "Animal 47 en la manga",
+    })
+    fotos = db.fotos_de("47")
+    assert len(fotos) == 1
+    assert fotos[0]["ruta"] == "media/huerfana_47.jpg"
+
+
 def test_resolver_animal_tags_flexibles(db):
     aid = db.registrar_animal("N-069", nombre="Negra")
     assert db.animal_id("N069") == aid

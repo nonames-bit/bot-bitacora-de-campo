@@ -1023,24 +1023,33 @@ class Database:
         return vinculadas
 
     def fotos_de(self, animal_tag_or_id, limit: int = 5) -> list[sqlite3.Row]:
+        """Fotos de un animal. El match "difuso" (caption/ocr/ruta con el tag
+        como substring, ej. buscando 'JA14' calzaría con 'JA14-7') solo debe
+        aplicar a fotos huérfanas (animal_id IS NULL) -- si no, una foto ya
+        vinculada a OTRO animal (ej. una cría cuyo tag "JA14-7" contiene el
+        tag del padre "JA14") se filtraba también en la ficha equivocada."""
         aid = self.resolve_animal(animal_tag_or_id)
         tag_str = str(animal_tag_or_id).strip()
         tag_like = f"%{tag_str}%"
         if aid is not None:
             return self.query(
                 "SELECT * FROM fotos WHERE animal_id = ? "
-                "   OR UPPER(tag) = UPPER(?) "
-                "   OR UPPER(caption) LIKE UPPER(?) "
-                "   OR UPPER(ocr_text) LIKE UPPER(?) "
-                "   OR UPPER(ruta) LIKE UPPER(?) "
+                "   OR (animal_id IS NULL AND ("
+                "       UPPER(tag) = UPPER(?) "
+                "       OR UPPER(caption) LIKE UPPER(?) "
+                "       OR UPPER(ocr_text) LIKE UPPER(?) "
+                "       OR UPPER(ruta) LIKE UPPER(?)"
+                "   )) "
                 "ORDER BY id DESC LIMIT ?",
                 (aid, tag_str, tag_like, tag_like, tag_like, limit),
             )
         return self.query(
-            "SELECT * FROM fotos WHERE UPPER(tag) = UPPER(?) "
+            "SELECT * FROM fotos WHERE animal_id IS NULL AND ("
+            "   UPPER(tag) = UPPER(?) "
             "   OR UPPER(caption) LIKE UPPER(?) "
             "   OR UPPER(ocr_text) LIKE UPPER(?) "
-            "   OR UPPER(ruta) LIKE UPPER(?) "
+            "   OR UPPER(ruta) LIKE UPPER(?)"
+            ") "
             "ORDER BY id DESC LIMIT ?",
             (tag_str, tag_like, tag_like, tag_like, limit),
         )
