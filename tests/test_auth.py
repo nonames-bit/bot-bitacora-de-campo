@@ -192,6 +192,14 @@ def test_auth_telegram_id_y_avatar(tmp_path):
     assert u["avatar"] == "patron"
     assert u["nombre"] == "Don José"
 
+    # PIN incorrecto (mismo largo y distinto largo) no autentica -- regresión
+    # del cambio de == a hmac.compare_digest, que no debe alterar el
+    # resultado, solo hacerlo en tiempo constante.
+    assert auth.autenticar_pin("4321") is None
+    assert auth.autenticar_pin("12345") is None
+    assert auth.autenticar_pin("123") is None
+    assert auth.autenticar_pin("") is None
+
 
 def test_auth_actualizar_usuario_preserva_telegram_id(tmp_path):
     archivo = tmp_path / "users.json"

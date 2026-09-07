@@ -107,10 +107,12 @@ __all__ = ["_ruta_relativa_media"]  # re-export compat WS-2 (fuente: engine.dash
 try:
     from flask import (Flask, abort, jsonify, redirect, render_template,  # type: ignore
                        request, send_file, send_from_directory, session)
+    from werkzeug.middleware.proxy_fix import ProxyFix  # type: ignore
 
     _FLASK_OK = True
 except Exception:  # Flask no instalado: no romper el bot
     Flask = None  # type: ignore
+    ProxyFix = None  # type: ignore
     _FLASK_OK = False
 
     def jsonify(*a, **k):  # type: ignore
@@ -661,6 +663,28 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     app.secret_key = _obtener_secret_key()
     clave_esperada = password if password is not None else PWA_PASSWORD
 
+    # Waitress solo escucha en loopback; Nginx es el único que le habla
+    # directo (1 salto). Sin esto, request.remote_addr y el X-Forwarded-For
+    # que lee _cliente_ip() vienen tal cual los mande el cliente -- nginx
+    # normalmente AGREGA la IP real al final del header en vez de
+    # reemplazarlo, así que cualquiera puede mandar su propio
+    # X-Forwarded-For falso y colarse como "primera IP" para eludir el
+    # rate-limit de /login por IP.
+    if ProxyFix is not None:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=0, x_port=0, x_prefix=0)  # type: ignore
+
+    # Cookie de sesión: Secure (solo por HTTPS), HttpOnly (ya es el default
+    # de Flask, pero se deja explícito) y SameSite=Lax (bloquea que un sitio
+    # externo dispare peticiones autenticadas contra /api/* del visitante).
+    # PWA_COOKIE_SECURE=0 es la única razón para desactivar Secure: correr
+    # el servidor local por HTTP plano sin Nginx/TLS delante (desarrollo).
+    _cookie_secure = os.getenv("PWA_COOKIE_SECURE", "1").strip().lower() not in ("0", "false", "no")
+    app.config.update(
+        SESSION_COOKIE_SECURE=_cookie_secure,
+        SESSION_COOKIE_HTTPONLY=True,
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
+
     # Rutas que no requieren sesión iniciada (nombres de endpoint de Flask,
     # es decir el nombre de la función de vista, no la URL).
     _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest", "sw_js", "offline_page"}
@@ -677,9 +701,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     _LOGIN_VENTANA_SEG = 60.0
 
     def _cliente_ip() -> str:
-        xff = request.headers.get("X-Forwarded-For", "")
-        if xff:
-            return xff.split(",")[0].strip()
+        # request.remote_addr ya viene corregido por ProxyFix (confía en
+        # exactamente 1 salto = Nginx) -- no leer X-Forwarded-For a mano
+        # aquí, porque el valor crudo del header es falsificable por el
+        # cliente y volvería a abrir el bypass del rate-limit de /login.
         return request.remote_addr or "desconocido"
 
     def _login_bloqueado(ip: str) -> bool:

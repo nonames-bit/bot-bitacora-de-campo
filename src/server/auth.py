@@ -1,6 +1,7 @@
 """Módulo de autenticación y control de acceso basado en roles (RBAC)."""
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
@@ -198,7 +199,12 @@ class Auth:
         pin_limpio = str(pin).strip()
         for u in self.usuarios:
             pin_u = str(u.get("pin", "")).strip()
-            if pin_u and pin_u == pin_limpio:
+            # compare_digest en vez de == : una comparación normal corta en
+            # cuanto encuentra el primer carácter distinto, así que el tiempo
+            # de respuesta revela cuántos dígitos del PIN acertó un atacante
+            # (ataque de temporización). Con 4 dígitos y el sitio expuesto a
+            # internet, vale la pena la comparación en tiempo constante.
+            if pin_u and hmac.compare_digest(pin_u, pin_limpio):
                 rol_u = str(u.get("rol", "")).strip().upper()
                 avatar_u = u.get("avatar") or ("patron" if rol_u == "OWNER" else "admin" if rol_u == "ADMIN" else "vaquero")
                 return {

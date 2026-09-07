@@ -105,6 +105,37 @@ def test_logout_envia_clear_site_data(client):
     assert r.headers.get("Clear-Site-Data") == '"cache", "storage"'
 
 
+def test_login_rate_limit_no_se_elude_falsificando_x_forwarded_for(db_file):
+    """Nginx (el único proxy real delante de waitress) AGREGA la IP real al
+    final de X-Forwarded-For en vez de reemplazarlo -- así que un atacante
+    puede mandar cualquier prefijo falso y aun así el último valor (el que
+    puso Nginx) sigue siendo su IP real. ProxyFix(x_for=1) debe usar ese
+    último valor, no el primero, para que rotar el prefijo falso no elida
+    el rate-limit de /login."""
+    app = crear_app(db_file, password="clave-de-prueba")
+    c = app.test_client()
+    ip_real = "5.5.5.5"
+    for i in range(8):
+        xff = f"{i}.{i}.{i}.{i}, {ip_real}"  # prefijo falso distinto cada vez + misma IP real al final
+        r = c.post("/login", data={"password": "0000"}, headers={"X-Forwarded-For": xff})
+        assert r.status_code in (301, 302, 303, 307, 308)
+    # Con un prefijo falso todavía distinto, pero la misma IP real al final,
+    # debe seguir bloqueado -- si el bug estuviera presente (leer el PRIMER
+    # valor), cada prefijo nuevo resetearía el contador y esto pasaría.
+    bloqueado = c.post(
+        "/login", data={"password": "clave-de-prueba"},
+        headers={"X-Forwarded-For": f"99.99.99.99, {ip_real}"},
+    )
+    assert bloqueado.status_code == 429
+
+
+def test_cookies_de_sesion_son_secure_httponly_samesite(db_file):
+    app = crear_app(db_file, password="clave-de-prueba")
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+    assert app.config["SESSION_COOKIE_HTTPONLY"] is True
+    assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
+
+
 def test_sin_password_configurada_bloquea_todo(db_file):
     app = crear_app(db_file, password="")
     c = app.test_client()
