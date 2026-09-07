@@ -1038,6 +1038,19 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   border-color: #000000 !important;
   font-weight: 600;
 }
+/* .barra-fila (distribución por raza, existencias por potrero, etc.) usa
+   --borde de pista y --verde-marca de relleno -- en este tema ambos son
+   casi negros (#000000 y #143516), así que el relleno se vuelve invisible
+   contra la pista. Se reutilizan las mismas variables ya definidas para la
+   pirámide de edades (pista clara + verde saturado) que resuelven este
+   mismo problema de contraste. */
+:root[data-theme="sun"] .barra-fila .pista {
+  background: var(--piramide-pista);
+  border: 1px solid #000000;
+}
+:root[data-theme="sun"] .barra-fila .relleno {
+  background: var(--piramide-hembra);
+}
 
 /* --- Badge de Usuario & Sincronización en Header --- */
 .marca-titulo { display: inline-flex; align-items: center; gap: 8px; }
