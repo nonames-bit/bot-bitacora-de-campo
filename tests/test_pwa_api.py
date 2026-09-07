@@ -986,3 +986,36 @@ def test_api_finanzas_filtra_por_desde_hasta(client):
     r = client.get("/api/finanzas?desde=2026-09-01&hasta=2026-09-30")
     assert r.status_code == 200
     assert r.get_json()["resumen"]["total_ingresos"] == 200000
+
+
+def test_api_sync_gasto_con_foto_queda_enlazada_en_finanzas(client, db_file):
+    """La foto adjunta a un evento 'gasto' vía /api/sync (cola offline de
+    Captura) debe quedar enlazada en finanzas.foto_ruta, no solo en la
+    galería general de fotos -- si no, el detalle del movimiento en la
+    vista Finanzas nunca puede mostrarla."""
+    import base64
+
+    fake_img = base64.b64encode(
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    ).decode("utf-8")
+    b64_data = f"data:image/jpeg;base64,{fake_img}"
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "tipo": "gasto",
+        "id_local": "loc_gasto_foto",
+        "fecha": "2026-09-07",
+        "payload": {
+            "tipo_finanza": "EGRESO", "categoria": "INSUMO",
+            "concepto": "Alambre de púa 200m", "monto": 250000,
+            "foto_base64": b64_data,
+        },
+    }]})
+    assert r.status_code == 200
+    assert r.get_json()["procesados"] == 1
+
+    r_fin = client.get("/api/finanzas")
+    assert r_fin.status_code == 200
+    recientes = r_fin.get_json()["recientes"]
+    fila = next(f for f in recientes if f["concepto"] == "Alambre de púa 200m")
+    assert fila["foto_ruta"]
+    assert fila["foto_ruta"].startswith("media/") or fila["foto_ruta"].startswith("media\\")

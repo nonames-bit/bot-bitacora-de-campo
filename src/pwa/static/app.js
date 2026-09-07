@@ -71,6 +71,7 @@
       grass: '<path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/>',
       milk: '<path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/>',
       search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
       alert: '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
       rain: '<path d="M17 10a5 5 0 0 0-10 0 4 4 0 0 0 0 8h10a4 4 0 0 0 0-8zm-8 10l-1 2m4-2l-1 2m4-2l-1 2"/>',
       gauge: '<path d="M3 12a9 9 0 0 1 15 0"/><path d="M12 12L9 9"/>',
@@ -396,6 +397,7 @@
 
   /* ---------- Finanzas: Ingresos, Egresos y Utilidad ---------- */
   var _finanzasAno = new Date().getFullYear();
+  var _finanzasMovsActuales = [];
   var CATEGORIAS_FINANZAS_LABEL = {
     VENTA_LECHE: "Venta de leche", VENTA_ANIMAL: "Venta de animales",
     COMPRA_ANIMAL: "Compra de animales", NOMINA: "Nómina / Jornales",
@@ -435,19 +437,24 @@
     var movs = (d.recientes || []).map(function (f) {
       return {
         fecha: f.fecha, tipo: f.tipo, categoria: etiquetaCategoriaFinanza(f.categoria),
-        detalle: f.concepto || "", monto: f.monto,
+        detalle: f.concepto || "", monto: f.monto, litros: f.litros,
         animal_tag: f.animal_tag || null,
-        otro_txt: f.animal_tag ? "" : (f.contraparte || f.potrero_nombre || "")
+        otro_txt: f.animal_tag ? "" : (f.contraparte || f.potrero_nombre || ""),
+        contraparte: f.contraparte || null, potrero_nombre: f.potrero_nombre || null,
+        notas: f.notas || null, foto_ruta: f.foto_ruta || null
       };
     }).concat((d.ventas_compras || []).map(function (m) {
       return {
         fecha: m.fecha, tipo: m.tipo_movimiento === "VENTA" ? "INGRESO" : "EGRESO",
         categoria: m.tipo_movimiento === "VENTA" ? "Venta de animales" : "Compra de animales",
-        detalle: m.notas || "", monto: m.precio,
+        detalle: m.notas || "", monto: m.precio, litros: null,
         animal_tag: m.animal_tag || null,
-        otro_txt: m.procedencia_destino || ""
+        otro_txt: m.procedencia_destino || "",
+        contraparte: m.procedencia_destino || null, potrero_nombre: null,
+        notas: null, foto_ruta: null
       };
     })).sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); });
+    _finanzasMovsActuales = movs;
 
     h += "<h4>" + icon("calendar") + "Movimientos recientes</h4>"
       + tabla(movs, [
@@ -461,10 +468,71 @@
           return link || extra || "—";
         }],
         ["detalle", "Detalle"],
-        ["monto", "Monto", "text", function (v) { return fmtMoneda(v); }]
+        ["monto", "Monto", "text", function (v) { return fmtMoneda(v); }],
+        ["fecha", "Ver", "text", function (v, fila) {
+          var idx = movs.indexOf(fila);
+          var conFoto = fila.foto_ruta ? icon("camera", 12) : "";
+          return "<button type='button' class='tema-btn' data-fin-ver='" + idx + "' style='font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;' title='Ver detalle'>" + icon("eye", 13) + conFoto + "</button>";
+        }]
       ], "Sin movimientos recientes en este periodo.");
 
     return h;
+  }
+
+  function mostrarDetalleFinanza(fila) {
+    if (!fila) return;
+    var overlay = document.getElementById("fin-detalle-modal");
+    if (overlay) overlay.remove();
+
+    var animalHtml = fila.animal_tag
+      ? ("<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(fila.animal_tag) + "\" style='font-weight:bold; text-decoration:none; display:inline-flex; align-items:center; gap:5px;'>" + icon("cow", 15) + "<span>" + esc(fila.animal_tag) + "</span></a>")
+      : "—";
+
+    var filasDetalle = [
+      ["Fecha", esc(fechaCorta(fila.fecha))],
+      ["Tipo", "<span class='chip " + (fila.tipo === "INGRESO" ? "verde" : "rojo") + "'>" + esc(fila.tipo) + "</span>"],
+      ["Categoría", esc(fila.categoria)],
+      ["Concepto", esc(fila.detalle) || "—"],
+      ["Monto", "<b style='font-size:16px;'>" + fmtMoneda(fila.monto) + "</b>"],
+      ["Animal", animalHtml]
+    ];
+    if (fila.litros != null) filasDetalle.push(["Litros", esc(fila.litros) + " L"]);
+    if (fila.contraparte) filasDetalle.push(["Proveedor / Comprador / Trabajador", esc(fila.contraparte)]);
+    if (fila.potrero_nombre) filasDetalle.push(["Potrero", esc(fila.potrero_nombre)]);
+    if (fila.notas) filasDetalle.push(["Notas", esc(fila.notas)]);
+
+    var cuerpoHtml = "<div style='display:flex; flex-direction:column; gap:8px; font-size:13.5px;'>"
+      + filasDetalle.map(function (par) {
+        return "<div><span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block;'>" + esc(par[0]) + "</span>" + par[1] + "</div>";
+      }).join("")
+      + "</div>";
+
+    if (fila.foto_ruta) {
+      var ruta = fila.foto_ruta.indexOf("/") === 0 ? fila.foto_ruta : "/" + fila.foto_ruta;
+      cuerpoHtml += "<div style='margin-top:14px;'>"
+        + "<span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block; margin-bottom:6px;'>" + icon("camera", 13) + " Foto de la Factura / Recibo</span>"
+        + "<img class='zoomable-img' src='" + esc(ruta) + "' alt='Factura: " + esc(fila.detalle || fila.categoria) + "' style='max-width:100%; border-radius:8px; border:1px solid var(--borde); cursor:zoom-in; display:block;' data-onerror-hide='self'>"
+        + "<small style='color:var(--texto-suave);'>Toca la imagen para ampliarla.</small>"
+        + "</div>";
+    } else {
+      cuerpoHtml += "<p class='aviso' style='margin-top:14px;'>" + icon("camera", 13) + "Sin foto adjunta.</p>";
+    }
+
+    var html = "<div id='fin-detalle-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido'>"
+      + "<div class='modal-header'><b>" + icon("receipt", 15) + " Detalle del Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-detalle'>✕</button></div>"
+      + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
+      + "</div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("fin-detalle-modal");
+    function cerrarModal() { if (ov) ov.remove(); }
+    var btnCerrar = document.getElementById("btn-cerrar-fin-detalle");
+    if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
   }
 
   function bindFinanzas() {
@@ -484,6 +552,12 @@
         cargarFinanzasPeriodo();
       });
     }
+    qa("[data-fin-ver]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.getAttribute("data-fin-ver"), 10);
+        mostrarDetalleFinanza(_finanzasMovsActuales[idx]);
+      });
+    });
   }
 
   function cargarFinanzasPeriodo() {
@@ -3223,32 +3297,62 @@
     var btnSistema = document.getElementById("btn-nav-sistema");
     var btnUsuarios = document.getElementById("btn-nav-usuarios");
     var btnGps = document.getElementById("btn-nav-gps");
+    var sheetSistema = document.getElementById("sheet-item-sistema");
+    var sheetUsuarios = document.getElementById("sheet-item-usuarios");
+    var sheetGps = document.getElementById("sheet-item-gps");
 
     if (rol === "OWNER") {
       if (btnSistema) btnSistema.style.display = "";
       if (btnUsuarios) btnUsuarios.style.display = "";
       if (btnGps) btnGps.style.display = "";
+      if (sheetSistema) sheetSistema.style.display = "";
+      if (sheetUsuarios) sheetUsuarios.style.display = "";
+      if (sheetGps) sheetGps.style.display = "";
       qa("nav > button").forEach(function (b) { b.style.display = ""; });
+      qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
+        var v = m.getAttribute("data-v");
+        if (v !== "sistema" && v !== "usuarios" && v !== "gps") m.style.display = "";
+      });
     } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
       if (btnSistema) btnSistema.style.display = "none";
       if (btnGps) btnGps.style.display = "none";
       if (btnUsuarios) btnUsuarios.style.display = "";
+      if (sheetSistema) sheetSistema.style.display = "none";
+      if (sheetGps) sheetGps.style.display = "none";
+      if (sheetUsuarios) sheetUsuarios.style.display = "";
       qa("nav > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
+      qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
+        var v = m.getAttribute("data-v");
+        if (v === "sistema" || v === "gps") m.style.display = "none";
+        else if (v !== "usuarios") m.style.display = "";
+      });
     } else if (rol === "TRABAJADOR") {
       if (btnSistema) btnSistema.style.display = "none";
       if (btnUsuarios) btnUsuarios.style.display = "none";
       if (btnGps) btnGps.style.display = "none";
+      if (sheetSistema) sheetSistema.style.display = "none";
+      if (sheetUsuarios) sheetUsuarios.style.display = "none";
+      if (sheetGps) sheetGps.style.display = "none";
       var permitidas = ["captura", "manga", "ficha"];
       qa("nav > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
+        if (!v) return; // e.g. #btn-nav-mas
         if (permitidas.indexOf(v) !== -1) {
           b.style.display = "";
         } else {
           b.style.display = "none";
+        }
+      });
+      qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
+        var v = m.getAttribute("data-v");
+        if (permitidas.indexOf(v) !== -1) {
+          m.style.display = "";
+        } else {
+          m.style.display = "none";
         }
       });
       if (permitidas.indexOf(actual) === -1 && actual !== "ayuda") {
@@ -3256,6 +3360,13 @@
         cargar();
       }
     }
+
+    // Ocultar categorías sin módulos disponibles para este rol
+    qa("#modal-mas-modulos .modulo-seccion").forEach(function (sec) {
+      var items = qa(".modulo-item", sec);
+      var visible = items.some(function (it) { return it.style.display !== "none"; });
+      sec.style.display = visible ? "" : "none";
+    });
   }
 
   /* ---------- Ficha con pestañas ---------- */
@@ -3830,9 +3941,7 @@
     var inp = q("#f-tag");
     if (inp) inp.value = tag;
 
-    qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
-    destino.classList.add("act");
-    actual = "ficha";
+    irAVista("ficha");
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) barraFiltros.style.display = "";
@@ -4227,15 +4336,53 @@
     fetch("/api/badges").then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
       .then(function (d) {
         badgesCache = d || {};
+        var totalSecundario = 0;
         VISTAS_BADGE.forEach(function (v) {
-          var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
-          if (!btn) return;
-          var span = btn.querySelector(".nav-badge");
-          if (!span) return;
           var n = parseInt(d && d[v], 10) || 0;
-          if (n > 0) { span.textContent = n > 99 ? "99+" : String(n); span.classList.add("on"); }
-          else { span.textContent = ""; span.classList.remove("on"); }
+          var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+          if (btn) {
+            var span = btn.querySelector(".nav-badge");
+            if (span) {
+              if (n > 0) { span.textContent = n > 99 ? "99+" : String(n); span.classList.add("on"); }
+              else { span.textContent = ""; span.classList.remove("on"); }
+            }
+          }
+          var item = document.querySelector("#modal-mas-modulos .modulo-item[data-v='" + v + "']");
+          if (item) {
+            var bSpan = item.querySelector(".badge-sheet");
+            if (!bSpan) {
+              bSpan = document.createElement("span");
+              bSpan.className = "badge-sheet";
+              item.appendChild(bSpan);
+            }
+            if (n > 0) {
+              bSpan.textContent = n > 99 ? "99+" : String(n);
+              bSpan.style.display = "inline-block";
+            } else {
+              bSpan.textContent = "";
+              bSpan.style.display = "none";
+            }
+          }
+          totalSecundario += n;
         });
+
+        var btnMas = document.getElementById("btn-nav-mas");
+        if (btnMas) {
+          var spanMas = btnMas.querySelector(".nav-badge");
+          if (!spanMas) {
+            spanMas = document.createElement("span");
+            spanMas.className = "nav-badge";
+            btnMas.appendChild(spanMas);
+          }
+          if (totalSecundario > 0) {
+            spanMas.textContent = totalSecundario > 99 ? "99+" : String(totalSecundario);
+            spanMas.classList.add("on");
+          } else {
+            spanMas.textContent = "";
+            spanMas.classList.remove("on");
+          }
+        }
+
         // Campana del header (total = agenda) + notificación al aumentar.
         var camp = document.getElementById("notif-dot");
         var nA = parseInt(d && d.agenda, 10) || 0;
@@ -4282,8 +4429,7 @@
         window.location = "/?v=ayuda";
         return;
       }
-      qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
-      actual = "ayuda";
+      irAVista("ayuda");
       var barraFiltros = document.getElementById("barra-filtros");
       if (barraFiltros) barraFiltros.style.display = "none";
       cargar(true);
@@ -4291,27 +4437,132 @@
     });
   }
 
+  var VISTAS_PRIMARIAS = ["tablero", "captura", "inventario", "finanzas"];
+  var NOMBRES_VISTA = {
+    tablero: "Tablero",
+    captura: "Captura",
+    inventario: "Inventario",
+    finanzas: "Finanzas",
+    manga: "Manga",
+    agenda: "Agenda",
+    repro: "Repro",
+    leche: "Leche",
+    sanidad: "Sanidad",
+    pasturas: "Pasturas",
+    genetica: "Genética",
+    ficha: "Ficha",
+    gps: "GPS",
+    usuarios: "Usuarios",
+    sistema: "Sistema",
+    ayuda: "Ayuda"
+  };
+
+  function setupModalMas() {
+    var modalMas = document.getElementById("modal-mas-modulos");
+    var btnNavMas = document.getElementById("btn-nav-mas");
+    var btnCerrarMas = document.getElementById("btn-cerrar-mas");
+
+    function abrirModalMas() {
+      if (!modalMas) return;
+      modalMas.style.display = "flex";
+      qa("#modal-mas-modulos .modulo-item").forEach(function (it) {
+        if (it.getAttribute("data-v") === actual) it.classList.add("act");
+        else it.classList.remove("act");
+      });
+    }
+
+    function cerrarModalMas() {
+      if (!modalMas) return;
+      modalMas.style.display = "none";
+    }
+
+    window.__abrirModalMas = abrirModalMas;
+    window.__cerrarModalMas = cerrarModalMas;
+
+    if (btnNavMas) {
+      btnNavMas.addEventListener("click", function (e) {
+        e.stopPropagation();
+        abrirModalMas();
+      });
+    }
+
+    if (btnCerrarMas) {
+      btnCerrarMas.addEventListener("click", function (e) {
+        e.stopPropagation();
+        cerrarModalMas();
+      });
+    }
+
+    if (modalMas) {
+      modalMas.addEventListener("click", function (e) {
+        if (e.target === modalMas) cerrarModalMas();
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modalMas && modalMas.style.display === "flex") {
+        cerrarModalMas();
+      }
+    });
+
+    qa("#modal-mas-modulos .modulo-item").forEach(function (item) {
+      item.addEventListener("click", function () {
+        var v = item.getAttribute("data-v");
+        if (!v) return;
+        cerrarModalMas();
+        irAVista(v);
+        var barraFiltros = document.getElementById("barra-filtros");
+        if (barraFiltros) {
+          barraFiltros.style.display = (v === "ayuda") ? "none" : "";
+        }
+        cargar();
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+      });
+    });
+  }
+
   qa("nav > button").forEach(function (b) {
     b.addEventListener("click", function () {
-      qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
-      b.classList.add("act");
-      actual = b.getAttribute("data-v");
+      if (b.id === "btn-nav-mas") {
+        if (typeof window.__abrirModalMas === "function") window.__abrirModalMas();
+        return;
+      }
+      var v = b.getAttribute("data-v");
+      if (!v) return;
+      irAVista(v);
       cargar();
       if (VISTAS_BADGE.indexOf(actual) !== -1) {
-        // Al abrir la vista, los datos frescos actualizan su badge al instante.
         var span = b.querySelector(".nav-badge");
         if (span) { span.textContent = ""; span.classList.remove("on"); }
       }
     });
   });
-  // Cambia de pestaña activa sin recargar (usado por el buscador de arriba:
-  // si el usuario escribe un tag/potrero estando en OTRA vista, hay que
-  // saltar a la vista que sabe usar ese campo antes de cargar).
+
+  // Cambia de pestaña activa sin recargar
   function irAVista(v) {
     actual = v;
     qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
     var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
     if (destino) destino.classList.add("act");
+
+    // Sincronizar botón Más en barra móvil
+    var btnMas = document.getElementById("btn-nav-mas");
+    var txtMas = document.getElementById("txt-nav-mas");
+    if (btnMas) {
+      if (VISTAS_PRIMARIAS.indexOf(v) !== -1) {
+        btnMas.classList.remove("act");
+        if (txtMas) txtMas.textContent = "Más";
+      } else {
+        btnMas.classList.add("act");
+        if (txtMas) txtMas.textContent = NOMBRES_VISTA[v] || "Más";
+      }
+    }
+
+    // Sincronizar ítem activo en modal de módulos
+    qa("#modal-mas-modulos .modulo-item").forEach(function (it) {
+      if (it.getAttribute("data-v") === v) it.classList.add("act");
+      else it.classList.remove("act");
+    });
   }
   // Cargar manual (botón o Enter): el tag manda a Ficha y el potrero manda a
   // Tablero (únicas vistas que usan esos campos), sin importar qué pestaña
@@ -4416,8 +4667,7 @@
     // Alias: la vista de población se unificó dentro de Inventario.
     if (v === "poblacion") v = "inventario";
     if (v === "ayuda") {
-      qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
-      actual = "ayuda";
+      irAVista("ayuda");
       var barraFiltros = document.getElementById("barra-filtros");
       if (barraFiltros) barraFiltros.style.display = "none";
       cargar(true);
@@ -4429,7 +4679,8 @@
     if (v && qa("nav > button").length) {
       var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
       if (destino) {
-        destino.click(); // activa pestaña + cargar() con los campos ya puestos
+        irAVista(v);
+        cargar();
         return;
       }
     }
@@ -4657,6 +4908,7 @@
     setupSyncOffline();
     setupChatModal();
     setupVozModal();
+    setupModalMas();
     crearBadgesNav();
     setupCampana();
     setupHeaderAyuda();

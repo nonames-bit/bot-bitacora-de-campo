@@ -1625,7 +1625,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         if id_local:
                             ids_ok.append(id_local)
                     elif tipo == "gasto":
-                        db_sync.registrar_finanza(
+                        fid_finanza = db_sync.registrar_finanza(
                             fecha=fecha,
                             tipo=payload.get("tipo_finanza") or "EGRESO",
                             categoria=payload.get("categoria"),
@@ -1638,7 +1638,14 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
-                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        fid_foto = _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        if fid_foto:
+                            foto_fila = db_sync.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
+                            if foto_fila and foto_fila["ruta"]:
+                                db_sync.execute(
+                                    "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
+                                    (foto_fila["ruta"], fid_finanza),
+                                )
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
