@@ -436,14 +436,16 @@
       return {
         fecha: f.fecha, tipo: f.tipo, categoria: etiquetaCategoriaFinanza(f.categoria),
         detalle: f.concepto || "", monto: f.monto,
-        contraparte: f.animal_tag ? ("🐮 " + f.animal_tag) : (f.contraparte || f.potrero_nombre || "")
+        animal_tag: f.animal_tag || null,
+        otro_txt: f.animal_tag ? "" : (f.contraparte || f.potrero_nombre || "")
       };
     }).concat((d.ventas_compras || []).map(function (m) {
       return {
         fecha: m.fecha, tipo: m.tipo_movimiento === "VENTA" ? "INGRESO" : "EGRESO",
         categoria: m.tipo_movimiento === "VENTA" ? "Venta de animales" : "Compra de animales",
         detalle: m.notas || "", monto: m.precio,
-        contraparte: "🐮 " + (m.animal_tag || "") + (m.procedencia_destino ? " · " + m.procedencia_destino : "")
+        animal_tag: m.animal_tag || null,
+        otro_txt: m.procedencia_destino || ""
       };
     })).sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); });
 
@@ -452,7 +454,12 @@
         ["fecha", "Fecha", "text", function (v) { return esc(fechaCorta(v)); }],
         ["tipo", "Tipo", "text", function (v) { return "<span class='chip " + (v === "INGRESO" ? "verde" : "rojo") + "'>" + esc(v) + "</span>"; }],
         ["categoria", "Categoría"],
-        ["contraparte", "Animal / Contraparte"],
+        ["animal_tag", "Animal / Contraparte", "text", function (v, fila) {
+          var link = v ? ("<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(v) + "\" style='font-weight:bold; text-decoration:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("cow", 13) + "<span>" + esc(v) + "</span></a>") : "";
+          var extra = fila.otro_txt ? esc(fila.otro_txt) : "";
+          if (link && extra) return link + " · " + extra;
+          return link || extra || "—";
+        }],
         ["detalle", "Detalle"],
         ["monto", "Monto", "text", function (v) { return fmtMoneda(v); }]
       ], "Sin movimientos recientes en este periodo.");
