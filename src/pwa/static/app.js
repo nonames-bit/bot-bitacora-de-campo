@@ -4269,7 +4269,7 @@
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
       + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
-      + campo("an-potrero", "Potrero", val(f && f.potrero), " list='dl-potreros' placeholder='ej. Guayabal'")
+      + campo("an-potrero", "Potrero", val(f && f.potrero && f.potrero !== "Sin potrero asignado" ? f.potrero : ""), " list='dl-potreros' placeholder='ej. Guayabal'")
       + campo("an-hierro", "Hierro / Marca a fuego", val(f && f.hierro), " placeholder='ej. JA'")
       + campo("an-chip", "Chip / RFID", val(f && f.chip), " placeholder='ej. 985...'")
       + campo("an-color", "Color / Pelo", val(f && f.color), " placeholder='ej. Negro'")
