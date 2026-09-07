@@ -1166,7 +1166,7 @@
       + "<small style='font-size:11px; color:var(--texto-suave); display:block; margin-top:2px;'>" + esc(hintFoto) + "</small>"
       + "</div>"
       + "<div style='display:flex; gap:8px; align-items:center;'>"
-      + "<input type='file' id='cap-foto-input' accept='image/*' capture='environment' style='display:none;'>"
+      + "<input type='file' id='cap-foto-input' accept='image/*' style='display:none;'>"
       + "<button type='button' id='btn-elegir-foto' class='tema-btn' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
       + icon("camera", 13) + txtBtnFoto
       + "</button>"
@@ -3387,7 +3387,7 @@
       + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
       + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
       + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
-      + "<input type='file' id='f-ident-foto' accept='image/*' capture='environment' style='min-height:40px; flex:1'>"
+      + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1'>"
       + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
       + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
       + "</div>"
