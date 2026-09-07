@@ -876,3 +876,44 @@ def test_ficha_genealogia_3g_y_crias(client, db_file):
     assert "consanguinidad" in g
     assert "texto_arbol" in g
     assert "ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)" in g["texto_arbol"]
+
+
+def test_api_leche_analizar_recibo_y_guardar_quincena(client, db_file):
+    from unittest.mock import patch
+    sample_parse = {
+        "ok": True,
+        "es_recibo_leche": True,
+        "periodo": "1 al 15 de Mayo 2026",
+        "total_litros_calculado": 360.0,
+        "dias": [
+            {"fecha": "2026-05-01", "dia": 1, "litros": 180.0, "notas": "AM+PM"},
+            {"fecha": "2026-05-02", "dia": 2, "litros": 180.0, "notas": "AM+PM"},
+        ],
+    }
+
+    with patch("src.vision.recibo_leche_parser.analizar_recibo_leche", return_value=sample_parse):
+        r = client.post("/api/leche/analizar-recibo", json={"foto_base64": "fake_base64_data"})
+        assert r.status_code == 200
+        res = r.get_json()
+        assert res["ok"] is True
+        assert len(res["dias"]) == 2
+
+    # Guardar la quincena
+    r_guardar = client.post("/api/leche/guardar-quincena", json={
+        "periodo": "1 al 15 de Mayo 2026",
+        "dias": res["dias"],
+        "observaciones": "Recibo de prueba"
+    })
+    assert r_guardar.status_code == 200
+    g_res = r_guardar.get_json()
+    assert g_res["ok"] is True
+    assert g_res["guardados"] == 2
+    assert g_res["total_litros"] == 360.0
+
+    # Verificar que los datos aparecen en /api/leche
+    r_leche = client.get("/api/leche")
+    assert r_leche.status_code == 200
+    d_leche = r_leche.get_json()
+    fechas = [f["fecha"] for f in d_leche["serie_tanque"]]
+    assert "2026-05-01" in fechas
+    assert "2026-05-02" in fechas

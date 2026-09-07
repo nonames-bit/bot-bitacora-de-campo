@@ -38,7 +38,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v42: Icono de cría adaptado fielmente de la vaquita favorita con frente redondeada tierna sin cuernos e icono de parto con Vaca Madre + Cría juntas en estilo idéntico.
 // v43: Selector de temas en /ficha/<tag>, botones de Asistente IA (Chat) y Ayuda en header de ficha, e icono SVG Lucide de vaca sin emojis.
 // v44: Foto de recibo/planilla quincenal de leche en captura rápida, galería de recibos en vista Leche con zoom táctil.
-var CACHE = "pwa-ja-v44"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v45: Digitalización inteligente de recibos/planillas de leche con IA Multimodal (Gemini Vision) y desglose interactivo.
+var CACHE = "pwa-ja-v45"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

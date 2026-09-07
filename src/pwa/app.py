@@ -879,6 +879,106 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.post("/api/leche/analizar-recibo")
+    def api_leche_analizar_recibo():
+        datos = request.get_json(silent=True) or {}
+        foto_b64 = datos.get("foto_base64")
+        fecha_ref = datos.get("fecha_referencia") or date.today().isoformat()
+        if not foto_b64:
+            return jsonify({"ok": False, "error": "No se recibió la foto del recibo."}), 400
+
+        try:
+            from ..vision.recibo_leche_parser import analizar_recibo_leche
+        except (ImportError, ValueError):
+            from src.vision.recibo_leche_parser import analizar_recibo_leche
+
+        res = analizar_recibo_leche(foto_b64, fecha_referencia=fecha_ref)
+        return jsonify(res)
+
+    @app.post("/api/leche/guardar-quincena")
+    def api_leche_guardar_quincena():
+        datos = request.get_json(silent=True) or {}
+        dias = datos.get("dias") or []
+        foto_b64 = datos.get("foto_base64")
+        observaciones = datos.get("observaciones") or ""
+        periodo = datos.get("periodo") or ""
+        uid = session.get("user_id")
+
+        if not dias or not isinstance(dias, list):
+            return jsonify({"ok": False, "error": "No hay días válidos para registrar."}), 400
+
+        db_inst = _db(db_path)
+        guardados = 0
+        total_l = 0.0
+
+        try:
+            # Guardar foto en disco y tabla fotos si se adjuntó
+            if foto_b64:
+                try:
+                    try:
+                        from ..vision.recibo_leche_parser import _extraer_bytes_e_imagen
+                    except (ImportError, ValueError):
+                        from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
+                    raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
+                    os.makedirs(media_dir_abs, exist_ok=True)
+                    ts = int(time.time())
+                    rnd = uuid.uuid4().hex[:6]
+                    fname = f"recibo_leche_{ts}_{rnd}.jpg"
+                    dest_file = os.path.join(media_dir_abs, fname)
+                    with open(dest_file, "wb") as f:
+                        f.write(raw_bytes)
+                    ruta_rel = os.path.join("media", fname).replace("\\", "/")
+                    db_inst.registrar_foto(
+                        ruta=ruta_rel,
+                        animal_tag=None,
+                        fecha=dias[0].get("fecha") or date.today().isoformat(),
+                        caption=f"Recibo Quincenal: {periodo}".strip(),
+                        user_id=uid,
+                        notas=f"Control lechero quincenal ({len(dias)} días). {observaciones}".strip(),
+                    )
+                except Exception as ferr:
+                    logger.warning("No se pudo guardar archivo de foto del recibo: %s", ferr)
+
+            for d in dias:
+                f = d.get("fecha")
+                try:
+                    litros = round(float(d.get("litros") or 0.0), 1)
+                except (TypeError, ValueError):
+                    continue
+                if not f or litros < 0:
+                    continue
+
+                nota_dia = (d.get("notas") or observaciones or "").strip() or None
+                existente = db_inst.query_one(
+                    "SELECT id FROM produccion_leche WHERE animal_id IS NULL AND fecha = ?", (f,)
+                )
+                if existente:
+                    db_inst.execute(
+                        "UPDATE produccion_leche SET litros = ?, notas = ? WHERE id = ?",
+                        (litros, nota_dia, existente["id"])
+                    )
+                else:
+                    db_inst.registrar_produccion_leche(
+                        fecha=f, litros=litros, notas=nota_dia, registrado_por=uid
+                    )
+                guardados += 1
+                total_l += litros
+
+            return jsonify({
+                "ok": True,
+                "guardados": guardados,
+                "total_litros": round(total_l, 1),
+                "periodo": periodo,
+            })
+        except Exception as e:
+            logger.exception("Error al guardar quincena de leche: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_inst.close()
+            except Exception:
+                pass
+
     @app.get("/api/ficha/<tag>")
     def api_ficha(tag):
         out = datos_ficha(tag, db_path)

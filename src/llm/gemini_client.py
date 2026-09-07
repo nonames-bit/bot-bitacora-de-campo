@@ -190,7 +190,86 @@ class GeminiClient:
                 if not parts:
                     return None
                 text = parts[0].get("text", "").strip()
-                return text if text else None
         except Exception as e:
             logger.warning("Error en transcripción Gemini Audio: %s", e)
             return None
+
+    def generate_vision_structured(
+        self,
+        system_instruction: str,
+        prompt: str,
+        image_bytes: bytes,
+        mime_type: str = "image/jpeg",
+        response_schema: Optional[dict] = None,
+        temperature: float = 0.1,
+        max_output_tokens: int = 3072,
+    ) -> Optional[Union[dict, list]]:
+        """Analiza una imagen con Gemini Multimodal y devuelve JSON estructurado."""
+        if not self.is_available() or not image_bytes:
+            return None
+        import base64
+        try:
+            img_b64 = base64.b64encode(image_bytes).decode("utf-8")
+        except Exception as e:
+            logger.warning("No se pudo codificar imagen para Gemini Vision: %s", e)
+            return None
+
+        url = DEFAULT_API_URL.format(model=self.model)
+        gen_config: dict = {
+            "temperature": temperature,
+            "maxOutputTokens": max_output_tokens,
+            "responseMimeType": "application/json",
+        }
+        if response_schema:
+            gen_config["responseSchema"] = response_schema
+
+        payload = {
+            "system_instruction": {"parts": [{"text": system_instruction}]},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": img_b64,
+                            }
+                        },
+                    ],
+                }
+            ],
+            "generationConfig": gen_config,
+        }
+        req = urllib.request.Request(
+            url=url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "x-goog-api-key": self.api_key,
+                "Accept": "application/json",
+                "User-Agent": "BitacoraCampo-Gemini/1.0",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                body = resp.read().decode("utf-8")
+                data = json.loads(body)
+                candidates = data.get("candidates", [])
+                if not candidates:
+                    return None
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if not parts:
+                    return None
+                text = parts[0].get("text", "").strip()
+                if not text:
+                    return None
+                if text.startswith("```"):
+                    text = re.sub(r"^```(?:json)?\s*", "", text)
+                    text = re.sub(r"\s*```$", "", text).strip()
+                return json.loads(text)
+        except Exception as e:
+            logger.warning("Fallo en generate_vision_structured de Gemini: %s", e)
+            return None
+

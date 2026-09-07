@@ -440,7 +440,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Captura Rápida Adaptada a la Realidad de Finca**: Ajuste del formulario de leche para recibir la foto del recibo de quincena o planilla manual en papel donde anotan los litros diarios, con título contextual `Foto del Recibo / Planilla de Leche`, botón `Tomar o Subir Recibo / Hoja`, y campo de litros adaptado a ordeño o consolidado de quincena.
     - **Galería de Recibos en Vista Leche con Zoom Lightbox**: Incorporación de sección visual con miniaturas de recibos y planillas subidas, permitiendo abrir cualquier hoja en pantalla completa con zoom táctil (1.5x) para verificar números y notas de campo.
     - **Caché y Service Worker `v44`**: Bump de versión para refresco inmediato de estilos y componentes.
-- [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando).
+  - **Digitalización Inteligente de Recibos y Planillas de Leche con IA Multimodal (2026-09-06)**:
+    - **Parser Multimodal Especializado (`src/vision/recibo_leche_parser.py`)**: Motor de visión artificial que procesa fotos de recibos quincenales impresos o planillas manuscritas de campo usando Gemini Vision (`gemini-2.5-flash`) con fallback automático a NVIDIA NIM (`meta/llama-3.2-90b-vision-instruct`).
+    - **Extracción de Tablas y Verificación de Sumas**: Detección inteligente del período, asignación de fechas ISO a cada renglón/día (1 al 15 o 16 al 31), litros diarios y detección de discrepancias entre la suma de las filas y el total liquidado en el papel.
+    - **Endpoints PWA (`/api/leche/analizar-recibo` y `/api/leche/guardar-quincena`)**: Rutas REST para análisis multimodal, upsert masivo idempotente en `produccion_leche` y archivo de la foto del recibo en `media/` y la tabla `fotos`.
+    - **Desglose Diario Interactivo en Captura Rápida**: Al subir una foto de recibo, aparece el botón `[ Leer Recibo con IA ]`, mostrando el progreso en vivo y una tabla interactiva donde el usuario puede verificar, editar o agregar días con suma recalculada en tiempo real antes de guardar todo en un solo clic.
+    - **Atajo en Vista de Leche**: Botón `[ Digitalizar Recibo con IA ]` en la cabecera de Producción de Leche para iniciar de inmediato la captura y digitalización.
+    - **Caché y Service Worker `v45`**: Actualización de versión para distribución instantánea en celulares y computadores.
+- [x] Suite de pruebas con pytest: **585 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

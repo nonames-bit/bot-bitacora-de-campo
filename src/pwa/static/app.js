@@ -127,7 +127,10 @@
       mic: '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>',
       square: '<rect x="4" y="4" width="16" height="16" rx="2"/>',
       truck: '<path d="M10 17h4V5H2v12h3"/><polygon points="14 8 18 8 21 11 21 17 14 17 14 8"/><circle cx="7.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
-      target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>'
+      target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+      sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M19 3v4"/><path d="M21 5h-4"/>',
+      plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+      table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>'
     };
     var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
@@ -328,7 +331,8 @@
   function renderLeche(d) {
     var total = 0;
     (d.serie_tanque || []).forEach(function (f) { total += Number(f.litros) || 0; });
-    var h = "<h3>" + icon("milk") + "Producción de Leche (Recibos y Control)</h3>" + erroresHtml(d);
+    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer;'>" + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
+    var h = "<h3>" + icon("milk") + "Producción de Leche (Recibos y Control)" + btnIa + "</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.controles.length, "Controles") + kpi(total.toFixed(0), "L últimos 30 días");
     var mejor = (d.ranking_vacas && d.ranking_vacas.length) ? d.ranking_vacas[0] : null;
     if (mejor) {
@@ -365,6 +369,18 @@
     h += "<h4>" + icon("calendar") + "Controles individuales</h4>"
       + tabla(d.controles, [["tag", "Vaca"], ["fecha", "Fecha"], ["litros", "L", "num"]], "Sin controles individuales.");
     return h;
+  }
+
+  function bindLeche() {
+    var btnIa = document.getElementById("btn-ir-captura-leche");
+    if (btnIa) {
+      btnIa.addEventListener("click", function () {
+        _tipoCapturaActual = "leche";
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+      });
+    }
   }
 
   /* ---------- Vistas WS-5: Inventario / Población / Genética / Agenda ---------- */
@@ -949,6 +965,24 @@
       + "</div>"
       + "</div>";
 
+    if (tipo === "leche") {
+      h += "<div id='box-analizar-recibo-ia' style='display:none; margin-top:14px; padding:14px; border-radius:8px; background:var(--superficie); border:1.5px solid var(--verde-marca); box-shadow:0 2px 6px var(--sombra);'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;'>"
+        + "<div>"
+        + "<div style='font-weight:700; font-size:13.5px; color:var(--verde-marca); display:flex; align-items:center; gap:6px;'>"
+        + icon("sparkles", 16) + "Digitalización Inteligente de Recibo (IA)"
+        + "</div>"
+        + "<small style='color:var(--texto-suave); font-size:11.5px; display:block; margin-top:2px;'>Lee automáticamente cada renglón manuscrito, detecta fechas y suma los litros diarios.</small>"
+        + "</div>"
+        + "<button type='button' id='btn-analizar-recibo-ia' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:700; font-size:12.5px; padding:7px 14px; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+        + icon("sparkles", 14) + "Leer Recibo con IA"
+        + "</button>"
+        + "</div>"
+        + "<div id='recibo-ia-estado' style='margin-top:10px; font-size:12.5px;'></div>"
+        + "<div id='recibo-ia-preview' style='margin-top:12px; display:none;'></div>"
+        + "</div>";
+    }
+
     return h;
   }
 
@@ -965,6 +999,15 @@
       var preTam = document.getElementById("cap-foto-tam");
       var btnQuitar = document.getElementById("btn-quitar-foto");
 
+      var boxIa = document.getElementById("box-analizar-recibo-ia");
+      var estadoIa = document.getElementById("recibo-ia-estado");
+      var previewIa = document.getElementById("recibo-ia-preview");
+      var btnAnalizarIa = document.getElementById("btn-analizar-recibo-ia");
+
+      if (_fotoActual && _tipoCapturaActual === "leche" && boxIa) {
+        boxIa.style.display = "block";
+      }
+
       if (btnElegir && fileInp) {
         btnElegir.addEventListener("click", function () {
           fileInp.click();
@@ -977,6 +1020,12 @@
           if (fileInp) fileInp.value = "";
           if (preWrap) preWrap.style.display = "none";
           if (preImg) preImg.src = "";
+          if (boxIa) boxIa.style.display = "none";
+          if (estadoIa) estadoIa.innerHTML = "";
+          if (previewIa) {
+            previewIa.style.display = "none";
+            previewIa.innerHTML = "";
+          }
         });
       }
 
@@ -1021,10 +1070,323 @@
               if (preNom) preNom.textContent = _fotoActual.nombre;
               if (preTam) preTam.textContent = "Optimizada (" + tamKb + " KB) · Lista para adjuntar";
               if (preWrap) preWrap.style.display = "flex";
+
+              if (boxIa && _tipoCapturaActual === "leche") {
+                boxIa.style.display = "block";
+                if (estadoIa) {
+                  estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
+                    + "<span class='chip verde' style='font-size:11px;'>Foto cargada</span>"
+                    + "<span style='color:var(--texto-suave); font-size:12px;'>Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente.</span>"
+                    + "</div>";
+                }
+                if (previewIa) {
+                  previewIa.style.display = "none";
+                  previewIa.innerHTML = "";
+                }
+              }
             };
             img.src = ev.target.result;
           };
           reader.readAsDataURL(file);
+        });
+      }
+
+      function bindTablaReciboIa(res) {
+        function recalcularSuma() {
+          var total = 0;
+          qa(".inp-ia-litros", previewIa).forEach(function (inp) {
+            var val = parseFloat(inp.value);
+            if (!isNaN(val) && val > 0) total += val;
+          });
+          total = Math.round(total * 10) / 10;
+          var sumSpan = document.getElementById("ia-suma-total");
+          if (sumSpan) sumSpan.textContent = total;
+          var fLitros = document.getElementById("cap-litros");
+          if (fLitros) fLitros.value = total;
+        }
+
+        qa(".inp-ia-litros", previewIa).forEach(function (inp) {
+          inp.addEventListener("input", recalcularSuma);
+        });
+
+        previewIa.addEventListener("click", function (e) {
+          var btnQ = e.target && e.target.closest ? e.target.closest(".btn-ia-quitar-fila") : null;
+          if (btnQ) {
+            var tr = btnQ.closest("tr");
+            if (tr) {
+              tr.remove();
+              recalcularSuma();
+            }
+          }
+        });
+
+        var btnAgregar = document.getElementById("btn-ia-agregar-dia");
+        if (btnAgregar) {
+          btnAgregar.addEventListener("click", function () {
+            var tbody = previewIa.querySelector("tbody");
+            if (!tbody) return;
+            var filas = qa("tr.ia-fila-dia", tbody);
+            var ultimoDia = filas.length + 1;
+            var ultimaFecha = "";
+            if (filas.length) {
+              var ultInpF = filas[filas.length - 1].querySelector(".inp-ia-fecha");
+              if (ultInpF && ultInpF.value) {
+                try {
+                  var d = new Date(ultInpF.value + "T12:00:00");
+                  d.setDate(d.getDate() + 1);
+                  ultimaFecha = d.toISOString().slice(0, 10);
+                } catch (ex) { /* noop */ }
+              }
+            }
+            if (!ultimaFecha) ultimaFecha = new Date().toISOString().slice(0, 10);
+
+            var tr = document.createElement("tr");
+            tr.className = "ia-fila-dia";
+            tr.style.borderBottom = "1px solid var(--borde)";
+            tr.innerHTML = "<td style='text-align:center; font-weight:bold; font-size:12px; color:var(--texto-suave);'>" + ultimoDia + "</td>"
+              + "<td><input type='date' class='inp-ia-fecha' value='" + esc(ultimaFecha) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+              + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='0' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+              + "<td><input type='text' class='inp-ia-notas' value='' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>";
+            tbody.appendChild(tr);
+            var nuevoInpL = tr.querySelector(".inp-ia-litros");
+            if (nuevoInpL) nuevoInpL.addEventListener("input", recalcularSuma);
+            recalcularSuma();
+          });
+        }
+
+        var btnGuardarQ = document.getElementById("btn-guardar-quincena-ia");
+        if (btnGuardarQ) {
+          btnGuardarQ.addEventListener("click", function () {
+            var filas = qa("tr.ia-fila-dia", previewIa);
+            if (!filas.length) {
+              alert("No hay días para guardar.");
+              return;
+            }
+
+            var listaDias = [];
+            for (var i = 0; i < filas.length; i++) {
+              var tr = filas[i];
+              var fInp = tr.querySelector(".inp-ia-fecha");
+              var lInp = tr.querySelector(".inp-ia-litros");
+              var nInp = tr.querySelector(".inp-ia-notas");
+
+              var fechaVal = fInp ? fInp.value.trim() : "";
+              var litVal = lInp ? parseFloat(lInp.value) : 0;
+              var notVal = nInp ? nInp.value.trim() : "";
+
+              if (!fechaVal) {
+                alert("La fila " + (i + 1) + " no tiene fecha válida.");
+                if (fInp) fInp.focus();
+                return;
+              }
+              if (isNaN(litVal) || litVal < 0) {
+                alert("La fila " + (i + 1) + " tiene litros inválidos.");
+                if (lInp) lInp.focus();
+                return;
+              }
+
+              listaDias.push({
+                dia: i + 1,
+                fecha: fechaVal,
+                litros: litVal,
+                notas: notVal
+              });
+            }
+
+            btnGuardarQ.disabled = true;
+            btnGuardarQ.innerHTML = "⏳ Guardando " + listaDias.length + " días...";
+
+            var payloadGuardar = {
+              periodo: res.periodo || "",
+              dias: listaDias,
+              foto_base64: _fotoActual ? _fotoActual.base64 : null,
+              observaciones: (q("#cap-notas") && q("#cap-notas").value) || ""
+            };
+
+            fetch("/api/leche/guardar-quincena", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payloadGuardar)
+            })
+            .then(function (r) {
+              if (r.status === 401) { window.location = "/login"; throw new Error("No autorizado"); }
+              if (!r.ok) throw new Error("HTTP " + r.status);
+              return r.json();
+            })
+            .then(function (data) {
+              btnGuardarQ.disabled = false;
+              btnGuardarQ.innerHTML = icon("save", 15) + "Guardar Todos los Días en la Bitácora";
+
+              if (!data.ok) {
+                alert("Error al guardar: " + (data.error || "Desconocido"));
+                return;
+              }
+
+              if (previewIa) previewIa.style.display = "none";
+              if (estadoIa) {
+                estadoIa.innerHTML = "<div style='padding:12px; background:rgba(47,82,51,0.12); border-left:4px solid var(--verde-marca); border-radius:6px;'>"
+                  + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>🎉 ¡Quincena guardada con éxito!</div>"
+                  + "<div style='margin-top:4px; font-size:12.5px;'>Se registraron <b>" + data.guardados + " días</b> con un total de <b>" + data.total_litros + " Litros</b>. La foto quedó archivada como respaldo en el historial.</div>"
+                  + "<div style='margin-top:10px; display:flex; gap:8px;'>"
+                  + "<button type='button' id='btn-ia-ir-leche' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:bold; padding:6px 12px; font-size:12px; border:none; border-radius:4px; cursor:pointer;'>" + icon("milk", 13) + "Ver en Producción de Leche</button>"
+                  + "</div>"
+                  + "</div>";
+
+                var btnIrLeche = document.getElementById("btn-ia-ir-leche");
+                if (btnIrLeche) {
+                  btnIrLeche.addEventListener("click", function () {
+                    irAVista("leche");
+                    cargar(true);
+                    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+                  });
+                }
+              }
+
+              actualizarBadges();
+            })
+            .catch(function (err) {
+              btnGuardarQ.disabled = false;
+              btnGuardarQ.innerHTML = icon("save", 15) + "Reintentar Guardar";
+              alert("Error al guardar: " + err.message);
+            });
+          });
+        }
+      }
+
+      function renderizarTablaReciboIa(res) {
+        var dias = res.dias || [];
+        var per = res.periodo || "Quincena detectada";
+        var motor = res.motor || "IA";
+        var totDetectado = res.total_litros_detectado != null ? Number(res.total_litros_detectado) : null;
+
+        var sumaInicial = 0;
+        dias.forEach(function (d) { sumaInicial += (Number(d.litros) || 0); });
+        sumaInicial = Math.round(sumaInicial * 10) / 10;
+
+        var fLitros = document.getElementById("cap-litros");
+        if (fLitros) fLitros.value = sumaInicial;
+        var fNotas = document.getElementById("cap-notas");
+        if (fNotas && !fNotas.value) {
+          fNotas.value = "Recibo " + per + " (" + dias.length + " días)";
+        }
+
+        var hEstado = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
+          + "<div><span class='chip verde'>✓ Lectura Exitosa</span> <b>" + esc(per) + "</b> · " + dias.length + " días leídos</div>"
+          + "<div style='font-size:11px; color:var(--texto-suave);'>Motor: " + esc(motor) + "</div>"
+          + "</div>";
+
+        if (res.discrepancia_total) {
+          hEstado += "<div style='margin-top:6px; padding:6px 10px; background:rgba(217,119,6,0.1); border-left:3px solid #d97706; border-radius:4px; font-size:12px;'>"
+            + "⚠️ <b>Discrepancia en la suma:</b> La suma de los días da <b>" + sumaInicial + " L</b> pero en el papel dice <b>" + totDetectado + " L</b>. Por favor revisa los días abajo y ajusta cualquier número si es necesario."
+            + "</div>";
+        }
+        if (estadoIa) estadoIa.innerHTML = hEstado;
+
+        var hTabla = "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:10px; margin-top:10px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>"
+          + "<h4 style='margin:0; font-size:13px; display:flex; align-items:center; gap:6px;'>" + icon("table", 14) + "Desglose Diario Detectado</h4>"
+          + "<button type='button' id='btn-ia-agregar-dia' class='tema-btn' style='font-size:11.5px; padding:3px 8px;'>" + icon("plus", 12) + "Agregar Día</button>"
+          + "</div>"
+          + "<div class='tabla-scroll' style='max-height:280px; overflow-y:auto;'>"
+          + "<table style='width:100%; border-collapse:collapse;' id='tabla-recibo-dias'>"
+          + "<thead><tr style='border-bottom:2px solid var(--borde-fuerte); text-align:left;'>"
+          + "<th style='width:36px; text-align:center;'>Día</th>"
+          + "<th style='min-width:130px;'>Fecha</th>"
+          + "<th style='min-width:95px;'>Litros</th>"
+          + "<th>Notas</th>"
+          + "<th style='width:28px;'></th>"
+          + "</tr></thead>"
+          + "<tbody>";
+
+        dias.forEach(function (d, idx) {
+          var diaNum = d.dia || (idx + 1);
+          var fIso = d.fecha || "";
+          var lts = d.litros != null ? d.litros : 0;
+          var not = d.notas || "";
+
+          hTabla += "<tr class='ia-fila-dia' style='border-bottom:1px solid var(--borde);'>"
+            + "<td style='text-align:center; font-weight:bold; font-size:12px; color:var(--texto-suave);'>" + diaNum + "</td>"
+            + "<td><input type='date' class='inp-ia-fecha' value='" + esc(fIso) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+            + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='" + esc(lts) + "' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+            + "<td><input type='text' class='inp-ia-notas' value='" + esc(not) + "' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>"
+            + "</tr>";
+        });
+
+        hTabla += "</tbody>"
+          + "<tfoot>"
+          + "<tr style='background:rgba(47,82,51,0.05); font-weight:bold;'>"
+          + "<td colspan='2' style='text-align:right; padding:8px;'>Suma Total:</td>"
+          + "<td style='padding:8px;'><span id='ia-suma-total' style='color:var(--verde-marca); font-size:14px;'>" + sumaInicial + "</span> L</td>"
+          + "<td colspan='2' style='font-size:11px; color:var(--texto-suave); padding:8px;'>" + (totDetectado != null ? ("(Papel: " + totDetectado + " L)") : "") + "</td>"
+          + "</tr>"
+          + "</tfoot>"
+          + "</table></div>"
+          + "<button type='button' id='btn-guardar-quincena-ia' class='tema-btn' style='margin-top:12px; width:100%; background:var(--verde-marca); color:#fff; font-weight:bold; font-size:13.5px; padding:10px; border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;'>"
+          + icon("save", 15) + "Guardar Todos los Días en la Bitácora"
+          + "</button>"
+          + "</div>";
+
+        if (previewIa) {
+          previewIa.innerHTML = hTabla;
+          previewIa.style.display = "block";
+          bindTablaReciboIa(res);
+        }
+      }
+
+      if (btnAnalizarIa) {
+        btnAnalizarIa.addEventListener("click", function () {
+          if (!_fotoActual || !_fotoActual.base64) {
+            alert("Por favor toma o selecciona primero una foto del recibo o planilla.");
+            return;
+          }
+          btnAnalizarIa.disabled = true;
+          btnAnalizarIa.innerHTML = "⏳ Analizando...";
+          if (estadoIa) {
+            estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:10px; padding:10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
+              + "<span style='font-size:18px;'>⏳</span>"
+              + "<div><b style='color:var(--verde-marca);'>Digitalizando recibo con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo días, fechas y litros de las anotaciones manuscritas. Esto toma 5-10 segundos.</small></div>"
+              + "</div>";
+          }
+          if (previewIa) previewIa.style.display = "none";
+
+          var fechaRef = (q("#cap-fecha") && q("#cap-fecha").value) || new Date().toISOString().slice(0, 10);
+          fetch("/api/leche/analizar-recibo", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              foto_base64: _fotoActual.base64,
+              fecha_referencia: fechaRef
+            })
+          })
+          .then(function (r) {
+            if (r.status === 401) { window.location = "/login"; throw new Error("No autorizado"); }
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            return r.json();
+          })
+          .then(function (res) {
+            btnAnalizarIa.disabled = false;
+            btnAnalizarIa.innerHTML = icon("sparkles", 14) + "Re-analizar Recibo";
+
+            if (!res.ok) {
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ <b>Error:</b> " + esc(res.error || "No se pudo procesar el recibo.") + "</div>";
+              return;
+            }
+
+            if (!res.es_recibo_leche || !res.dias || !res.dias.length) {
+              var obs = res.observaciones || "No se detectaron anotaciones numéricas de producción lechera diaria.";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece un recibo de leche válido:</b><br><small style='color:var(--texto);'>" + esc(obs) + "</small></div>";
+              return;
+            }
+
+            renderizarTablaReciboIa(res);
+          })
+          .catch(function (err) {
+            btnAnalizarIa.disabled = false;
+            btnAnalizarIa.innerHTML = icon("sparkles", 14) + "Reintentar";
+            if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ Error de conexión: " + esc(err.message) + "</div>";
+          });
         });
       }
     }
@@ -3675,6 +4037,7 @@
       else if (actual === "genetica") html = renderGenetica(d);
       else if (actual === "agenda") html = renderAgenda(d);
       montarVista(vista, html, animar);
+      if (actual === "leche") bindLeche();
     }, animar ? vista : null);
   }
 
