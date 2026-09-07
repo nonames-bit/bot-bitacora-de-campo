@@ -489,18 +489,29 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Nuevo módulo `src/reports/estilo_ja.py`**: fuente única de identidad visual JA (constantes de color institucional, estilos de párrafo, `TableStyle` base/alertas/potreros/header-verde, helpers de canvas `dibujar_encabezado`/`dibujar_pie`/`dibujar_seccion_hdr`, y flowables platypus `EncabezadoFlowable`/`SeccionFlowable`/`PieFlowable`), eliminando la duplicación de `_COLOR_MARCA` que había en `pdf_report.py` y `qr_fichas.py`.
     - **Reporte general de la finca (`/reporte`, `/api/reporte.pdf`) alineado con la ficha**: encabezado con franja verde sólida `#2F5233` + logo, secciones con banda `#E7EFE8`, tablas con header verde y texto blanco + zebra, alertas destacadas con fondo/acento de retiro (rojo suave) y pie de página con línea separadora corporativa. Se conservan las firmas públicas (`generar_pdf`, `recolectar_datos`).
     - **Tarjetas QR en lote (6/hoja) refinadas**: marcos `roundRect` con radio, QR con contenedor blanco/borde sutil y truncado elegante de textos, mismos constantes que la ficha individual.
-    - **Ficha individual pulida**: espaciado vertical de secciones, truncado de genealogía y listas de retiros ordenadas, todo con las constantes compartidas de `estilo_ja`.
-  - **Integración del Hierro / Marca de Fuego de cada Animal (2026-09-07)**:
-    - **Modelo y Migración Idempotente (`src/db/models.py`, `src/db/database.py`)**: Añadida columna `hierro TEXT` a la tabla `animales` con chequeo automático de `PRAGMA table_info` en `create_tables()` para bases de datos existentes sin recrear tablas.
-    - **Importador Software Ganadero (`src/importers/dbf_importer.py`)**: Mapeo del campo `HIE` de `hoja.dbf` al registrar o actualizar animales en SQLite.
-    - **Backend Ficha y Trazabilidad (`src/engine/dashboard_data.py`)**: Exposición de `hierro` en el objeto base de la ficha, en cada nodo ancestral del árbol genealógico (3G) y en el listado de crías del animal.
-    - **Bot de Telegram (`src/engine/query/historial.py`)**: Inclusión de `🔥 Hierro: <valor>` en el encabezado de la ficha e historial del animal.
-    - **Ficha Técnica PDF (`src/reports/qr_fichas.py`)**: Visualización destacada de `Hierro: <valor>` en la sección de Identificación y Categorización Zootécnica.
-    - **PWA Frontend (`src/pwa/static/app.js`, `sw.js` v57)**:
-      - Chip ámbar en el encabezado de la ficha: `[ 🔥 Hierro <valor> ]` junto a los chips de potrero y categoría, más detalle en la línea meta.
-      - Fila `Hierro / Marca:` en la tarjeta de Identificación & Genealogía de la pestaña General.
-      - Indicador de hierro en los ancestros dentro del diagrama de genealogía.
-- [x] Suite de pruebas con pytest: **617 pruebas en verde** (100% pasando).
+  - **Rediseño Estético y Ejecutivo de Reportes PDF y Tarjetas QR (2026-09-07)**:
+    - **Sistema de Diseño Unificado (`src/reports/estilo_ja.py`)**: Tokens de color premium institucional (`#1B4D3E`, `#12352B`, `#D5E2D7`, `#D4AF37`), medalla circular con aro dorado decorativo (`dibujar_logo_circular`), bloques KPI ejecutivos (`crear_bloque_kpis`), tablas modernas con franja de acento y zebra (`tabla_style_moderna`), y cabeceras/pies de página limpios.
+    - **Reporte General de Campo (`src/reports/pdf_report.py`)**:
+      - Corrección de doble cabecera en página 1 y eliminación total de solapamientos en páginas 2+ (`topMargin = 26 mm`).
+      - Bloque ejecutivo de 4 tarjetas KPI para resumen de inventario (Hato Activo, Hembras %, Machos %, Histórico total).
+      - Tabla de existencias por potrero enriquecida con fila de totales generales y recuadro explicativo de glosario de categorías SG.
+      - Tablas de eventos (partos, muertes) con tags en negrita y padding profesional; tarjeta de estado óptimo en alertas.
+    - **Ficha Zootécnica Individual A4 Apaisada (`src/reports/qr_fichas.py`)**:
+      - Encabezado con medalla circular oficial y aro dorado.
+      - Tarjeta pasaporte izquierda con tag en 22pt, nombre, pastilla ámbar para el Hierro del animal (`HIERRO: <valor>`), QR vectorial nativo de alta resolución e imagen/placeholder.
+      - Grilla estructurada de 4 columnas en Identificación y Categoría con chip de estado (`ACTIVO` verde, `VENDIDO` ámbar, `MUERTO` rojo).
+      - Tarjetas de genealogía (Línea Materna y Paterna) con padres y abuelos, más chequeo de consanguinidad en 3G.
+      - 3 tarjetas KPI métricas de peso (Peso al Nacer, Último Peso, GMD) e historial con zebra.
+      - Condición reproductiva y partos limpios; bloque sanitario sin caracteres rotos `■` ni emojis no soportados por WinAnsi.
+    - **Tarjetas QR Plastificables por Lote (6 por hoja, `generar_fichas_lote`)**:
+      - Código QR vectorial directo con `QrCodeWidget` en cada una de las 6 tarjetas (100% nítidos, scannables e independientes de cache local en disco).
+      - Líneas guía de corte punteadas (`c.setDash([2, 3])`) entre filas y columnas para guillotina o tijeras.
+      - Franja institucional verde, tag prominente, chip de hierro, edad, perfil zootécnico y estado sanitario sin caracteres rotos.
+  - **Pronóstico Meteorológico 7 Días Open-Meteo (`src/engine/pronostico.py`, `src/server/telegram_bot.py`)**:
+    - Integración sin clave con Open-Meteo para coordenadas de la finca con caché de 3 horas.
+    - Despacho matutino enriquecido con clima del día (temperatura, probabilidad de precipitación, índice UV, viento y alertas de campo).
+    - Comando `/pronostico` en Telegram con tabla extendida a 7 días y botones interactivos.
+- [x] Suite de pruebas con pytest: **646 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

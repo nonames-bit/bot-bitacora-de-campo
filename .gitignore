@@ -48,6 +48,7 @@ yarn-debug.log*
 data/
 media/
 backups/
+scratch/
 src/server/users.json
 
 # Archivos de Secretos y Configuración Local

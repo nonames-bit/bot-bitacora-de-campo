@@ -65,11 +65,22 @@ def main() -> int:
     parser.add_argument("--users", default=os.getenv("USERS_FILE", "src/server/users.json"), help="Ruta users.json")
     parser.add_argument("--enviar-telegram", action="store_true", help="Envía el mensaje por Telegram a los usuarios")
     parser.add_argument("--fecha", default=None, help="Simular fecha YYYY-MM-DD")
+    parser.add_argument("--sin-pronostico", action="store_true", help="No consultar Open-Meteo (uso local/tests sin red)")
     args = parser.parse_args()
 
     db = Database(args.db)
     sim_fecha = date.fromisoformat(args.fecha) if args.fecha else None
-    texto_despacho = formatear_despacho_matutino(db, hoy=sim_fecha)
+    # Pronóstico Open-Meteo con cache: nunca debe romper el despacho.
+    pron = None
+    if not args.sin_pronostico:
+        try:
+            from src.engine.pronostico import obtener_pronostico_para_despacho
+
+            pron = obtener_pronostico_para_despacho(db)
+        except Exception as e:
+            print(f"⚠️ Pronóstico no disponible: {e}", file=sys.stderr)
+            pron = None
+    texto_despacho = formatear_despacho_matutino(db, hoy=sim_fecha, pronostico=pron)
 
     try:
         print(texto_despacho)

@@ -2043,7 +2043,7 @@ def formatear_panel_preguntas_rapidas_texto() -> str:
     )
 
 
-def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_nombre: str = "GANADERÍA JA") -> str:
+def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_nombre: str = "GANADERÍA JA", pronostico: Optional[dict] = None) -> str:
     """Genera el Despacho Matutino (Morning Briefing) con las tareas críticas del día:
     1. Ordeño & Retiros sanitarios (solo si hay alertas activas).
     2. Inseminaciones AM por regla AM-PM (celos de ayer PM) y programadas.
@@ -2067,6 +2067,19 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
         f"📅 <i>{fecha_bonita} · 05:30 AM</i>",
         "────────────────────────────────────────",
     ]
+
+    # 0. ⛅ Clima & pronóstico (primera sección; solo si hay datos).
+    # Si pronostico es None la salida queda EXACTAMENTE igual que antes.
+    if pronostico is not None:
+        try:
+            from ..engine.pronostico import formatear_pronostico_despacho
+
+            bloque_clima = formatear_pronostico_despacho(pronostico)
+        except Exception:
+            bloque_clima = ""
+        if bloque_clima:
+            lineas.append(bloque_clima)
+            lineas.append("")
 
     # 1. 🥛 Control de Ordeño & Retiros Sanitarios (Solo alerta si hay vacas en retiro)
     retiros_leche = db.query(
@@ -2489,6 +2502,25 @@ def formatear_clima_panel(db: Database, hoy: Optional[date] = None) -> str:
     info = ClimaIDEAM.clasificar_estacionalidad(res["ultimos_30d_mm"])
     hist = db.obtener_pluviometria(limite=5)
 
+    # Pronóstico 7 días Open-Meteo al inicio del panel (solo si hay datos).
+    # Envuelto en try/except: un fallo de red nunca debe romper /clima.
+    _bloque_pron = ""
+    _tabla_pron = ""
+    try:
+        from ..engine.pronostico import (
+            formatear_pronostico_despacho,
+            formatear_tabla_pronostico,
+            obtener_pronostico_para_despacho,
+        )
+
+        _pron = obtener_pronostico_para_despacho(db)
+        if _pron:
+            _bloque_pron = formatear_pronostico_despacho(_pron)
+            _tabla_pron = formatear_tabla_pronostico(_pron)
+    except Exception:
+        _bloque_pron = ""
+        _tabla_pron = ""
+
     lineas = [
         "🌧️ <b>PLUVIOMETRÍA & CLIMA AGROPECUARIO (IDEAM)</b>",
         f"📅 <b>Fecha:</b> {ref.isoformat()}",
@@ -2499,6 +2531,11 @@ def formatear_clima_panel(db: Database, hoy: Optional[date] = None) -> str:
         f"• <b>Mes actual en curso:</b> <b>{res['mes_actual_mm']:.1f} mm</b>",
         f"• <b>Acumulado Anual ({ref.year}):</b> <b>{res['anio_actual_mm']:.1f} mm</b>",
     ]
+    if _bloque_pron:
+        lineas.append(_bloque_pron)
+        if _tabla_pron:
+            lineas.append(_tabla_pron)
+        lineas.append("────────────────────────────────────────")
     if res.get("satelital_mm") is not None:
         lineas.append(
             f"🛰️ <b>Estimado Satelital (CHIRPS, {res['satelital_dias']}d hasta {res['satelital_fecha']}):</b> "

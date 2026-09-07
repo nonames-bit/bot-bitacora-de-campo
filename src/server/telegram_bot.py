@@ -632,7 +632,15 @@ def construir_application(
             if not auth.es_autorizado(user_id):
                 await update.message.reply_text("⛔ No autorizado.")
                 return
-            msg = formatear_despacho_matutino(db)
+            # Pronóstico del clima (Open-Meteo, con cache): nunca debe romper el despacho.
+            _pron = None
+            try:
+                from ..engine.pronostico import obtener_pronostico_para_despacho
+
+                _pron = obtener_pronostico_para_despacho(db)
+            except Exception:
+                _pron = None
+            msg = formatear_despacho_matutino(db, pronostico=_pron)
             await _enviar_texto_seguro(
                 update.message,
                 msg,
@@ -1053,6 +1061,41 @@ def construir_application(
             )
         except Exception as e:
             logger.error("Error en cmd_clima: %s", e, exc_info=True)
+            if update.message:
+                await update.message.reply_text(f"❌ Error: {e}")
+
+    async def cmd_pronostico(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Pronóstico del clima a 7 días (Open-Meteo) con recomendaciones de campo."""
+        try:
+            if not update.effective_user or not update.message:
+                return
+            user_id = update.effective_user.id
+            if not auth.es_autorizado(user_id):
+                await update.message.reply_text("⛔ No autorizado.")
+                return
+            try:
+                from ..engine.pronostico import (
+                    formatear_pronostico_despacho,
+                    formatear_tabla_pronostico,
+                    obtener_pronostico_para_despacho,
+                )
+
+                _pron = obtener_pronostico_para_despacho(db)
+            except Exception:
+                _pron = None
+            if not _pron:
+                await update.message.reply_text(
+                    "⛅ <b>PRONÓSTICO DEL CLIMA</b>\n\n"
+                    "⚠️ <i>No hay pronóstico disponible (sin coordenadas de finca o sin conexión).</i>",
+                    parse_mode="HTML",
+                )
+                return
+            msg = formatear_pronostico_despacho(_pron) + "\n" + formatear_tabla_pronostico(_pron)
+            await update.message.reply_text(
+                msg, parse_mode="HTML", reply_markup=crear_teclado_clima()
+            )
+        except Exception as e:
+            logger.error("Error en cmd_pronostico: %s", e, exc_info=True)
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
@@ -3373,6 +3416,7 @@ def construir_application(
     app.add_handler(CommandHandler(["diagnosticos", "palpaciones"], cmd_diagnosticos))
     app.add_handler(CommandHandler(["kpi_reprod", "concepcion", "tasa_concepcion"], cmd_kpi_reprod))
     app.add_handler(CommandHandler(["clima", "lluvias", "pluviometro"], cmd_clima))
+    app.add_handler(CommandHandler(["pronostico", "tiempo", "weather"], cmd_pronostico))
     app.add_handler(CommandHandler(["lluvia", "precipitacion"], cmd_lluvia))
     app.add_handler(CommandHandler(["balance_forrajero", "balance_ms", "balance_pasto"], cmd_balance_forrajero))
     app.add_handler(CommandHandler(["ndvi", "satelite", "indice_verde", "satelital"], cmd_ndvi))
@@ -3415,7 +3459,15 @@ def construir_application(
     # Tarea proactiva programada: Despacho Matutino diario (ej. 05:30 AM)
     async def _tarea_despacho_matutino(context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
-            msg = formatear_despacho_matutino(db)
+            # Pronóstico con cache: un fallo de red nunca debe impedir el despacho.
+            _pron_auto = None
+            try:
+                from ..engine.pronostico import obtener_pronostico_para_despacho
+
+                _pron_auto = obtener_pronostico_para_despacho(db)
+            except Exception:
+                _pron_auto = None
+            msg = formatear_despacho_matutino(db, pronostico=_pron_auto)
             teclado = crear_teclado_despacho_matutino()
             for u in auth.listar_usuarios():
                 u_id = u.get("user_id")
