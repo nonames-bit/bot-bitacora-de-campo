@@ -1414,11 +1414,19 @@
             btnGuardarQ.disabled = true;
             btnGuardarQ.innerHTML = "⏳ Guardando " + listaDias.length + " días...";
 
+            var inpMonto = document.getElementById("ia-monto-pagado");
+            var montoPagado = inpMonto && inpMonto.value ? parseFloat(inpMonto.value) : null;
+
             var payloadGuardar = {
               periodo: res.periodo || "",
               dias: listaDias,
-              foto_base64: _fotoActual ? _fotoActual.base64 : null,
-              observaciones: (q("#cap-notas") && q("#cap-notas").value) || ""
+              // La foto ya quedó guardada al analizarla (foto_ruta); solo se
+              // manda foto_base64 como respaldo si por algo no vino foto_ruta.
+              foto_ruta: res.foto_ruta || null,
+              foto_base64: res.foto_ruta ? null : (_fotoActual ? _fotoActual.base64 : null),
+              observaciones: (q("#cap-notas") && q("#cap-notas").value) || "",
+              monto_pagado: (montoPagado && montoPagado > 0) ? montoPagado : null,
+              acopiador: (res.acopiador && res.acopiador !== "No especificado") ? res.acopiador : null
             };
 
             fetch("/api/leche/guardar-quincena", {
@@ -1442,11 +1450,15 @@
 
               if (previewIa) previewIa.style.display = "none";
               if (estadoIa) {
+                var msgIngreso = data.ingreso_id
+                  ? "También se registró el <b>ingreso en Finanzas</b> (Venta de leche) con esa misma foto como respaldo."
+                  : "La foto quedó archivada como respaldo en el historial.";
                 estadoIa.innerHTML = "<div style='padding:12px; background:rgba(47,82,51,0.12); border-left:4px solid var(--verde-marca); border-radius:6px;'>"
                   + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>🎉 ¡Quincena guardada con éxito!</div>"
-                  + "<div style='margin-top:4px; font-size:12.5px;'>Se registraron <b>" + data.guardados + " días</b> con un total de <b>" + data.total_litros + " Litros</b>. La foto quedó archivada como respaldo en el historial.</div>"
-                  + "<div style='margin-top:10px; display:flex; gap:8px;'>"
+                  + "<div style='margin-top:4px; font-size:12.5px;'>Se registraron <b>" + data.guardados + " días</b> con un total de <b>" + data.total_litros + " Litros</b>. " + msgIngreso + "</div>"
+                  + "<div style='margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;'>"
                   + "<button type='button' id='btn-ia-ir-leche' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:bold; padding:6px 12px; font-size:12px; border:none; border-radius:4px; cursor:pointer;'>" + icon("milk", 13) + "Ver en Producción de Leche</button>"
+                  + (data.ingreso_id ? "<button type='button' id='btn-ia-ir-finanzas' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:bold; padding:6px 12px; font-size:12px; border:none; border-radius:4px; cursor:pointer;'>" + icon("banknote", 13) + "Ver en Finanzas</button>" : "")
                   + "</div>"
                   + "</div>";
 
@@ -1454,6 +1466,14 @@
                 if (btnIrLeche) {
                   btnIrLeche.addEventListener("click", function () {
                     irAVista("leche");
+                    cargar(true);
+                    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+                  });
+                }
+                var btnIrFinanzas = document.getElementById("btn-ia-ir-finanzas");
+                if (btnIrFinanzas) {
+                  btnIrFinanzas.addEventListener("click", function () {
+                    irAVista("finanzas");
                     cargar(true);
                     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
                   });
@@ -1539,8 +1559,17 @@
           + "<td colspan='2' style='font-size:11px; color:var(--texto-suave); padding:8px;'>" + (totDetectado != null ? ("(Papel: " + totDetectado + " L)") : "") + "</td>"
           + "</tr>"
           + "</tfoot>"
-          + "</table></div>"
-          + "<button type='button' id='btn-guardar-quincena-ia' class='tema-btn' style='margin-top:12px; width:100%; background:var(--verde-marca); color:#fff; font-weight:bold; font-size:13.5px; padding:10px; border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;'>"
+          + "</table></div>";
+
+        var montoDetectado = res.valor_total_pagado != null ? res.valor_total_pagado : "";
+        var precioLitroDetectado = res.precio_litro != null ? fmtMoneda(res.precio_litro) + "/L" : "";
+        hTabla += "<div style='margin-top:12px; padding:10px; background:rgba(47,82,51,0.05); border:1px dashed var(--verde-marca); border-radius:8px;'>"
+          + "<label style='font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("banknote", 14) + "Monto Pagado en esta Quincena ($) <span style='font-weight:normal; font-size:11px; color:var(--texto-suave);'>(opcional -- si lo llenas, se registra el ingreso en Finanzas)</span></label>"
+          + "<input type='number' step='1' min='0' id='ia-monto-pagado' value='" + esc(montoDetectado) + "' placeholder='ej. 10184000' style='width:100%; padding:8px; margin-top:6px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:bold;'>"
+          + (precioLitroDetectado ? "<small style='color:var(--texto-suave); display:block; margin-top:4px;'>Precio detectado en el recibo: <b>" + esc(precioLitroDetectado) + "</b></small>" : "")
+          + "</div>";
+
+        hTabla += "<button type='button' id='btn-guardar-quincena-ia' class='tema-btn' style='margin-top:12px; width:100%; background:var(--verde-marca); color:#fff; font-weight:bold; font-size:13.5px; padding:10px; border:none; border-radius:6px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;'>"
           + icon("save", 15) + "Guardar Todos los Días en la Bitácora"
           + "</button>"
           + "</div>";

@@ -46,7 +46,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v51: Barra inferior de 5 botones con bottom sheet categorizado para módulos en móviles (cero scroll horizontal) y sincronización con RBAC.
 // v52: Aislamiento estricto de #nav-principal vs #ficha-tabs mini para evitar superposición y bloqueo de navegación en móviles al abrir ficha animal.
 // v53: Quita capture='environment' de los inputs de foto (recibo/factura y arete) para que el selector nativo ofrezca también elegir de galería, no solo cámara.
-var CACHE = "pwa-ja-v53"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v54: La foto del recibo de leche se guarda al analizarla con IA (no se pierde si no llegas a "Guardar Quincena"); extrae precio/litro y valor pagado del recibo y crea el ingreso en Finanzas (Venta de leche) al guardar la quincena.
+var CACHE = "pwa-ja-v54"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

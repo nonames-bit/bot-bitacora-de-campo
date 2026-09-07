@@ -20,6 +20,7 @@ import socket
 import sys
 import threading
 import time
+import uuid
 
 # Fix Windows cp1252: consola sin UTF-8 rompía los print() del banner
 # (UnicodeEncodeError) antes de que Flask arrancara. No requiere acción
@@ -1003,6 +1004,41 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         finally:
             db_f.close()
 
+    def _guardar_foto_recibo_leche(foto_b64: str, periodo: str, fecha_ref: str) -> Optional[str]:
+        """Guarda en disco + tabla fotos la imagen del recibo de leche. Devuelve
+        la ruta relativa guardada, o None si falla (nunca lanza)."""
+        try:
+            try:
+                from ..vision.recibo_leche_parser import _extraer_bytes_e_imagen
+            except (ImportError, ValueError):
+                from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
+            raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
+            media_dir_abs = (
+                os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
+                if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
+            )
+            os.makedirs(media_dir_abs, exist_ok=True)
+            ts = int(time.time())
+            rnd = uuid.uuid4().hex[:6]
+            fname = f"recibo_leche_{ts}_{rnd}.jpg"
+            with open(os.path.join(media_dir_abs, fname), "wb") as f:
+                f.write(raw_bytes)
+            ruta_rel = os.path.join("media", fname).replace("\\", "/")
+            db_foto = _db(db_path)
+            try:
+                db_foto.registrar_foto(
+                    ruta=ruta_rel, animal_tag=None, fecha=fecha_ref,
+                    caption=f"Recibo Quincenal: {periodo}".strip() or "Recibo Quincenal",
+                    user_id=session.get("user_id"),
+                    notas="Foto guardada al momento de analizar con IA (evidencia del pago).",
+                )
+            finally:
+                db_foto.close()
+            return ruta_rel
+        except Exception:
+            logger.exception("No se pudo guardar la foto del recibo de leche al analizar")
+            return None
+
     @app.post("/api/leche/analizar-recibo")
     def api_leche_analizar_recibo():
         datos = request.get_json(silent=True) or {}
@@ -1017,6 +1053,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             from src.vision.recibo_leche_parser import analizar_recibo_leche
 
         res = analizar_recibo_leche(foto_b64, fecha_referencia=fecha_ref)
+        # La foto se guarda de una vez como evidencia, sin depender de que el
+        # usuario termine de revisar y presione "Guardar Quincena" -- si
+        # tomó la foto es porque es la prueba del pago, no debería perderse
+        # si cierra la pestaña a mitad de camino.
+        res["foto_ruta"] = _guardar_foto_recibo_leche(foto_b64, res.get("periodo") or "", fecha_ref)
         return jsonify(res)
 
     @app.post("/api/leche/guardar-quincena")
@@ -1024,8 +1065,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         datos = request.get_json(silent=True) or {}
         dias = datos.get("dias") or []
         foto_b64 = datos.get("foto_base64")
+        foto_ruta_previa = (datos.get("foto_ruta") or "").strip() or None
         observaciones = datos.get("observaciones") or ""
         periodo = datos.get("periodo") or ""
+        acopiador = (datos.get("acopiador") or "").strip() or None
         uid = session.get("user_id")
 
         if not dias or not isinstance(dias, list):
@@ -1034,34 +1077,18 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         db_inst = _db(db_path)
         guardados = 0
         total_l = 0.0
+        ingreso_id = None
 
         try:
-            # Guardar foto en disco y tabla fotos si se adjuntó
-            if foto_b64:
-                try:
-                    try:
-                        from ..vision.recibo_leche_parser import _extraer_bytes_e_imagen
-                    except (ImportError, ValueError):
-                        from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
-                    raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
-                    os.makedirs(media_dir_abs, exist_ok=True)
-                    ts = int(time.time())
-                    rnd = uuid.uuid4().hex[:6]
-                    fname = f"recibo_leche_{ts}_{rnd}.jpg"
-                    dest_file = os.path.join(media_dir_abs, fname)
-                    with open(dest_file, "wb") as f:
-                        f.write(raw_bytes)
-                    ruta_rel = os.path.join("media", fname).replace("\\", "/")
-                    db_inst.registrar_foto(
-                        ruta=ruta_rel,
-                        animal_tag=None,
-                        fecha=dias[0].get("fecha") or date.today().isoformat(),
-                        caption=f"Recibo Quincenal: {periodo}".strip(),
-                        user_id=uid,
-                        notas=f"Control lechero quincenal ({len(dias)} días). {observaciones}".strip(),
-                    )
-                except Exception as ferr:
-                    logger.warning("No se pudo guardar archivo de foto del recibo: %s", ferr)
+            fecha_primer_dia = dias[0].get("fecha") or date.today().isoformat()
+            # Si /api/leche/analizar-recibo ya guardó la foto (caso normal:
+            # el usuario la analizó con IA antes de llegar aquí), se reusa esa
+            # misma ruta en vez de volver a guardarla duplicada. Solo se
+            # guarda una foto nueva aquí si llega base64 sin haber pasado por
+            # análisis (registro manual con foto adjunta directamente).
+            foto_ruta = foto_ruta_previa
+            if not foto_ruta and foto_b64:
+                foto_ruta = _guardar_foto_recibo_leche(foto_b64, periodo, fecha_primer_dia)
 
             for d in dias:
                 f = d.get("fecha")
@@ -1088,11 +1115,36 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 guardados += 1
                 total_l += litros
 
+            # Si el usuario confirmó el monto que le pagaron por esta
+            # quincena, se registra de una vez como ingreso en Finanzas
+            # (categoría VENTA_LECHE) con la misma foto del recibo como
+            # respaldo -- así no hay que volver a digitarlo aparte.
+            monto_pagado_raw = datos.get("monto_pagado")
+            if monto_pagado_raw not in (None, ""):
+                try:
+                    monto_pagado = float(monto_pagado_raw)
+                except (TypeError, ValueError):
+                    monto_pagado = 0.0
+                if monto_pagado > 0:
+                    fecha_ingreso = max(
+                        (d.get("fecha") for d in dias if d.get("fecha")),
+                        default=fecha_primer_dia,
+                    )
+                    ingreso_id = db_inst.registrar_finanza(
+                        fecha=fecha_ingreso, tipo="INGRESO", categoria="VENTA_LECHE",
+                        concepto=f"Pago quincenal de leche: {periodo}".strip() or "Pago quincenal de leche",
+                        monto=monto_pagado, litros=round(total_l, 1),
+                        contraparte=acopiador, foto_ruta=foto_ruta,
+                        notas=observaciones or None, registrado_por=uid,
+                    )
+
             return jsonify({
                 "ok": True,
                 "guardados": guardados,
                 "total_litros": round(total_l, 1),
                 "periodo": periodo,
+                "foto_ruta": foto_ruta,
+                "ingreso_id": ingreso_id,
             })
         except Exception as e:
             logger.exception("Error al guardar quincena de leche: %s", e)

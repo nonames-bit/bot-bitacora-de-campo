@@ -78,6 +78,55 @@ def test_analizar_recibo_leche_gemini_exitoso():
     assert res["dias"][0]["fecha"] == "2026-05-01"
 
 
+def test_analizar_recibo_leche_extrae_precio_y_valor_pagado():
+    """Recibo real: 16 al 31 de agosto, 5092 L, $2.000/L, $10.184.000 total."""
+    sample_json = {
+        "es_recibo_leche": True,
+        "periodo": "16 al 31 de Agosto",
+        "mes": "Agosto",
+        "ano": 2026,
+        "acopiador": "Sebastian Arcila",
+        "total_litros_declarado": 5092.0,
+        "precio_litro": 2000.0,
+        "valor_total_pagado": 10184000.0,
+        "observaciones": "Subió de precio",
+        "dias": [{"dia": 16, "litros": 350.0, "notas": ""}],
+        "confianza": "alta",
+    }
+    mock_gemini = MagicMock()
+    mock_gemini.is_available.return_value = True
+    mock_gemini.generate_vision_structured.return_value = sample_json
+    dummy_img = base64.b64encode(b"dummy_image").decode("utf-8")
+
+    with patch("src.vision.recibo_leche_parser.GeminiClient", return_value=mock_gemini):
+        res = analizar_recibo_leche(dummy_img, fecha_referencia="2026-08-31")
+
+    assert res["precio_litro"] == 2000.0
+    assert res["valor_total_pagado"] == 10184000.0
+
+
+def test_analizar_recibo_leche_completa_precio_faltante_desde_total():
+    """Si el recibo trae el total pagado pero no el precio por litro
+    desglosado, se calcula (litros x precio = total, siempre casan)."""
+    sample_json = {
+        "es_recibo_leche": True, "periodo": "Quincena", "mes": "Agosto", "ano": 2026,
+        "acopiador": None, "total_litros_declarado": 100.0,
+        "precio_litro": None, "valor_total_pagado": 150000.0,
+        "observaciones": "", "dias": [{"dia": 1, "litros": 100.0, "notas": ""}],
+        "confianza": "alta",
+    }
+    mock_gemini = MagicMock()
+    mock_gemini.is_available.return_value = True
+    mock_gemini.generate_vision_structured.return_value = sample_json
+    dummy_img = base64.b64encode(b"dummy_image").decode("utf-8")
+
+    with patch("src.vision.recibo_leche_parser.GeminiClient", return_value=mock_gemini):
+        res = analizar_recibo_leche(dummy_img, fecha_referencia="2026-08-01")
+
+    assert res["precio_litro"] == 1500.0
+    assert res["valor_total_pagado"] == 150000.0
+
+
 def test_analizar_recibo_leche_sin_keys():
     mock_gemini = MagicMock()
     mock_gemini.is_available.return_value = False

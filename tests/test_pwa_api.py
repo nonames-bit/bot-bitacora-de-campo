@@ -951,6 +951,81 @@ def test_api_leche_analizar_recibo_y_guardar_quincena(client, db_file):
     assert "2026-05-02" in fechas
 
 
+def test_api_leche_analizar_recibo_guarda_la_foto_de_inmediato(client, db_file):
+    """Regresión: la foto del recibo es la prueba del pago -- si el usuario
+    cierra la pestaña después de analizarla pero antes de "Guardar Quincena",
+    no debería perderse. /analizar-recibo debe guardarla ya, sin depender
+    del paso final."""
+    import base64
+    from unittest.mock import patch
+    from src.db.database import Database
+
+    fake_img_b64 = base64.b64encode(
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    ).decode("utf-8")
+    sample_parse = {
+        "ok": True, "es_recibo_leche": True, "periodo": "16 al 31 de Agosto",
+        "total_litros_calculado": 350.0,
+        "dias": [{"fecha": "2026-08-16", "dia": 16, "litros": 350.0, "notas": ""}],
+    }
+
+    with patch("src.vision.recibo_leche_parser.analizar_recibo_leche", return_value=sample_parse):
+        r = client.post("/api/leche/analizar-recibo", json={
+            "foto_base64": f"data:image/jpeg;base64,{fake_img_b64}",
+        })
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["foto_ruta"]  # se guardó, sin necesidad de "Guardar Quincena"
+
+    db = Database(db_file)
+    try:
+        fila = db.query_one("SELECT * FROM fotos WHERE ruta = ?", (res["foto_ruta"],))
+        assert fila is not None
+        assert fila["caption"].startswith("Recibo Quincenal")
+    finally:
+        db.close()
+
+
+def test_api_leche_guardar_quincena_con_monto_crea_ingreso_en_finanzas(client, db_file):
+    """Guardar la quincena con el monto que pagaron debe crear el ingreso en
+    Finanzas (categoría VENTA_LECHE) reusando la misma foto ya guardada al
+    analizar -- sin volver a duplicar el archivo."""
+    r_guardar = client.post("/api/leche/guardar-quincena", json={
+        "periodo": "16 al 31 de Agosto",
+        "dias": [
+            {"fecha": "2026-08-16", "dia": 16, "litros": 350.0, "notas": ""},
+            {"fecha": "2026-08-17", "dia": 17, "litros": 321.0, "notas": ""},
+        ],
+        "foto_ruta": "media/recibo_leche_ya_guardada.jpg",
+        "monto_pagado": 1342000,
+        "acopiador": "Sebastian Arcila",
+    })
+    assert r_guardar.status_code == 200
+    g_res = r_guardar.get_json()
+    assert g_res["ok"] is True
+    assert g_res["ingreso_id"] is not None
+    assert g_res["foto_ruta"] == "media/recibo_leche_ya_guardada.jpg"
+
+    r_fin = client.get("/api/finanzas")
+    assert r_fin.status_code == 200
+    recientes = r_fin.get_json()["recientes"]
+    fila = next(f for f in recientes if f["id"] == g_res["ingreso_id"])
+    assert fila["categoria"] == "VENTA_LECHE"
+    assert fila["monto"] == 1342000
+    assert fila["litros"] == 671.0
+    assert fila["contraparte"] == "Sebastian Arcila"
+    assert fila["foto_ruta"] == "media/recibo_leche_ya_guardada.jpg"
+
+
+def test_api_leche_guardar_quincena_sin_monto_no_crea_ingreso(client):
+    r = client.post("/api/leche/guardar-quincena", json={
+        "periodo": "1 al 15 de Junio",
+        "dias": [{"fecha": "2026-06-01", "dia": 1, "litros": 200.0, "notas": ""}],
+    })
+    assert r.status_code == 200
+    assert r.get_json()["ingreso_id"] is None
+
+
 # ---------------------------------------------------------------------------
 # Finanzas: libro de ingresos/egresos + resumen de utilidad.
 # ---------------------------------------------------------------------------

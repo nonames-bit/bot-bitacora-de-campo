@@ -34,7 +34,11 @@ INSTRUCCIONES DE LECTURA:
   * litros: número flotante con los litros de ese día (ej: 185.0). Si hay desglose de mañana (AM) y tarde (PM), suma ambos para el total del día y coloca el desglose en 'notas'.
   * notas: notas breves del día si las hay (ej: 'AM: 110, PM: 75').
 - Identifica el total de litros declarado o impreso al final del recibo (total_litros_declarado) si está visible.
-- Extrae observaciones generales (acopiador/empresa, grasa %, proteína %, precio por litro, retenciones, etc.).
+- Si es un RECIBO/COLILLA DE PAGO (no una planilla manual de control diario), extrae también:
+  * precio_litro: precio pagado por litro, como número (ej: 1450.0). Sin símbolo de moneda ni separadores de miles.
+  * valor_total_pagado: el valor TOTAL pagado en esa quincena, como número (ej: 3973000.0). Es el monto final/neto que el acopiador le paga al productor, normalmente el número más grande y prominente del recibo. Sin símbolo de moneda ni separadores de miles.
+  Si el recibo no trae esos datos (es solo una planilla de control diario sin pago), deja ambos en null.
+- Extrae observaciones generales (grasa %, proteína %, retenciones, bonificaciones, etc. -- sin repetir precio_litro/valor_total_pagado que ya van en sus propios campos).
 
 Debes responder ÚNICAMENTE un objeto JSON válido con la siguiente estructura exacta:
 {{
@@ -44,6 +48,8 @@ Debes responder ÚNICAMENTE un objeto JSON válido con la siguiente estructura e
   "ano": 2026,
   "acopiador": "Colanta",
   "total_litros_declarado": 2740.0,
+  "precio_litro": 1450.0,
+  "valor_total_pagado": 3973000.0,
   "observaciones": "Grasa: 3.7%, Proteína: 3.1%",
   "dias": [
     {{
@@ -278,6 +284,22 @@ def analizar_recibo_leche(imagen: Union[bytes, str], fecha_referencia: Optional[
 
     discrepancia = round(abs(total_calculado - (total_declarado or total_calculado)), 1)
 
+    def _num_o_none(valor):
+        try:
+            return round(float(valor), 2) if valor is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    precio_litro = _num_o_none(datos_json.get("precio_litro"))
+    valor_total_pagado = _num_o_none(datos_json.get("valor_total_pagado"))
+    # Si el recibo trae litros y precio pero no el total (o viceversa), se
+    # completa el que falte por consistencia -- el ejemplo real que valida
+    # esto: 5092 L x $2.000/L = $10.184.000, los 3 valores siempre casan.
+    if valor_total_pagado is None and precio_litro is not None:
+        valor_total_pagado = round((total_declarado or total_calculado) * precio_litro, 2)
+    elif precio_litro is None and valor_total_pagado is not None and (total_declarado or total_calculado):
+        precio_litro = round(valor_total_pagado / (total_declarado or total_calculado), 2)
+
     return {
         "ok": True,
         "es_recibo_leche": bool(datos_json.get("es_recibo_leche", True) and len(dias_procesados) > 0),
@@ -288,6 +310,8 @@ def analizar_recibo_leche(imagen: Union[bytes, str], fecha_referencia: Optional[
         "total_litros_declarado": total_declarado,
         "total_litros_calculado": total_calculado,
         "discrepancia_litros": discrepancia,
+        "precio_litro": precio_litro,
+        "valor_total_pagado": valor_total_pagado,
         "observaciones": str(datos_json.get("observaciones") or "").strip(),
         "dias": dias_procesados,
         "confianza": datos_json.get("confianza") or ("alta" if discrepancia < 2.0 else "media"),
