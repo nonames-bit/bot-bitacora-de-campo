@@ -3310,7 +3310,7 @@
       if (sheetSistema) sheetSistema.style.display = "";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
       if (sheetGps) sheetGps.style.display = "";
-      qa("nav > button").forEach(function (b) { b.style.display = ""; });
+      qa("#nav-principal > button").forEach(function (b) { b.style.display = ""; });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
         if (v !== "sistema" && v !== "usuarios" && v !== "gps") m.style.display = "";
@@ -3322,7 +3322,7 @@
       if (sheetSistema) sheetSistema.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
-      qa("nav > button").forEach(function (b) {
+      qa("#nav-principal > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
@@ -3340,7 +3340,7 @@
       if (sheetUsuarios) sheetUsuarios.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
       var permitidas = ["captura", "manga", "ficha"];
-      qa("nav > button").forEach(function (b) {
+      qa("#nav-principal > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
         if (permitidas.indexOf(v) !== -1) {
@@ -3439,9 +3439,9 @@
     head += "</div>";
 
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
-    html += "<div id='ficha-tabs'><nav class='mini'>"
+    html += "<div id='ficha-tabs'><div class='mini'>"
       + TABS.map(function (t, i) { return "<button data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
-      + "</nav></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
+      + "</div></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
     return html;
   }
   function chipResultado(v) {
@@ -3790,9 +3790,9 @@
     if (!nav) return;
     // Closure con la ficha de ESTE render: evita condiciones de carrera si se
     // abre otra ficha mientras se navega por las pestañas de la anterior.
-    qa("nav.mini button", nav).forEach(function (b) {
+    qa(".mini button", nav).forEach(function (b) {
       b.addEventListener("click", function () {
-        qa("nav.mini button", nav).forEach(function (x) { x.classList.remove("act"); });
+        qa(".mini button", nav).forEach(function (x) { x.classList.remove("act"); });
         b.classList.add("act");
         var panel = document.getElementById("ficha-panel");
         if (panel) panel.innerHTML = fichaTab(b.getAttribute("data-tab"), ficha || window.__ultimaFicha || {});
@@ -3922,7 +3922,7 @@
     tag = String(tag).trim();
     if (!tag) return;
 
-    var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
+    var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
     if (!destino) {
       // Si estamos en la página standalone /ficha/<tag> (usa #ficha, no #vista)
       var destinoStandalone = vista || document.getElementById("ficha");
@@ -4002,7 +4002,7 @@
   }, true);
   function vincularTagsFicha(root) {
     if (!root) return;
-    if (!qa("nav > button").length) return; // solo en el dashboard con navegación
+    if (!qa("#nav-principal > button").length) return; // solo en el dashboard con navegación
     var trs = qa("table tr", root);
     trs.forEach(function (tr) {
       var celdas = qa("td", tr);
@@ -4325,7 +4325,7 @@
   var badgesCache = {};
   function crearBadgesNav() {
     VISTAS_BADGE.forEach(function (v) {
-      var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+      var btn = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
       if (!btn || btn.querySelector(".nav-badge")) return;
       var span = document.createElement("span");
       span.className = "nav-badge";
@@ -4341,7 +4341,7 @@
         var totalSecundario = 0;
         VISTAS_BADGE.forEach(function (v) {
           var n = parseInt(d && d[v], 10) || 0;
-          var btn = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+          var btn = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
           if (btn) {
             var span = btn.querySelector(".nav-badge");
             if (span) {
@@ -4418,7 +4418,7 @@
           if (s) s.title = p === "granted" ? "Notificaciones activadas" : "Notificaciones apagadas";
         });
       }
-      var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
+      var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
       if (destino) destino.click();
     });
   }
@@ -4523,7 +4523,7 @@
     });
   }
 
-  qa("nav > button").forEach(function (b) {
+  qa("#nav-principal > button").forEach(function (b) {
     b.addEventListener("click", function () {
       if (b.id === "btn-nav-mas") {
         if (typeof window.__abrirModalMas === "function") window.__abrirModalMas();
@@ -4543,8 +4543,8 @@
   // Cambia de pestaña activa sin recargar
   function irAVista(v) {
     actual = v;
-    qa("nav > button").forEach(function (x) { x.classList.remove("act"); });
-    var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+    qa("#nav-principal > button").forEach(function (x) { x.classList.remove("act"); });
+    var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
     if (destino) destino.classList.add("act");
 
     // Sincronizar botón Más en barra móvil
@@ -4678,8 +4678,8 @@
     if (pot && q("#f-potrero")) q("#f-potrero").value = pot;
     if (tag && q("#f-tag")) q("#f-tag").value = tag;
     if (!v && (pot || tag)) v = pot ? "tablero" : "ficha";
-    if (v && qa("nav > button").length) {
-      var destino = qa("nav > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+    if (v && qa("#nav-principal > button").length) {
+      var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
       if (destino) {
         irAVista(v);
         cargar();

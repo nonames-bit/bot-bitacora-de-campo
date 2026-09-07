@@ -456,7 +456,8 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Sincronización Bidireccional & Estado Activo Dinámico**: Al elegir un módulo secundario (ej. `Producción Leche`), el botón "Más" se resalta con el nombre de la vista activa (`Leche`), dando retroalimentación visual clara sin alterar el diseño compacto.
     - **Cumplimiento RBAC Estricto**: La visibilidad de módulos en la barra inferior y en la hoja "Más" se sincroniza rigurosamente con los permisos del usuario logueado (`TRABAJADOR` solo ve herramientas operativas autorizadas y sus categorías vacías se ocultan automáticamente; `ADMIN` y `OWNER` acceden a sus paneles respectivos).
     - **Badges y Alertas Integradas**: El botón "Más" muestra un indicador con el conteo acumulado si hay tareas o alertas pendientes en los módulos secundarios (Agenda, Reproducción o Sanidad).
-    - **Caché y Service Worker `v51`**: Actualización de versión de caché para entrega inmediata sin fricción en todos los navegadores móviles y desktop.
+    - **Caché y Service Worker `v51/v52`**: Actualización de versión de caché para entrega inmediata sin fricción en todos los navegadores móviles y desktop.
+    - **Aislamiento Estricto de Navegación & Ficha Animal (v52)**: Corrección de solapamiento donde los estilos de la barra fija móvil afectaban a las pestañas internas de la ficha animal (`#ficha-tabs`) al usar el selector genérico `nav`. Se encapsuló la barra principal bajo `#nav-principal` y las pestañas de la ficha bajo `#ficha-tabs .mini`, restaurando la operatividad total de los botones inferiores (Tablero, Captura, Inventario, Finanzas, Más) al consultar cualquier ficha.
 - [x] Suite de pruebas con pytest: **586 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
