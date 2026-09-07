@@ -1016,18 +1016,110 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         logger.error("seccion traslados fallo", exc_info=True)
         base["traslados"] = []
 
-    # 9. Movimientos (ventas, compras, bajas)
+    # 9. Movimientos (ventas, compras, traslados, bajas)
     try:
         m_rows = db.query(
             """SELECT fecha, tipo_movimiento, procedencia_destino, precio, notas
                FROM movimientos
                WHERE animal_id = ?
-               ORDER BY fecha DESC, id DESC LIMIT 4""", (aid,)
+               ORDER BY fecha DESC, id DESC LIMIT 20""", (aid,)
         )
         base["movimientos"] = _filas_dict(m_rows)
     except Exception:
         logger.error("seccion movimientos fallo", exc_info=True)
         base["movimientos"] = []
+
+    # 10. Datos específicos de venta (si existe registro de venta)
+    venta_info: Optional[dict[str, Any]] = None
+    try:
+        v_row = db.query_one(
+            """SELECT fecha, tipo_movimiento, procedencia_destino, precio, notas
+               FROM movimientos
+               WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA'
+               ORDER BY fecha DESC, id DESC LIMIT 1""", (aid,)
+        )
+        if v_row:
+            venta_info = dict(v_row)
+            f_v = venta_info.get("fecha")
+            # Verificar si se vendió junto a su madre en la misma fecha
+            if an.get("madre_id") and f_v:
+                m_v = db.query_one(
+                    """SELECT a.tag, a.nombre FROM movimientos mo
+                       JOIN animales a ON a.id_animal = mo.animal_id
+                       WHERE mo.animal_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA' LIMIT 1""",
+                    (an["madre_id"], f_v)
+                )
+                if m_v:
+                    venta_info["madre_tag"] = m_v["tag"]
+                    venta_info["madre_nombre"] = m_v["nombre"]
+            # Verificar si se vendió con crías en la misma fecha
+            if f_v:
+                c_v = db.query(
+                    """SELECT a.tag, a.nombre FROM movimientos mo
+                       JOIN animales a ON a.id_animal = mo.animal_id
+                       WHERE a.madre_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA'""",
+                    (aid, f_v)
+                )
+                if c_v:
+                    venta_info["crias_vendidas"] = [{"tag": r["tag"], "nombre": r["nombre"]} for r in c_v]
+        elif str(an.get("estado") or "").upper() == "VENDIDO":
+            venta_info = {
+                "fecha": None,
+                "tipo_movimiento": "VENTA",
+                "procedencia_destino": None,
+                "precio": None,
+                "notas": "Estado marcado como VENDIDO en base de datos",
+            }
+    except Exception as e:
+        logger.error("seccion venta fallo", exc_info=True)
+        errores["venta"] = str(e)
+    base["venta"] = venta_info
+
+    # 11. Datos específicos de muerte (si existe registro en muertes)
+    muerte_info: Optional[dict[str, Any]] = None
+    try:
+        mu_row = db.query_one(
+            """SELECT fecha, causa_presunta, notas
+               FROM muertes
+               WHERE animal_id = ?
+               ORDER BY fecha DESC, id DESC LIMIT 1""", (aid,)
+        )
+        if mu_row:
+            muerte_info = dict(mu_row)
+        elif str(an.get("estado") or "").upper() == "MUERTO":
+            muerte_info = {
+                "fecha": None,
+                "causa_presunta": "Sin causa registrada",
+                "notas": "Estado marcado como MUERTO en base de datos",
+            }
+    except Exception as e:
+        logger.error("seccion muerte fallo", exc_info=True)
+        errores["muerte"] = str(e)
+    base["muerte"] = muerte_info
+
+    # 12. Historial consolidado de bajas y movimientos
+    historial_bajas: list[dict[str, Any]] = []
+    if base.get("movimientos"):
+        for m in base["movimientos"]:
+            historial_bajas.append({
+                "fecha": m.get("fecha"),
+                "tipo": m.get("tipo_movimiento") or "MOVIMIENTO",
+                "destino_causa": m.get("procedencia_destino") or "",
+                "precio": m.get("precio"),
+                "notas": m.get("notas") or "",
+            })
+    if muerte_info and muerte_info.get("fecha"):
+        ya_existe = any(h.get("tipo", "").upper() in ("MUERTE", "BAJA") and h.get("fecha") == muerte_info["fecha"] for h in historial_bajas)
+        if not ya_existe:
+            historial_bajas.append({
+                "fecha": muerte_info.get("fecha"),
+                "tipo": "MUERTE",
+                "destino_causa": muerte_info.get("causa_presunta") or "Muerte registrada",
+                "precio": None,
+                "notas": muerte_info.get("notas") or "",
+            })
+    historial_bajas.sort(key=lambda x: str(x.get("fecha") or ""), reverse=True)
+    base["historial_bajas"] = historial_bajas
 
     if errores:
         base["errores"] = errores

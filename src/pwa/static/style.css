@@ -510,6 +510,53 @@ header {
 .chip.gris  { background: var(--color-gris-bg); color: var(--color-gris-txt); }
 .chip.azul  { background: var(--color-azul-bg); color: var(--color-azul-txt); }
 
+/* Banners destacados de bajas e historial de salidas (Ventas / Muertes / Descartes) */
+.banner-baja {
+  padding: 14px 16px;
+  border-radius: 8px;
+  margin-bottom: 14px;
+  box-shadow: 0 1px 3px var(--sombra);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.banner-baja-venta {
+  background: var(--color-ambar-bg);
+  border: 1px solid var(--color-ambar-txt);
+  border-left: 5px solid var(--color-ambar-txt);
+  color: var(--texto);
+}
+.banner-baja-venta .titulo-baja {
+  color: var(--color-ambar-txt);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.banner-baja-muerte {
+  background: var(--color-rojo-bg);
+  border: 1px solid var(--color-rojo-txt);
+  border-left: 5px solid var(--color-rojo-txt);
+  color: var(--texto);
+}
+.banner-baja-muerte .titulo-baja {
+  color: var(--color-rojo-txt);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.banner-baja-descarte {
+  background: var(--color-gris-bg);
+  border: 1px solid var(--color-gris-txt);
+  border-left: 5px solid var(--color-gris-txt);
+  color: var(--texto);
+}
+.banner-baja-descarte .titulo-baja {
+  color: var(--texto);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
 /* Iconos SVG: entrada suave al aparecer + reacción al pasar el mouse */
 @keyframes iconPop {
   from { transform: scale(.4); opacity: 0; }

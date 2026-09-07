@@ -3437,10 +3437,20 @@
     }
     var estadoChip = "";
     var stUpper = String(f.estado || "").toUpperCase();
-    if (stUpper === "ACTIVO") estadoChip = "<span class='chip verde'>ACTIVO</span>";
-    else if (stUpper === "VENDIDO" || stUpper === "DESCARTADO") estadoChip = "<span class='chip ambar'>" + esc(f.estado) + "</span>";
-    else if (stUpper === "MUERTO") estadoChip = "<span class='chip rojo'>MUERTO</span>";
-    else if (f.estado) estadoChip = "<span class='chip gris'>" + esc(f.estado) + "</span>";
+    if (stUpper === "ACTIVO") {
+      estadoChip = "<span class='chip verde'>ACTIVO</span>";
+    } else if (stUpper === "VENDIDO") {
+      var fVenta = (f.venta && f.venta.fecha) ? (" · " + fechaCorta(f.venta.fecha)) : "";
+      estadoChip = "<span class='chip ambar' style='font-weight:600; display:inline-flex; align-items:center; gap:4px;'>" + icon("receipt", 12) + "<span>VENDIDO" + esc(fVenta) + "</span></span>";
+    } else if (stUpper === "MUERTO") {
+      var fMuerte = (f.muerte && f.muerte.fecha) ? (" · " + fechaCorta(f.muerte.fecha)) : "";
+      estadoChip = "<span class='chip rojo' style='font-weight:600; display:inline-flex; align-items:center; gap:4px;'>" + icon("cowSkull", 12) + "<span>MUERTO" + esc(fMuerte) + "</span></span>";
+    } else if (stUpper === "DESCARTADO") {
+      var fDesc = (f.venta && f.venta.fecha) ? (" · " + fechaCorta(f.venta.fecha)) : ((f.muerte && f.muerte.fecha) ? (" · " + fechaCorta(f.muerte.fecha)) : "");
+      estadoChip = "<span class='chip ambar' style='font-weight:600;'>" + esc(f.estado) + esc(fDesc) + "</span>";
+    } else if (f.estado) {
+      estadoChip = "<span class='chip gris'>" + esc(f.estado) + "</span>";
+    }
 
     var potChip = f.potrero ? "<span class='chip gris' style='margin-left:4px;'>" + icon("grass", 13) + esc(f.potrero) + "</span>" : "";
     var catChip = f.categoria_sg ? "<span class='chip gris' style='margin-left:4px;'>" + esc(f.categoria_sg) + "</span>" : "";
@@ -3663,6 +3673,74 @@
     }
     // Tab "general"
     var h = "";
+    var stUpper = String(f.estado || "").toUpperCase();
+
+    // Banner destacado si el animal fue VENDIDO
+    if (stUpper === "VENDIDO" || (f.venta && f.venta.fecha)) {
+      var v = f.venta || {};
+      var fecVenta = v.fecha ? fechaCorta(v.fecha) : (f.fecha_salida ? fechaCorta(f.fecha_salida) : "Fecha no registrada");
+      var destVenta = v.procedencia_destino ? esc(v.procedencia_destino) : "Destino no especificado";
+      var precioVenta = (v.precio != null && Number(v.precio) > 0) ? (" · <b>" + fmtMoneda(v.precio) + "</b>") : "";
+
+      var extraVenta = "";
+      if (v.madre_tag) {
+        extraVenta += "<div style='margin-top:4px;'><span style='color:var(--texto-suave);'>Venta conjunta (cría al pie):</span> Se vendió junto a su madre <a href='#' class='ficha-link' data-ir-ficha=\"" + esc(v.madre_tag) + "\"><b>" + esc(v.madre_tag) + "</b>" + (v.madre_nombre ? " (" + esc(v.madre_nombre) + ")" : "") + "</a></div>";
+      }
+      if (v.crias_vendidas && v.crias_vendidas.length) {
+        var cvLinks = v.crias_vendidas.map(function (cv) {
+          return "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(cv.tag) + "\"><b>" + esc(cv.tag) + "</b>" + (cv.nombre ? " (" + esc(cv.nombre) + ")" : "") + "</a>";
+        }).join(", ");
+        extraVenta += "<div style='margin-top:4px;'><span style='color:var(--texto-suave);'>Venta conjunta con cría(s):</span> Vendida en la misma fecha junto a " + cvLinks + "</div>";
+      }
+      var notasVenta = v.notas ? ("<div style='margin-top:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'><b>Observaciones de venta:</b> " + esc(v.notas) + "</div>") : "";
+
+      h += "<div class='banner-baja banner-baja-venta'>"
+        + "<div style='color:var(--color-ambar-txt); margin-top:2px; flex-shrink:0;'>" + icon("receipt", 24) + "</div>"
+        + "<div style='flex:1; min-width:0;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;'>"
+        + "<div class='titulo-baja'>REGISTRO DE VENTA · ANIMAL VENDIDO</div>"
+        + "<span class='chip ambar' style='font-size:12px; font-weight:bold;'>" + icon("calendar", 12) + "Vendido el: " + esc(fecVenta) + "</span>"
+        + "</div>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; font-size:13px;'>"
+        + "<div><span style='color:var(--texto-suave);'>Fecha de Venta:</span> <b>" + esc(fecVenta) + "</b></div>"
+        + "<div><span style='color:var(--texto-suave);'>Comprador / Destino:</span> <b>" + destVenta + "</b>" + precioVenta + "</div>"
+        + "</div>"
+        + extraVenta
+        + notasVenta
+        + "</div></div>";
+    }
+
+    // Banner destacado si el animal está MUERTO
+    if (stUpper === "MUERTO" || (f.muerte && f.muerte.fecha)) {
+      var m = f.muerte || {};
+      var fecMuerte = m.fecha ? fechaCorta(m.fecha) : (f.fecha_baja ? fechaCorta(f.fecha_baja) : "Fecha no registrada");
+      var causaMuerte = m.causa_presunta ? esc(m.causa_presunta) : "Sin causa registrada";
+      var notasMuerte = m.notas ? ("<div style='margin-top:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'><b>Diagnóstico / Necropsia / Notas:</b> " + esc(m.notas) + "</div>") : "";
+
+      h += "<div class='banner-baja banner-baja-muerte'>"
+        + "<div style='color:var(--color-rojo-txt); margin-top:2px; flex-shrink:0;'>" + icon("cowSkull", 24) + "</div>"
+        + "<div style='flex:1; min-width:0;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;'>"
+        + "<div class='titulo-baja'>BAJA POR MUERTE · ANIMAL FALLECIDO</div>"
+        + "<span class='chip rojo' style='font-size:12px; font-weight:bold;'>" + icon("calendar", 12) + "Murió el: " + esc(fecMuerte) + "</span>"
+        + "</div>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:6px; font-size:13px;'>"
+        + "<div><span style='color:var(--texto-suave);'>Fecha de Muerte:</span> <b>" + esc(fecMuerte) + "</b></div>"
+        + "<div><span style='color:var(--texto-suave);'>Causa Presunta:</span> <b style='color:var(--color-rojo-txt);'>" + causaMuerte + "</b></div>"
+        + "</div>"
+        + notasMuerte
+        + "</div></div>";
+    }
+
+    // Banner si fue DESCARTADO
+    if (stUpper === "DESCARTADO" && !(f.venta && f.venta.fecha) && !(f.muerte && f.muerte.fecha)) {
+      h += "<div class='banner-baja banner-baja-descarte'>"
+        + "<div style='color:var(--color-gris-txt); margin-top:2px; flex-shrink:0;'>" + icon("alert", 24) + "</div>"
+        + "<div style='flex:1; min-width:0;'>"
+        + "<div class='titulo-baja'>ANIMAL DESCARTADO</div>"
+        + "<p style='margin:4px 0 0 0; font-size:13px; color:var(--texto-suave);'>Este animal ha sido dado de baja o descartado del hato activo.</p>"
+        + "</div></div>";
+    }
 
     // 1. Alerta de Retiro Sanitario si está en período de retiro
     if (f.en_retiro && f.retiros_activos && f.retiros_activos.length) {
@@ -3688,8 +3766,21 @@
       ultPesoTxt = f.peso_nacimiento + " kg (nac)";
     }
 
+    var potreroKpiLabel = "Potrero Actual";
+    var potreroKpiVal = f.potrero ? esc(f.potrero) : "Sin asignar";
+    if (stUpper === "VENDIDO") {
+      potreroKpiLabel = "Estado Hato";
+      potreroKpiVal = "Vendido";
+    } else if (stUpper === "MUERTO") {
+      potreroKpiLabel = "Estado Hato";
+      potreroKpiVal = "Baja (Muerte)";
+    } else if (stUpper === "DESCARTADO") {
+      potreroKpiLabel = "Estado Hato";
+      potreroKpiVal = "Descartado";
+    }
+
     h += "<div class='kpis' style='margin-bottom:14px;'>"
-      + kpi(f.potrero ? esc(f.potrero) : "Sin asignar", "Potrero Actual")
+      + kpi(potreroKpiVal, potreroKpiLabel)
       + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad Zootécnica")
       + kpi(ultPesoTxt, "Último Pesaje")
       + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
@@ -3779,6 +3870,31 @@
           ["destino", "Destino", "text", function (v) { return "<b>" + esc(v || "—") + "</b>"; }],
           ["motivo", "Motivo", "text", function (v) { return esc(v || "Rotación"); }]
         ], "Sin traslados registrados.");
+    }
+
+    // 6. Historial de Bajas, Ventas y Movimientos
+    var bajasList = (f.historial_bajas && f.historial_bajas.length) ? f.historial_bajas : (f.movimientos || []);
+    if (bajasList && bajasList.length) {
+      h += "<h4 style='margin-top:16px;'>" + icon("receipt") + "Historial de Bajas, Ventas y Movimientos</h4>"
+        + tabla(bajasList, [
+          ["fecha", "Fecha", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
+          ["tipo", "Tipo", "text", function (v, row) {
+            var t = String(v || row.tipo_movimiento || "MOVIMIENTO").toUpperCase();
+            if (t === "VENTA") return "<span class='chip ambar' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("receipt", 12) + "<span>Venta</span></span>";
+            if (t === "MUERTE") return "<span class='chip rojo' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("cowSkull", 12) + "<span>Muerte</span></span>";
+            if (t === "COMPRA") return "<span class='chip verde' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 12) + "<span>Compra</span></span>";
+            if (t === "TRASLADO") return "<span class='chip gris' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("truck", 12) + "<span>Traslado</span></span>";
+            return "<span class='chip gris'>" + esc(t) + "</span>";
+          }],
+          ["destino_causa", "Destino / Causa / Detalle", "text", function (v, row) {
+            var d = v || row.procedencia_destino || row.causa_presunta || "—";
+            return esc(d);
+          }],
+          ["precio", "Precio / Valor", "text", function (v) {
+            return (v != null && Number(v) > 0) ? ("<b>" + fmtMoneda(v) + "</b>") : "—";
+          }],
+          ["notas", "Observaciones", "text", function (v) { return esc(v || "—"); }]
+        ], "Sin movimientos ni bajas registradas.");
     }
 
     // 6. Tarjeta de Código QR & Ficha Oficial PDF

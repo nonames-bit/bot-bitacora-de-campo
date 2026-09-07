@@ -1125,3 +1125,48 @@ def test_api_sync_gasto_con_foto_queda_enlazada_en_finanzas(client, db_file):
     fila = next(f for f in recientes if f["concepto"] == "Alambre de púa 200m")
     assert fila["foto_ruta"]
     assert fila["foto_ruta"].startswith("media/") or fila["foto_ruta"].startswith("media\\")
+
+
+def test_ficha_incluye_venta_muerte_e_historial_bajas(db_file, client):
+    """Verifica que /api/ficha/<tag> reporte la información estructurada de
+    venta y muerte con fechas, comprador, causa, precio y notas."""
+    d = Database(db_file)
+    # Registrar animal vendido con movimiento de venta
+    d.registrar_animal("V01", sexo="Hembra", estado="VENDIDO")
+    d.execute(
+        "INSERT INTO movimientos (animal_id, fecha, tipo_movimiento, procedencia_destino, precio, notas) "
+        "VALUES (?, '2026-09-05', 'VENTA', 'Subasta Ganadera San Martín', 3200000, 'Vendida con cría')",
+        (d.animal_id("V01"),),
+    )
+    # Registrar animal muerto con registro de muerte
+    d.registrar_animal("M01", sexo="Hembra", estado="MUERTO")
+    d.execute(
+        "INSERT INTO muertes (animal_id, fecha, causa_presunta, notas) "
+        "VALUES (?, '2026-08-12', 'TIMPANISMO', 'Hallada en potrero 3')",
+        (d.animal_id("M01"),),
+    )
+    d.close()
+
+    # Consultar ficha de V01
+    r_v = client.get("/api/ficha/V01")
+    assert r_v.status_code == 200
+    data_v = r_v.get_json()
+    assert data_v["estado"] == "VENDIDO"
+    assert data_v["venta"] is not None
+    assert data_v["venta"]["fecha"] == "2026-09-05"
+    assert data_v["venta"]["procedencia_destino"] == "Subasta Ganadera San Martín"
+    assert data_v["venta"]["precio"] == 3200000
+    assert len(data_v["historial_bajas"]) >= 1
+    assert data_v["historial_bajas"][0]["tipo"] == "VENTA"
+
+    # Consultar ficha de M01
+    r_m = client.get("/api/ficha/M01")
+    assert r_m.status_code == 200
+    data_m = r_m.get_json()
+    assert data_m["estado"] == "MUERTO"
+    assert data_m["muerte"] is not None
+    assert data_m["muerte"]["fecha"] == "2026-08-12"
+    assert data_m["muerte"]["causa_presunta"] == "TIMPANISMO"
+    assert len(data_m["historial_bajas"]) >= 1
+    assert data_m["historial_bajas"][0]["tipo"] == "MUERTE"
+

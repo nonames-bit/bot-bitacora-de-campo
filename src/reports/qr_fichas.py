@@ -588,8 +588,21 @@ def generar_ficha_qr_individual(
     c.setFont("Helvetica-Bold", 8)
     c.drawString(col_der_x + 310, y_pos - 38, "Estado Hato:")
     c.setFont("Helvetica-Bold", 8)
-    c.setFillColor(colors.HexColor("#2E7D32"))
-    c.drawString(col_der_x + 375, y_pos - 38, "ACTIVO")
+    st_an = str(ficha.get("estado") or "ACTIVO").upper()
+    if st_an == "VENDIDO":
+        c.setFillColor(colors.HexColor("#D97706"))
+        v_fec = ficha.get("venta", {}).get("fecha") if ficha.get("venta") else None
+        c.drawString(col_der_x + 375, y_pos - 38, f"VENDIDO ({str(v_fec)[:10]})" if v_fec else "VENDIDO")
+    elif st_an == "MUERTO":
+        c.setFillColor(colors.HexColor("#DC2626"))
+        m_fec = ficha.get("muerte", {}).get("fecha") if ficha.get("muerte") else None
+        c.drawString(col_der_x + 375, y_pos - 38, f"MUERTO ({str(m_fec)[:10]})" if m_fec else "MUERTO")
+    elif st_an == "DESCARTADO":
+        c.setFillColor(colors.HexColor("#B45309"))
+        c.drawString(col_der_x + 375, y_pos - 38, "DESCARTADO")
+    else:
+        c.setFillColor(colors.HexColor("#2E7D32"))
+        c.drawString(col_der_x + 375, y_pos - 38, st_an)
 
     y_pos -= 46
 
