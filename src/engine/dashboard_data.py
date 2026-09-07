@@ -445,8 +445,18 @@ def datos_leche(db: Database) -> dict:
         logger.error("seccion ranking_vacas fallo", exc_info=True)
         errores["ranking_vacas"] = str(e)
         ranking = []
+    try:
+        fotos_recibos = _filas_dict(db.query(
+            """SELECT id, ruta, fecha, caption, notas
+               FROM fotos
+               WHERE notas LIKE '%(leche)%' OR caption LIKE '%Leche%' OR caption LIKE '%Recibo%'
+               ORDER BY fecha DESC, id DESC LIMIT 12"""
+        ))
+    except Exception as e:
+        logger.error("seccion fotos_recibos fallo", exc_info=True)
+        fotos_recibos = []
     out: dict[str, Any] = {"serie_tanque": serie, "controles": controles,
-                           "ranking_vacas": ranking}
+                           "ranking_vacas": ranking, "fotos_recibos": fotos_recibos}
     if errores:
         out["errores"] = errores
     return out

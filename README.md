@@ -436,6 +436,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Iconografía SVG Canónica**: Sustitución del emoji residual `🐮` por el icono SVG Lucide de vaca (`COW_HEAD`) en la ruta de navegación.
     - **Herramientas de Encabezado**: Integración de Asistente IA (modal de chat zootécnico interactivo con sugerencias contextuales para el animal consultado) y botón de Ayuda con redirección a `/?v=ayuda`.
     - **Caché y Service Worker `v43`**: Actualización de versión para forzar la recarga limpia de assets en navegadores móviles y escritorio.
+  - **Módulo de Leche: Recibos Quincenales & Planillas Manuales de Campo (2026-09-06)**:
+    - **Captura Rápida Adaptada a la Realidad de Finca**: Ajuste del formulario de leche para recibir la foto del recibo de quincena o planilla manual en papel donde anotan los litros diarios, con título contextual `Foto del Recibo / Planilla de Leche`, botón `Tomar o Subir Recibo / Hoja`, y campo de litros adaptado a ordeño o consolidado de quincena.
+    - **Galería de Recibos en Vista Leche con Zoom Lightbox**: Incorporación de sección visual con miniaturas de recibos y planillas subidas, permitiendo abrir cualquier hoja en pantalla completa con zoom táctil (1.5x) para verificar números y notas de campo.
+    - **Caché y Service Worker `v44`**: Bump de versión para refresco inmediato de estilos y componentes.
 - [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

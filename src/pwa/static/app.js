@@ -328,13 +328,31 @@
   function renderLeche(d) {
     var total = 0;
     (d.serie_tanque || []).forEach(function (f) { total += Number(f.litros) || 0; });
-    var h = "<h3>" + icon("milk") + "Leche (tanque)</h3>" + erroresHtml(d);
+    var h = "<h3>" + icon("milk") + "Producción de Leche (Recibos y Control)</h3>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.controles.length, "Controles") + kpi(total.toFixed(0), "L últimos 30 días");
     var mejor = (d.ranking_vacas && d.ranking_vacas.length) ? d.ranking_vacas[0] : null;
     if (mejor) {
       h += kpi(esc(mejor.tag), "Mejor vaca", "ok");
     }
     h += "</div>";
+
+    if (d.fotos_recibos && d.fotos_recibos.length) {
+      h += "<h4>" + icon("camera") + "Recibos y Planillas de Quincena (Fotos de Respaldo)</h4>";
+      h += "<p class='aviso' style='margin-bottom:10px;'>Fotos de recibos o planillas manuales de leche. Toca cualquier imagen para abrirla en pantalla completa con zoom táctil y verificar las anotaciones diarias.</p>";
+      h += "<div class='fotos-wrap' style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-bottom:18px;'>";
+      d.fotos_recibos.forEach(function (f) {
+        var ruta = f.ruta ? (f.ruta.startsWith("/") ? f.ruta : "/" + f.ruta) : "";
+        h += "<div class='foto-card' style='border:1px solid var(--borde-suave); border-radius:8px; overflow:hidden; background:var(--superficie); padding:6px;'>"
+          + "<div style='aspect-ratio:4/3; overflow:hidden; border-radius:6px; background:#111; display:flex; align-items:center; justify-content:center; cursor:pointer;'>"
+          + "<img src='" + esc(ruta) + "' alt='" + esc(f.caption || "Recibo de leche") + "' class='zoomable-img' style='width:100%; height:100%; object-fit:cover;'>"
+          + "</div>"
+          + "<div style='font-size:11px; font-weight:600; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>" + esc(f.caption || "Recibo") + "</div>"
+          + "<div style='font-size:10px; color:var(--texto-suave);'>" + esc(fechaCorta(f.fecha)) + "</div>"
+          + "</div>";
+      });
+      h += "</div>";
+    }
+
     h += grafico("leche_total", "Producción total de leche") + grafico("eficiencia_lechera", "Eficiencia lechera");
     h += grafico("ranking_vacas_leche", "Ranking de producción por vaca");
     h += "<h4>" + icon("chartBar") + "Ranking de vacas por litros (acumulado)</h4>"
@@ -343,7 +361,7 @@
         ["ultima_fecha", "Último control", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }]
       ], "Sin producción por vaca registrada.");
     h += "<h4>" + icon("chartLine") + "Producción por día</h4>"
-      + tabla(d.serie_tanque, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin registros de tanque.");
+      + tabla(d.serie_tanque, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin registros de producción o recibos.");
     h += "<h4>" + icon("calendar") + "Controles individuales</h4>"
       + tabla(d.controles, [["tag", "Vaca"], ["fecha", "Fecha"], ["litros", "L", "num"]], "Sin controles individuales.");
     return h;
@@ -866,8 +884,8 @@
         + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Inseminador: <input id='cap-inseminador' placeholder='Nombre del técnico' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "leche") {
-      h += "<label>Litros Totales Ordeño: <input type='number' step='0.5' id='cap-litros' placeholder='ej. 185' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Observaciones: <input id='cap-notas' placeholder='Tanque de enfriamiento, retiro aplicado, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+      h += "<label>Litros Totales (Ordeño o Quincena): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 1850' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Recibo quincena 1-15, control diario, planilla manual, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "muerte") {
       h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Causa Presunta: <input id='cap-causa' placeholder='ej. Mordedura de serpiente, timpanismo, descarte vejez' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -875,22 +893,34 @@
     }
 
     var hintFoto = "Foto de respaldo en campo";
+    var titFoto = "Foto del Evento";
+    var txtBtnFoto = " Tomar o Subir Foto";
+
     if (tipo === "parto") {
+      titFoto = "Foto del Parto / Cría";
       hintFoto = "Foto de la cría recién nacida, ubre o condición de la madre";
     } else if (tipo === "muerte") {
+      titFoto = "Foto del Hallazgo / Necropsia";
       hintFoto = "Foto del animal fallecido, necropsia o causa de muerte";
     } else if (tipo === "tratamiento") {
+      titFoto = "Foto del Medicamento / Receta";
       hintFoto = "Foto del frasco/lote de medicamento, receta o zona tratada";
     } else if (tipo === "pesaje") {
+      titFoto = "Foto de Báscula / Animal";
       hintFoto = "Foto del animal en báscula, arete o condición corporal";
     } else if (tipo === "celo") {
+      titFoto = "Foto de Manifestación de Celo";
       hintFoto = "Foto de manifestación de celo (moco, monta, comportamiento)";
     } else if (tipo === "servicio") {
+      titFoto = "Foto de Pajuela / Procedimiento";
       hintFoto = "Foto de la pajuela, catálogo del toro o procedimiento IA";
     } else if (tipo === "traslado") {
+      titFoto = "Foto del Lote / Potrero";
       hintFoto = "Foto del lote o potrero de destino";
     } else if (tipo === "leche") {
-      hintFoto = "Foto del tanque o medidor de leche";
+      titFoto = "Foto del Recibo / Planilla de Leche";
+      hintFoto = "Foto del recibo de quincena o planilla donde anotan la leche diaria";
+      txtBtnFoto = " Tomar o Subir Recibo / Hoja";
     }
 
     h += "<div class='cap-foto-box' style='margin-top:12px; padding:12px; border:1.5px dashed var(--borde-fuerte); border-radius:8px; background:var(--superficie);'>"
@@ -898,14 +928,14 @@
       + "<div>"
       + "<div style='font-size:12.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>"
       + icon("camera", 15)
-      + "Foto del Evento <span style='font-size:11px; font-weight:normal; color:var(--texto-suave);'>(Opcional)</span>"
+      + titFoto + " <span style='font-size:11px; font-weight:normal; color:var(--texto-suave);'>(Opcional)</span>"
       + "</div>"
       + "<small style='font-size:11px; color:var(--texto-suave); display:block; margin-top:2px;'>" + esc(hintFoto) + "</small>"
       + "</div>"
       + "<div style='display:flex; gap:8px; align-items:center;'>"
       + "<input type='file' id='cap-foto-input' accept='image/*' capture='environment' style='display:none;'>"
       + "<button type='button' id='btn-elegir-foto' class='tema-btn' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-      + icon("camera", 13) + " Tomar o Subir Foto"
+      + icon("camera", 13) + txtBtnFoto
       + "</button>"
       + "</div>"
       + "</div>"

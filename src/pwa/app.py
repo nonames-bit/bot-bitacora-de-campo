@@ -1259,6 +1259,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 caption_txt = f"Tratamiento: {payload.get('producto') or ''} ({tag_asoc or ''})".strip()
             elif tipo == "muerte":
                 caption_txt = f"Muerte: {payload.get('causa_presunta') or ''} ({tag_asoc or ''})".strip()
+            elif tipo == "leche":
+                litros_str = f"{payload.get('litros')} L" if payload.get("litros") is not None else ""
+                caption_txt = f"Recibo/Planilla de Leche: {litros_str} · {fecha}".strip()
 
             fid = db_inst.registrar_foto(
                 ruta=ruta_rel,
