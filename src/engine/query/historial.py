@@ -219,6 +219,8 @@ class HistorialQueryMixin:
         if f_nac:
             edad_str = formatear_edad_zootecnica(f_nac, self.hoy)
             header.append(f"🎂 <b>Edad:</b> {edad_str}")
+        if "hierro" in animal.keys() and animal["hierro"]:
+            header.append(f"🔥 <b>Hierro:</b> {animal['hierro']}")
         header.append(f"● <b>Estado:</b> {estado}")
         if estado == "HISTORICO":
             header.append(

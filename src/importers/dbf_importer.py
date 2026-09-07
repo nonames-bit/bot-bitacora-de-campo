@@ -329,6 +329,7 @@ def import_animales(db: Database, records, causas: dict) -> dict:
 
         codpot = (r.get("CODPOT") or "").strip() or None
         estado_nuevo = _estado_desde_tipo(r.get("TIPO"), codpot=codpot)
+        hierro = (r.get("HIE") or "").strip() or None
         db.registrar_animal(
             tag=tag,
             nombre=(r.get("NOMANI") or "").strip() or None,
@@ -338,6 +339,7 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             potrero=codpot,
             estado=estado_nuevo,
             notas=(r.get("OBS") or "").strip() or None,
+            hierro=hierro,
         )
         tags.append((tag, r, estado_previo, estado_nuevo))
 

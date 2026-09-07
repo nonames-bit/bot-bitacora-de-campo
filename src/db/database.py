@@ -50,6 +50,12 @@ class Database:
         self.conn.executescript(SCHEMA_SQL)
         # Migración idempotente para columnas añadidas
         try:
+            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()]
+            if "hierro" not in cols:
+                self.conn.execute("ALTER TABLE animales ADD COLUMN hierro TEXT")
+        except Exception:
+            pass
+        try:
             cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()]
             if "ocr_text" not in cols:
                 self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
@@ -216,7 +222,7 @@ class Database:
     # ------------------------------------------------------------------ #
     def registrar_animal(self, tag, nombre=None, sexo=None, raza=None,
                          fecha_nacimiento=None, madre_tag=None, padre_tag=None,
-                         potrero=None, estado=None, notas=None) -> int:
+                         potrero=None, estado=None, notas=None, hierro=None) -> int:
         tag_str = str(tag).strip()
         existente = self.animal_id(tag_str)
 
@@ -239,6 +245,7 @@ class Database:
             nombre=nombre, sexo=sexo, raza=raza,
             fecha_nacimiento=iso(fecha_nacimiento), madre_id=madre_id,
             padre_id=padre_id, potrero_id=potrero_id, estado=estado, notas=notas,
+            hierro=hierro,
         )
         if existente is not None:
             sets = ", ".join(f"{k} = ?" for k, v in campos.items() if v is not None)

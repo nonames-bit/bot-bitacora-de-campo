@@ -47,7 +47,9 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v52: Aislamiento estricto de #nav-principal vs #ficha-tabs mini para evitar superposición y bloqueo de navegación en móviles al abrir ficha animal.
 // v54: La foto del recibo de leche se guarda al analizarla con IA (no se pierde si no llegas a "Guardar Quincena"); extrae precio/litro y valor pagado del recibo y crea el ingreso en Finanzas (Venta de leche) al guardar la quincena.
 // v55: Información explícita de bajas por venta y muerte en ficha animal (banners destacados con fecha exacta, comprador/precio, causa/diagnóstico, vínculos de venta conjunta madre-cría y tabla consolidada de movimientos).
-var CACHE = "pwa-ja-v55"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v56: Estructura del hato (SG: cría/levante/novilla/vaca parida-seca/reproductor con % y UGG estimado) en Inventario, e Indicadores reproductivos del hato (IEP, días abiertos, servicios/concepción, tasa de concepción, edad 1er parto) en Reproducción.
+// v57: Integración del Hierro / Marca de fuego de cada animal en ficha técnica (chip de encabezado, tarjeta de identificación, árbol genealógico, reporte PDF y bot).
+var CACHE = "pwa-ja-v57"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

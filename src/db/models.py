@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS animales (
     padre_id INTEGER,
     potrero_id INTEGER,
     estado TEXT,
-    notas TEXT
+    notas TEXT,
+    hierro TEXT
 );
 
 CREATE TABLE IF NOT EXISTS partos (

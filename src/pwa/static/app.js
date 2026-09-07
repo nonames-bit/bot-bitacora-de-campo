@@ -594,6 +594,27 @@
     });
     return h;
   }
+  var COLORES_HATO_SG = {
+    "Cría macho": "#66bb6a", "Cría hembra": "#2e7d32",
+    "Levante macho": "#26a69a", "Levante hembra": "#00838f",
+    "Novilla de vientre": "#5c6bc0", "Vaca parida": "#1b5e20",
+    "Vaca seca": "#f9a825", "Macho de ceba/levante adulto": "#8d6e63",
+    "Reproductor": "#6d4c41"
+  };
+  function barraApiladaCategorias(filas) {
+    if (!filas || !filas.length) return vacio("Sin datos.");
+    var segs = "", leyenda = "";
+    filas.forEach(function (f) {
+      var color = COLORES_HATO_SG[f.categoria] || "#90a4ae";
+      var pct = Math.max(0, Number(f.pct) || 0);
+      segs += "<div style='width:" + pct + "%; background:" + color + ";' title=\"" + esc(f.categoria) + ": " + esc(f.n) + " (" + esc(f.pct) + "%)\"></div>";
+      leyenda += "<span style='display:inline-flex; align-items:center; gap:5px;'>"
+        + "<span style='width:10px; height:10px; border-radius:2px; background:" + color + "; display:inline-block; flex-shrink:0;'></span>"
+        + esc(f.categoria) + " <b>" + esc(f.n) + "</b> (" + esc(f.pct) + "%)</span>";
+    });
+    return "<div style='display:flex; height:30px; border-radius:7px; overflow:hidden; border:1px solid var(--borde-fuerte); margin-bottom:12px;'>" + segs + "</div>"
+      + "<div style='display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; margin-bottom:6px;'>" + leyenda + "</div>";
+  }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
     var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
@@ -611,7 +632,7 @@
     if (!eh || !eh.filas || !eh.filas.length) {
       h += vacio("Sin animales activos para clasificar.");
     } else {
-      h += barrasDeFilas(eh.filas, "pct", "n");
+      h += barraApiladaCategorias(eh.filas);
       h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Cabezas</th><th>%</th><th>UGG (est.)</th></tr>";
       eh.filas.forEach(function (f) {
         h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.ugg) + "</td></tr>";
@@ -3479,6 +3500,7 @@
 
     var potChip = f.potrero ? "<span class='chip gris' style='margin-left:4px;'>" + icon("grass", 13) + esc(f.potrero) + "</span>" : "";
     var catChip = f.categoria_sg ? "<span class='chip gris' style='margin-left:4px;'>" + esc(f.categoria_sg) + "</span>" : "";
+    var hierroChip = f.hierro ? ("<span class='chip ambar' style='margin-left:4px; font-weight:600;' title='Hierro / Marca a fuego de la ganadería'>" + icon("flame", 12) + "Hierro <b>" + esc(f.hierro) + "</b></span>") : "";
     var retiroChip = f.en_retiro ? "<span class='chip rojo' style='margin-left:4px; font-weight:bold;'>" + icon("alert", 13) + "EN RETIRO</span>" : "";
 
     head += "<div class='datos' style='flex:1; min-width:0;'>"
@@ -3487,10 +3509,11 @@
       + estadoChip + retiroChip
       + "</div>"
       + "<div style='display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;'>"
-      + potChip + catChip
+      + potChip + catChip + hierroChip
       + "</div>"
       + "<span class='meta' style='font-size:12px; color:var(--texto-suave);'>"
       + esc(f.sexo || "") + " · " + esc(f.raza || "S/D")
+      + (f.hierro ? " · Hierro: <b>" + esc(f.hierro) + "</b>" : "")
       + (f.edad_str ? " · <b>" + esc(f.edad_str) + "</b>" : (f.fecha_nacimiento ? " · Nac: " + esc(fechaCorta(f.fecha_nacimiento)) : ""))
       + "</span>"
       + "</div>";
@@ -3549,10 +3572,10 @@
         }
         var nom = an.nombre ? " · " + esc(an.nombre) : "";
         var rz = an.raza ? " [" + esc(an.raza) + "]" : "";
-        var click = "data-ir-ficha='" + esc(an.tag) + "'";
+        var hie = an.hierro ? (" <span class='chip ambar' style='font-size:10px; padding:1px 4px;' title='Hierro'>" + esc(an.hierro) + "</span>") : "";
         return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
           + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
-          + "<div><a href='#' class='ficha-link' " + click + " style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span></div>"
+          + "<div><a href='#' class='ficha-link' " + click + " style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span>" + hie + "</div>"
           + "</div>";
       }
 
@@ -3818,6 +3841,7 @@
       + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px; font-size:13px; margin-top:10px;'>"
       + "<div><span style='color:var(--texto-suave);'>Arete / Tag:</span> <b>" + esc(f.tag) + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Nombre:</span> <b>" + esc(f.nombre || "S/D") + "</b></div>"
+      + "<div><span style='color:var(--texto-suave);'>Hierro / Marca:</span> <b>" + (f.hierro ? ("<span style='color:var(--verde-marca);'>" + icon("flame", 13) + esc(f.hierro) + "</span>") : "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Sexo:</span> <b>" + esc(f.sexo || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Raza:</span> <b>" + esc(f.raza || "S/D") + "</b></div>"
       + "<div><span style='color:var(--texto-suave);'>Color / Pelo:</span> <b>" + esc(f.color || "S/D") + "</b></div>"

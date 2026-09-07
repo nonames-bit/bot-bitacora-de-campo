@@ -490,7 +490,17 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Reporte general de la finca (`/reporte`, `/api/reporte.pdf`) alineado con la ficha**: encabezado con franja verde sólida `#2F5233` + logo, secciones con banda `#E7EFE8`, tablas con header verde y texto blanco + zebra, alertas destacadas con fondo/acento de retiro (rojo suave) y pie de página con línea separadora corporativa. Se conservan las firmas públicas (`generar_pdf`, `recolectar_datos`).
     - **Tarjetas QR en lote (6/hoja) refinadas**: marcos `roundRect` con radio, QR con contenedor blanco/borde sutil y truncado elegante de textos, mismos constantes que la ficha individual.
     - **Ficha individual pulida**: espaciado vertical de secciones, truncado de genealogía y listas de retiros ordenadas, todo con las constantes compartidas de `estilo_ja`.
-- [x] Suite de pruebas con pytest: **609 pruebas en verde** (100% pasando).
+  - **Integración del Hierro / Marca de Fuego de cada Animal (2026-09-07)**:
+    - **Modelo y Migración Idempotente (`src/db/models.py`, `src/db/database.py`)**: Añadida columna `hierro TEXT` a la tabla `animales` con chequeo automático de `PRAGMA table_info` en `create_tables()` para bases de datos existentes sin recrear tablas.
+    - **Importador Software Ganadero (`src/importers/dbf_importer.py`)**: Mapeo del campo `HIE` de `hoja.dbf` al registrar o actualizar animales en SQLite.
+    - **Backend Ficha y Trazabilidad (`src/engine/dashboard_data.py`)**: Exposición de `hierro` en el objeto base de la ficha, en cada nodo ancestral del árbol genealógico (3G) y en el listado de crías del animal.
+    - **Bot de Telegram (`src/engine/query/historial.py`)**: Inclusión de `🔥 Hierro: <valor>` en el encabezado de la ficha e historial del animal.
+    - **Ficha Técnica PDF (`src/reports/qr_fichas.py`)**: Visualización destacada de `Hierro: <valor>` en la sección de Identificación y Categorización Zootécnica.
+    - **PWA Frontend (`src/pwa/static/app.js`, `sw.js` v57)**:
+      - Chip ámbar en el encabezado de la ficha: `[ 🔥 Hierro <valor> ]` junto a los chips de potrero y categoría, más detalle en la línea meta.
+      - Fila `Hierro / Marca:` en la tarjeta de Identificación & Genealogía de la pestaña General.
+      - Indicador de hierro en los ancestros dentro del diagrama de genealogía.
+- [x] Suite de pruebas con pytest: **617 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

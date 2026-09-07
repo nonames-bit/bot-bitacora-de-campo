@@ -655,6 +655,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base: dict[str, Any] = {"existe": True, "tag": an["tag"], "nombre": an["nombre"],
             "sexo": an["sexo"], "raza": an["raza"],
             "fecha_nacimiento": an["fecha_nacimiento"], "estado": an["estado"],
+            "hierro": an.get("hierro"),
             "qr_payload": f"JA://animal/{an['tag']}", "qr_url": f"/ficha/{an['tag']}"}
     try:
         base["ultimo_parto"] = dict(db.ultimo_parto(aid)) if db.ultimo_parto(aid) else None
@@ -770,7 +771,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             return None
         try:
             row = db.query_one(
-                "SELECT id_animal, tag, nombre, raza, sexo, padre_id, madre_id, estado "
+                "SELECT id_animal, tag, nombre, raza, sexo, padre_id, madre_id, estado, hierro "
                 "FROM animales WHERE id_animal = ?", (animal_id,)
             )
             if not row:
@@ -784,6 +785,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                 "padre_id": row["padre_id"],
                 "madre_id": row["madre_id"],
                 "estado": row["estado"],
+                "hierro": row["hierro"] if "hierro" in row.keys() else None,
             }
         except Exception:
             return None
@@ -815,7 +817,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     try:
         crias_rows = db.query(
             """
-            SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.estado,
+            SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.estado, a.hierro,
                    p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
             FROM animales a
             LEFT JOIN partos p ON p.id_cria = a.id_animal

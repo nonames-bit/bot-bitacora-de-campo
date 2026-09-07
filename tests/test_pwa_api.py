@@ -1197,3 +1197,43 @@ def test_ficha_incluye_venta_muerte_e_historial_bajas(db_file, client):
     assert len(data_m["historial_bajas"]) >= 1
     assert data_m["historial_bajas"][0]["tipo"] == "MUERTE"
 
+
+def test_ficha_incluye_hierro_y_en_genealogia(db_file, client):
+    """Verifica que /api/ficha/<tag> reporte el hierro del animal,
+    así como el hierro de sus ancestros y de sus crías."""
+    d = Database(db_file)
+    # Registrar madre con hierro
+    d.registrar_animal("MADRE_HIE", sexo="Hembra", estado="ACTIVO", hierro="17QX")
+    # Registrar hija con hierro
+    d.registrar_animal(
+        "HIJA_HIE", sexo="Hembra", estado="ACTIVO", madre_tag="MADRE_HIE", hierro="49BG"
+    )
+    # Registrar nieta (cría de HIJA_HIE) con hierro
+    d.registrar_animal(
+        "CRIA_HIE", sexo="Hembra", estado="ACTIVO", madre_tag="HIJA_HIE", hierro="SJ65"
+    )
+    d.close()
+
+    # Consultar ficha de HIJA_HIE
+    r = client.get("/api/ficha/HIJA_HIE")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert data["tag"] == "HIJA_HIE"
+    assert data["hierro"] == "49BG"
+
+    # Verificar que el árbol genealógico incluye el hierro de la madre
+    gen = data.get("genealogia_3g") or {}
+    madre = gen.get("madre")
+    assert madre is not None
+    assert madre["tag"] == "MADRE_HIE"
+    assert madre["hierro"] == "17QX"
+    assert data.get("madre") is not None
+    assert data["madre"]["hierro"] == "17QX"
+
+    # Verificar que el listado de crías incluye el hierro de la cría
+    crias = data.get("crias") or []
+    assert len(crias) >= 1
+    cria_entry = next((c for c in crias if c["tag"] == "CRIA_HIE"), None)
+    assert cria_entry is not None
+    assert cria_entry["hierro"] == "SJ65"
+
