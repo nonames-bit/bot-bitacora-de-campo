@@ -48,9 +48,34 @@ except Exception:  # pragma: no cover
             return None
 
 
-# Paleta institucional GANADERÍA JA (misma que pdf_report.py).
-_COLOR_MARCA = "#2F5233"
-_COLOR_MARCA_CLARA = "#E7EFE8"
+from .estilo_ja import (
+    COLOR_ALERTA_BG,
+    COLOR_ALERTA_TXT,
+    COLOR_BORDE_TARJETA,
+    COLOR_DESCARTADO,
+    COLOR_FONDO_TARJETA,
+    COLOR_FOTO_BORDE,
+    COLOR_FOTO_PLACEHOLDER,
+    COLOR_FOTO_TEXTO,
+    COLOR_LINEA,
+    COLOR_MARCA,
+    COLOR_MARCA_CLARA,
+    COLOR_MARCA_HEADER,
+    COLOR_MUERTO,
+    COLOR_NEGRO,
+    COLOR_PIE,
+    COLOR_QR_BORDE,
+    COLOR_QR_FONDO,
+    COLOR_QR_URL,
+    COLOR_VENDIDO,
+    COLOR_VERDE,
+    dibujar_pie,
+    dibujar_seccion_hdr,
+)
+
+# Alias locales (compatibilidad con código existente de este módulo).
+_COLOR_MARCA = COLOR_MARCA
+_COLOR_MARCA_CLARA = COLOR_MARCA_CLARA
 
 QR_CACHE_DIR = os.path.join("data", "qr_cache")
 
@@ -278,12 +303,12 @@ def generar_fichas_lote(
         edad = _edad_str(animal, hoy)
         estado = _estado_repro_retiro(db, int(animal["id_animal"]), hoy_iso)
 
-        # Marco + franja marca.
+        # Marco + franja marca (roundRect como la ficha individual).
         c.setStrokeColor(_COLOR_MARCA)
         c.setLineWidth(1.2)
-        c.rect(x0, y0, cw, ch, stroke=1, fill=0)
+        c.roundRect(x0, y0, cw, ch, 6, stroke=1, fill=0)
         c.setFillColor(_COLOR_MARCA)
-        c.rect(x0, y0 + ch - 20, cw, 20, stroke=0, fill=1)
+        c.rect(x0 + 1, y0 + ch - 20, cw - 2, 20, stroke=0, fill=1)
         c.setFillColor("white")
         c.setFont("Helvetica-Bold", 9)
         c.drawString(x0 + 6, y0 + ch - 14, "GANADERÍA JA")
@@ -295,18 +320,28 @@ def generar_fichas_lote(
         c.setFont("Helvetica-Bold", 20)
         c.drawString(x0 + 8, y0 + ch - 44, tag[:18])
 
-        # QR (cache) o placeholder si falta librería qrcode.
+        # QR (cache) o placeholder — mismo tratamiento ficha individual:
+        # fondo blanco + borde sutil #DDDDDD.
+        from reportlab.lib import colors as _colors_lote
         qx, qy, qs = x0 + 8, y0 + 10, 92
+        c.setFillColor(_colors_lote.HexColor("#FFFFFF"))
+        c.setStrokeColor(_colors_lote.HexColor(COLOR_QR_BORDE))
+        c.setLineWidth(0.8)
+        c.rect(qx - 3, qy - 3, qs + 6, qs + 6, fill=1, stroke=1)
         qr_png = _qr_png_path(tag, cache_dir)
         if qr_png and os.path.exists(qr_png):
             try:
                 c.drawImage(ImageReader(qr_png), qx, qy, width=qs, height=qs)
             except Exception:
-                c.rect(qx, qy, qs, qs)
+                c.setFillColor(_colors_lote.HexColor(COLOR_QR_FONDO))
+                c.rect(qx, qy, qs, qs, fill=1, stroke=0)
+                c.setFillColor("black")
                 c.setFont("Helvetica", 6)
                 c.drawString(qx + 4, qy + qs / 2, payload[:28])
         else:
-            c.rect(qx, qy, qs, qs)
+            c.setFillColor(_colors_lote.HexColor(COLOR_QR_FONDO))
+            c.rect(qx, qy, qs, qs, fill=1, stroke=0)
+            c.setFillColor("black")
             c.setFont("Helvetica", 6)
             c.drawString(qx + 4, qy + qs / 2, payload[:28])
 
@@ -324,19 +359,33 @@ def generar_fichas_lote(
         c.drawString(tx, y0 + 24, payload[:44])
         c.drawString(tx, y0 + 13, full_url[:44])
 
-        # Foto mini si existe en media/.
+        # Foto mini si existe en media/ (contenedor roundRect como la ficha).
         try:
             foto = buscar_foto_animal(db, tag, media_dir=media_dir) if buscar_foto_animal else None
             if foto and os.path.exists(foto):
                 fw, fh = 64, 48
-                c.drawImage(ImageReader(foto), x0 + cw - fw - 6, y0 + ch - 44 - fh,
+                fx, fy = x0 + cw - fw - 6, y0 + ch - 44 - fh
+                c.saveState()
+                _clip = c.beginPath()
+                _clip.roundRect(fx, fy, fw, fh, 4)
+                c.clipPath(_clip, stroke=0, fill=0)
+                c.drawImage(ImageReader(foto), fx, fy,
                             width=fw, height=fh, preserveAspectRatio=True)
+                c.restoreState()
+                c.setStrokeColor(_colors_lote.HexColor(COLOR_FOTO_BORDE))
+                c.setLineWidth(0.6)
+                c.roundRect(fx, fy, fw, fh, 4, stroke=1, fill=0)
         except Exception:
             pass
 
-    # Pie con conteo en la última página.
+    # Pie con línea + texto (mismo formato que la ficha individual).
+    from reportlab.lib import colors as _colors_pie
+    c.setStrokeColor(_colors_pie.HexColor(COLOR_LINEA))
+    c.setLineWidth(0.5)
+    c.line(margen, margen - 6, W - margen, margen - 6)
+    c.setFillColor(_colors_pie.HexColor(COLOR_PIE))
     c.setFont("Helvetica-Oblique", 8)
-    c.drawCentredString(W / 2, margen - 14, f"Fichas QR · {filtro} · {len(animales)} animales ACTIVOS · {hoy_iso}")
+    c.drawCentredString(W / 2, margen - 18, f"Fichas QR · {filtro} · {len(animales)} animales ACTIVOS · {hoy_iso}")
     c.save()
     return ruta
 
@@ -536,16 +585,24 @@ def generar_ficha_qr_individual(
     col_der_x = col_izq_x + col_izq_w + 12
     col_der_w = x0 + cw - 10 - col_der_x
     y_pos = y_hdr - 6
+    y_min = y0 + 28  # no invadir el pie de página
 
-    def _dibujar_seccion_hdr(titulo, bg_color=_COLOR_MARCA_CLARA, txt_color=_COLOR_MARCA):
+    def _trunc(txt: str, n: int) -> str:
+        """Trunca con elegancia (elipsis) para no salirse del rectángulo."""
+        t = str(txt or "").strip()
+        return t if len(t) <= n else t[: max(0, n - 1)].rstrip() + "…"
+
+    def _hay_espacio(necesario: float = 16) -> bool:
+        return (y_pos - necesario) >= y_min
+
+    def _dibujar_seccion_hdr(titulo, bg_color=COLOR_MARCA_CLARA, txt_color=COLOR_MARCA):
         nonlocal y_pos
-        y_pos -= 16
-        c.setFillColor(colors.HexColor(bg_color))
-        c.rect(col_der_x, y_pos, col_der_w, 16, fill=1, stroke=0)
-        c.setFillColor(colors.HexColor(txt_color))
-        c.setFont("Helvetica-Bold", 8.5)
-        c.drawString(col_der_x + 8, y_pos + 4, titulo)
-        y_pos -= 4
+        # Espaciado vertical: evita amontonar secciones cuando hay muchos datos.
+        if not _hay_espacio(22):
+            return
+        dibujar_seccion_hdr(c, col_der_x, y_pos - 16, col_der_w, titulo,
+                            bg_color=bg_color, txt_color=txt_color)
+        y_pos -= 20
 
     # --- SECCIÓN 1: IDENTIFICACIÓN Y CATEGORÍA SG ---
     _dibujar_seccion_hdr("1. IDENTIFICACIÓN Y CATEGORIZACIÓN ZOOTÉCNICA")
@@ -556,15 +613,22 @@ def generar_ficha_qr_individual(
     c.drawString(col_der_x + 38, y_pos - 10, str(ficha.get("sexo") or "S/D"))
 
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(col_der_x + 130, y_pos - 10, "Raza:")
+    c.drawString(col_der_x + 105, y_pos - 10, "Raza:")
     c.setFont("Helvetica", 8)
-    c.drawString(col_der_x + 162, y_pos - 10, str(ficha.get("raza") or "S/D"))
+    c.drawString(col_der_x + 135, y_pos - 10, str(ficha.get("raza") or "S/D"))
 
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(col_der_x + 280, y_pos - 10, "Categoría SG:")
+    c.drawString(col_der_x + 205, y_pos - 10, "Hierro:")
     c.setFont("Helvetica-Bold", 8)
     c.setFillColor(colors.HexColor(_COLOR_MARCA))
-    c.drawString(col_der_x + 352, y_pos - 10, str(ficha.get("categoria_sg") or "S/D")[:30])
+    c.drawString(col_der_x + 240, y_pos - 10, str(ficha.get("hierro") or "S/D"))
+
+    c.setFillColor(colors.HexColor("#222222"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(col_der_x + 305, y_pos - 10, "Categoría:")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor(_COLOR_MARCA))
+    c.drawString(col_der_x + 358, y_pos - 10, str(ficha.get("categoria_sg") or "S/D")[:26])
 
     c.setFillColor(colors.HexColor("#222222"))
     c.setFont("Helvetica-Bold", 8)
@@ -616,13 +680,13 @@ def generar_ficha_qr_individual(
     c.drawString(col_der_x + 8, y_pos - 10, "Madre:")
     c.setFont("Helvetica", 8)
     m_txt = f"{madre.get('tag') or ''} {('· ' + madre.get('nombre')) if madre.get('nombre') else ''} {('(' + madre.get('raza') + ')') if madre.get('raza') else ''}".strip() or "Sin madre registrada"
-    c.drawString(col_der_x + 46, y_pos - 10, m_txt[:48])
+    c.drawString(col_der_x + 46, y_pos - 10, _trunc(m_txt, 48))
 
     c.setFont("Helvetica-Bold", 8)
     c.drawString(col_der_x + 280, y_pos - 10, "Padre:")
     c.setFont("Helvetica", 8)
     p_txt = f"{padre.get('tag') or ''} {('· ' + padre.get('nombre')) if padre.get('nombre') else ''} {('(' + padre.get('raza') + ')') if padre.get('raza') else ''}".strip() or "Sin padre registrado"
-    c.drawString(col_der_x + 318, y_pos - 10, p_txt[:44])
+    c.drawString(col_der_x + 318, y_pos - 10, _trunc(p_txt, 44))
 
     y_pos -= 18
 
@@ -728,14 +792,18 @@ def generar_ficha_qr_individual(
 
     ret_act = ficha.get("retiros_activos") or []
     if ret_act:
-        for r_item in ret_act[:2]:
+        # Múltiples retiros: ordenados por fecha y sin solaparse.
+        ordenados = sorted(ret_act, key=lambda r: str(r.get("fecha_fin_retiro_carne") or r.get("fecha_fin_retiro_leche") or ""))
+        for r_item in ordenados[:3]:
+            if not _hay_espacio(12):
+                break
             c.setFillColor(colors.HexColor("#B71C1C"))
             c.setFont("Helvetica-Bold", 7.5)
-            prod = r_item.get("producto") or "Tratamiento"
+            prod = _trunc(r_item.get("producto") or "Tratamiento", 26)
             leche_fin = f"Retiro Leche: {r_item.get('fecha_fin_retiro_leche')}" if r_item.get("fecha_fin_retiro_leche") else "Sin retiro leche"
             carne_fin = f"Retiro Carne: {r_item.get('fecha_fin_retiro_carne')}" if r_item.get("fecha_fin_retiro_carne") else "Sin retiro carne"
-            c.drawString(col_der_x + 8, y_pos - 10, f"• {prod}: {leche_fin} | {carne_fin}")
-            y_pos -= 11
+            c.drawString(col_der_x + 8, y_pos - 10, _trunc(f"• {prod}: {leche_fin} | {carne_fin}", 88))
+            y_pos -= 12
     else:
         c.setFillColor(colors.HexColor("#2E7D32"))
         c.setFont("Helvetica", 8)

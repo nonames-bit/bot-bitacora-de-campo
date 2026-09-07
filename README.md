@@ -485,6 +485,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Historial Consolidado de Bajas y Movimientos**: Tabla estructurada que consolida todas las bajas (ventas, muertes, compras, traslados) con fecha, tipo, destino/causa, precio y observaciones.
     - **Ficha Técnica PDF (`/api/ficha/<tag>/qr.pdf`)**: El estado del hato en la ficha imprimible A4 refleja dinámicamente el estado real y fecha de baja (`VENDIDO (2026-09-05)`, `MUERTO (2016-05-07)`) en vez de asumir estáticamente "ACTIVO".
     - **Caché y Service Worker `v55`**: Incremento de versión para refresco instantáneo en celulares y navegadores.
+  - **Rediseño Estético Unificado del Sistema PDF (2026-09-07)**:
+    - **Nuevo módulo `src/reports/estilo_ja.py`**: fuente única de identidad visual JA (constantes de color institucional, estilos de párrafo, `TableStyle` base/alertas/potreros/header-verde, helpers de canvas `dibujar_encabezado`/`dibujar_pie`/`dibujar_seccion_hdr`, y flowables platypus `EncabezadoFlowable`/`SeccionFlowable`/`PieFlowable`), eliminando la duplicación de `_COLOR_MARCA` que había en `pdf_report.py` y `qr_fichas.py`.
+    - **Reporte general de la finca (`/reporte`, `/api/reporte.pdf`) alineado con la ficha**: encabezado con franja verde sólida `#2F5233` + logo, secciones con banda `#E7EFE8`, tablas con header verde y texto blanco + zebra, alertas destacadas con fondo/acento de retiro (rojo suave) y pie de página con línea separadora corporativa. Se conservan las firmas públicas (`generar_pdf`, `recolectar_datos`).
+    - **Tarjetas QR en lote (6/hoja) refinadas**: marcos `roundRect` con radio, QR con contenedor blanco/borde sutil y truncado elegante de textos, mismos constantes que la ficha individual.
+    - **Ficha individual pulida**: espaciado vertical de secciones, truncado de genealogía y listas de retiros ordenadas, todo con las constantes compartidas de `estilo_ja`.
 - [x] Suite de pruebas con pytest: **609 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

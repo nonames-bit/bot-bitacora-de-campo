@@ -2,6 +2,10 @@
 
 Contiene la lógica pura de recolección de datos (``recolectar_datos``) y la
 construcción del documento PDF (``generar_pdf``) mediante reportlab.
+
+Línea visual unificada con la ficha individual (ver ``estilo_ja.py``):
+franja verde sólida, bandas de sección, tablas header verde / zebra y
+pie con línea.
 """
 from __future__ import annotations
 
@@ -9,14 +13,32 @@ import os
 from datetime import date, timedelta
 from typing import Any, Optional
 
-# Paleta institucional GANADERÍA JA (verde pasto oscuro + acentos armónicos).
-_COLOR_MARCA = "#2F5233"
-_COLOR_MARCA_CLARA = "#E7EFE8"
-_COLOR_MARCA_ZEBRA = "#F3F7F3"
-_COLOR_TIERRA = "#8D6E63"
-_COLOR_GRIS = "#78909C"
-_COLOR_VERDE = "#2e7d32"
-_COLOR_ROJO = "#c62828"
+from .estilo_ja import (
+    COLOR_ALERTA_BG,
+    COLOR_ALERTA_TXT,
+    COLOR_LINEA,
+    COLOR_MARCA,
+    COLOR_MARCA_CLARA,
+    COLOR_MARCA_HEADER,
+    COLOR_MARCA_ZEBRA,
+    COLOR_NEGRO,
+    COLOR_PIE,
+    COLOR_TOTALES_BG,
+    buscar_logo_path,
+    estilo_normal,
+    estilo_pie,
+    estilo_subseccion_grafico,
+    estilo_subtitulo,
+    estilo_titulo,
+    banda_seccion,
+    SeccionFlowable,
+    tabla_encabezado_franja,
+    tabla_pie,
+    tabla_style_alertas,
+    tabla_style_base,
+    tabla_style_header_verde,
+    tabla_style_potreros,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -230,7 +252,7 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
 
 
 # --------------------------------------------------------------------------- #
-# Generación del PDF (reportlab)
+# Generación del PDF (reportlab, línea visual ficha JA)
 # --------------------------------------------------------------------------- #
 def generar_pdf(
     db,
@@ -272,7 +294,6 @@ def generar_pdf(
 
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
     from reportlab.platypus import (
@@ -306,92 +327,97 @@ def generar_pdf(
     if dir_padre:
         os.makedirs(dir_padre, exist_ok=True)
 
+    ANCHO_UTIL = 170 * mm
+
+    def _encabezado_con_datos(c, doc) -> None:
+        """Franja verde sólida en cada página (logo + textos blancos)."""
+        c.saveState()
+        logo_path = buscar_logo_path()
+        y_top = A4[1] - 12 * mm
+        h_hdr = 16 * mm
+        x0 = 20 * mm
+        cw = A4[0] - 40 * mm
+        c.setFillColor(colors.HexColor(COLOR_MARCA))
+        c.roundRect(x0, y_top - h_hdr, cw, h_hdr, 3, fill=1, stroke=0)
+        x_txt = x0 + 26 * mm if (logo_path and os.path.exists(logo_path)) else x0 + 5 * mm
+        if logo_path and os.path.exists(logo_path):
+            try:
+                c.drawImage(ImageReader(logo_path), x0 + 3 * mm, y_top - h_hdr + 2.5 * mm,
+                            width=11 * mm, height=11 * mm,
+                            preserveAspectRatio=True, mask="auto")
+            except Exception:
+                x_txt = x0 + 5 * mm
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 13)
+        c.drawString(x_txt, y_top - 7.5 * mm, "GANADERÍA JA")
+        c.setFont("Helvetica", 7.5)
+        c.setFillColor(colors.HexColor(COLOR_MARCA_HEADER))
+        c.drawString(x_txt, y_top - 12 * mm,
+                     f"BITÁCORA DE CAMPO  |  {datos['periodo']['desde']} al "
+                     f"{datos['periodo']['hasta']}  ·  Emisión: {fecha_hoy.isoformat()}")
+        # Paginación + pie con línea en cada página.
+        c.setStrokeColor(colors.HexColor(COLOR_LINEA))
+        c.setLineWidth(0.5)
+        c.line(x0, 12 * mm, x0 + cw, 12 * mm)
+        c.setFillColor(colors.HexColor(COLOR_PIE))
+        c.setFont("Helvetica-Oblique", 7.5)
+        c.drawString(x0, 8 * mm, "Ganadería JA · Bitácora de Campo Zootécnico · HATO ACTIVO")
+        c.drawRightString(x0 + cw, 8 * mm, f"Página {doc.page}")
+        c.restoreState()
+
     doc = SimpleDocTemplate(
         ruta_salida,
         pagesize=A4,
         rightMargin=20 * mm,
         leftMargin=20 * mm,
-        topMargin=18 * mm,
-        bottomMargin=18 * mm,
-        title="Reporte de campo",
+        topMargin=22 * mm,
+        bottomMargin=16 * mm,
+        title="Reporte de campo — Ganadería JA",
     )
 
-    base = getSampleStyleSheet()
-    estilo_titulo = ParagraphStyle(
-        "TituloReporte", parent=base["Title"], fontName="Helvetica-Bold",
-        fontSize=15, textColor=colors.HexColor(_COLOR_MARCA), spaceAfter=2,
-    )
-    estilo_subtitulo = ParagraphStyle(
-        "SubtituloReporte", parent=base["Normal"], fontName="Helvetica",
-        fontSize=9, textColor=colors.HexColor("#555555"), spaceAfter=6,
-    )
-    estilo_seccion = ParagraphStyle(
-        "SeccionReporte", parent=base["Heading2"], fontName="Helvetica-Bold",
-        fontSize=12, textColor=colors.HexColor(_COLOR_MARCA),
-        spaceBefore=10, spaceAfter=4,
-    )
-    estilo_subseccion_grafico = ParagraphStyle(
-        "SubseccionGrafico", parent=base["Normal"], fontName="Helvetica-Bold",
-        fontSize=8.5, textColor=colors.HexColor(_COLOR_MARCA), spaceAfter=2,
-    )
-    estilo_normal = ParagraphStyle(
-        "NormalReporte", parent=base["Normal"], fontName="Helvetica",
-        fontSize=9, textColor=colors.HexColor("#333333"),
-    )
-    estilo_pie = ParagraphStyle(
-        "PieReporte", parent=base["Normal"], fontName="Helvetica-Oblique",
-        fontSize=8, textColor=colors.HexColor("#888888"), spaceBefore=14,
-    )
+    est_titulo = estilo_titulo()
+    est_subtitulo = estilo_subtitulo()
+    est_seccion_graf = estilo_subseccion_grafico()
+    est_normal = estilo_normal()
+    est_pie = estilo_pie()
 
-    # Buscar logo si existe
-    logo_path = None
-    candidatos_logo = [
-        "docs/GanaderiaJA_Logo.jpg",
-        "media/GanaderiaJA_Logo.jpg",
-        os.path.join(os.path.dirname(__file__), "../../docs/GanaderiaJA_Logo.jpg"),
+    logo_path = buscar_logo_path()
+
+    # Encabezado: franja verde sólida (tabla simula la franja de la ficha).
+    story = [
+        tabla_encabezado_franja(
+            "GANADERÍA JA · Reporte de Campo Zootécnico",
+            f"BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}",
+            f"HATO ACTIVO  |  Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}",
+            ancho_total=ANCHO_UTIL,
+            logo_path=logo_path,
+        ),
+        Spacer(1, 6),
     ]
-    for cand in candidatos_logo:
-        if os.path.exists(cand):
-            logo_path = cand
-            break
 
-    # Encabezado con logo
-    if logo_path:
-        img = Image(logo_path, width=20 * mm, height=20 * mm)
-        texto_enc = [
-            Paragraph("GANADERÍA JA", estilo_titulo),
-            Paragraph(f"Bitácora de Campo Zootécnico · Sistema Ganadería JA · Generado: {fecha_hoy.isoformat()}", estilo_subtitulo),
-            Paragraph(f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}", estilo_normal),
-        ]
-        enc_table = Table([[img, texto_enc]], colWidths=[24 * mm, 146 * mm])
-        enc_table.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING", (0, 0), (-1, -1), 0),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-            ("TOPPADDING", (0, 0), (-1, -1), 0),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ]))
-        story = [enc_table]
-    else:
-        story = [Paragraph("Reporte de campo — Ganadería JA", estilo_titulo)]
-        story.append(Paragraph(
-            f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']} · Generado: {fecha_hoy.isoformat()}",
-            estilo_subtitulo,
-        ))
+    def _tabla_evento(filas_datos, anchos):
+        """Tabla de evento con header verde sólido + zebra (línea ficha)."""
+        tabla = Table(filas_datos, colWidths=anchos, repeatRows=1)
+        tabla.setStyle(tabla_style_base())
+        tabla.setStyle(tabla_style_header_verde())
+        return tabla
 
     # Inventario.
     inv = datos["inventario"]
-    story.append(Paragraph("Inventario de animales", estilo_seccion))
+    story.append(SeccionFlowable("INVENTARIO DE ANIMALES (HATO ACTIVO)", width=ANCHO_UTIL))
+    story.append(Spacer(1, 2))
     story.append(Paragraph(
-        f"Activos: {inv['activos']} (Hembras: {inv['hembras']} · Machos: {inv['machos']}) · "
+        f"Activos: <b>{inv['activos']}</b> (Hembras: {inv['hembras']} · Machos: {inv['machos']}) · "
         f"Histórico total: {inv['historico_total']}",
-        estilo_normal,
+        est_normal,
     ))
+    story.append(Spacer(1, 2))
 
     # Existencias por potrero
     potreros_sg = datos.get("potreros_sg", [])
     if potreros_sg:
-        story.append(Paragraph("Existencias por Potrero", estilo_seccion))
+        story.append(SeccionFlowable("EXISTENCIAS POR POTRERO", width=ANCHO_UTIL))
+        story.append(Spacer(1, 2))
         tabla_pot_datos = [["Potrero", "CH", "HL", "NV", "VP", "VS", "CM", "ML", "MC", "Rep", "Total"]]
         for p in potreros_sg:
             def v(n: int) -> str: return str(n) if n > 0 else "-"
@@ -421,26 +447,18 @@ def generar_pdf(
 
         tabla_p = Table(
             tabla_pot_datos,
-            colWidths=[40 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm]
+            colWidths=[40 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm],
+            repeatRows=1,
         )
+        tabla_p.setStyle(tabla_style_potreros())
+        tabla_p.setStyle(tabla_style_header_verde())
         tabla_p.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
             ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#D7E5D9")),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -2), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
-            ("LEFTPADDING", (0, 0), (-1, -1), 2),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor(COLOR_TOTALES_BG)),
+            ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor(COLOR_MARCA)),
         ]))
         story.append(tabla_p)
+        story.append(Spacer(1, 2))
 
     # Gráficos (opcionales: si matplotlib no está disponible en el servidor,
     # el reporte se genera igual, solo sin esta sección).
@@ -465,9 +483,10 @@ def generar_pdf(
                 pass
 
         if graficos_embebidos:
-            story.append(Paragraph("Gráficos de gestión", estilo_seccion))
+            story.append(SeccionFlowable("GRÁFICOS DE GESTIÓN", width=ANCHO_UTIL))
+            story.append(Spacer(1, 2))
             if len(graficos_embebidos) == 1:
-                story.append(Paragraph(graficos_embebidos[0][0], estilo_subseccion_grafico))
+                story.append(banda_seccion(graficos_embebidos[0][0], ancho=ANCHO_UTIL))
                 story.append(_imagen_ajustada(graficos_embebidos[0][1], 165))
                 story.append(Spacer(1, 4))
             else:
@@ -475,12 +494,12 @@ def generar_pdf(
                 for i in range(0, len(graficos_embebidos), 2):
                     par = graficos_embebidos[i : i + 2]
                     celda_izq = [
-                        Paragraph(par[0][0], estilo_subseccion_grafico),
+                        Paragraph(par[0][0], est_seccion_graf),
                         _imagen_ajustada(par[0][1], 80),
                     ]
                     if len(par) > 1:
                         celda_der = [
-                            Paragraph(par[1][0], estilo_subseccion_grafico),
+                            Paragraph(par[1][0], est_seccion_graf),
                             _imagen_ajustada(par[1][1], 80),
                         ]
                     else:
@@ -499,66 +518,41 @@ def generar_pdf(
                 story.append(tabla_g)
                 story.append(Spacer(1, 4))
 
-    # Tablas por evento.
+    # Tablas por evento (cada una con su banda de sección).
     for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
         filas = datos["eventos"].get(clave)
         if not filas:
             continue
-        story.append(Paragraph(_ETIQUETAS_EVENTOS[clave], estilo_seccion))
+        story.append(SeccionFlowable(_ETIQUETAS_EVENTOS[clave].upper(), width=ANCHO_UTIL))
+        story.append(Spacer(1, 2))
         tabla_datos = [["Fecha", "Animal", "Detalle"]]
         for f in filas:
             tabla_datos.append([f["fecha"], f["tag"], f["resumen"]])
-        tabla = Table(tabla_datos, colWidths=[30 * mm, 24 * mm, 116 * mm])
-        tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
-        story.append(tabla)
+        story.append(_tabla_evento(tabla_datos, [30 * mm, 24 * mm, 116 * mm]))
+        story.append(Spacer(1, 2))
 
-    # Alertas próximas 7 días.
-    story.append(Paragraph("Alertas próximas 7 días", estilo_seccion))
+    # Alertas próximas 7 días (tratamiento ficha: header de alerta).
+    story.append(SeccionFlowable("ALERTAS PRÓXIMAS 7 DÍAS", alerta=True, width=ANCHO_UTIL))
+    story.append(Spacer(1, 2))
     alertas = datos["alertas"]
     if alertas:
         tabla_datos = [["Fecha", "Animal", "Tipo"]]
         for a in alertas:
             tabla_datos.append([a["fecha"], a["tag"], a["tipo"]])
-        tabla = Table(tabla_datos, colWidths=[30 * mm, 24 * mm, 116 * mm])
-        tabla.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA_CLARA)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor(_COLOR_MARCA)),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(_COLOR_MARCA_ZEBRA)]),
-            ("LEFTPADDING", (0, 0), (-1, -1), 4),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 3),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ]))
+        tabla = Table(tabla_datos, colWidths=[30 * mm, 24 * mm, 116 * mm], repeatRows=1)
+        tabla.setStyle(tabla_style_alertas())
         story.append(tabla)
     else:
-        story.append(Paragraph("Sin alertas programadas.", estilo_normal))
+        story.append(Paragraph("Sin alertas programadas.", est_normal))
 
-    # Pie.
+    # Pie con línea + texto (mismo formato ficha).
     story.append(Spacer(1, 8))
-    story.append(Paragraph(
+    story.append(tabla_pie(
         "Generado por el bot de bitácora — para registro manual en Software Ganadero",
-        estilo_pie,
+        ancho=ANCHO_UTIL,
     ))
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_encabezado_con_datos, onLaterPages=_encabezado_con_datos)
     if tmp_charts_dir:
         shutil.rmtree(tmp_charts_dir, ignore_errors=True)
     return ruta_salida
