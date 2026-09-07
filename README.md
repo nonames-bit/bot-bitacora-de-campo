@@ -447,7 +447,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Desglose Diario Interactivo en Captura Rápida**: Al subir una foto de recibo, aparece el botón `[ Leer Recibo con IA ]`, mostrando el progreso en vivo y una tabla interactiva donde el usuario puede verificar, editar o agregar días con suma recalculada en tiempo real antes de guardar todo en un solo clic.
     - **Atajo en Vista de Leche**: Botón `[ Digitalizar Recibo con IA ]` en la cabecera de Producción de Leche para iniciar de inmediato la captura y digitalización.
     - **Caché y Service Worker `v45`**: Actualización de versión para distribución instantánea en celulares y computadores.
-- [x] Suite de pruebas con pytest: **585 pruebas en verde** (100% pasando).
+  - **Visualización de Ventas y Vínculos Madre ⇄ Cría en Tablero (2026-09-07)**:
+    - **Idempotencia y Backfill en Importador DBF (`src/importers/dbf_importer.py`)**: Eliminada la condición excluyente `estado_previo != "VENDIDO"`, verificando directamente contra `movimientos` para permitir que reimportaciones de backups históricos o archivos zip completen las ventas fechadas (`FECMUERTE`) en `movimientos` sin crear duplicados.
+    - **Alimentador Cronológico de Eventos (`src/engine/dashboard_data.py`)**: Enriquecimiento de `query_eventos` en tablero para vincular bidireccionalmente ventas de vacas y sus crías vendidas en la misma fecha (ej. `V089` ⇄ `V089-6`, `A090` ⇄ `A090-6`, `A096` ⇄ `A096-6`), etiquetando `detalle_label` (`Madre`/`Cría`), generando descripciones zootécnicas claras (`Venta con cría`, `Venta (cría de ...)`) y ampliando el límite a 35 eventos recientes.
+    - **Interfaz PWA con Iconografía Reactiva (`src/pwa/static/app.js` & `sw.js v47`)**: Renderizado dinámico de icono ternero (`CALF_HEAD`) o vaca (`COW_HEAD`) según el rol del animal en el evento, chip con acceso directo a la contraparte (Madre o Cría) y apertura suave de la ficha técnica zootécnica al tocar cualquier arete.
+- [x] Suite de pruebas con pytest: **586 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

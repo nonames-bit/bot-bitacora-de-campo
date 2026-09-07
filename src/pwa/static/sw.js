@@ -40,7 +40,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v44: Foto de recibo/planilla quincenal de leche en captura rápida, galería de recibos en vista Leche con zoom táctil.
 // v45: Digitalización inteligente de recibos/planillas de leche con IA Multimodal (Gemini Vision) y desglose interactivo.
 // v46: Módulo de Finanzas (fase 1) -- libro de ingresos/egresos, resumen de utilidad por año y captura de gastos con foto de factura.
-var CACHE = "pwa-ja-v46"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v47: Eventos de ventas en tablero con vinculación bidireccional Madre ⇄ Cría, iconos dinámicos y navegación a fichas.
+var CACHE = "pwa-ja-v47"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

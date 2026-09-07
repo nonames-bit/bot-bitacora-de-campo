@@ -193,6 +193,32 @@ def test_import_venta_con_fecmuerte_usa_fecha_real_de_sg(db):
     assert "aproximada" not in (mov["notas"] or "").lower()
 
 
+def test_import_venta_backfills_movimiento_si_animal_ya_era_vendido_en_db(db):
+    """Si el animal ya existía en la DB con estado='VENDIDO' (por ejemplo de
+    un respaldo viejo o importación previa sin módulo de movimientos), la
+    reimportación debe completar el registro en la tabla movimientos."""
+    base = {"NOMANI": "", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "CODPOT": "", "ESTADO": "", "OBS": "", "MADRE": "", "PADRE": "",
+            "CAU": "", "MOTIVO": ""}
+    # Simular estado previo: animal ya registrado en la DB como VENDIDO pero sin fila en movimientos
+    db.registrar_animal(tag="A100", estado="VENDIDO")
+    assert db.query_one("SELECT COUNT(*) AS n FROM movimientos")["n"] == 0
+
+    conteos = import_animales(db, [
+        {**base, "CODANI": "A100", "TIPO": "V", "FECMUERTE": "20260905",
+         "VENDIDOA": "Comprador Y", "VALOR": 2000000.0},
+    ], {})
+    assert conteos["animales"]["ventas_registradas"] == 1
+
+    mov = db.query_one(
+        "SELECT m.* FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id WHERE a.tag = 'A100'"
+    )
+    assert mov is not None
+    assert mov["fecha"] == "2026-09-05"
+    assert mov["procedencia_destino"] == "Comprador Y"
+    assert mov["precio"] == 2000000.0
+
+
 def test_import_muerte_sin_fecmuerte_crea_muerte_aproximada(db):
     """Igual que con ventas: TIPO='M' sin FECMUERTE debe dejar un evento
     fechado (aproximado) en vez de solo cambiar animales.estado."""

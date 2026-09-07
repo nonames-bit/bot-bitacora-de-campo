@@ -131,6 +131,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
             SELECT * FROM (
                 SELECT 'PARTO' AS tipo, p.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        COALESCE(c.tag, '') AS detalle_tag,
+                       'Cría' AS detalle_label,
                        CASE WHEN p.sexo_cria IS NOT NULL THEN 'Cría ' || p.sexo_cria ELSE 'Parto registrado' END ||
                        CASE WHEN p.peso_nacimiento IS NOT NULL THEN ' (' || ROUND(p.peso_nacimiento, 1) || ' kg)' ELSE '' END AS descripcion,
                        COALESCE(p.notas, p.estado_cria, '') AS notas, p.id AS id
@@ -142,6 +143,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 SELECT 'MUERTE' AS tipo, m.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
+                       '' AS detalle_label,
                        COALESCE(m.causa_presunta, 'Muerte registrada') AS descripcion,
                        COALESCE(m.notas, '') AS notas, m.id AS id
                 FROM muertes m
@@ -150,17 +152,86 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
                 UNION ALL
 
                 SELECT COALESCE(mo.tipo_movimiento, 'VENTA') AS tipo, mo.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
-                       '' AS detalle_tag,
-                       COALESCE(mo.procedencia_destino, 'Movimiento registrado') ||
+                       CASE
+                           -- Si la cría se vendió en la misma fecha que su madre:
+                           WHEN a.madre_id IS NOT NULL AND m_parent.tag IS NOT NULL AND EXISTS (
+                               SELECT 1 FROM movimientos m_madre
+                               WHERE m_madre.animal_id = a.madre_id
+                                 AND m_madre.fecha = mo.fecha
+                                 AND UPPER(m_madre.tipo_movimiento) = 'VENTA'
+                           ) THEN m_parent.tag
+                           -- Si la vaca se vendió con cría en la misma fecha (o cría lactante reciente):
+                           ELSE COALESCE(
+                               (SELECT c.tag FROM animales c
+                                JOIN movimientos mc ON mc.animal_id = c.id_animal
+                                WHERE c.madre_id = a.id_animal
+                                  AND mc.fecha = mo.fecha
+                                  AND UPPER(mc.tipo_movimiento) = 'VENTA'
+                                LIMIT 1),
+                               (SELECT c.tag FROM partos p
+                                JOIN animales c ON c.id_animal = p.id_cria
+                                WHERE p.vaca_id = a.id_animal
+                                  AND (julianday(mo.fecha) - julianday(p.fecha)) BETWEEN 0 AND 365
+                                ORDER BY p.fecha DESC LIMIT 1),
+                               ''
+                           )
+                       END AS detalle_tag,
+                       CASE
+                           WHEN a.madre_id IS NOT NULL AND m_parent.tag IS NOT NULL AND EXISTS (
+                               SELECT 1 FROM movimientos m_madre
+                               WHERE m_madre.animal_id = a.madre_id
+                                 AND m_madre.fecha = mo.fecha
+                                 AND UPPER(m_madre.tipo_movimiento) = 'VENTA'
+                           ) THEN 'Madre'
+                           WHEN (
+                               EXISTS (
+                                   SELECT 1 FROM animales c
+                                   JOIN movimientos mc ON mc.animal_id = c.id_animal
+                                   WHERE c.madre_id = a.id_animal
+                                     AND mc.fecha = mo.fecha
+                                     AND UPPER(mc.tipo_movimiento) = 'VENTA'
+                               )
+                               OR EXISTS (
+                                   SELECT 1 FROM partos p
+                                   JOIN animales c ON c.id_animal = p.id_cria
+                                   WHERE p.vaca_id = a.id_animal
+                                     AND (julianday(mo.fecha) - julianday(p.fecha)) BETWEEN 0 AND 365
+                               )
+                           ) THEN 'Cría'
+                           ELSE ''
+                       END AS detalle_label,
+                       CASE
+                           WHEN UPPER(COALESCE(mo.tipo_movimiento, 'VENTA')) = 'VENTA' THEN
+                               CASE
+                                   WHEN a.madre_id IS NOT NULL AND m_parent.tag IS NOT NULL AND EXISTS (
+                                       SELECT 1 FROM movimientos m_madre
+                                       WHERE m_madre.animal_id = a.madre_id
+                                         AND m_madre.fecha = mo.fecha
+                                         AND UPPER(m_madre.tipo_movimiento) = 'VENTA'
+                                   ) THEN 'Venta (cría de ' || m_parent.tag || ')'
+                                   WHEN EXISTS (
+                                       SELECT 1 FROM animales c
+                                       JOIN movimientos mc ON mc.animal_id = c.id_animal
+                                       WHERE c.madre_id = a.id_animal
+                                         AND mc.fecha = mo.fecha
+                                         AND UPPER(mc.tipo_movimiento) = 'VENTA'
+                                   ) THEN 'Venta con cría'
+                                   WHEN mo.procedencia_destino IS NOT NULL AND TRIM(mo.procedencia_destino) != '' THEN 'Venta a ' || TRIM(mo.procedencia_destino)
+                                   ELSE 'Venta registrada'
+                               END
+                           ELSE COALESCE(mo.procedencia_destino, 'Movimiento registrado')
+                       END ||
                        CASE WHEN mo.precio IS NOT NULL AND mo.precio > 0 THEN ' · $' || ROUND(mo.precio, 0) ELSE '' END AS descripcion,
                        COALESCE(mo.notas, '') AS notas, mo.id AS id
                 FROM movimientos mo
                 JOIN animales a ON a.id_animal = mo.animal_id
+                LEFT JOIN animales m_parent ON m_parent.id_animal = a.madre_id
 
                 UNION ALL
 
                 SELECT 'TRASLADO' AS tipo, t.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
+                       '' AS detalle_label,
                        COALESCE(po.nombre, po.codigo, 'Origen') || ' ➔ ' || COALESCE(pd.nombre, pd.codigo, 'Destino') AS descripcion,
                        COALESCE(t.motivo, '') AS notas, t.id AS id
                 FROM traslados t
@@ -172,6 +243,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 SELECT 'PESAJE' AS tipo, pe.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
+                       '' AS detalle_label,
                        pe.peso_kg || ' kg' ||
                        CASE WHEN pe.gmd_calculada IS NOT NULL AND pe.gmd_calculada > 0
                             THEN ' (+' || ROUND(pe.gmd_calculada * 1000, 0) || ' g/d)'
@@ -184,6 +256,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 SELECT 'TRATAMIENTO' AS tipo, tr.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
+                       '' AS detalle_label,
                        tr.producto || CASE WHEN tr.dosis IS NOT NULL THEN ' ' || tr.dosis ELSE '' END AS descripcion,
                        COALESCE(tr.diagnostico, '') AS notas, tr.id AS id
                 FROM tratamientos tr
@@ -193,6 +266,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 SELECT 'SERVICIO' AS tipo, s.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
+                       '' AS detalle_label,
                        COALESCE(s.tipo_servicio, 'Servicio/IA') ||
                        CASE WHEN s.toro_pajilla IS NOT NULL THEN ' · ' || s.toro_pajilla ELSE '' END AS descripcion,
                        COALESCE(s.estado, '') AS notas, s.id AS id
@@ -201,7 +275,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
             )
             WHERE fecha IS NOT NULL AND TRIM(fecha) != ''
             ORDER BY fecha DESC, id DESC
-            LIMIT 25
+            LIMIT 35
         """
         eventos_recientes = _filas_dict(db.query(query_eventos))
     except Exception as e:
@@ -941,6 +1015,19 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     except Exception:
         logger.error("seccion traslados fallo", exc_info=True)
         base["traslados"] = []
+
+    # 9. Movimientos (ventas, compras, bajas)
+    try:
+        m_rows = db.query(
+            """SELECT fecha, tipo_movimiento, procedencia_destino, precio, notas
+               FROM movimientos
+               WHERE animal_id = ?
+               ORDER BY fecha DESC, id DESC LIMIT 4""", (aid,)
+        )
+        base["movimientos"] = _filas_dict(m_rows)
+    except Exception:
+        logger.error("seccion movimientos fallo", exc_info=True)
+        base["movimientos"] = []
 
     if errores:
         base["errores"] = errores

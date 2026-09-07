@@ -422,7 +422,9 @@ def import_animales(db: Database, records, causas: dict) -> dict:
         # visible en "Últimos Eventos" ni en reportes por periodo. Usa la
         # fecha real (FECMUERTE) cuando SG la trae; si no, aproxima con la
         # fecha de esta importación.
-        if estado_nuevo == "VENDIDO" and estado_previo != "VENDIDO":
+        # La idempotencia se valida contra la tabla movimientos (no con estado_previo),
+        # garantizando que respaldos previos o reimportaciones completen las ventas faltantes.
+        if estado_nuevo == "VENDIDO":
             existe_venta = db.query_one(
                 "SELECT 1 FROM movimientos WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA' LIMIT 1",
                 (aid,),
