@@ -333,6 +333,31 @@ CREATE TABLE IF NOT EXISTS usuarios_presencia (
 );
 
 CREATE INDEX IF NOT EXISTS idx_presencia_actividad ON usuarios_presencia(ultima_actividad);
+
+-- Libro único de ingresos y egresos (venta de leche, insumos, nómina, etc.).
+-- La venta/compra de animales NO se duplica aquí -- ya vive en `movimientos`
+-- (con su `precio`) y los reportes de utilidad la suman desde allá.
+CREATE TABLE IF NOT EXISTS finanzas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    categoria TEXT NOT NULL,
+    concepto TEXT,
+    monto REAL NOT NULL DEFAULT 0.0,
+    litros REAL,
+    animal_id INTEGER,
+    potrero_id INTEGER,
+    contraparte TEXT,
+    foto_ruta TEXT,
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_finanzas_fecha ON finanzas(fecha);
+CREATE INDEX IF NOT EXISTS idx_finanzas_tipo ON finanzas(tipo);
+CREATE INDEX IF NOT EXISTS idx_finanzas_categoria ON finanzas(categoria);
+CREATE INDEX IF NOT EXISTS idx_finanzas_potrero ON finanzas(potrero_id);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -343,6 +368,7 @@ TABLAS = [
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
+    "finanzas",
 ]
 
 
@@ -569,5 +595,21 @@ class MonitoreoSatelitalNDVI:
     id: Optional[int] = None
 
 
+@dataclass
+class Finanza:
+    fecha: str = ""
+    tipo: str = ""  # "INGRESO" | "EGRESO"
+    categoria: str = ""  # VENTA_LECHE, NOMINA, INSUMO, VETERINARIO, INFRAESTRUCTURA, COMBUSTIBLE, OTRO_INGRESO, OTRO_EGRESO
+    concepto: Optional[str] = None
+    monto: float = 0.0
+    litros: Optional[float] = None
+    animal_id: Optional[int] = None
+    potrero_id: Optional[int] = None
+    contraparte: Optional[str] = None
+    foto_ruta: Optional[str] = None
+    notas: Optional[str] = None
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
 
 

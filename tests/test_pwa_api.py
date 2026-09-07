@@ -58,7 +58,8 @@ def client(db_file):
 def test_endpoints_sin_sesion_devuelven_401(db_file):
     app = crear_app(db_file, password="clave-de-prueba")
     c = app.test_client()
-    for ep in ("/api/tablero", "/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche", "/api/ficha/47"):
+    for ep in ("/api/tablero", "/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche",
+               "/api/ficha/47", "/api/finanzas"):
         r = c.get(ep)
         assert r.status_code == 401, ep
 
@@ -917,3 +918,71 @@ def test_api_leche_analizar_recibo_y_guardar_quincena(client, db_file):
     fechas = [f["fecha"] for f in d_leche["serie_tanque"]]
     assert "2026-05-01" in fechas
     assert "2026-05-02" in fechas
+
+
+# ---------------------------------------------------------------------------
+# Finanzas: libro de ingresos/egresos + resumen de utilidad.
+# ---------------------------------------------------------------------------
+def test_api_finanzas_crear_valida_tipo_categoria_y_monto(client):
+    r = client.post("/api/finanzas", json={"tipo": "X", "categoria": "INSUMO", "monto": 1000})
+    assert r.status_code == 400
+
+    r = client.post("/api/finanzas", json={"tipo": "EGRESO", "categoria": "", "monto": 1000})
+    assert r.status_code == 400
+
+    r = client.post("/api/finanzas", json={"tipo": "EGRESO", "categoria": "INSUMO", "monto": 0})
+    assert r.status_code == 400
+
+    r = client.post("/api/finanzas", json={"tipo": "EGRESO", "categoria": "INSUMO", "monto": "no-numero"})
+    assert r.status_code == 400
+
+
+def test_api_finanzas_crear_y_listar(client):
+    r = client.post("/api/finanzas", json={
+        "fecha": "2026-09-06", "tipo": "egreso", "categoria": "insumo",
+        "concepto": "Sal mineralizada 40kg", "monto": 180000, "contraparte": "Agropecuaria X",
+    })
+    assert r.status_code == 200
+    assert r.get_json()["ok"] is True
+
+    r2 = client.post("/api/finanzas", json={
+        "fecha": "2026-09-05", "tipo": "ingreso", "categoria": "venta_leche",
+        "monto": 2000000, "litros": 1500,
+    })
+    assert r2.status_code == 200
+
+    r_get = client.get("/api/finanzas")
+    assert r_get.status_code == 200
+    d = r_get.get_json()
+    assert d["resumen"]["total_ingresos"] == 2000000
+    assert d["resumen"]["total_egresos"] == 180000
+    assert d["resumen"]["utilidad"] == 1820000
+    conceptos = [f["concepto"] for f in d["recientes"]]
+    assert "Sal mineralizada 40kg" in conceptos
+
+
+def test_api_finanzas_incluye_venta_compra_de_animales_de_movimientos(client, db_file):
+    d = Database(db_file)
+    try:
+        d.registrar_movimiento("47", fecha="2026-09-06", tipo_movimiento="VENTA", precio=1500000)
+    finally:
+        d.close()
+
+    r = client.get("/api/finanzas")
+    assert r.status_code == 200
+    resumen = r.get_json()["resumen"]
+    assert resumen["total_ingresos"] == 1500000
+    categorias = {(c["tipo"], c["categoria"]) for c in resumen["categorias"]}
+    assert ("INGRESO", "VENTA_ANIMAL") in categorias
+
+    ventas_compras = r.get_json()["ventas_compras"]
+    assert any(v["animal_tag"] == "47" and v["tipo_movimiento"] == "VENTA" for v in ventas_compras)
+
+
+def test_api_finanzas_filtra_por_desde_hasta(client):
+    client.post("/api/finanzas", json={"fecha": "2026-01-15", "tipo": "INGRESO", "categoria": "VENTA_LECHE", "monto": 100000})
+    client.post("/api/finanzas", json={"fecha": "2026-09-15", "tipo": "INGRESO", "categoria": "VENTA_LECHE", "monto": 200000})
+
+    r = client.get("/api/finanzas?desde=2026-09-01&hasta=2026-09-30")
+    assert r.status_code == 200
+    assert r.get_json()["resumen"]["total_ingresos"] == 200000

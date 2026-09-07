@@ -462,6 +462,70 @@ def datos_leche(db: Database) -> dict:
     return out
 
 
+CATEGORIAS_FINANZAS = {
+    "INGRESO": ["VENTA_LECHE", "OTRO_INGRESO"],
+    "EGRESO": ["NOMINA", "INSUMO", "VETERINARIO", "INFRAESTRUCTURA", "COMBUSTIBLE", "OTRO_EGRESO"],
+}
+
+
+def datos_finanzas(db: Database, desde: Optional[str] = None, hasta: Optional[str] = None) -> dict:
+    """Libro de Ingresos/Egresos + resumen de Utilidad. La venta/compra de
+    animales no vive en `finanzas` (ya está en `movimientos` con su precio);
+    `resumen_finanzas` la suma desde allá para no duplicar el dato."""
+    hoy = date.today()
+    desde = desde or date(hoy.year, 1, 1).isoformat()
+    hasta = hasta or date(hoy.year, 12, 31).isoformat()
+
+    errores: dict[str, str] = {}
+    resumen: dict[str, Any] = {"total_ingresos": 0.0, "total_egresos": 0.0, "utilidad": 0.0, "categorias": []}
+    try:
+        resumen = db.resumen_finanzas(desde, hasta)
+    except Exception as e:
+        logger.error("seccion resumen_finanzas fallo", exc_info=True)
+        errores["resumen"] = str(e)
+
+    try:
+        recientes = _filas_dict(db.query(
+            """SELECT f.id, f.fecha, f.tipo, f.categoria, f.concepto, f.monto, f.litros,
+                      f.contraparte, f.foto_ruta, f.notas, a.tag AS animal_tag, p.nombre AS potrero_nombre
+               FROM finanzas f
+               LEFT JOIN animales a ON a.id_animal = f.animal_id
+               LEFT JOIN potreros p ON p.id = f.potrero_id
+               WHERE f.fecha >= ? AND f.fecha <= ?
+               ORDER BY f.fecha DESC, f.id DESC LIMIT 60""",
+            (desde, hasta),
+        ))
+    except Exception as e:
+        logger.error("seccion finanzas_recientes fallo", exc_info=True)
+        errores["recientes"] = str(e)
+        recientes = []
+
+    try:
+        ventas_compras = _filas_dict(db.query(
+            """SELECT m.id, m.fecha, UPPER(m.tipo_movimiento) AS tipo_movimiento,
+                      m.precio, m.procedencia_destino, m.notas, a.tag AS animal_tag
+               FROM movimientos m JOIN animales a ON a.id_animal = m.animal_id
+               WHERE m.fecha >= ? AND m.fecha <= ? AND m.precio IS NOT NULL AND m.precio > 0
+               ORDER BY m.fecha DESC, m.id DESC LIMIT 60""",
+            (desde, hasta),
+        ))
+    except Exception as e:
+        logger.error("seccion finanzas_ventas_compras fallo", exc_info=True)
+        errores["ventas_compras"] = str(e)
+        ventas_compras = []
+
+    out: dict[str, Any] = {
+        "desde": desde, "hasta": hasta,
+        "resumen": resumen,
+        "recientes": recientes,
+        "ventas_compras": ventas_compras,
+        "categorias_disponibles": CATEGORIAS_FINANZAS,
+    }
+    if errores:
+        out["errores"] = errores
+    return out
+
+
 def datos_ficha_animal(db: Database, tag: str) -> dict:
     """Ficha animal: header + historial resumido + QR payload (abre /ficha/<tag>)."""
     errores: dict[str, str] = {}

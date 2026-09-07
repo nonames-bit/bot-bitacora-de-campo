@@ -520,3 +520,56 @@ def test_ultimo_import_sg_devuelve_el_mas_reciente(db):
     assert db.ultimo_import_sg()["archivo"] == "Datos20260830.Zip"
 
 
+# ---------------------------------------------------------------------------
+# Finanzas: libro de ingresos/egresos + resumen de utilidad.
+# ---------------------------------------------------------------------------
+def test_registrar_finanza_basico(db):
+    fid = db.registrar_finanza(
+        fecha="2026-09-07", tipo="egreso", categoria="insumo",
+        concepto="Sal mineralizada 40kg", monto=180000, contraparte="Agropecuaria X",
+    )
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["tipo"] == "EGRESO"
+    assert fila["categoria"] == "INSUMO"
+    assert fila["monto"] == 180000
+    assert fila["creado_en"] is not None
+
+
+def test_registrar_finanza_vincula_animal_y_potrero_opcionales(db):
+    db.registrar_animal("N069", sexo="Hembra", estado="ACTIVO")
+    db.registrar_potrero(nombre="Olegario")
+    fid = db.registrar_finanza(
+        fecha="2026-09-07", tipo="egreso", categoria="veterinario",
+        monto=50000, animal_tag="N069", potrero="Olegario",
+    )
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["animal_id"] == db.animal_id("N069")
+    assert fila["potrero_id"] == db.potrero_id("Olegario")
+
+
+def test_resumen_finanzas_calcula_utilidad_incluyendo_ventas_de_animales(db):
+    # Ingresos: venta de leche (finanzas) + venta de un animal (movimientos).
+    db.registrar_finanza(fecha="2026-09-05", tipo="INGRESO", categoria="VENTA_LECHE", monto=2000000, litros=1500)
+    db.registrar_movimiento("V089", fecha="2026-09-06", tipo_movimiento="VENTA", precio=1500000)
+    # Egresos: nómina + insumo + compra de un animal.
+    db.registrar_finanza(fecha="2026-09-05", tipo="EGRESO", categoria="NOMINA", monto=800000, contraparte="Andrés")
+    db.registrar_finanza(fecha="2026-09-06", tipo="EGRESO", categoria="INSUMO", monto=180000)
+    db.registrar_movimiento("V090", fecha="2026-09-06", tipo_movimiento="COMPRA", precio=1200000)
+
+    resumen = db.resumen_finanzas("2026-09-01", "2026-09-30")
+    assert resumen["total_ingresos"] == 3500000
+    assert resumen["total_egresos"] == 2180000
+    assert resumen["utilidad"] == 1320000
+    categorias = {(c["tipo"], c["categoria"]): c["total"] for c in resumen["categorias"]}
+    assert categorias[("INGRESO", "VENTA_LECHE")] == 2000000
+    assert categorias[("INGRESO", "VENTA_ANIMAL")] == 1500000
+    assert categorias[("EGRESO", "COMPRA_ANIMAL")] == 1200000
+
+
+def test_resumen_finanzas_ignora_fuera_de_rango(db):
+    db.registrar_finanza(fecha="2026-08-15", tipo="INGRESO", categoria="VENTA_LECHE", monto=100000)
+    db.registrar_finanza(fecha="2026-09-15", tipo="INGRESO", categoria="VENTA_LECHE", monto=200000)
+    resumen = db.resumen_finanzas("2026-09-01", "2026-09-30")
+    assert resumen["total_ingresos"] == 200000
+
+

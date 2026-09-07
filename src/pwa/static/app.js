@@ -44,6 +44,10 @@
       "' loading='lazy' data-onerror-hide='self'></div>";
   }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
+  function fmtMoneda(n) {
+    var v = Number(n) || 0;
+    return "$" + Math.round(v).toLocaleString("es-CO");
+  }
 
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
   // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
@@ -109,6 +113,9 @@
       // Cápsula/pastilla (tratamientos) — Lucide ISC
       pill: '<path d="m10.5 20.5 10-10a4.95 4.95 0 1 0-7-7l-10 10a4.95 4.95 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/>',
       cross: '<path d="M4 9a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4a1 1 0 0 1 1 1v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-4a1 1 0 0 1 1-1h4a2 2 0 0 0 2-2v-2a2 2 0 0 0-2-2h-4a1 1 0 0 1-1-1V4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4a1 1 0 0 1-1 1z"/>',
+      // Billete (finanzas: ingresos/egresos/utilidad) — Lucide ISC "banknote"
+      banknote: '<rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/>',
+      receipt: '<path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/>',
       // --- Iconos Fase 7 y operacionales estilo Lucide ---
       cloud: '<path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>',
       chat: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
@@ -381,6 +388,102 @@
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
       });
     }
+  }
+
+  /* ---------- Finanzas: Ingresos, Egresos y Utilidad ---------- */
+  var _finanzasAno = new Date().getFullYear();
+  var CATEGORIAS_FINANZAS_LABEL = {
+    VENTA_LECHE: "Venta de leche", VENTA_ANIMAL: "Venta de animales",
+    COMPRA_ANIMAL: "Compra de animales", NOMINA: "Nómina / Jornales",
+    INSUMO: "Insumos (sal, alambre, etc.)", VETERINARIO: "Veterinario / Medicamentos",
+    INFRAESTRUCTURA: "Infraestructura / Mantenimiento", COMBUSTIBLE: "Combustible",
+    OTRO_INGRESO: "Otro ingreso", OTRO_EGRESO: "Otro gasto"
+  };
+  function etiquetaCategoriaFinanza(cat) { return CATEGORIAS_FINANZAS_LABEL[cat] || cat; }
+
+  function renderFinanzas(d) {
+    var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
+    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
+    var h = "<h3>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad" + btnGasto + "</h3>" + erroresHtml(d);
+
+    var anoActual = new Date().getFullYear();
+    var opcionesAno = "";
+    for (var y = anoActual; y >= anoActual - 4; y--) {
+      opcionesAno += "<option value='" + y + "'" + (y === _finanzasAno ? " selected" : "") + ">" + y + "</option>";
+    }
+    h += "<div style='margin-bottom:12px;'><label style='font-size:13px; font-weight:600;'>Año: "
+      + "<select id='fin-ano' style='padding:6px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); margin-left:6px;'>" + opcionesAno + "</select></label></div>";
+
+    h += "<div class='kpis'>"
+      + kpi(fmtMoneda(r.total_ingresos), "Ingresos " + esc(d.desde || "") + " a " + esc(d.hasta || ""), "ok")
+      + kpi(fmtMoneda(r.total_egresos), "Egresos", "alerta")
+      + kpi(fmtMoneda(r.utilidad), "Utilidad", r.utilidad >= 0 ? "ok" : "alerta")
+      + "</div>";
+
+    h += "<h4>" + icon("chartBar") + "Desglose por categoría</h4>"
+      + tabla(r.categorias, [
+        ["tipo", "Tipo", "text", function (v) { return "<span class='chip " + (v === "INGRESO" ? "verde" : "rojo") + "'>" + esc(v) + "</span>"; }],
+        ["categoria", "Categoría", "text", function (v) { return esc(etiquetaCategoriaFinanza(v)); }],
+        ["total", "Monto", "text", function (v) { return "<b>" + fmtMoneda(v) + "</b>"; }],
+        ["n", "# Registros", "num"]
+      ], "Sin ingresos ni egresos registrados en este periodo.");
+
+    var movs = (d.recientes || []).map(function (f) {
+      return {
+        fecha: f.fecha, tipo: f.tipo, categoria: etiquetaCategoriaFinanza(f.categoria),
+        detalle: f.concepto || "", monto: f.monto,
+        contraparte: f.animal_tag ? ("🐮 " + f.animal_tag) : (f.contraparte || f.potrero_nombre || "")
+      };
+    }).concat((d.ventas_compras || []).map(function (m) {
+      return {
+        fecha: m.fecha, tipo: m.tipo_movimiento === "VENTA" ? "INGRESO" : "EGRESO",
+        categoria: m.tipo_movimiento === "VENTA" ? "Venta de animales" : "Compra de animales",
+        detalle: m.notas || "", monto: m.precio,
+        contraparte: "🐮 " + (m.animal_tag || "") + (m.procedencia_destino ? " · " + m.procedencia_destino : "")
+      };
+    })).sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); });
+
+    h += "<h4>" + icon("calendar") + "Movimientos recientes</h4>"
+      + tabla(movs, [
+        ["fecha", "Fecha", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["tipo", "Tipo", "text", function (v) { return "<span class='chip " + (v === "INGRESO" ? "verde" : "rojo") + "'>" + esc(v) + "</span>"; }],
+        ["categoria", "Categoría"],
+        ["contraparte", "Animal / Contraparte"],
+        ["detalle", "Detalle"],
+        ["monto", "Monto", "text", function (v) { return fmtMoneda(v); }]
+      ], "Sin movimientos recientes en este periodo.");
+
+    return h;
+  }
+
+  function bindFinanzas() {
+    var btnGasto = document.getElementById("btn-ir-captura-gasto");
+    if (btnGasto) {
+      btnGasto.addEventListener("click", function () {
+        _tipoCapturaActual = "gasto";
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+      });
+    }
+    var selAno = document.getElementById("fin-ano");
+    if (selAno) {
+      selAno.addEventListener("change", function () {
+        _finanzasAno = parseInt(selAno.value, 10) || new Date().getFullYear();
+        cargarFinanzasPeriodo();
+      });
+    }
+  }
+
+  function cargarFinanzasPeriodo() {
+    var desde = _finanzasAno + "-01-01";
+    var hasta = _finanzasAno + "-12-31";
+    skeleton(vista, "finanzas");
+    fetchJSON("/api/finanzas?desde=" + desde + "&hasta=" + hasta, function (d) {
+      if (!vista) return;
+      montarVista(vista, renderFinanzas(d), true);
+      bindFinanzas();
+    }, vista);
   }
 
   /* ---------- Vistas WS-5: Inventario / Población / Genética / Agenda ---------- */
@@ -830,7 +933,8 @@
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
-      { id: "muerte", nom: "Muerte / Descarte", ico: "cowSkull" }
+      { id: "muerte", nom: "Muerte / Descarte", ico: "cowSkull" },
+      { id: "gasto", nom: "Ingreso / Gasto", ico: "banknote" }
     ];
 
     var h = "<h3>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>";
@@ -906,6 +1010,28 @@
       h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Causa Presunta: <input id='cap-causa' placeholder='ej. Mordedura de serpiente, timpanismo, descarte vejez' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "gasto") {
+      h += "<label>Categoría: <select id='cap-fin-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+        + "<optgroup label='💰 Ingresos'>"
+        + "<option value='VENTA_LECHE'>Venta de leche</option>"
+        + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
+        + "</optgroup>"
+        + "<optgroup label='💸 Egresos'>"
+        + "<option value='INSUMO' selected>Insumos (sal, alambre, herramienta, etc.)</option>"
+        + "<option value='NOMINA'>Nómina / Jornales</option>"
+        + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
+        + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
+        + "<option value='COMBUSTIBLE'>Combustible</option>"
+        + "<option value='OTRO_EGRESO'>Otro gasto</option>"
+        + "</optgroup>"
+        + "</select></label>"
+        + "<label>Concepto: <input id='cap-fin-concepto' placeholder='ej. Sal mineralizada 40kg, Jornal Andrés' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Monto ($): <input type='number' step='1' min='0' id='cap-fin-monto' placeholder='ej. 180000' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div id='cap-fin-litros-wrap' style='display:none;'><label>Litros vendidos (solo venta de leche): <input type='number' step='0.5' id='cap-fin-litros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<label>Proveedor / Comprador / Trabajador (opcional): <input id='cap-fin-contraparte' placeholder='ej. Agropecuaria X, Andrés' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Arete / Animal relacionado (opcional): <input id='cap-tag' placeholder='ej. N069' list='dl-tags' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Potrero relacionado (opcional): <input id='cap-fin-potrero' placeholder='ej. Olegario' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Notas: <input id='cap-notas' placeholder='Detalles adicionales' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     }
 
     var hintFoto = "Foto de respaldo en campo";
@@ -937,6 +1063,10 @@
       titFoto = "Foto del Recibo / Planilla de Leche";
       hintFoto = "Foto del recibo de quincena o planilla donde anotan la leche diaria";
       txtBtnFoto = " Tomar o Subir Recibo / Hoja";
+    } else if (tipo === "gasto") {
+      titFoto = "Foto de la Factura / Recibo";
+      hintFoto = "Foto de la factura de compra, recibo de pago o comprobante";
+      txtBtnFoto = " Tomar o Subir Factura";
     }
 
     h += "<div class='cap-foto-box' style='margin-top:12px; padding:12px; border:1.5px dashed var(--borde-fuerte); border-radius:8px; background:var(--superficie);'>"
@@ -1391,9 +1521,19 @@
       }
     }
 
+    function bindCamposFinanza() {
+      var selCat = document.getElementById("cap-fin-categoria");
+      var wrapLitros = document.getElementById("cap-fin-litros-wrap");
+      if (!selCat || !wrapLitros) return;
+      function toggleLitros() { wrapLitros.style.display = selCat.value === "VENTA_LECHE" ? "block" : "none"; }
+      selCat.addEventListener("change", toggleLitros);
+      toggleLitros();
+    }
+
     if (cCampos) {
       cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
       bindFotoCaptura();
+      bindCamposFinanza();
     }
 
     qa("button[data-cap-tipo]").forEach(function (b) {
@@ -1405,6 +1545,7 @@
         if (cCampos) {
           cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
           bindFotoCaptura();
+          bindCamposFinanza();
         }
         var fTag = document.getElementById("cap-tag");
         if (fTag) fTag.focus();
@@ -1458,6 +1599,18 @@
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.causa_presunta = (q("#cap-causa") && q("#cap-causa").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        } else if (_tipoCapturaActual === "gasto") {
+          var finCategoria = (q("#cap-fin-categoria") && q("#cap-fin-categoria").value) || "OTRO_EGRESO";
+          var CATEGORIAS_INGRESO = ["VENTA_LECHE", "OTRO_INGRESO"];
+          payload.categoria = finCategoria;
+          payload.tipo_finanza = CATEGORIAS_INGRESO.indexOf(finCategoria) !== -1 ? "INGRESO" : "EGRESO";
+          payload.concepto = (q("#cap-fin-concepto") && q("#cap-fin-concepto").value || "").trim();
+          payload.monto = parseFloat(q("#cap-fin-monto") && q("#cap-fin-monto").value) || 0;
+          payload.litros = parseFloat(q("#cap-fin-litros") && q("#cap-fin-litros").value) || null;
+          payload.contraparte = (q("#cap-fin-contraparte") && q("#cap-fin-contraparte").value) || null;
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
+          payload.potrero = (q("#cap-fin-potrero") && q("#cap-fin-potrero").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
         }
 
         // Adjuntar foto opcional
@@ -1480,6 +1633,7 @@
           if (cCampos) {
             cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
             bindFotoCaptura();
+            bindCamposFinanza();
           }
           actualizarBadges();
         }
@@ -3534,6 +3688,7 @@
     sanidad:   { kpis: 0, graf: 0, tabla: 9 },
     pasturas:  { kpis: 0, graf: 3, tabla: 8 },
     leche:     { kpis: 3, graf: 2, tabla: 8 },
+    finanzas:  { kpis: 3, graf: 0, tabla: 8 },
     ficha:     { kpis: 0, graf: 1, tabla: 7 },
     manga:     { kpis: 0, graf: 0, tabla: 4 },
     captura:   { kpis: 0, graf: 0, tabla: 0 },
@@ -4036,8 +4191,10 @@
       else if (actual === "poblacion") html = renderInventario(d); // alias (vista unificada)
       else if (actual === "genetica") html = renderGenetica(d);
       else if (actual === "agenda") html = renderAgenda(d);
+      else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
       if (actual === "leche") bindLeche();
+      if (actual === "finanzas") bindFinanzas();
     }, animar ? vista : null);
   }
 

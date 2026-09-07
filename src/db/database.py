@@ -487,6 +487,67 @@ class Database:
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
+    def registrar_finanza(self, fecha=None, tipo=None, categoria=None, concepto=None,
+                          monto=0.0, litros=None, animal_tag=None, potrero=None,
+                          contraparte=None, foto_ruta=None, notas=None,
+                          registrado_por=None) -> int:
+        f = iso(fecha) or date.today().isoformat()
+        animal_id = self.resolve_animal(animal_tag) if animal_tag else None
+        potrero_id = self.resolve_potrero(potrero) if potrero else None
+        return self.insert("finanzas", dict(
+            fecha=f, tipo=(tipo or "").strip().upper(), categoria=(categoria or "").strip().upper(),
+            concepto=concepto, monto=float(monto or 0.0), litros=(float(litros) if litros is not None else None),
+            animal_id=animal_id, potrero_id=potrero_id, contraparte=contraparte,
+            foto_ruta=foto_ruta, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+    def resumen_finanzas(self, desde: str, hasta: str) -> dict:
+        """Resumen de Ingresos/Egresos/Utilidad entre `desde` y `hasta` (ISO),
+        combinando el libro de `finanzas` con las ventas/compras de animales
+        de `movimientos` (que ya traen su propio `precio`, sin duplicar)."""
+        filas_finanzas = self.query(
+            "SELECT tipo, categoria, SUM(monto) AS total, COUNT(*) AS n "
+            "FROM finanzas WHERE fecha >= ? AND fecha <= ? GROUP BY tipo, categoria",
+            (desde, hasta),
+        )
+        filas_animales = self.query(
+            "SELECT UPPER(tipo_movimiento) AS tipo_movimiento, SUM(COALESCE(precio, 0)) AS total, COUNT(*) AS n "
+            "FROM movimientos WHERE fecha >= ? AND fecha <= ? AND precio IS NOT NULL AND precio > 0 "
+            "GROUP BY UPPER(tipo_movimiento)",
+            (desde, hasta),
+        )
+
+        categorias: list[dict] = []
+        total_ingresos = 0.0
+        total_egresos = 0.0
+        for fila in filas_finanzas:
+            tipo = (fila["tipo"] or "").upper()
+            total = float(fila["total"] or 0.0)
+            categorias.append({"tipo": tipo, "categoria": fila["categoria"], "total": total, "n": fila["n"]})
+            if tipo == "INGRESO":
+                total_ingresos += total
+            elif tipo == "EGRESO":
+                total_egresos += total
+
+        for fila in filas_animales:
+            tm = fila["tipo_movimiento"] or ""
+            total = float(fila["total"] or 0.0)
+            if tm == "VENTA":
+                categorias.append({"tipo": "INGRESO", "categoria": "VENTA_ANIMAL", "total": total, "n": fila["n"]})
+                total_ingresos += total
+            elif tm == "COMPRA":
+                categorias.append({"tipo": "EGRESO", "categoria": "COMPRA_ANIMAL", "total": total, "n": fila["n"]})
+                total_egresos += total
+
+        return {
+            "desde": desde, "hasta": hasta,
+            "total_ingresos": round(total_ingresos, 2),
+            "total_egresos": round(total_egresos, 2),
+            "utilidad": round(total_ingresos - total_egresos, 2),
+            "categorias": categorias,
+        }
+
     def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
                                      notas=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)

@@ -66,6 +66,7 @@ try:
         datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
         datos_ficha_animal as _datos_ficha_animal,
+        datos_finanzas as _datos_finanzas,
         datos_genetica as _datos_genetica,
         datos_inventario as _datos_inventario,
         datos_leche as _datos_leche,
@@ -88,6 +89,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
         datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
         datos_ficha_animal as _datos_ficha_animal,
+        datos_finanzas as _datos_finanzas,
         datos_genetica as _datos_genetica,
         datos_inventario as _datos_inventario,
         datos_leche as _datos_leche,
@@ -393,6 +395,24 @@ def datos_leche(db_path: str = DB_PATH_DEFAULT) -> dict:
             logger.exception("datos_leche fallo completo")
             return {"serie_tanque": [], "controles": [],
                     "errores": {"leche": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def datos_finanzas(db_path: str = DB_PATH_DEFAULT, desde: str | None = None, hasta: str | None = None) -> dict:
+    """Finanzas: resumen de Ingresos/Egresos/Utilidad + movimientos recientes."""
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_finanzas(db, desde=desde, hasta=hasta)
+        except Exception:
+            logger.exception("datos_finanzas fallo completo")
+            return {"resumen": {"total_ingresos": 0, "total_egresos": 0, "utilidad": 0, "categorias": []},
+                    "recientes": [], "ventas_compras": [],
+                    "errores": {"finanzas": "error interno"}}
     finally:
         try:
             db.close()
@@ -879,6 +899,85 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.get("/api/finanzas")
+    def api_finanzas():
+        desde = request.args.get("desde") or None
+        hasta = request.args.get("hasta") or None
+        out = datos_finanzas(db_path, desde=desde, hasta=hasta)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.post("/api/finanzas")
+    def api_finanzas_crear():
+        datos = request.get_json(silent=True) or {}
+        fecha = datos.get("fecha") or date.today().isoformat()
+        tipo = str(datos.get("tipo") or "").strip().upper()
+        categoria = str(datos.get("categoria") or "").strip().upper()
+        if tipo not in ("INGRESO", "EGRESO"):
+            return jsonify({"ok": False, "error": "El campo 'tipo' debe ser INGRESO o EGRESO."}), 400
+        if not categoria:
+            return jsonify({"ok": False, "error": "La categoría es obligatoria."}), 400
+        try:
+            monto = float(datos.get("monto"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "El monto debe ser un número."}), 400
+        if monto <= 0:
+            return jsonify({"ok": False, "error": "El monto debe ser mayor a 0."}), 400
+
+        uid = session.get("user_id")
+        db_f = _db(db_path)
+        try:
+            foto_ruta = None
+            foto_b64 = datos.get("foto_base64")
+            animal_tag = (datos.get("animal_tag") or "").strip() or None
+            if foto_b64 and isinstance(foto_b64, str):
+                try:
+                    import base64
+                    import uuid
+
+                    if "," in foto_b64:
+                        foto_b64 = foto_b64.split(",", 1)[1]
+                    raw_bytes = base64.b64decode(foto_b64)
+                    if raw_bytes:
+                        media_dir_abs = (
+                            os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
+                            if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
+                        )
+                        os.makedirs(media_dir_abs, exist_ok=True)
+                        ts = int(time.time())
+                        rnd = uuid.uuid4().hex[:6]
+                        fname = f"gasto_{categoria.lower()}_{ts}_{rnd}.jpg"
+                        with open(os.path.join(media_dir_abs, fname), "wb") as f:
+                            f.write(raw_bytes)
+                        foto_ruta = os.path.join("media", fname).replace("\\", "/")
+                        db_f.registrar_foto(
+                            ruta=foto_ruta, animal_tag=animal_tag, fecha=fecha,
+                            caption=f"Factura/Recibo: {categoria}",
+                            user_id=uid,
+                            notas=(datos.get("concepto") or "").strip() or None,
+                        )
+                except Exception:
+                    logger.exception("No se pudo guardar la foto de la factura adjunta")
+
+            fid = db_f.registrar_finanza(
+                fecha=fecha, tipo=tipo, categoria=categoria,
+                concepto=(datos.get("concepto") or "").strip() or None,
+                monto=monto,
+                litros=datos.get("litros"),
+                animal_tag=animal_tag,
+                potrero=(datos.get("potrero") or "").strip() or None,
+                contraparte=(datos.get("contraparte") or "").strip() or None,
+                foto_ruta=foto_ruta,
+                notas=(datos.get("notas") or "").strip() or None,
+                registrado_por=uid,
+            )
+            return jsonify({"ok": True, "id": fid})
+        except Exception as e:
+            logger.exception("Error al registrar finanza")
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_f.close()
+
     @app.post("/api/leche/analizar-recibo")
     def api_leche_analizar_recibo():
         datos = request.get_json(silent=True) or {}
@@ -1362,6 +1461,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             elif tipo == "leche":
                 litros_str = f"{payload.get('litros')} L" if payload.get("litros") is not None else ""
                 caption_txt = f"Recibo/Planilla de Leche: {litros_str} · {fecha}".strip()
+            elif tipo == "gasto":
+                caption_txt = f"Factura/Recibo: {payload.get('categoria') or ''} · {payload.get('concepto') or ''}".strip(" ·")
 
             fid = db_inst.registrar_foto(
                 ruta=ruta_rel,
@@ -1518,6 +1619,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             fecha=fecha,
                             litros=payload.get("litros"),
                             notas=payload.get("notas"),
+                        )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "gasto":
+                        db_sync.registrar_finanza(
+                            fecha=fecha,
+                            tipo=payload.get("tipo_finanza") or "EGRESO",
+                            categoria=payload.get("categoria"),
+                            concepto=payload.get("concepto"),
+                            monto=payload.get("monto"),
+                            litros=payload.get("litros"),
+                            animal_tag=payload.get("animal_tag") or None,
+                            potrero=payload.get("potrero") or None,
+                            contraparte=payload.get("contraparte") or None,
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
                         )
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
