@@ -56,7 +56,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v62: Visor de fotos con arrastre interactivo (manito / pan), zoom suave multi-nivel (+/-, rueda, doble toque/clic) y soporte táctil fluido para inspeccionar detalles de recibos, hierros y ganado.
 // v63: Ícono de vaca adulta actualizado a silueta de cuerpo completo con relleno (el de cría/ternero se mantiene sin cambios).
 // v64: Ícono combinado de Parto (madre + cría) actualizado para usar la nueva silueta de vaca junto a la cabeza de cría, en vez de las dos cabezas de trazo anteriores.
-var CACHE = "pwa-ja-v64"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v65: Fix Diagnóstico General en Sistema -- las etiquetas <b>/<i> del texto salían literales en vez de renderizarse en negrita/cursiva.
+var CACHE = "pwa-ja-v65"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

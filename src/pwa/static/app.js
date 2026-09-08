@@ -2660,9 +2660,13 @@
     }
 
     // 4. Diagnóstico General
+    // d.texto viene de formatear_tablero_sistema() (mismo texto que usa el bot de
+    // Telegram con parse_mode HTML): trae <b>/<i> intencionales y sus valores
+    // dinámicos ya vienen escapados del lado del servidor -- no re-escapar aquí
+    // o los tags salen literales en vez de renderizarse.
     h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
-      + esc(d.texto || "Sin diagnóstico disponible.") + "</pre>";
+      + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA, Copias)
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
