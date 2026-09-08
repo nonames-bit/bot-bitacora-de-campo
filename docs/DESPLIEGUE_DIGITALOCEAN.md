@@ -301,6 +301,40 @@ crontab -l
 Debería ver una línea como:
 `0 3 * * * /root/bitacora/scripts/backup_diario.sh >> /root/bitacora/bot.log 2>&1`
 
+### Backup diario a Google Drive (base de datos + fotos, fuera del servidor)
+
+El backup diario de arriba se guarda **en el mismo droplet** -- si el droplet
+se destruye, la base de datos y sus 30 copias locales desaparecen juntas.
+Además, ese backup **no incluye `media/`** (fotos de recibos, facturas,
+animales). `scripts/respaldo_drive.sh` cubre ambos huecos: cada noche
+comprime `data/bitacora.db` + `media/` en un `.tar.gz` y lo sube a una
+cuenta de Google Drive vía `rclone` (remoto `gdrive`), con retención de 90
+días en Drive.
+
+**Configuración inicial (una sola vez, si hay que reinstalar el servidor):**
+
+1. Instalar rclone en el droplet: `apt-get install -y rclone`.
+2. En una PC con navegador (nunca en el servidor, porque hace falta iniciar
+   sesión en Google): `rclone authorize "drive"`. Se abre el navegador, se
+   inicia sesión con la cuenta de Google donde está el Drive a usar, y al
+   aceptar el permiso la terminal imprime un bloque JSON
+   (`{"access_token":...}`).
+3. En el droplet, crear `/root/.config/rclone/rclone.conf` con:
+   ```
+   [gdrive]
+   type = drive
+   scope = drive
+   token = <pegar el JSON del paso 2>
+   ```
+4. Verificar: `rclone lsd gdrive:` debe listar las carpetas del Drive.
+5. Crear la carpeta destino una vez: `rclone mkdir "gdrive:Bitacora_Backups_JA"`.
+6. Agregar al cron: `0 4 * * * /root/bitacora/scripts/respaldo_drive.sh >> /root/bitacora/backups/respaldo_drive.log 2>&1`
+   (una hora después del backup diario local, para no competir por disco).
+
+> ⚠️ El token de acceso (`access_token`) vence en ~1 hora, pero rclone lo
+> renueva solo usando el `refresh_token` (no vence salvo que se revoque el
+> acceso desde la cuenta de Google) -- no hace falta repetir la autorización.
+
 ### Snapshots de DigitalOcean (recomendado, ≈ $1/mes)
 
 Además del backup diario, active **Snapshots** del droplet en DigitalOcean
@@ -308,8 +342,10 @@ Además del backup diario, active **Snapshots** del droplet en DigitalOcean
 completa del servidor (sistema + código + datos) y permite restaurarlo entero si
 algo falla. El plan recomendado cuesta alrededor de **$1/mes**.
 
-> ✅ Regla de oro: el backup diario protege la **base de datos**; el snapshot
-> protege **el servidor completo**. Con ambos, la finca queda bien respaldada.
+> ✅ Regla de oro: el backup diario protege la **base de datos**; el backup a
+> Drive protege **base de datos + fotos fuera del servidor**; el snapshot
+> protege **el servidor completo**. Con los tres, la finca queda bien
+> respaldada.
 
 ---
 
@@ -612,6 +648,7 @@ journalctl -u bitacora-bot -n 20 --no-pager
 | Bot responde `/start` en Telegram | ☐ |
 | Servicio `bitacora-bot` activo y autoarranca | ☐ |
 | `crontab -l` muestra el backup diario | ☐ |
+| `rclone lsd gdrive:` conecta y backup a Drive en el cron | ☐ |
 | Snapshots activados (recomendado) | ☐ |
 
 ---
