@@ -416,15 +416,17 @@ def generar_pdf(
     activos = inv.get("activos", 0)
     hembras = inv.get("hembras", 0)
     machos = inv.get("machos", 0)
-    hist = inv.get("historico_total", 0)
     pct_h = f"{(hembras / activos * 100):.1f}% del hato" if activos > 0 else ""
     pct_m = f"{(machos / activos * 100):.1f}% del hato" if activos > 0 else ""
 
+    # Solo datos actuales del hato activo -- el acumulado histórico (todos
+    # los registros desde que se empezó a importar Software Ganadero, sin
+    # importar si siguen activos) confundía al usuario haciéndole pensar que
+    # había 1.141 animales en la finca hoy, en vez de los 328 reales.
     kpis_bloque = [
         (str(activos), "Hato Activo", "Cabezas en finca", COLOR_MARCA),
         (str(hembras), "Hembras", pct_h or "Vacas / Novillas", "#047857"),
         (str(machos), "Machos", pct_m or "Toros / Levante", "#1D4ED8"),
-        (f"{hist:,}".replace(",", "."), "Histórico Total", "Registros en base", COLOR_GRIS),
     ]
     story.append(SeccionFlowable("RESUMEN EJECUTIVO & INVENTARIO (HATO ACTIVO)", width=ANCHO_UTIL))
     story.append(Spacer(1, 3))
