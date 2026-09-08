@@ -632,10 +632,14 @@ def datos_leche(db: Database) -> dict:
         errores["ranking_vacas"] = str(e)
         ranking = []
     try:
+        # El caption de un recibo de leche siempre lo pone _guardar_foto_recibo_leche()
+        # (pwa/app.py) como "Recibo Quincenal: <periodo>". El filtro anterior
+        # ('%Recibo%') también atrapaba fotos de Finanzas ("Factura/Recibo: <concepto>"),
+        # mezclando facturas de gastos ajenas a la leche en esta sección.
         fotos_recibos = _filas_dict(db.query(
             """SELECT id, ruta, fecha, caption, notas
                FROM fotos
-               WHERE notas LIKE '%(leche)%' OR caption LIKE '%Leche%' OR caption LIKE '%Recibo%'
+               WHERE caption LIKE 'Recibo Quincenal%'
                ORDER BY fecha DESC, id DESC LIMIT 12"""
         ))
     except Exception as e:

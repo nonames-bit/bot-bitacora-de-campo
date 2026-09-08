@@ -1148,6 +1148,27 @@ def test_api_leche_analizar_recibo_guarda_la_foto_de_inmediato(client, db_file):
         db.close()
 
 
+def test_datos_leche_fotos_recibos_excluye_facturas_de_finanzas(db):
+    """Regresión: el filtro de fotos_recibos en Leche usaba `caption LIKE
+    '%Recibo%'`, que también atrapaba las facturas de Finanzas (caption
+    "Factura/Recibo: <concepto>") -- se colaban gastos/compras ajenos a la
+    leche en la sección de recibos de leche."""
+    from src.engine.dashboard_data import datos_leche
+
+    db.registrar_foto(ruta="media/recibo_leche_1.jpg", fecha="2026-09-08",
+                      caption="Recibo Quincenal: 1 al 15 de Septiembre",
+                      notas="Foto guardada al momento de analizar con IA (evidencia del pago).")
+    db.registrar_foto(ruta="media/factura_1.jpg", fecha="2026-09-08",
+                      caption="Factura/Recibo: Compra de sal mineralizada",
+                      notas="Foto guardada al momento de analizar con IA (evidencia del gasto/ingreso).")
+
+    datos = datos_leche(db)
+
+    rutas = [f["ruta"] for f in datos["fotos_recibos"]]
+    assert "media/recibo_leche_1.jpg" in rutas
+    assert "media/factura_1.jpg" not in rutas
+
+
 def test_api_finanzas_analizar_factura(client):
     """Fase 2 de Finanzas: digitalización de facturas/recibos generales con
     IA, mismo patrón que el recibo de leche -- extrae categoría, concepto,

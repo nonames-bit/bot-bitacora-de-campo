@@ -559,23 +559,6 @@
     }
     h += "</div>";
 
-    if (d.fotos_recibos && d.fotos_recibos.length) {
-      h += "<h4>" + icon("camera") + "Recibos y Planillas de Quincena (Fotos de Respaldo)</h4>";
-      h += "<p class='aviso' style='margin-bottom:10px;'>Fotos de recibos o planillas manuales de leche. Toca cualquier imagen para abrirla en pantalla completa con zoom táctil y verificar las anotaciones diarias.</p>";
-      h += "<div class='fotos-wrap' style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-bottom:18px;'>";
-      d.fotos_recibos.forEach(function (f) {
-        var ruta = f.ruta ? (f.ruta.startsWith("/") ? f.ruta : "/" + f.ruta) : "";
-        h += "<div class='foto-card' style='border:1px solid var(--borde-suave); border-radius:8px; overflow:hidden; background:var(--superficie); padding:6px;'>"
-          + "<div style='aspect-ratio:4/3; overflow:hidden; border-radius:6px; background:#111; display:flex; align-items:center; justify-content:center; cursor:pointer;'>"
-          + "<img src='" + esc(ruta) + "' alt='" + esc(f.caption || "Recibo de leche") + "' class='zoomable-img' style='width:100%; height:100%; object-fit:cover;'>"
-          + "</div>"
-          + "<div style='font-size:11px; font-weight:600; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>" + esc(f.caption || "Recibo") + "</div>"
-          + "<div style='font-size:10px; color:var(--texto-suave);'>" + esc(fechaCorta(f.fecha)) + "</div>"
-          + "</div>";
-      });
-      h += "</div>";
-    }
-
     h += grafico("leche_total", "Producción total de leche") + grafico("eficiencia_lechera", "Eficiencia lechera");
     h += grafico("ranking_vacas_leche", "Ranking de producción por vaca");
     h += "<h4>" + icon("chartBar") + "Ranking de vacas por litros (acumulado)</h4>"
@@ -587,6 +570,25 @@
       + tabla(d.serie_tanque, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin registros de producción o recibos.");
     h += "<h4>" + icon("calendar") + "Controles individuales</h4>"
       + tabla(d.controles, [["tag", "Vaca"], ["fecha", "Fecha"], ["litros", "L", "num"]], "Sin controles individuales.");
+
+    if (d.fotos_recibos && d.fotos_recibos.length) {
+      h += "<details style='margin-top:18px;'>"
+        + "<summary style='cursor:pointer; font-weight:700; padding:6px 0; display:flex; align-items:center; gap:6px;'>" + icon("camera", 16) + "Recibos y Planillas de Quincena (Fotos de Respaldo) — " + d.fotos_recibos.length + "</summary>"
+        + "<p class='aviso' style='margin:10px 0;'>Fotos de recibos o planillas manuales de leche. Toca cualquier imagen para abrirla en pantalla completa con zoom táctil y verificar las anotaciones diarias.</p>"
+        + "<div class='fotos-wrap' style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px;'>";
+      d.fotos_recibos.forEach(function (f) {
+        var ruta = f.ruta ? (f.ruta.startsWith("/") ? f.ruta : "/" + f.ruta) : "";
+        h += "<div class='foto-card' style='border:1px solid var(--borde-suave); border-radius:8px; overflow:hidden; background:var(--superficie); padding:6px;'>"
+          + "<div style='aspect-ratio:4/3; overflow:hidden; border-radius:6px; background:#111; display:flex; align-items:center; justify-content:center; cursor:pointer;'>"
+          + "<img src='" + esc(ruta) + "' alt='" + esc(f.caption || "Recibo de leche") + "' class='zoomable-img' style='width:100%; height:100%; object-fit:cover;'>"
+          + "</div>"
+          + "<div style='font-size:11px; font-weight:600; margin-top:5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>" + esc(f.caption || "Recibo") + "</div>"
+          + "<div style='font-size:10px; color:var(--texto-suave);'>" + esc(fechaCorta(f.fecha)) + "</div>"
+          + "</div>";
+      });
+      h += "</div></details>";
+    }
+
     return h;
   }
 
