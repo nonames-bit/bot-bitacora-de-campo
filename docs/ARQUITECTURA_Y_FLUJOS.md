@@ -1,178 +1,472 @@
-# 📐 Arquitectura del Sistema y Flujos de Datos
+# 📐 Arquitectura, Flujos de Trabajo, Estados y Secuencias
+## Sistema Bitácora de Campo Ganadera JA (PWA, Bot Telegram & Monitoreo Satelital)
 
-Este documento describe la arquitectura modular, el modelo de datos, los flujos de eventos zootécnicos y el ciclo de sincronización bidireccional entre el **Bot de Bitácora de Campo Ganadero** y el **Software Ganadero (SG/TP)**.
-
----
-
-## 🏛️ 1. Arquitectura General del Sistema
-
-```text
-                                  ┌───────────────────────────────┐
-                                  │      USUARIOS EN CAMPO        │
-                                  │  (Dueño, Admin, Trabajadores) │
-                                  └───────────────┬───────────────┘
-                                                  │
-                                   Telegram / CLI interactivo
-                                                  │
-                                                  ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 CAPA DE ENTRADA Y SEGURIDAD                                     │
-│  ┌─────────────────────────────┐                         ┌───────────────────────────────────┐  │
-│  │   Auth / RBAC (users.json)  │                         │       Telegram Application        │  │
-│  │  OWNER · ADMIN · TRABAJADOR │                         │  Comandos / Handlers de Mensajes  │  │
-│  └──────────────┬──────────────┘                         └─────────────────┬─────────────────┘  │
-└─────────────────┼──────────────────────────────────────────────────────────┼────────────────────┘
-                  │                                                          │
-                  ▼                                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                CAPA DE PARSERS Y MULTIMODAL                                     │
-│  ┌───────────────────────────┐   ┌───────────────────────────┐   ┌───────────────────────────┐  │
-│  │  NLU / EventParser        │   │  MediaHandler             │   │  QueryEngine              │  │
-│  │  (8 eventos zootécnicos,  │   │  (Voz, fotos, tags OCR,   │   │  (Q&A lenguaje natural,   │  │
-│  │   normalización, fechas)  │   │   captions de aretes)     │   │   consultas reproductivas)│  │
-│  └─────────────┬─────────────┘   └─────────────┬─────────────┘   └─────────────┬─────────────┘  │
-└────────────────┼───────────────────────────────┼───────────────────────────────┼────────────────┘
-                 │                               │                               │
-                 ▼                               ▼                               ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 CAPA DE MOTORES ZOOTÉCNICOS                                     │
-│  ┌───────────────────────────────┐                       ┌───────────────────────────────────┐  │
-│  │  ReproductiveEngine           │                       │  HealthEngine                     │  │
-│  │  • Regla AM-PM celos          │                       │  • Retiro en carne y leche        │  │
-│  │  • FEP (+283d), Eco (+35d),   │                       │  • Bloqueo sanitario              │  │
-│  │    Palpación (+60d), Secado   │                       │                                   │  │
-│  ├───────────────────────────────┤                       ├───────────────────────────────────┤  │
-│  │  PastureEngine (Voisin)       │                       │  GrowthEngine                     │  │
-│  │  • Leyes de reposo/ocupación  │                       │  • Ganancia Media Diaria (GMD)    │  │
-│  │  • Aforo kg/m², carga UGG     │                       │  • Peso ajustado a 205 días       │  │
-│  └──────────────┬────────────────┘                       └─────────────────┬─────────────────┘  │
-└─────────────────┼──────────────────────────────────────────────────────────┼────────────────────┘
-                  │                                                          │
-                  ▼                                                          ▼
-┌─────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                CAPA DE DATOS Y PERSISTENCIA                                     │
-│  ┌───────────────────────────────────────────────────────────────────────────────────────────┐  │
-│  │                                 Database (SQLite — WAL Mode)                              │  │
-│  │  Tablas: animales · partos · celos · servicios · tratamientos · pesajes · traslados       │  │
-│  │          muertes · movimientos · potreros · alertas · fotos · produccion_leche            │  │
-│  │          recordatorios_programados · import_sg_historial · consultas_animal               │  │
-│  └──────────────────────────────┬──────────────────────────────────────────┬─────────────────┘  │
-└─────────────────────────────────┼──────────────────────────────────────────┼────────────────────┘
-                                  │                                          │
-                                  ▼                                          ▼
-┌──────────────────────────────────────────────────┐       ┌──────────────────────────────────────┐
-│           CAPA DE IMPORTACIÓN HISTÓRICA          │       │      CAPA DE REPORTES Y EXPORTACIÓN  │
-│  ┌────────────────────────────────────────────┐  │       │  ┌────────────────────────────────┐  │
-│  │  DBFReader / Importer (TP/SG)              │  │       │  │  PDF Reports (/reporte)        │  │
-│  │  • 8 tablas DBF (hoja, partos, celos, etc.)│  │       │  │  • Resumen semanal / diario    │  │
-│  │  • Deduplicación por llave natural         │  │       │  ├────────────────────────────────┤  │
-│  │  • Sincronización idempotente              │  │       │  │  DataExporter (/exportar)      │  │
-│  └────────────────────────────────────────────┘  │       │  │  • DBF (Software Ganadero ZIP) │  │
-│                                                  │       │  │  • CSV (todas las tablas)      │  │
-│                                                  │       │  │  • JSON (volcado estructurado) │  │
-│                                                  │       │  └────────────────────────────────┘  │
-└──────────────────────────────────────────────────┘       └──────────────────────────────────────┘
-```
+Este documento presenta la especificación visual y técnica completa del sistema ganadero, integrando la arquitectura modular, los flujos operativos en campo, las máquinas de estado biológicas/operativas y los diagramas de secuencia de sincronización e inteligencia artificial.
 
 ---
 
-## 🔄 2. Ciclo de Sincronización con Software Ganadero (SG)
+## 🏛️ 1. Diagrama de Arquitectura Global del Sistema
 
-El sistema mantiene una coexistencia armoniosa con el software de escritorio del cliente mediante un ciclo continuo:
+El sistema opera bajo un modelo híbrido **Offline-First en el Edge** (PWA móvil para corral/manga) y **Cloud/VPS Central** (`206.189.188.183`), comunicando servicios zootécnicos, satelitales e inteligencia artificial con una base de datos SQLite en modo WAL (*Write-Ahead Logging*).
 
-```text
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 1. CAMPO: Mayordomo o vaquero registra notas (texto/voz/foto) en bot   │
-  └───────────────────────────────────┬────────────────────────────────────┘
-                                      │
-                                      ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 2. NUBE: SQLite procesa eventos y genera alertas automáticas           │
-  └───────────────────────────────────┬────────────────────────────────────┘
-                                      │
-                                      ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 3. DUEÑO: Consulta /reporte en PDF o /exportar csv/dbf                 │
-  └───────────────────────────────────┬────────────────────────────────────┘
-                                      │
-                                      ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 4. ESCRITORIO: Carga manual o validación en Software Ganadero SG       │
-  └───────────────────────────────────┬────────────────────────────────────┘
-                                      │
-                                      ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 5. BACKUP: SG genera nuevo backup (DatosYYYYMMDD.Zip con Dbf.zip)      │
-  └───────────────────────────────────┬────────────────────────────────────┘
-                                      │
-                                      ▼
-  ┌────────────────────────────────────────────────────────────────────────┐
-  │ 6. SYNC: Se envía el .zip al bot -> /confirmar_importar                │
-  │    (Deduplicación automática por llave natural, sin duplicar notas)    │
-  └────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph CLIENTES["📱 CAPA DE CLIENTES & ACCESO"]
+        direction TB
+        PWA["📲 PWA Móvil & Escritorio<br/>(Service Worker v62 · IndexedDB Cache<br/>Bottom Nav · Lightbox Pan & Zoom)"]
+        TBOT["🤖 Bot de Telegram<br/>(Comandos · Notas de Voz · Fotos<br/>Teclados Inline · Consultas NLP)"]
+        ADMIN["💻 Panel Administrativo PWA<br/>(Gestión RBAC · Usuarios · Reportes PDF)"]
+    end
+
+    subgraph INGRESS["🛡️ CAPA DE ENTRADA, SEGURIDAD & SESIÓN"]
+        direction TB
+        WSGI["🌐 Servidor WSGI Waitress<br/>(Puerto 8080 · Multi-hilo)"]
+        RBAC["🔐 Control de Acceso RBAC<br/>(users.json · Niveles 1, 2, 3<br/>OWNER · ADMIN · TRABAJADOR)"]
+        BOT_APP["⚡ Telegram Application<br/>(Polling Asíncrono PTB)"]
+    end
+
+    subgraph ENGINES["⚙️ CAPA DE MOTORES ZOOTÉCNICOS & DE DOMINIO"]
+        direction TB
+        REPRO["🧬 ReproductiveEngine<br/>• Regla AM-PM Celos<br/>• FEP (+283d) · Eco (+35d) · Palp (+60d)<br/>• Control de Consanguinidad 3G"]
+        HEALTH["💉 HealthEngine<br/>• Tiempos de Retiro Carne/Leche<br/>• Alertas de Bloqueo Sanitario<br/>• Control de Tratamientos y Dosis"]
+        PASTURE["🌿 PastureEngine<br/>• Leyes de André Voisin (Reposo/Ocupación)<br/>• Balance Forrajero · Aforo kg/m²<br/>• Capacidad de Carga UGG"]
+        GROWTH["⚖️ GrowthEngine<br/>• Ganancia Media Diaria (GMD)<br/>• Curvas de Crecimiento · Ajuste 205d"]
+        FINANZAS["💰 FinancialEngine<br/>• Libro Ingresos / Egresos / Margen<br/>• Costos Unitarios (L leche / kg carne)"]
+        REPORTS["📊 Report & Chart Engine<br/>• ReportLab (PDF A4 · Tarjetas QR)<br/>• Matplotlib (Mapas NDVI · Cajas IEP)"]
+    end
+
+    subgraph IA_SATELLITE["🛰️ CAPA DE SERVICIOS EXTERNOS & IA"]
+        direction TB
+        GEE_SAR["📡 Google Earth Engine: Sentinel-1 SAR<br/>(Radar C-band 10m · Penetra Nubes<br/>Dual-Pol VV/VH · RVI · Humedad Suelo)"]
+        GEE_OPT["🛰️ Google Earth Engine: Sentinel-2 L2A<br/>(Óptico Multiespectral 10m · NDVI<br/>Máscara QA60 Nubosidad)"]
+        CHIRPS["🌧️ GEE: CHIRPS Rainfall<br/>(Climatología 30 años · Índice Sequía SPI)"]
+        GEMINI["🧠 Google Gemini Vision 2.5<br/>(OCR Multimodal · Facturas · Recibos Leche)"]
+        OPEN_METEO["🌤️ Open-Meteo API<br/>(Pronóstico 7 días · Recomendaciones)"]
+    end
+
+    subgraph PERSISTENCIA["💾 CAPA DE PERSISTENCIA & STORAGE"]
+        direction TB
+        SQLITE[("🗄️ SQLite 3 — Modo WAL<br/>data/bitacora.db<br/>(Concurrencia PWA + Bot sin bloqueos)")]
+        MEDIA["📁 Almacenamiento Local media/<br/>(Fotos de Ganado · Recibos · Evidencias)"]
+        SG_BRIDGE["🔄 DBF Bridge (Software Ganadero)<br/>(Importación / Exportación Idempotente ZIP)"]
+    end
+
+    %% Conexiones Clientes -> Entrada
+    PWA -->|HTTPS / REST API / Sync Offline| WSGI
+    ADMIN -->|HTTPS / Cookies de Sesión| WSGI
+    TBOT -->|Telegram MTProto| BOT_APP
+
+    %% Entrada -> Seguridad & Motores
+    WSGI --> RBAC
+    RBAC --> ENGINES
+    BOT_APP --> ENGINES
+
+    %% Motores -> IA & Satélites
+    ENGINES --> GEE_SAR
+    ENGINES --> GEE_OPT
+    ENGINES --> CHIRPS
+    ENGINES --> GEMINI
+    ENGINES --> OPEN_METEO
+
+    %% Motores -> Persistencia
+    ENGINES --> SQLITE
+    ENGINES --> MEDIA
+    ENGINES --> SG_BRIDGE
 ```
 
 ---
 
-## ⚡ 3. Flujo de Procesamiento de Eventos y Alertas
+## 🔄 2. Flujos de Trabajo en Campo (Workflows)
 
-```text
-Entrada de Texto / Foto
-        │
-        ▼
-   EventParser
-        │
-   ┌────┴──────────────────────────┐
-   │ Clasificación de Evento       │
-   └────┬──────────────────────────┘
-        │
-        ├─► Parto ────────► Registra parto + cría ──► Alerta secado, IEP, genealogía
-        ├─► Celo ─────────► Registra celo ──────────► Alerta INSEMINACION_PROGRAMADA (AM-PM)
-        ├─► Servicio ─────► Registra IA/MN ─────────► Alertas: ECOGRAFIA (+35d), PALPACION (+60d),
-        │                                                     SECADO (FEP - 60d), PARTO_ESPERADO (+283d)
-        ├─► Tratamiento ──► Registra fármaco ───────► Alertas: RETIRO_LECHE / RETIRO_CARNE
-        ├─► Pesaje ───────► Registra peso ──────────► Calcula GMD y peso ajustado 205 días
-        ├─► Traslado ─────► Registra movimiento ────► Actualiza ocupación/reposo potrero (Voisin)
-        ├─► Muerte ───────► Registra baja ──────────► Estado = MUERTO (excluido de inventario activo)
-        ├─► Movimiento ───► Compra/Venta/Entrada ───► Alta/Baja en inventario
-        ├─► Leche Hato ───► /leche <litros> ────────► Guarda en produccion_leche (animal_id = NULL)
-        └─► Programar ────► /programar <fecha> ─────► Guarda en recordatorios_programados (estado PENDIENTE)
+### 2.1 Flujo de Pesaje y Manejo en Corral ("Modo Manga Offline")
+Permite registrar pesajes individuales o por lotes directamente en el corral de manejo, calculando la Ganancia Media Diaria (GMD) en tiempo real sin requerir conectividad a Internet.
+
+```mermaid
+flowchart TD
+    A["🐮 Vaquero en Manga con Celular/Tablet"] --> B{"¿Hay Conectividad 4G/Wi-Fi en el Corral?"}
+    B -- "NO (Común en potrero)" --> C["📱 Modo Manga Offline (PWA)<br/>Lectura de arete visual o RFID"]
+    B -- "SÍ" --> D["🌐 Conexión en Línea Directa"]
+
+    C --> E["Ingreso de Arete (Tag) + Peso (kg) + Condición Corporal"]
+    D --> E
+
+    E --> F["⚡ Motor Local de Pesaje (app.js)"]
+    F --> G["Cálculo instantáneo GMD contra pesaje previo en caché local"]
+    G --> H{"¿Guardado Offline o Online?"}
+
+    H -- "Offline" --> I["💾 Almacena en IndexedDB (cola: eventos_pendientes)<br/>Chip visual: '💾 Guardado Offline'"]
+    H -- "Online" --> J["🚀 Envío directo POST /api/manga/pesaje"]
+
+    I --> K["Vaquero termina sesión de manga"]
+    K --> L["Al llegar a casa de campo o detectar Wi-Fi"]
+    L --> M["🔄 Sincronizador Automático (sw.js / app.js)"]
+    M --> N["POST /api/sync con lote de eventos"]
+    N --> O["🗄️ Database.registrar_pesaje() en SQLite WAL"]
+    J --> O
+    O --> P["✅ Actualiza historial animal, GMD y peso ajustado 205 días"]
 ```
 
-### 3.1 Flujo del Despacho Matutino (05:30 AM)
+---
 
-El Despacho Matutino (`formatear_despacho_matutino`) se ejecuta automáticamente cada mañana a las 05:30 AM (vía `scripts/enviar_despacho.py` en cron/systemd) o bajo demanda con `/despacho`. Consolida 4 consultas prioritarias para la operación del día:
+### 2.2 Flujo de Digitalización de Recibos y Gastos con IA Multimodal
+Transforma recibos manuales de leche y facturas de insumos en registros contables automáticos, asociando la imagen como respaldo auditable.
 
-```text
- Cron 05:30 AM / /despacho
-            │
-            ▼
-┌────────────────────────────────────────────────────────┐
-│             formatear_despacho_matutino()              │
-└───────────┬──────────────┬──────────────┬──────────────┘
-            │              │              │              │
-            ▼              ▼              ▼              ▼
-┌─────────────────┐ ┌──────────────┐ ┌──────────────┐ ┌─────────────────┐
-│ 1. Ordeño &     │ │ 2. Celos AM  │ │ 3. Tareas    │ │ 4. Calendario   │
-│    Retiros      │ │    (AM-PM)   │ │    Agendadas │ │    Reproductivo │
-│                 │ │              │ │              │ │                 │
-│ • tratamientos  │ │ • celos ayer │ │ • recordato- │ │ • servicios FEP │
-│   fin_retiro    │ │   PM/tarde   │ │   rios_pro-  │ │   próximos 7d   │
-│   >= hoy        │ │ • alertas IA │ │   gramados   │ │ • ecografía d35 │
-│ • Solo alerta   │ │   programada │ │   pendientes │ │ • palpación d60 │
-│   si hay casos  │ │   para hoy   │ │   de hoy     │ │                 │
-└─────────┬───────┘ └──────┬───────┘ └──────┬───────┘ └────────┬────────┘
-          │                │                │                  │
-          └────────────────┼────────────────┴──────────────────┘
-                           ▼
-              Mensaje Telegram Formateado
-                           +
-          Botonera de Acción Rápida (8 botones)
-    [ 🥛 Registrar Leche ]  [ ⏰ Programar Recordatorio ]
-    [ 🚨 Alertas Día ]      [ 💊 Medicamentos ]
-    [ 🌿 Potreros ]         [ 🐮 Tablero Finca ]
-    [ 🔍 Buscar Animal ]    [ 🏠 Menú Principal ]
+```mermaid
+flowchart TD
+    A["📸 Foto tomada en campo / recibo en papel"] --> B["Carga en PWA: Captura Leche o Finanzas"]
+    B --> C["Pre-compresión de imagen en cliente (Canvas WebP/JPEG)"]
+    C --> D["POST /api/leche/analizar-recibo o /api/finanzas/analizar-factura"]
+    
+    D --> E["🧠 Motor Gemini Vision (Prompt Zootécnico Especializado)"]
+    E --> F{"¿Tipo de Documento Detectado?"}
+
+    F -- "Planilla / Recibo de Leche" --> G["Extrae: Quincena, Litros día a día,<br/>Total Litros, Precio/Litro, Bonificaciones y Neto"]
+    F -- "Factura / Recibo de Gasto" --> H["Extrae: Categoría (Insumo, Sanidad, Flete),<br/>Proveedor, Monto Total, Concepto y Fecha"]
+
+    G --> I["Pre-llenado interactivo en formulario PWA"]
+    H --> I
+
+    I --> J["👁️ Verificación visual del usuario<br/>(Ajusta o confirma con 1 clic)"]
+    J --> K["Botón: 'Guardar Quincena' o 'Registrar Gasto'"]
+
+    K --> L["💾 Almacenamiento en SQLite: produccion_leche + finanzas_movimientos"]
+    K --> M["📁 Guarda foto física en media/fotos/ como evidencia vinculada"]
+    L --> N["📊 Actualiza KPI financiero: margen de utilidad y costo/litro"]
 ```
+
+---
+
+### 2.3 Flujo de Monitoreo Satelital Todo-Clima (Multi-Sensor SAR + Óptico)
+Garantiza la supervisión continua del forraje los 365 días del año, superando la limitación de nubosidad tropical mediante microondas de radar.
+
+```mermaid
+flowchart TD
+    A["🛰️ Solicitud de Monitoreo Satelital<br/>(Automático Semanal o Botón PWA)"] --> B["Carga polígonos potreros (geom_wkt_4326)"]
+    B --> C{"Modo de Consulta"}
+
+    C -- "Modo 'auto' (Por Defecto)" --> D["Consulta Sentinel-2 L2A en Earth Engine"]
+    C -- "Modo 'radar' / 's1'" --> E["Consulta Directa Sentinel-1 SAR GRD"]
+
+    D --> F{"¿Cielo Despejado?<br/>(Nubosidad < 40% en potreros)"}
+    
+    F -- "SÍ (Verano / Despejado)" --> G["Calcula NDVI Óptico Multiespectral (B8-B4)/(B8+B4)"]
+    G --> H["Fuente: Sentinel-2 L2A (Óptico)"]
+
+    F -- "NO (Invierno / Nublado)" --> I["🚨 Detección de nubes: Conmutación a Radar SAR"]
+    I --> E
+
+    E --> J["Radar Microondas C-band (10m) atraviesa nubes y lluvia"]
+    J --> K["Cálculo Backscatter Dual-Pol (VV / VH en dB y lineal)"]
+    K --> L["Índice Dual RVI = 4*VH / (VV + VH)<br/>Proxy NDVI_radar = clip(0.20 + 0.65*RVI)<br/>Humedad Suelo/Canopy desde respuesta dieléctrica VV"]
+    L --> M["Fuente: Sentinel-1 SAR GRD (Radar Todo Clima)"]
+
+    H --> N["Estimación Zootécnica de Rendimiento:<br/>• Aforo (kg MV/m²)<br/>• Biomasa (kg MS/ha)"]
+    M --> N
+
+    N --> O["💾 Database.registrar_lectura_ndvi()"]
+    O --> P["Purga caché de mapas: _pwa_cache_mapa_potreros.png"]
+    P --> Q["Refresco automático en PWA: Mapa coloreado por vigor forrajero"]
+```
+
+---
+
+## 🚦 3. Máquinas de Estados (State Machines)
+
+### 3.1 Ciclo de Vida del Animal en el Hato
+Control estricto de inventario según la regla fundamental: **toda consulta de hato activo debe filtrar estrictamente por `estado = 'ACTIVO'`**.
+
+```mermaid
+stateDiagram-v2
+    [*] --> ACTIVO: Nacimiento registrado en parto / Compra ingresada
+    
+    state ACTIVO {
+        [*] --> EnPotrero: Asignado a potrero con geometría
+        EnPotrero --> EnTraslado: Orden de traslado
+        EnTraslado --> EnPotrero: Entrada al nuevo potrero
+        --
+        [*] --> Sano: Estado sanitario normal
+        Sano --> EnTratamiento: Aplicación de fármaco
+        EnTratamiento --> EnRetiro: Periodo de carencia leche/carne
+        EnRetiro --> Sano: Vencimiento de periodo de retiro
+    }
+
+    ACTIVO --> VENDIDO: Registro de Venta (Fecha, Comprador, Monto)
+    ACTIVO --> MUERTO: Registro de Muerte (Fecha, Causa, Diagnóstico)
+    ACTIVO --> DESCARTADO: Descarte zootécnico / Salida administrativa
+
+    VENDIDO --> [*]: Conserva historial genealógico / Sale de inventario activo
+    MUERTO --> [*]: Conserva historial genealógico / Sale de inventario activo
+    DESCARTADO --> [*]: Sale de inventario activo
+```
+
+---
+
+### 3.2 Ciclo Reproductivo de la Hembra Bovina
+Gobierna la fertilidad del rebaño mediante la regla zootécnica AM-PM y el cronograma veterinario de confirmación de preñez.
+
+```mermaid
+stateDiagram-v2
+    [*] --> VACIA: Hembra apta para reproducción / Post-parto voluntario
+
+    VACIA --> EN_CELO: Detección visual de celo (mañana o tarde)
+    
+    note right of EN_CELO
+        Regla AM-PM:
+        • Celo AM -> Inseminar PM
+        • Celo PM -> Inseminar AM siguiente
+    end note
+
+    EN_CELO --> SERVIDA: Inseminación Artificial (IA) o Monta Natural (MN)
+    
+    SERVIDA --> ECOGRAFIA_PENDIENTE: Día +35 post-servicio
+    
+    ECOGRAFIA_PENDIENTE --> SERVIDA: Reconfirma evolución
+    ECOGRAFIA_PENDIENTE --> VACIA: Diagnóstico NEGATIVO (Vuelve al ciclo)
+    ECOGRAFIA_PENDIENTE --> GESTANTE: Diagnóstico POSITIVO en ecografía
+
+    SERVIDA --> PALPACION_PENDIENTE: Día +60 post-servicio (Confirmación física)
+    PALPACION_PENDIENTE --> GESTANTE: Confirmación positiva
+    PALPACION_PENDIENTE --> VACIA: Diagnóstico NEGATIVO
+
+    GESTANTE --> SECA_PRENADA: Día +223 (FEP - 60 días: Secado obligatorio)
+    
+    note right of SECA_PRENADA
+        Descanso mamario y preparación
+        nutricional para el parto (+283d)
+    end note
+
+    SECA_PRENADA --> PARTO_PARIDA: Día +283 (Parto de cría macho/hembra)
+    
+    PARTO_PARIDA --> LACTANDO: Producción láctea + amamantamiento
+    LACTANDO --> VACIA: Cumplimiento de Periodo de Espera Voluntario (PEV)
+```
+
+---
+
+### 3.3 Semáforo de Ocupación y Rotación Voisin de Potreros
+Implementa las leyes universales del pastoreo racional de André Voisin (ley del reposo y ley de la ocupación).
+
+```mermaid
+stateDiagram-v2
+    [*] --> EN_REPOSO: Ganado retirado / Potrero vacío
+
+    state EN_REPOSO {
+        [*] --> Recuperando: Días 1 a 20
+        Recuperando --> PuntoOptimoCorte: Días 21 a 35 (Llamarada de crecimiento Voisin)
+        PuntoOptimoCorte --> PastoPasado: Días 36+ (Lignificación / Pérdida de proteína)
+    }
+
+    EN_REPOSO --> OCUPADO_OPTIMO: Entrada de lote de animales (Día 1 a 3)
+    
+    note left of OCUPADO_OPTIMO
+        Semáforo: 🟢 Verde
+        Ocupación ideal: 1 a 3 días máx.
+        Sin comer rebrote tierno.
+    end note
+
+    OCUPADO_OPTIMO --> ROTAR_PRONTO: Días 4 a 6 en el potrero
+    
+    note right of ROTAR_PRONTO
+        Semáforo: 🟡 Amarillo
+        Alerta: El ganado empieza a dañar
+        el rebrote nuevo.
+    end note
+
+    ROTAR_PRONTO --> SOBREOCUPADO: Días 7 o más sin rotación
+    
+    note right of SOBREOCUPADO
+        Semáforo: 🔴 Rojo
+        Peligro: Pérdida de biomasa,
+        compactación y degradación.
+    end note
+
+    OCUPADO_OPTIMO --> EN_REPOSO: Salida de animales (Registro fecha_salida)
+    ROTAR_PRONTO --> EN_REPOSO: Salida de animales (Registro fecha_salida)
+    SOBREOCUPADO --> EN_REPOSO: Salida urgente de animales
+```
+
+---
+
+## ⏱️ 4. Diagramas de Secuencia (Sequence Diagrams)
+
+### 4.1 Secuencia de Sincronización Offline Bidireccional (PWA ⇄ VPS)
+Muestra cómo los datos capturados en mangas sin señal viajan con seguridad hasta la base de datos central sin pérdida de información.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Vaquero as 🤠 Vaquero en Corral
+    participant UI as 📱 PWA UI (Manga)
+    participant IDB as 🗃️ IndexedDB (Local)
+    participant SW as ⚙️ Service Worker (v62)
+    participant API as 🌐 Waitress / Flask (/api/sync)
+    participant DB as 🗄️ SQLite 3 (WAL)
+
+    Vaquero->>UI: Registra pesaje: Tag V097, 460 kg
+    UI->>UI: Verifica navigator.onLine (False)
+    UI->>IDB: encolarOffline("pesaje", {tag: "V097", peso: 460})
+    IDB-->>UI: Guardado en cola local (ID: evt_101)
+    UI-->>Vaquero: Feedback visual: "💾 Guardado Offline (en cola)"
+
+    Note over Vaquero,UI: El vaquero termina la jornada y se conecta a Wi-Fi
+
+    SW->>SW: Detecta evento "online" / reconexión de red
+    SW->>UI: Notifica canal de sincronización listo
+    UI->>IDB: obtenerEventosPendientes()
+    IDB-->>UI: Retorna [evt_101, evt_102, ...]
+    
+    UI->>API: POST /api/sync {eventos: [...], token_sesion}
+    API->>API: Valida permisos RBAC y firma HMAC
+    
+    loop Por cada evento en lote
+        API->>DB: Database.registrar_pesaje(tag="V097", peso=460)
+        DB-->>API: Retorna id_pesaje y cálculo GMD
+    end
+    
+    API-->>UI: HTTP 200 {ok: true, sincronizados: 2, errores: []}
+    UI->>IDB: eliminarEventosConfirmados(["evt_101", "evt_102"])
+    UI-->>Vaquero: Notificación en pantalla: "✅ 2 eventos sincronizados con éxito"
+```
+
+---
+
+### 4.2 Secuencia de Digitalización de Facturas / Recibos con Gemini Vision
+Flujo paso a paso para la extracción multimodal asistida por inteligencia artificial con supervisión humana.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Usuario as 👤 Administrador / Dueño
+    participant PWA as 📱 Interfaz PWA (Finanzas)
+    participant App as 🌐 Backend Flask (/api/finanzas/analizar-factura)
+    participant Gemini as 🧠 Google Gemini 2.5 Vision API
+    participant Storage as 📁 Disco VPS (media/fotos/)
+    participant DB as 🗄️ SQLite (finanzas_movimientos)
+
+    Usuario->>PWA: Toca botón "Digitalizar Factura / Recibo con IA"
+    Usuario->>PWA: Selecciona foto o captura con la cámara del celular
+    PWA->>PWA: Comprime imagen a WebP (máx 1600px, calidad 0.85)
+    
+    PWA->>App: POST /api/finanzas/analizar-factura {foto_base64: "..."}
+    App->>Storage: Guarda copia física temporal en media/fotos/recibos/
+    
+    App->>Gemini: Solicitud multimodal (System Prompt Contable + Imagen Bytes)
+    Note over App,Gemini: Analiza tabla de items, proveedor, IVA, total y fecha
+    Gemini-->>App: JSON Estructurado {categoria: "INSUMO", monto: 450000, proveedor: "Agrovida", fecha: "2026-09-08"}
+    
+    App-->>PWA: Retorna datos extraídos + ruta de foto guardada
+    PWA-->>Usuario: Despliega modal con campos autocompletados y foto en pantalla
+    
+    Usuario->>PWA: Revisa y presiona "Confirmar Gasto"
+    PWA->>App: POST /api/finanzas {tipo: "EGRESO", monto: 450000, categoria: "INSUMO", ...}
+    App->>DB: Database.registrar_movimiento_financiero(...)
+    DB-->>App: Confirmado ID #84
+    App-->>PWA: HTTP 200 {ok: true}
+    PWA-->>Usuario: Muestra en libro contable y actualiza KPI de utilidad
+```
+
+---
+
+### 4.3 Secuencia del Monitoreo Satelital Radar SAR Sentinel-1
+Detalla la invocación a Google Earth Engine desde el botón de la PWA para penetrar nubes y actualizar el mapa de potreros.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Usuario as 👤 Usuario en PWA (Pasturas)
+    participant PWA as 📱 PWA UI (Botón Radar SAR)
+    participant App as 🌐 Backend Flask (/api/satelite/actualizar)
+    participant GIS as 🛰️ Módulo GIS (earth_engine_ndvi.py / earth_engine_sar.py)
+    participant GEE as ☁️ Google Earth Engine (COPERNICUS/S1_GRD)
+    participant DB as 🗄️ SQLite 3 (monitoreo_satelital_ndvi)
+    participant Cache as 🖼️ Caché de Gráficos (_pwa_cache_*)
+
+    Usuario->>PWA: Clic en botón "📡 Radar SAR (Todo Clima)"
+    PWA->>PWA: Muestra recuadro de estado con animación de satélite
+    PWA->>App: POST /api/satelite/actualizar {modo: "radar"}
+    
+    App->>DB: Obtiene 20 potreros con geometría WKT (geom_wkt_4326)
+    DB-->>App: Retorna lista de polígonos
+    
+    App->>GIS: actualizar_lecturas_reales(potreros, modo="radar")
+    GIS->>GEE: Autentica con Service Account (GEE_SERVICE_ACCOUNT_EMAIL)
+    GIS->>GEE: Colección S1_GRD: Polarización dual VV/VH, modo IW, órbita descendente
+    
+    loop Por cada uno de los 20 potreros
+        GEE-->>GIS: Retorna backscatter medio VV_dB y VH_dB
+        GIS->>GIS: Convierte a lineal: σ° = 10^(dB/10)
+        GIS->>GIS: Dual-Pol RVI = 4*VH / (VV + VH)
+        GIS->>GIS: Proxy NDVI = clip(0.20 + 0.65*RVI, 0.15, 0.85)
+        GIS->>GIS: Humedad % = clip((VV_dB - (-18)) / ((-7) - (-18)) * 100)
+    end
+    
+    GIS-->>App: 20 lecturas consolidadas (NDVI, biomasa, aforo, humedad)
+    
+    loop Por cada potrero procesado
+        App->>DB: Database.registrar_lectura_ndvi(fuente="Sentinel-1 SAR GRD...")
+    end
+    
+    App->>Cache: Elimina archivos _pwa_cache_mapa_potreros.png
+    App-->>PWA: HTTP 200 {ok: true, actualizados: 20, sar: 20, modo: "radar"}
+    
+    PWA->>PWA: Oculta spinner y muestra "✅ 20 potreros actualizados vía Radar SAR"
+    PWA->>App: Solicita /api/grafico/mapa_potreros
+    App->>App: Regenera mapa en alta resolución con nuevos valores de vigor
+    App-->>PWA: Renderiza nuevo mapa coloreado y actualiza tabla satelital
+```
+
+---
+
+### 4.4 Secuencia del Despacho Matutino Diario (05:30 AM)
+Orquesta el envío proactivo del informe diario matutino al canal de Telegram del propietario y personal de campo.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Cron as ⏰ Systemd Timer (05:30 AM)
+    participant Script as 📜 scripts/enviar_despacho.py
+    participant Engine as ⚙️ Orchestrator / Despacho
+    participant DB as 🗄️ SQLite 3 (Database)
+    participant Meteo as 🌤️ Open-Meteo API
+    participant Bot as 🤖 Telegram Bot API
+    actor Personal as 📱 Mayordomo & Dueño (Telegram)
+
+    Cron->>Script: Disparo automático programado
+    Script->>Engine: formatear_despacho_matutino(db)
+    
+    Engine->>DB: Consulta 1: Partos próximos (FEP en ventana 7 días)
+    Engine->>DB: Consulta 2: Vacas en periodo de retiro (leche y carne bloqueadas)
+    Engine->>DB: Consulta 3: Potreros en sobreocupación (Voisin: ocupación > 6 días)
+    Engine->>DB: Consulta 4: Nivel del termo de nitrógeno y recargas próximas
+    
+    Engine->>Meteo: Pronóstico del día (T° máx/mín, probabilidad lluvia mm)
+    Meteo-->>Engine: Retorna pronóstico meteorológico
+    
+    Engine->>Engine: Compone mensaje con formato Markdown enriquecido y semáforos
+    Engine-->>Script: Texto consolidado del Despacho Matutino
+    
+    Script->>Bot: send_message(chat_id=OWNER_CHAT_ID, text=despacho)
+    Script->>Bot: send_message(chat_id=GRUPO_FINCA, text=despacho)
+    Bot-->>Personal: Entrega mensaje al amanecer antes del inicio de labores
+```
+
+---
+
+## 📋 Resumen de Componentes Clave
+
+| Componente | Archivo / Ubicación | Responsabilidad Principal |
+| :--- | :--- | :--- |
+| **PWA Web App** | [`src/pwa/app.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/pwa/app.py) | Servidor WSGI Flask, API REST, autenticación RBAC y renderizado. |
+| **PWA Client JS** | [`src/pwa/static/app.js`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/pwa/static/app.js) | Lógica de vistas, IndexedDB offline, visor Pan/Zoom y sincro de eventos. |
+| **Service Worker** | [`src/pwa/static/sw.js`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/pwa/static/sw.js) | Caché de activos estáticos, interceptor offline e instalación en móviles. |
+| **Telegram Bot** | [`src/server/telegram_bot.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/server/telegram_bot.py) | Interfaz de mensajería, comandos de audio, fotos y despacho diario. |
+| **Base de Datos** | [`src/db/database.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/db/database.py) | Capa de persistencia SQLite 3 en modo WAL, reglas de hato activo. |
+| **Sentinel-1 SAR** | [`src/gis/earth_engine_sar.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/gis/earth_engine_sar.py) | Monitoreo radar microondas C-band todo clima, biomasa RVI y humedad. |
+| **Sentinel-2 NDVI** | [`src/gis/earth_engine_ndvi.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/gis/earth_engine_ndvi.py) | Monitoreo multiespectral óptico y fallback automático a SAR en nubes. |
+| **IA Multimodal** | [`src/vision/recibo_leche_parser.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/vision/recibo_leche_parser.py) | Digitalización inteligente con Google Gemini Vision para recibos y facturas. |
+| **Generador Mapas** | [`src/engine/charts.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/engine/charts.py) | Cartografía vectorial de potreros reales con proyección esférica corregida. |
+| **Reportes PDF** | [`src/reports/pdf_report.py`](file:///C:/Users/Owner/Documents/projects/finca/2026-08-24-bot-bitacora-de-campo/src/reports/pdf_report.py) | Generación ejecutiva ReportLab de fichas técnicas y reportes generales. |
+
 
 ---
 
@@ -216,6 +510,8 @@ La base de datos SQLite opera con parámetros de concurrencia y confiabilidad pa
 - `idx_pesajes_animal_fecha` en `pesajes(animal_id, fecha)`
 - `idx_movimientos_animal_fecha` en `movimientos(animal_id, fecha)`
 - `idx_fotos_animal_tag` en `fotos(animal_id, tag)`
+
+---
 
 ---
 
