@@ -479,7 +479,7 @@ def datos_pasturas(db: Database) -> dict:
                       n.aforo_estimado_kg_m2, n.cobertura_nubes_pct, n.fuente
                FROM monitoreo_satelital_ndvi n
                JOIN potreros p ON p.id = n.potrero_id
-               ORDER BY n.fecha DESC, n.id DESC LIMIT 25"""
+               ORDER BY n.id DESC LIMIT 25"""
         ))
     except Exception as e:
         logger.error("seccion ndvi_reciente fallo", exc_info=True)
@@ -494,7 +494,7 @@ def datos_pasturas(db: Database) -> dict:
                FROM potreros p
                JOIN monitoreo_satelital_ndvi n ON n.id = (
                    SELECT id FROM monitoreo_satelital_ndvi
-                   WHERE potrero_id = p.id ORDER BY fecha DESC, id DESC LIMIT 1
+                   WHERE potrero_id = p.id ORDER BY id DESC LIMIT 1
                )
                WHERE p.geom_wkt_4326 IS NOT NULL"""
         ))

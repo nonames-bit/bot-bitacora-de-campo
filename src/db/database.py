@@ -1106,7 +1106,7 @@ class Database:
             "FROM potreros p "
             "LEFT JOIN monitoreo_satelital_ndvi n ON n.id = ("
             "  SELECT id FROM monitoreo_satelital_ndvi "
-            "  WHERE potrero_id = p.id ORDER BY fecha DESC, id DESC LIMIT 1"
+            "  WHERE potrero_id = p.id ORDER BY id DESC LIMIT 1"
             ") WHERE p.geom_wkt_4326 IS NOT NULL "
             "ORDER BY p.id ASC"
         )
