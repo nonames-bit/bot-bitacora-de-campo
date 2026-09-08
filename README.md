@@ -517,6 +517,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Penetración 100% de nubes, lluvia y neblina**: resuelve el apagón del NDVI óptico en temporada de lluvias en los Llanos Orientales.
     - Dual-Pol Radar Vegetation Index ($RVI$, Mandal et al. 2020), proxy SAR-NDVI y estimador dieléctrico de humedad superficial de pastura/suelo.
     - Fusión multisensor automática en `actualizar_lecturas_reales(modo='auto')`: si Sentinel-2 está nublado, conmuta de inmediato a Sentinel-1 SAR.
+  - **Depuración de UI: Asistente IA Limpio en PWA (v68)**: Remoción completa de los botones/chips inferiores de sugerencias del modal de chat en el Tablero principal y en la Ficha Animal, brindando un área despejada y enfocada exclusivamente en el historial de conversación y entrada de texto.
 - [x] Suite de pruebas con pytest: **670 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
