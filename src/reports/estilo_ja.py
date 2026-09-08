@@ -286,7 +286,8 @@ def dibujar_logo_circular(c, x: float, y: float, diametro: float = 30,
 
 
 def dibujar_encabezado(c, x0, y_hdr, cw, h_hdr=40, potrero="", fecha="",
-                       subtitulo="FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL") -> None:
+                       subtitulo="FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL",
+                       estado: str = "ACTIVO") -> None:
     """Franja institucional verde sólida con medalla circular y tipografía refinada."""
     c.saveState()
     c.setFillColor(colors.HexColor("#0D1D13"))
@@ -307,11 +308,21 @@ def dibujar_encabezado(c, x0, y_hdr, cw, h_hdr=40, potrero="", fecha="",
     c.setFillColor(colors.HexColor(COLOR_MARCA_HEADER))
     c.drawString(txt_x + 115, y_hdr + 22, f"·  {subtitulo.upper()[:65]}")
 
+    st_upper = str(estado or "ACTIVO").upper()
+    if st_upper == "ACTIVO":
+        st_sub = "HATO ACTIVO"
+    else:
+        st_sub = f"REGISTRO HISTÓRICO ({st_upper})"
+
     c.setFont("Helvetica", 7.6)
     c.setFillColor(colors.HexColor("#E2E8F0"))
-    c.drawString(txt_x, y_hdr + 9, "BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA · HATO ACTIVO")
+    c.drawString(txt_x, y_hdr + 9, f"BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA · {st_sub}")
 
-    if potrero:
+    if st_upper != "ACTIVO":
+        c.setFillColor(colors.white)
+        c.setFont("Helvetica-Bold", 9.5)
+        c.drawRightString(x0 + cw - 12, y_hdr + 22, f"ESTADO: {st_upper}")
+    elif potrero:
         c.setFillColor(colors.white)
         c.setFont("Helvetica-Bold", 9.5)
         c.drawRightString(x0 + cw - 12, y_hdr + 22, f"POTRERO: {str(potrero).upper()[:30]}")

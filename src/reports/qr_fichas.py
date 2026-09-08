@@ -526,13 +526,14 @@ def generar_ficha_qr_individual(
     hoy = hoy or date.today()
     hoy_iso = hoy.isoformat()
     tag_clean = str(tag or "").strip()
-    aid = db.animal_id(tag_clean)
+    aid = db.resolve_animal(tag_clean)
     if aid is None:
-        raise ValueError(f"Sin animal ACTIVO con tag '{tag_clean}'.")
+        raise ValueError(f"No se encontró ningún animal con el identificador '{tag_clean}'.")
     animal = db.get_animal(aid)
-    if animal is None or str(animal["estado"] or "").upper() != "ACTIVO":
-        raise ValueError(f"El animal '{tag_clean}' no está ACTIVO.")
+    if animal is None:
+        raise ValueError(f"No se encontró ningún animal con el identificador '{tag_clean}'.")
     an_tag = str(animal["tag"] or tag_clean)
+    estado_animal = str(animal["estado"] or "ACTIVO").upper()
 
     ficha = datos_ficha_animal(db, an_tag)
     payload, url = qr_payload(an_tag)
@@ -562,7 +563,8 @@ def generar_ficha_qr_individual(
     dibujar_encabezado(
         c, x0, y_hdr, cw, h_hdr=h_hdr,
         potrero=pot_nom, fecha=hoy_iso,
-        subtitulo="FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL"
+        subtitulo="FICHA TÉCNICA ZOOTÉCNICA Y TRAZABILIDAD INDIVIDUAL",
+        estado=estado_animal
     )
 
     # 3. Pie de página institucional

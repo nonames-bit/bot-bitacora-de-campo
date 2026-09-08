@@ -497,7 +497,8 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
       - Tabla de existencias por potrero enriquecida con fila de totales generales y recuadro explicativo de glosario de categorías SG.
       - Tablas de eventos (partos, muertes) con tags en negrita y padding profesional; tarjeta de estado óptimo en alertas.
     - **Ficha Zootécnica Individual A4 Apaisada (`src/reports/qr_fichas.py`)**:
-      - Encabezado con medalla circular oficial y aro dorado.
+      - Encabezado con medalla circular oficial y aro dorado que refleja dinámicamente el estado (`HATO ACTIVO` o `REGISTRO HISTÓRICO (VENDIDO/MUERTO)`).
+      - Soporte universal para animales activos e históricos (`VENDIDO`, `MUERTO`, `DESCARTADO`): descarga sin errores 404 ni restricciones de inventario activo.
       - Tarjeta pasaporte izquierda con tag en 22pt, nombre, pastilla ámbar para el Hierro del animal (`HIERRO: <valor>`), QR vectorial nativo de alta resolución e imagen/placeholder.
       - Grilla estructurada de 4 columnas en Identificación y Categoría con chip de estado (`ACTIVO` verde, `VENDIDO` ámbar, `MUERTO` rojo).
       - Tarjetas de genealogía (Línea Materna y Paterna) con padres y abuelos, más chequeo de consanguinidad en 3G.
@@ -511,7 +512,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Integración sin clave con Open-Meteo para coordenadas de la finca con caché de 3 horas.
     - Despacho matutino enriquecido con clima del día (temperatura, probabilidad de precipitación, índice UV, viento y alertas de campo).
     - Comando `/pronostico` en Telegram con tabla extendida a 7 días y botones interactivos.
-- [x] Suite de pruebas con pytest: **646 pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest: **648 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

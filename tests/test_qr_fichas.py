@@ -46,3 +46,28 @@ def test_qr_legible_y_activo_estricto(tmp_path, db_lote):
     ruta = str(tmp_path / "lote.pdf")
     out = generar_fichas_lote(db_lote, "LOTE-A", salida=ruta, media_dir="media")
     assert os.path.exists(out) and os.path.getsize(out) > 0
+
+
+def test_ficha_qr_individual_activo_y_vendido(tmp_path, db_lote):
+    from src.reports.qr_fichas import generar_ficha_qr_individual
+    # Animal activo
+    r_act = str(tmp_path / "ficha_47.pdf")
+    out1 = generar_ficha_qr_individual(db_lote, "47", salida=r_act)
+    assert os.path.exists(out1)
+    assert os.path.getsize(out1) > 0
+    with open(out1, "rb") as f:
+        assert f.read(4) == b"%PDF"
+
+    # Animal vendido (histórico debe permitir descargar su ficha técnica)
+    r_ven = str(tmp_path / "ficha_99.pdf")
+    out2 = generar_ficha_qr_individual(db_lote, "99", salida=r_ven)
+    assert os.path.exists(out2)
+    assert os.path.getsize(out2) > 0
+    with open(out2, "rb") as f:
+        assert f.read(4) == b"%PDF"
+
+
+def test_ficha_qr_individual_no_existe(db_lote):
+    from src.reports.qr_fichas import generar_ficha_qr_individual
+    with pytest.raises(ValueError, match="No se encontró"):
+        generar_ficha_qr_individual(db_lote, "TAG-QUE-NO-EXISTE")

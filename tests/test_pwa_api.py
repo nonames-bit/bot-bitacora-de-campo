@@ -455,10 +455,25 @@ def test_api_qr_pdf_por_animal(db_file, client):
     pytest.importorskip("reportlab", reason="reportlab no instalado")
     # 47 está ACTIVA en el fixture (con parto); exportar tarjeta QR no debe fallar.
     r = client.get("/api/ficha/47/qr.pdf")
-    assert r.status_code in (200, 404)
-    if r.status_code == 200:
-        assert r.content_type == "application/pdf"
-        assert r.data[:4] == b"%PDF"
+    assert r.status_code == 200
+    assert r.content_type == "application/pdf"
+    assert r.data[:4] == b"%PDF"
+
+    # 99 está VENDIDO en el fixture; debe poder descargarse igualmente su ficha.
+    r_ven = client.get("/api/ficha/99/qr.pdf")
+    assert r_ven.status_code == 200
+    assert r_ven.content_type == "application/pdf"
+    assert r_ven.data[:4] == b"%PDF"
+
+    # Rutas alias
+    r_alias1 = client.get("/api/ficha/47/pdf")
+    assert r_alias1.status_code == 200
+    r_alias2 = client.get("/ficha/47/pdf")
+    assert r_alias2.status_code == 200
+
+    # Animal inexistente retorna 404
+    r_404 = client.get("/api/ficha/ANIMAL-NO-EXISTENTE/qr.pdf")
+    assert r_404.status_code == 404
 
 
 def test_api_identificar_por_texto_rfid(client):

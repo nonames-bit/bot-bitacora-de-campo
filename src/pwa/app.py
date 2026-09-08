@@ -2429,8 +2429,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
 
     @app.get("/api/ficha/<tag>/qr.pdf")
+    @app.get("/api/ficha/<tag>/pdf")
+    @app.get("/ficha/<tag>/pdf")
     def api_ficha_qr_pdf(tag):
         # Exporta la tarjeta QR del animal como PDF (botón "Descargar QR").
+        from urllib.parse import unquote
         db_pdf = _db(db_path)
         try:
             try:
@@ -2442,12 +2445,13 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 base_url = request.host_url.rstrip("/")
             except Exception:
                 base_url = ""
+            tag_clean = unquote(str(tag or "")).strip()
             ruta = generar_ficha_qr_individual(
-                db_pdf, str(tag), media_dir=MEDIA_DIR_DEFAULT, base_url=base_url,
+                db_pdf, tag_clean, media_dir=MEDIA_DIR_DEFAULT, base_url=base_url,
             )
             if not ruta or not os.path.isfile(ruta):
                 abort(404)
-            tag_safe = re.sub(r"[^A-Za-z0-9_-]+", "_", str(tag)) or "animal"
+            tag_safe = re.sub(r"[^A-Za-z0-9_-]+", "_", tag_clean) or "animal"
             return send_file(os.path.abspath(ruta), mimetype="application/pdf",
                              as_attachment=True, download_name=f"ficha_qr_{tag_safe}.pdf")
         except ValueError as e:
