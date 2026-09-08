@@ -295,6 +295,7 @@ def _generadores_graficos_pwa():
         "evolucion": charts.generar_grafico_evolucion_rebano,
         "categorias": charts.generar_grafico_categorias,
         "composicion_racial": charts.generar_grafico_composicion_racial,
+        "flujo_caja": charts.generar_grafico_flujo_caja,
         "leche_total": charts.generar_grafico_leche_total_hato,
         "eficiencia_lechera": charts.generar_grafico_eficiencia_lechera,
         "reproductivo_hato": charts.generar_grafico_estado_reproductivo_hato,
@@ -1061,6 +1062,62 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         res["foto_ruta"] = _guardar_foto_recibo_leche(foto_b64, res.get("periodo") or "", fecha_ref)
         return jsonify(res)
 
+    def _guardar_foto_factura(foto_b64: str, concepto: str, fecha_ref: str) -> Optional[str]:
+        """Guarda en disco + tabla fotos la imagen de la factura/recibo de
+        gasto o ingreso, igual que ``_guardar_foto_recibo_leche``. Devuelve
+        la ruta relativa guardada, o None si falla (nunca lanza)."""
+        try:
+            try:
+                from ..vision.recibo_leche_parser import _extraer_bytes_e_imagen
+            except (ImportError, ValueError):
+                from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
+            raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
+            media_dir_abs = (
+                os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
+                if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
+            )
+            os.makedirs(media_dir_abs, exist_ok=True)
+            ts = int(time.time())
+            rnd = uuid.uuid4().hex[:6]
+            fname = f"factura_{ts}_{rnd}.jpg"
+            with open(os.path.join(media_dir_abs, fname), "wb") as f:
+                f.write(raw_bytes)
+            ruta_rel = os.path.join("media", fname).replace("\\", "/")
+            db_foto = _db(db_path)
+            try:
+                db_foto.registrar_foto(
+                    ruta=ruta_rel, animal_tag=None, fecha=fecha_ref,
+                    caption=f"Factura/Recibo: {concepto}".strip() or "Factura/Recibo",
+                    user_id=session.get("user_id"),
+                    notas="Foto guardada al momento de analizar con IA (evidencia del gasto/ingreso).",
+                )
+            finally:
+                db_foto.close()
+            return ruta_rel
+        except Exception:
+            logger.exception("No se pudo guardar la foto de la factura al analizar")
+            return None
+
+    @app.post("/api/finanzas/analizar-factura")
+    def api_finanzas_analizar_factura():
+        datos = request.get_json(silent=True) or {}
+        foto_b64 = datos.get("foto_base64")
+        fecha_ref = datos.get("fecha_referencia") or date.today().isoformat()
+        if not foto_b64:
+            return jsonify({"ok": False, "error": "No se recibió la foto de la factura."}), 400
+
+        try:
+            from ..vision.recibo_gasto_parser import analizar_factura_gasto
+        except (ImportError, ValueError):
+            from src.vision.recibo_gasto_parser import analizar_factura_gasto
+
+        res = analizar_factura_gasto(foto_b64, fecha_referencia=fecha_ref)
+        # Misma razón que el recibo de leche: la foto es la evidencia del
+        # gasto/ingreso, se guarda ya mismo sin depender de que termine de
+        # revisar el formulario y presione guardar.
+        res["foto_ruta"] = _guardar_foto_factura(foto_b64, res.get("concepto") or "", fecha_ref)
+        return jsonify(res)
+
     @app.post("/api/leche/guardar-quincena")
     def api_leche_guardar_quincena():
         datos = request.get_json(silent=True) or {}
@@ -1790,14 +1847,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
-                        fid_foto = _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
-                        if fid_foto:
-                            foto_fila = db_sync.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
-                            if foto_fila and foto_fila["ruta"]:
-                                db_sync.execute(
-                                    "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
-                                    (foto_fila["ruta"], fid_finanza),
-                                )
+                        foto_ruta_directa = (payload.get("foto_ruta") or "").strip() or None
+                        if foto_ruta_directa:
+                            # La foto ya se guardó al analizar la factura con IA
+                            # (ver /api/finanzas/analizar-factura) -- solo se
+                            # enlaza, no se vuelve a subir el mismo archivo.
+                            db_sync.execute(
+                                "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
+                                (foto_ruta_directa, fid_finanza),
+                            )
+                        else:
+                            fid_foto = _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                            if fid_foto:
+                                foto_fila = db_sync.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
+                                if foto_fila and foto_fila["ruta"]:
+                                    db_sync.execute(
+                                        "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
+                                        (foto_fila["ruta"], fid_finanza),
+                                    )
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)

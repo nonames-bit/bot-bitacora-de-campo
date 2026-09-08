@@ -560,6 +560,116 @@ class Database:
             "categorias": categorias,
         }
 
+    def flujo_caja_mensual(self, desde: str, hasta: str) -> list[dict]:
+        """Ingresos/egresos/utilidad por mes calendario entre desde y hasta
+        (misma fuente que ``resumen_finanzas`` -- finanzas + ventas/compras
+        de animales -- pero agrupado por mes para ver estacionalidad, no
+        solo el acumulado del periodo)."""
+        filas_finanzas = self.query(
+            "SELECT strftime('%Y-%m', fecha) AS mes, tipo, SUM(monto) AS total "
+            "FROM finanzas WHERE fecha >= ? AND fecha <= ? GROUP BY mes, tipo",
+            (desde, hasta),
+        )
+        filas_animales = self.query(
+            "SELECT strftime('%Y-%m', fecha) AS mes, UPPER(tipo_movimiento) AS tipo_movimiento, "
+            "SUM(COALESCE(precio, 0)) AS total FROM movimientos "
+            "WHERE fecha >= ? AND fecha <= ? AND precio IS NOT NULL AND precio > 0 "
+            "GROUP BY mes, tipo_movimiento",
+            (desde, hasta),
+        )
+        por_mes: dict[str, dict] = {}
+
+        def _mes(m):
+            return por_mes.setdefault(m, {"mes": m, "ingresos": 0.0, "egresos": 0.0})
+
+        for f in filas_finanzas:
+            if not f["mes"]:
+                continue
+            fila = _mes(f["mes"])
+            total = float(f["total"] or 0.0)
+            if (f["tipo"] or "").upper() == "INGRESO":
+                fila["ingresos"] += total
+            else:
+                fila["egresos"] += total
+        for f in filas_animales:
+            if not f["mes"]:
+                continue
+            fila = _mes(f["mes"])
+            total = float(f["total"] or 0.0)
+            if f["tipo_movimiento"] == "VENTA":
+                fila["ingresos"] += total
+            elif f["tipo_movimiento"] == "COMPRA":
+                fila["egresos"] += total
+
+        filas = sorted(por_mes.values(), key=lambda x: x["mes"])
+        for fila in filas:
+            fila["ingresos"] = round(fila["ingresos"], 2)
+            fila["egresos"] = round(fila["egresos"], 2)
+            fila["utilidad"] = round(fila["ingresos"] - fila["egresos"], 2)
+        return filas
+
+    def kpis_financieros(self, desde: str, hasta: str) -> dict:
+        """KPIs Fase 2 de Finanzas: costo por litro de leche, margen de
+        utilidad, costo por cabeza y costo por kg de carne vendida.
+
+        El costo por kg de carne es una APROXIMACIÓN: no se registra el peso
+        del animal en el momento de la venta, así que se usa el último
+        pesaje conocido antes de esa fecha. Ventas sin ningún pesaje previo
+        quedan excluidas del cálculo (se reportan aparte en
+        ``ventas_sin_peso`` para que quede claro que el número es parcial)."""
+        resumen = self.resumen_finanzas(desde, hasta)
+        total_ingresos = resumen["total_ingresos"]
+        total_egresos = resumen["total_egresos"]
+
+        litros_row = self.query_one(
+            "SELECT SUM(litros) AS total FROM produccion_leche WHERE fecha >= ? AND fecha <= ?",
+            (desde, hasta),
+        )
+        litros_producidos = float(litros_row["total"] or 0.0) if litros_row else 0.0
+        costo_por_litro_leche = round(total_egresos / litros_producidos, 2) if litros_producidos > 0 else None
+
+        margen_utilidad_pct = (
+            round((total_ingresos - total_egresos) / total_ingresos * 100, 1)
+            if total_ingresos > 0 else None
+        )
+
+        total_activos = self.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO'")["n"]
+        costo_por_cabeza = round(total_egresos / total_activos, 2) if total_activos > 0 else None
+
+        ventas = self.query(
+            "SELECT animal_id, fecha FROM movimientos "
+            "WHERE fecha >= ? AND fecha <= ? AND UPPER(tipo_movimiento) = 'VENTA' AND animal_id IS NOT NULL",
+            (desde, hasta),
+        )
+        kg_total = 0.0
+        ventas_con_peso = 0
+        ventas_sin_peso = 0
+        for v in ventas:
+            p = self.query_one(
+                "SELECT peso_kg FROM pesajes WHERE animal_id = ? AND fecha <= ? "
+                "AND peso_kg IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                (v["animal_id"], v["fecha"]),
+            )
+            if p and p["peso_kg"]:
+                kg_total += float(p["peso_kg"])
+                ventas_con_peso += 1
+            else:
+                ventas_sin_peso += 1
+        costo_por_kg_carne = round(total_egresos / kg_total, 2) if kg_total > 0 else None
+
+        return {
+            "litros_producidos": round(litros_producidos, 1),
+            "costo_por_litro_leche": costo_por_litro_leche,
+            "margen_utilidad_pct": margen_utilidad_pct,
+            "total_activos": total_activos,
+            "costo_por_cabeza": costo_por_cabeza,
+            "kg_carne_estimados": round(kg_total, 1),
+            "ventas_con_peso": ventas_con_peso,
+            "ventas_sin_peso": ventas_sin_peso,
+            "costo_por_kg_carne": costo_por_kg_carne,
+            "flujo_mensual": self.flujo_caja_mensual(desde, hasta),
+        }
+
     def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
                                      notas=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)

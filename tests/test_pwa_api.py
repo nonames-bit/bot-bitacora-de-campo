@@ -1103,6 +1103,82 @@ def test_api_leche_analizar_recibo_guarda_la_foto_de_inmediato(client, db_file):
         db.close()
 
 
+def test_api_finanzas_analizar_factura(client):
+    """Fase 2 de Finanzas: digitalización de facturas/recibos generales con
+    IA, mismo patrón que el recibo de leche -- extrae categoría, concepto,
+    monto y proveedor para pre-llenar la captura de gasto/ingreso."""
+    import base64
+    from unittest.mock import patch
+    fake_img_b64 = base64.b64encode(
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+    ).decode("utf-8")
+    sample_parse = {
+        "ok": True, "es_factura": True, "tipo": "EGRESO", "fecha": "2026-09-07",
+        "proveedor": "Agrotienda El Ganadero", "concepto": "Sal mineralizada 3 bultos",
+        "categoria_sugerida": "INSUMO", "monto_total": 450000.0,
+        "observaciones": "", "confianza": "alta",
+    }
+    with patch("src.vision.recibo_gasto_parser.analizar_factura_gasto", return_value=sample_parse):
+        r = client.post("/api/finanzas/analizar-factura", json={"foto_base64": fake_img_b64})
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["ok"] is True
+    assert res["categoria_sugerida"] == "INSUMO"
+    assert res["monto_total"] == 450000.0
+    assert res["foto_ruta"]  # se guarda de inmediato, igual que el recibo de leche
+
+
+def test_api_finanzas_analizar_factura_sin_foto_devuelve_400(client):
+    r = client.post("/api/finanzas/analizar-factura", json={})
+    assert r.status_code == 400
+
+
+def test_api_grafico_flujo_caja_esta_en_whitelist(client):
+    r = client.get("/api/grafico/flujo_caja")
+    assert r.status_code in (200, 404)
+    if r.status_code == 200:
+        assert r.content_type == "image/png"
+
+
+def test_api_finanzas_incluye_kpis(client):
+    r = client.get("/api/finanzas")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert "kpis" in d
+    for clave in ("costo_por_litro_leche", "margen_utilidad_pct", "costo_por_cabeza",
+                  "costo_por_kg_carne", "flujo_mensual"):
+        assert clave in d["kpis"], clave
+
+
+def test_api_sync_gasto_con_foto_ruta_no_duplica_foto(client, db_file):
+    """Si la factura ya se analizó con IA, la foto quedó guardada en ese
+    momento -- el evento final de captura debe enlazarla por ruta en vez de
+    volver a subir los mismos bytes (ver /api/finanzas/analizar-factura)."""
+    from src.db.database import Database
+
+    db = Database(db_file)
+    db.registrar_foto(ruta="media/factura_ya_guardada.jpg", caption="Factura/Recibo: Sal")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "id_local": "x1", "tipo": "gasto", "fecha": "2026-09-07",
+        "payload": {
+            "tipo_finanza": "EGRESO", "categoria": "INSUMO", "concepto": "Sal",
+            "monto": 100000, "foto_ruta": "media/factura_ya_guardada.jpg",
+        },
+    }]})
+    assert r.status_code == 200
+
+    db = Database(db_file)
+    try:
+        fila = db.query_one("SELECT foto_ruta FROM finanzas WHERE concepto = 'Sal'")
+        assert fila["foto_ruta"] == "media/factura_ya_guardada.jpg"
+        n_fotos = db.query_one("SELECT COUNT(*) n FROM fotos WHERE ruta = 'media/factura_ya_guardada.jpg'")
+        assert n_fotos["n"] == 1  # no se duplicó el registro de foto
+    finally:
+        db.close()
+
+
 def test_api_leche_guardar_quincena_con_monto_crea_ingreso_en_finanzas(client, db_file):
     """Guardar la quincena con el monto que pagaron debe crear el ingreso en
     Finanzas (categoría VENTA_LECHE) reusando la misma foto ya guardada al

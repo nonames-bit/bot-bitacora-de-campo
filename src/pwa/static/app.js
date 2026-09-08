@@ -436,6 +436,20 @@
       + kpi(fmtMoneda(r.utilidad), "Utilidad", r.utilidad >= 0 ? "ok" : "alerta")
       + "</div>";
 
+    var kf = d.kpis || {};
+    h += "<h4>" + icon("chartLine") + "Indicadores de rentabilidad</h4>";
+    h += "<div class='kpis'>"
+      + kpi(kf.margen_utilidad_pct != null ? kf.margen_utilidad_pct + "%" : "—", "Margen de utilidad", kf.margen_utilidad_pct != null && kf.margen_utilidad_pct < 0 ? "alerta" : "ok")
+      + kpi(kf.costo_por_litro_leche != null ? fmtMoneda(kf.costo_por_litro_leche) : "—", "Costo por litro de leche (" + (kf.litros_producidos != null ? kf.litros_producidos : 0) + " L)")
+      + kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)")
+      + kpi(kf.costo_por_kg_carne != null ? fmtMoneda(kf.costo_por_kg_carne) : "—", "Costo por kg de carne (estimado)")
+      + "</div>";
+    if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
+      h += "<p class='aviso' style='margin-top:-6px;'>⚠️ Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
+        + (kf.ventas_sin_peso ? " " + kf.ventas_sin_peso + " venta(s) sin ningún pesaje previo quedaron fuera del cálculo." : "") + "</p>";
+    }
+    h += grafico("flujo_caja", "Flujo de caja mensual");
+
     h += "<h4>" + icon("chartBar") + "Desglose por categoría</h4>"
       + tabla(r.categorias, [
         ["tipo", "Tipo", "text", function (v) { return "<span class='chip " + (v === "INGRESO" ? "verde" : "rojo") + "'>" + esc(v) + "</span>"; }],
@@ -1221,17 +1235,22 @@
       + "</div>"
       + "</div>";
 
-    if (tipo === "leche") {
+    if (tipo === "leche" || tipo === "gasto") {
+      var tituloIa = tipo === "leche" ? "Digitalización Inteligente de Recibo (IA)" : "Digitalización Inteligente de Factura (IA)";
+      var descIa = tipo === "leche"
+        ? "Lee automáticamente cada renglón manuscrito, detecta fechas y suma los litros diarios."
+        : "Lee automáticamente el monto, la fecha, el proveedor y sugiere la categoría del gasto o ingreso.";
+      var btnTxtIa = tipo === "leche" ? "Leer Recibo con IA" : "Leer Factura con IA";
       h += "<div id='box-analizar-recibo-ia' style='display:none; margin-top:14px; padding:14px; border-radius:8px; background:var(--superficie); border:1.5px solid var(--verde-marca); box-shadow:0 2px 6px var(--sombra);'>"
         + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;'>"
         + "<div>"
         + "<div style='font-weight:700; font-size:13.5px; color:var(--verde-marca); display:flex; align-items:center; gap:6px;'>"
-        + icon("sparkles", 16) + "Digitalización Inteligente de Recibo (IA)"
+        + icon("sparkles", 16) + tituloIa
         + "</div>"
-        + "<small style='color:var(--texto-suave); font-size:11.5px; display:block; margin-top:2px;'>Lee automáticamente cada renglón manuscrito, detecta fechas y suma los litros diarios.</small>"
+        + "<small style='color:var(--texto-suave); font-size:11.5px; display:block; margin-top:2px;'>" + esc(descIa) + "</small>"
         + "</div>"
         + "<button type='button' id='btn-analizar-recibo-ia' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:700; font-size:12.5px; padding:7px 14px; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
-        + icon("sparkles", 14) + "Leer Recibo con IA"
+        + icon("sparkles", 14) + esc(btnTxtIa)
         + "</button>"
         + "</div>"
         + "<div id='recibo-ia-estado' style='margin-top:10px; font-size:12.5px;'></div>"
@@ -1245,6 +1264,7 @@
   function bindCaptura() {
     var cCampos = document.getElementById("captura-campos");
     var _fotoActual = null;
+    var _facturaIaFotoRuta = null;
 
     function bindFotoCaptura() {
       var btnElegir = document.getElementById("btn-elegir-foto");
@@ -1260,7 +1280,8 @@
       var previewIa = document.getElementById("recibo-ia-preview");
       var btnAnalizarIa = document.getElementById("btn-analizar-recibo-ia");
 
-      if (_fotoActual && _tipoCapturaActual === "leche" && boxIa) {
+      var _esLecheOGasto = _tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto";
+      if (_fotoActual && _esLecheOGasto && boxIa) {
         boxIa.style.display = "block";
       }
 
@@ -1273,6 +1294,7 @@
       if (btnQuitar) {
         btnQuitar.addEventListener("click", function () {
           _fotoActual = null;
+          _facturaIaFotoRuta = null;
           if (fileInp) fileInp.value = "";
           if (preWrap) preWrap.style.display = "none";
           if (preImg) preImg.src = "";
@@ -1327,12 +1349,16 @@
               if (preTam) preTam.textContent = "Optimizada (" + tamKb + " KB) · Lista para adjuntar";
               if (preWrap) preWrap.style.display = "flex";
 
-              if (boxIa && _tipoCapturaActual === "leche") {
+              _facturaIaFotoRuta = null;
+              if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
                 boxIa.style.display = "block";
+                var txtAyudaIa = _tipoCapturaActual === "leche"
+                  ? "Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente."
+                  : "Presiona <b>Leer Factura con IA</b> para llenar categoría, monto y proveedor automáticamente.";
                 if (estadoIa) {
                   estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
                     + "<span class='chip verde' style='font-size:11px;'>Foto cargada</span>"
-                    + "<span style='color:var(--texto-suave); font-size:12px;'>Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente.</span>"
+                    + "<span style='color:var(--texto-suave); font-size:12px;'>" + txtAyudaIa + "</span>"
                     + "</div>";
                 }
                 if (previewIa) {
@@ -1620,24 +1646,49 @@
         }
       }
 
+      function rellenarCamposFactura(res) {
+        _facturaIaFotoRuta = res.foto_ruta || null;
+        var selCat = document.getElementById("cap-fin-categoria");
+        var fConcepto = document.getElementById("cap-fin-concepto");
+        var fMonto = document.getElementById("cap-fin-monto");
+        var fContraparte = document.getElementById("cap-fin-contraparte");
+        var fFecha = document.getElementById("cap-fecha");
+        if (selCat && res.categoria_sugerida) selCat.value = res.categoria_sugerida;
+        if (selCat) selCat.dispatchEvent(new Event("change"));
+        if (fConcepto && res.concepto) fConcepto.value = res.concepto;
+        if (fMonto && res.monto_total != null) fMonto.value = res.monto_total;
+        if (fContraparte && res.proveedor) fContraparte.value = res.proveedor;
+        if (fFecha && res.fecha) fFecha.value = res.fecha;
+        if (previewIa) {
+          previewIa.style.display = "block";
+          previewIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--verde-marca);'>"
+            + "✅ <b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
+            + (res.observaciones ? "<br><small>" + esc(res.observaciones) + "</small>" : "")
+            + "</div>";
+        }
+      }
+
       if (btnAnalizarIa) {
         btnAnalizarIa.addEventListener("click", function () {
           if (!_fotoActual || !_fotoActual.base64) {
-            alert("Por favor toma o selecciona primero una foto del recibo o planilla.");
+            alert("Por favor toma o selecciona primero una foto del recibo o factura.");
             return;
           }
+          var esGasto = _tipoCapturaActual === "gasto";
           btnAnalizarIa.disabled = true;
           btnAnalizarIa.innerHTML = "⏳ Analizando...";
           if (estadoIa) {
+            var txtEsperaIa = esGasto
+              ? "<b style='color:var(--verde-marca);'>Digitalizando factura con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo monto, fecha, proveedor y categoría. Esto toma 5-10 segundos.</small>"
+              : "<b style='color:var(--verde-marca);'>Digitalizando recibo con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo días, fechas y litros de las anotaciones manuscritas. Esto toma 5-10 segundos.</small>";
             estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:10px; padding:10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
-              + "<span style='font-size:18px;'>⏳</span>"
-              + "<div><b style='color:var(--verde-marca);'>Digitalizando recibo con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo días, fechas y litros de las anotaciones manuscritas. Esto toma 5-10 segundos.</small></div>"
-              + "</div>";
+              + "<span style='font-size:18px;'>⏳</span><div>" + txtEsperaIa + "</div></div>";
           }
           if (previewIa) previewIa.style.display = "none";
 
           var fechaRef = (q("#cap-fecha") && q("#cap-fecha").value) || new Date().toISOString().slice(0, 10);
-          fetch("/api/leche/analizar-recibo", {
+          var url = esGasto ? "/api/finanzas/analizar-factura" : "/api/leche/analizar-recibo";
+          fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -1652,10 +1703,20 @@
           })
           .then(function (res) {
             btnAnalizarIa.disabled = false;
-            btnAnalizarIa.innerHTML = icon("sparkles", 14) + "Re-analizar Recibo";
+            btnAnalizarIa.innerHTML = icon("sparkles", 14) + (esGasto ? "Re-analizar Factura" : "Re-analizar Recibo");
 
             if (!res.ok) {
-              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ <b>Error:</b> " + esc(res.error || "No se pudo procesar el recibo.") + "</div>";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ <b>Error:</b> " + esc(res.error || "No se pudo procesar la imagen.") + "</div>";
+              return;
+            }
+
+            if (esGasto) {
+              if (!res.es_factura) {
+                var obsF = res.observaciones || "No se detectó una factura o recibo legible en la imagen.";
+                if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece una factura válida:</b><br><small style='color:var(--texto);'>" + esc(obsF) + "</small></div>";
+                return;
+              }
+              rellenarCamposFactura(res);
               return;
             }
 
@@ -1768,8 +1829,12 @@
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
         }
 
-        // Adjuntar foto opcional
-        if (_fotoActual && _fotoActual.base64) {
+        // Adjuntar foto opcional. Si ya se analizó con IA (leche/gasto), la
+        // foto quedó guardada en ese momento -- se enlaza por ruta en vez de
+        // volver a subir los mismos bytes.
+        if (_tipoCapturaActual === "gasto" && _facturaIaFotoRuta) {
+          payload.foto_ruta = _facturaIaFotoRuta;
+        } else if (_fotoActual && _fotoActual.base64) {
           payload.foto_base64 = _fotoActual.base64;
           payload.foto_nombre = _fotoActual.nombre;
         }

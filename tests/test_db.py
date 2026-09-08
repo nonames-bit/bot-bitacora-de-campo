@@ -623,6 +623,61 @@ def test_resumen_finanzas_ignora_fuera_de_rango(db):
     assert resumen["total_ingresos"] == 200000
 
 
+def test_flujo_caja_mensual(db):
+    db.registrar_finanza(fecha="2026-08-05", tipo="INGRESO", categoria="VENTA_LECHE", monto=1000000)
+    db.registrar_finanza(fecha="2026-08-10", tipo="EGRESO", categoria="INSUMO", monto=300000)
+    db.registrar_finanza(fecha="2026-09-05", tipo="EGRESO", categoria="NOMINA", monto=500000)
+    db.registrar_movimiento("V1", fecha="2026-09-10", tipo_movimiento="VENTA", precio=2000000)
+
+    filas = db.flujo_caja_mensual("2026-08-01", "2026-09-30")
+    por_mes = {f["mes"]: f for f in filas}
+    assert por_mes["2026-08"]["ingresos"] == 1000000
+    assert por_mes["2026-08"]["egresos"] == 300000
+    assert por_mes["2026-08"]["utilidad"] == 700000
+    assert por_mes["2026-09"]["ingresos"] == 2000000
+    assert por_mes["2026-09"]["egresos"] == 500000
+
+
+def test_kpis_financieros_costo_litro_y_margen(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=100.0, animal_tag="47")
+    db.registrar_produccion_leche(fecha="2026-09-02", litros=100.0, animal_tag="47")
+    db.registrar_finanza(fecha="2026-09-01", tipo="INGRESO", categoria="VENTA_LECHE", monto=400000)
+    db.registrar_finanza(fecha="2026-09-02", tipo="EGRESO", categoria="INSUMO", monto=100000)
+
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    assert k["litros_producidos"] == 200.0
+    assert k["costo_por_litro_leche"] == 500.0  # 100000 egresos / 200 L
+    assert k["margen_utilidad_pct"] == 75.0  # (400000-100000)/400000
+    assert k["total_activos"] == 1
+    assert k["costo_por_cabeza"] == 100000.0
+    assert "flujo_mensual" in k
+
+
+def test_kpis_financieros_costo_por_kg_carne_usa_ultimo_pesaje(db):
+    db.registrar_animal("V1", sexo="Macho", estado="VENDIDO")
+    db.registrar_pesaje(animal_tag="V1", fecha="2026-08-01", peso_kg=380)
+    db.registrar_pesaje(animal_tag="V1", fecha="2026-08-20", peso_kg=420)  # el más reciente antes de vender
+    db.registrar_movimiento("V1", fecha="2026-09-01", tipo_movimiento="VENTA", precio=3000000)
+    db.registrar_finanza(fecha="2026-09-01", tipo="EGRESO", categoria="INSUMO", monto=420000)
+
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    assert k["kg_carne_estimados"] == 420.0
+    assert k["ventas_con_peso"] == 1
+    assert k["ventas_sin_peso"] == 0
+    assert k["costo_por_kg_carne"] == 1000.0  # 420000 / 420 kg
+
+
+def test_kpis_financieros_venta_sin_pesaje_queda_excluida(db):
+    db.registrar_animal("V2", sexo="Macho", estado="VENDIDO")
+    db.registrar_movimiento("V2", fecha="2026-09-01", tipo_movimiento="VENTA", precio=1000000)
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    assert k["ventas_sin_peso"] == 1
+    assert k["ventas_con_peso"] == 0
+    assert k["kg_carne_estimados"] == 0.0
+    assert k["costo_por_kg_carne"] is None
+
+
 def test_iep_promedio_hato(db):
     """Auditoría de SG mostró un IEP de 2,063 días (imposible) por huecos de
     registro -- el cálculo del bot debe excluir intervalos >730d por defecto

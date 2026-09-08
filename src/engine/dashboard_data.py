@@ -623,12 +623,20 @@ def datos_finanzas(db: Database, desde: Optional[str] = None, hasta: Optional[st
         errores["ventas_compras"] = str(e)
         ventas_compras = []
 
+    try:
+        kpis = db.kpis_financieros(desde, hasta)
+    except Exception as e:
+        logger.error("seccion kpis_financieros fallo", exc_info=True)
+        errores["kpis"] = str(e)
+        kpis = None
+
     out: dict[str, Any] = {
         "desde": desde, "hasta": hasta,
         "resumen": resumen,
         "recientes": recientes,
         "ventas_compras": ventas_compras,
         "categorias_disponibles": CATEGORIAS_FINANZAS,
+        "kpis": kpis,
     }
     if errores:
         out["errores"] = errores

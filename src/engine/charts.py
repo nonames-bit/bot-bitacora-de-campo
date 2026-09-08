@@ -1323,6 +1323,53 @@ def _kaplan_meier(observaciones: list) -> tuple:
     return tiempos, supervivencia
 
 
+def generar_grafico_flujo_caja(db, output_dir: str = "data/reportes",
+                               desde: Optional[str] = None, hasta: Optional[str] = None,
+                               hoy: Optional[date] = None, dpi: int = 130,
+                               placeholder_si_vacio: bool = False) -> Optional[str]:
+    """Barras agrupadas de ingresos/egresos por mes + línea de utilidad, para
+    ver estacionalidad del flujo de caja (no solo el acumulado del año)."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    desde = desde or date(hoy.year, 1, 1).isoformat()
+    hasta = hasta or date(hoy.year, 12, 31).isoformat()
+    filas = db.flujo_caja_mensual(desde, hasta)
+    if not filas:
+        if placeholder_si_vacio:
+            return generar_grafico_placeholder(
+                titulo="Flujo de Caja Mensual",
+                subtitulo="Sin movimientos financieros en el periodo.",
+                output_dir=output_dir,
+                nombre_archivo=f"grafico_flujo_caja_{hoy.isoformat()}.png",
+                hoy=hoy, dpi=dpi,
+            )
+        return None
+
+    meses = [f["mes"] for f in filas]
+    ingresos = [f["ingresos"] for f in filas]
+    egresos = [f["egresos"] for f in filas]
+    utilidad = [f["utilidad"] for f in filas]
+
+    x = list(range(len(meses)))
+    ancho = 0.38
+    fig, ax = plt.subplots(figsize=(9, 5), dpi=dpi)
+    ax.bar([i - ancho / 2 for i in x], ingresos, width=ancho, label="Ingresos", color=_COLOR_VERDE)
+    ax.bar([i + ancho / 2 for i in x], egresos, width=ancho, label="Egresos", color=_COLOR_ROJO)
+    ax.plot(x, utilidad, color=_COLOR_MARCA, marker="o", linewidth=2, label="Utilidad")
+    ax.axhline(0, color="#616161", linewidth=1)
+    ax.set_xticks(x)
+    ax.set_xticklabels(meses, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("Pesos ($)")
+    total_util = sum(utilidad)
+    _titulo_y_subtitulo(fig, ax, "Flujo de Caja Mensual",
+                        f"{len(meses)} mes(es) · utilidad del periodo: ${total_util:,.0f}".replace(",", "."))
+    _estilo_ejes(ax, margin_x=0.03)
+    ax.legend(loc="upper left", fontsize=8, ncol=3)
+
+    return _guardar(fig, output_dir, f"grafico_flujo_caja_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+
+
 def generar_grafico_dias_abiertos_km(db, output_dir: str = "data/reportes",
                                      hoy: Optional[date] = None, dpi: int = 130,
                                      placeholder_si_vacio: bool = False) -> Optional[str]:

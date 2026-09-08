@@ -13,6 +13,7 @@ from src.engine.charts import (
     generar_grafico_categorias,
     generar_grafico_composicion_racial,
     generar_grafico_dias_abiertos_km,
+    generar_grafico_flujo_caja,
     generar_grafico_eficiencia_lechera,
     generar_grafico_estado_reproductivo_hato,
     generar_grafico_evolucion_rebano,
@@ -126,6 +127,18 @@ def test_generar_grafico_composicion_racial(db, tmp_path):
 
 def test_generar_grafico_composicion_racial_sin_animales_devuelve_none(db, tmp_path):
     assert generar_grafico_composicion_racial(db, output_dir=str(tmp_path)) is None
+
+
+def test_generar_grafico_flujo_caja(db, tmp_path):
+    db.registrar_finanza(fecha="2026-08-05", tipo="INGRESO", categoria="VENTA_LECHE", monto=1000000)
+    db.registrar_finanza(fecha="2026-08-10", tipo="EGRESO", categoria="INSUMO", monto=300000)
+    ruta = generar_grafico_flujo_caja(db, output_dir=str(tmp_path), desde="2026-08-01", hasta="2026-08-31", hoy=date(2026, 8, 30))
+    assert ruta is not None
+    assert os.path.exists(ruta)
+
+
+def test_generar_grafico_flujo_caja_sin_movimientos_devuelve_none(db, tmp_path):
+    assert generar_grafico_flujo_caja(db, output_dir=str(tmp_path), desde="2026-08-01", hasta="2026-08-31") is None
 
 
 def test_generar_grafico_gmd_hato(db, tmp_path):
