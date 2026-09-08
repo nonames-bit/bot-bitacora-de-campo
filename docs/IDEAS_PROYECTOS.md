@@ -23,21 +23,22 @@
 ## 🌿 Monitoreo de Potreros & Clima
 
 ### 1. Pronóstico del clima integrado al Despacho Matutino
-- **Estado:** 💭 Idea
+- **Estado:** ✔️ Completada (2026-09-07) — bot y PWA
 - **Impacto:** 🟢 Alto — decisiones diarias informadas (fumigar, hacer heno, mover ganado)
 - **Costo:** 💲 (API gratuita)
 - **Esfuerzo:** S
 - **Descripción:** Integrar una API gratuita de pronóstico (Open-Meteo o NASA POWER, sin costo ni clave compleja) con lluvia, temperatura y humedad a 7 días. El despacho de las 5:30 AM incluiría recomendaciones prácticas: *"🌧️ Lluvia probable mañana → no fumigar hoy"* o *"☀️ 4 días secos seguidos → ventana buena para heno"*.
 - **Dependencias:** Ninguna. APIs: [Open-Meteo](https://open-meteo.com/) (gratis, sin API key), NASA POWER.
-- **Notas:** Ideal como primer proyecto — rápido, gratis, valor diario inmediato.
+- **Notas:** Implementado en `src/engine/pronostico.py` (Open-Meteo, caché 6h) e integrado al Despacho Matutino del bot. Agregado también a la vista Pasturas de la PWA (tarjetas de 7 días + recomendaciones), que no lo tenía.
 
 ### 2. Alerta temprana de sequía (SPI)
-- **Estado:** 💭 Idea
+- **Estado:** ✔️ Completada (2026-09-07) — solo PWA (a pedido del usuario, sin alerta por Telegram)
 - **Impacto:** 🟢 Alto — anticipar crisis forrajera antes de que el potrero colapse
 - **Costo:** 💲 (reusa datos CHIRPS ya disponibles)
 - **Esfuerzo:** S-M
 - **Descripción:** Calcular el Índice de Precipitación Estandarizada (SPI) a 30/60/90 días con los datos CHIRPS que ya se descargan semanalmente. Si entra en rango de sequía, alerta automática para ajustar carga animal preventivamente.
 - **Dependencias:** `scripts/actualizar_lluvia_satelital.py` ya corriendo (CHIRPS semanal).
+- **Notas:** SPI real (McKee et al. 1993), no un proxy simplificado: `src/gis/earth_engine_lluvia.climatologia_historica_chirps` descarga ~30 años de CHIRPS por ventana (cacheados en `climatologia_lluvia_chirps`, refresco anual) y `src/engine/spi.calcular_spi` ajusta una distribución gamma para ubicar la lluvia actual contra ese histórico. El job semanal guarda el resultado en `monitoreo_spi_sequia`; se muestra en Pasturas (PWA) con semáforo por severidad, sin notificación al bot.
 
 ### 3. Balance forrajero predictivo a 30 días
 - **Estado:** 💭 Idea
