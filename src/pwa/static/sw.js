@@ -53,7 +53,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v59: Crear Animal y Editar Animal (identidad, genealogía, potrero, hierro, chip/RFID, color, notas) directamente en la PWA -- primer paso para dejar de depender de Software Ganadero para el alta/edición del hato. Solo ADMIN/OWNER.
 // v60: Finanzas Fase 2 -- indicadores de rentabilidad (margen de utilidad, costo por litro de leche, costo por cabeza, costo estimado por kg de carne) y gráfico de flujo de caja mensual; digitalización con IA de facturas/recibos generales de gasto o ingreso (categoría, concepto, monto, proveedor), con la foto guardada de inmediato como evidencia igual que el recibo de leche.
 // v61: Pronóstico del clima (Open-Meteo, 7 días) en Pasturas -- ya estaba en el Despacho Matutino del bot, ahora también visible en la PWA con recomendaciones prácticas (fumigar, heno, mover ganado).
-var CACHE = "pwa-ja-v61"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v62: Visor de fotos con arrastre interactivo (manito / pan), zoom suave multi-nivel (+/-, rueda, doble toque/clic) y soporte táctil fluido para inspeccionar detalles de recibos, hierros y ganado.
+var CACHE = "pwa-ja-v62"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

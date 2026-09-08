@@ -246,6 +246,28 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
     from ..engine.query_engine import calcular_existencias_potreros_sg
     potreros_sg = calcular_existencias_potreros_sg(db, hoy)
 
+    # Finanzas del período del reporte (mismo rango que "eventos", no el año
+    # completo): utilidad/margen semanal, no el acumulado anual de la PWA.
+    try:
+        resumen_finanzas = db.resumen_finanzas(desde_iso, hasta_iso)
+        kpis_finanzas = db.kpis_financieros(desde_iso, hasta_iso)
+    except Exception:
+        resumen_finanzas = None
+        kpis_finanzas = None
+
+    # Clima: mismo pronóstico Open-Meteo del Despacho Matutino/PWA (Pasturas)
+    # y misma alerta SPI de sequía -- no se recalculan aparte para el PDF.
+    try:
+        from ..engine.pronostico import obtener_pronostico_para_despacho, interpretar_pronostico
+        _pron = obtener_pronostico_para_despacho(db)
+        recomendaciones_clima = interpretar_pronostico(_pron) if _pron else []
+    except Exception:
+        recomendaciones_clima = []
+    try:
+        spi_sequia = [dict(r) for r in db.ultimos_spi_sequia()]
+    except Exception:
+        spi_sequia = []
+
     return {
         "inventario": {
             "activos": activos,
@@ -257,6 +279,9 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
         "eventos": eventos,
         "alertas": alertas,
         "potreros_sg": potreros_sg,
+        "finanzas": {"resumen": resumen_finanzas, "kpis": kpis_finanzas},
+        "clima": {"recomendaciones": recomendaciones_clima},
+        "spi_sequia": spi_sequia,
     }
 
 
@@ -471,6 +496,33 @@ def generar_pdf(
                                   ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
         story.append(Spacer(1, 5))
 
+    # Finanzas del período (ingresos/egresos/utilidad + indicadores de
+    # rentabilidad ya calculados en la PWA -- Fase 2 de Finanzas).
+    def _fmt_moneda(n) -> str:
+        try:
+            return "$" + f"{round(float(n or 0)):,}".replace(",", ".")
+        except (TypeError, ValueError):
+            return "—"
+
+    fin = datos.get("finanzas") or {}
+    resumen_fin = fin.get("resumen")
+    kpis_fin = fin.get("kpis")
+    if resumen_fin and (resumen_fin.get("total_ingresos") or resumen_fin.get("total_egresos")):
+        story.append(SeccionFlowable("FINANZAS: INGRESOS, EGRESOS Y UTILIDAD DEL PERÍODO", width=ANCHO_UTIL))
+        story.append(Spacer(1, 3))
+        margen = kpis_fin.get("margen_utilidad_pct") if kpis_fin else None
+        costo_litro = kpis_fin.get("costo_por_litro_leche") if kpis_fin else None
+        util = resumen_fin.get("utilidad", 0)
+        col_util = COLOR_VERDE_OK if util >= 0 else COLOR_ROJO_ALERTA
+        kpis_fin_bloque = [
+            (_fmt_moneda(resumen_fin.get("total_ingresos")), "Ingresos", "Del período", COLOR_MARCA),
+            (_fmt_moneda(resumen_fin.get("total_egresos")), "Egresos", "Del período", "#B45309"),
+            (_fmt_moneda(util), "Utilidad", f"Margen: {margen}%" if margen is not None else "", col_util),
+            (_fmt_moneda(costo_litro) if costo_litro is not None else "—", "Costo x Litro Leche", "Egresos / litros producidos", COLOR_GRIS),
+        ]
+        story.append(crear_bloque_kpis(kpis_fin_bloque, ancho_total=ANCHO_UTIL))
+        story.append(Spacer(1, 6))
+
     # Gráficos (opcionales: si matplotlib no está disponible en el servidor,
     # el reporte se genera igual, solo sin esta sección).
     tmp_charts_dir = None
@@ -528,6 +580,31 @@ def generar_pdf(
                 ]))
                 story.append(tabla_g)
                 story.append(Spacer(1, 4))
+
+    # Clima: pronóstico Open-Meteo (recomendaciones prácticas) + Alerta
+    # Temprana de Sequía (SPI 30/60/90d vs climatología histórica CHIRPS).
+    clima = datos.get("clima") or {}
+    recs_clima = clima.get("recomendaciones") or []
+    spi_rows = datos.get("spi_sequia") or []
+    if recs_clima or spi_rows:
+        story.append(SeccionFlowable("CLIMA & ALERTA TEMPRANA DE SEQUÍA", width=ANCHO_UTIL))
+        story.append(Spacer(1, 3))
+        if recs_clima:
+            for r in recs_clima:
+                story.append(Paragraph(f"• {r}", est_normal))
+            story.append(Spacer(1, 3))
+        if spi_rows:
+            tabla_spi_datos = [["Ventana", "SPI", "Clasificación", "Lluvia acumulada"]]
+            for s in spi_rows:
+                spi_v = s.get("spi_valor")
+                tabla_spi_datos.append([
+                    f"{s.get('dias_ventana')} días",
+                    f"{spi_v:.2f}" if spi_v is not None else "—",
+                    s.get("clasificacion") or "Sin datos",
+                    f"{s.get('mm_actual')} mm" if s.get("mm_actual") is not None else "—",
+                ])
+            story.append(_tabla_evento(tabla_spi_datos, [28 * mm, 22 * mm, 60 * mm, 40 * mm]))
+        story.append(Spacer(1, 5))
 
     # Tablas por evento (cada una con su banda de sección).
     for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
