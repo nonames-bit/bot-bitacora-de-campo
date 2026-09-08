@@ -1648,6 +1648,7 @@
 
       function rellenarCamposFactura(res) {
         _facturaIaFotoRuta = res.foto_ruta || null;
+        if (estadoIa) estadoIa.innerHTML = "";
         var selCat = document.getElementById("cap-fin-categoria");
         var fConcepto = document.getElementById("cap-fin-concepto");
         var fMonto = document.getElementById("cap-fin-monto");
