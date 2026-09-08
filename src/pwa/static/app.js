@@ -51,14 +51,22 @@
 
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
   // Cabeza de vaca real (Lucide Lab 'cow-head', ISC) — frontal, con orejas y morro.
+  // Sigue usándose como base del ícono combinado "parto" (madre + cría).
   var COW_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
   // Cabeza de cría / ternero (adaptación directa de la vaquita favorita: misma silueta, ojos y hocico, pero con frente redondeada sin cuernos de adulto)
   var CALF_HEAD = '<path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3C20.5 3.8 18 4.2 16.2 4.9a10 10 0 0 0-8.4 0C6 4.2 3.5 3.8 2 5c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/>';
   // Evento de Parto / Maternidad: Vaca Madre (izquierda) + Cría (derecha), ambas con el estilo idéntico de la vaquita favorita
   var PARTO_HEADS = '<g transform="translate(-1.5, 1) scale(0.68)" stroke-width="2.3">' + COW_HEAD + '</g><g transform="translate(10.5, 7.5) scale(0.53)" stroke-width="2.6">' + CALF_HEAD + '</g>';
+  // Vaca adulta (ícono nuevo, silueta de cuerpo completo con relleno) — viewBox 256, distinto del set de trazo estilo Lucide.
+  var COW_BODY_FILL = '<path d="M104 192a8 8 0 0 1-8 8H80a8 8 0 0 1 0-16h16a8 8 0 0 1 8 8m72-8h-16a8 8 0 0 0 0 16h16a8 8 0 0 0 0-16m-76-48a12 12 0 1 0-12-12a12 12 0 0 0 12 12m56 0a12 12 0 1 0-12-12a12 12 0 0 0 12 12m88.39-13.88A16 16 0 0 1 232 128h-32v32a40 40 0 0 1-24 72H80a40 40 0 0 1-24-72v-32H24a16 16 0 0 1-15.69-19a56.13 56.13 0 0 1 54.91-45h1.64A55.83 55.83 0 0 1 48 24a8 8 0 0 1 16 0a40 40 0 0 0 40 40h48a40 40 0 0 0 40-40a8 8 0 0 1 16 0a55.83 55.83 0 0 1-16.86 40h1.64a56.13 56.13 0 0 1 54.91 45a15.82 15.82 0 0 1-3.3 13.12M72 152.8a40.6 40.6 0 0 1 8-.8h96a40.6 40.6 0 0 1 8 .8V104a24 24 0 0 0-24-24H96a24 24 0 0 0-24 24ZM56 112v-8a39.8 39.8 0 0 1 8-24h-.8A40.09 40.09 0 0 0 24 112Zm144 80a24 24 0 0 0-24-24H80a24 24 0 0 0 0 48h96a24 24 0 0 0 24-24m32-80a40.08 40.08 0 0 0-39.2-32h-.8a39.8 39.8 0 0 1 8 24v8Z"/>';
   function icon(name, size) {
+    var s = size || 18;
+    // "cow" usa un dibujo de cuerpo completo con relleno (viewBox/estilo propio);
+    // el resto de íconos de vaca (cría, combinado de parto) sigue con trazo Lucide.
+    if (name === "cow") {
+      return '<svg class="svg-icon" viewBox="0 0 256 256" width="' + s + '" height="' + s + '" fill="currentColor" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + COW_BODY_FILL + '</svg>';
+    }
     var paths = {
-      cow: COW_HEAD,
       calf: CALF_HEAD,
       cria: CALF_HEAD,
       cowCalf: PARTO_HEADS,
@@ -141,7 +149,6 @@
       table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
       pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'
     };
-    var s = size || 18;
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
   }
 
