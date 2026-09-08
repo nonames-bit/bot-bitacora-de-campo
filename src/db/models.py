@@ -285,6 +285,35 @@ CREATE TABLE IF NOT EXISTS monitoreo_satelital_lluvia (
 
 CREATE INDEX IF NOT EXISTS idx_lluvia_satelital_fecha ON monitoreo_satelital_lluvia(fecha);
 
+-- Muestra climatológica histórica CHIRPS (uno por ventana de días), para
+-- ajustar la distribución gamma del SPI sin tener que re-descargar 30 años
+-- de Earth Engine en cada corrida semanal (ver src.gis.earth_engine_lluvia.
+-- climatologia_historica_chirps y src.engine.spi.calcular_spi).
+CREATE TABLE IF NOT EXISTS climatologia_lluvia_chirps (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    dias_ventana INTEGER NOT NULL,
+    muestra_json TEXT NOT NULL,
+    lat REAL,
+    lon REAL,
+    calculado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_climatologia_ventana ON climatologia_lluvia_chirps(dias_ventana);
+
+-- Índice de Precipitación Estandarizada calculado en cada corrida semanal
+-- (una fila por ventana de 30/60/90 días), para el panel de Pasturas.
+CREATE TABLE IF NOT EXISTS monitoreo_spi_sequia (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    dias_ventana INTEGER NOT NULL,
+    mm_actual REAL,
+    spi_valor REAL,
+    clasificacion TEXT,
+    creado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_spi_sequia_fecha ON monitoreo_spi_sequia(fecha, dias_ventana);
+
 CREATE TABLE IF NOT EXISTS rondas_campo (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -371,7 +400,7 @@ TABLAS = [
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
-    "finanzas",
+    "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia",
 ]
 
 

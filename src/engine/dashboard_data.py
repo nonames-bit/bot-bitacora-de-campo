@@ -475,12 +475,54 @@ def datos_pasturas(db: Database) -> dict:
                          else "🔴" if oc_i is not None else "⚪")
     try:
         ndvi = _filas_dict(db.query(
-            """SELECT p.nombre potrero, n.fecha, n.ndvi_promedio FROM monitoreo_satelital_ndvi n
-               JOIN potreros p ON p.id = n.potrero_id ORDER BY n.fecha DESC LIMIT 10"""))
+            """SELECT p.nombre potrero, n.fecha, n.ndvi_promedio, n.biomasa_estimada_kg_ha,
+                      n.aforo_estimado_kg_m2, n.cobertura_nubes_pct, n.fuente
+               FROM monitoreo_satelital_ndvi n
+               JOIN potreros p ON p.id = n.potrero_id
+               ORDER BY n.fecha DESC, n.id DESC LIMIT 25"""
+        ))
     except Exception as e:
         logger.error("seccion ndvi_reciente fallo", exc_info=True)
         errores["ndvi_reciente"] = str(e)
         ndvi = []
+
+    satelite_resumen = {}
+    try:
+        filas_sat = _filas_dict(db.query(
+            """SELECT p.id, p.nombre, p.area_has, n.fecha, n.ndvi_promedio,
+                      n.biomasa_estimada_kg_ha, n.aforo_estimado_kg_m2, n.fuente, n.cobertura_nubes_pct
+               FROM potreros p
+               JOIN monitoreo_satelital_ndvi n ON n.id = (
+                   SELECT id FROM monitoreo_satelital_ndvi
+                   WHERE potrero_id = p.id ORDER BY fecha DESC, id DESC LIMIT 1
+               )
+               WHERE p.geom_wkt_4326 IS NOT NULL"""
+        ))
+        if filas_sat:
+            total_sar = sum(1 for f in filas_sat if "SENTINEL-1" in (f.get("fuente") or "").upper() or "SAR" in (f.get("fuente") or "").upper())
+            total_s2 = sum(1 for f in filas_sat if "SENTINEL-2" in (f.get("fuente") or "").upper())
+            prom_ndvi = sum(f["ndvi_promedio"] for f in filas_sat if f.get("ndvi_promedio") is not None) / len(filas_sat)
+            biomasas = [f["biomasa_estimada_kg_ha"] for f in filas_sat if f.get("biomasa_estimada_kg_ha") is not None]
+            prom_bio = sum(biomasas) / len(biomasas) if biomasas else None
+            aforos = [f["aforo_estimado_kg_m2"] for f in filas_sat if f.get("aforo_estimado_kg_m2") is not None]
+            prom_af = sum(aforos) / len(aforos) if aforos else None
+            fechas = [f["fecha"] for f in filas_sat if f.get("fecha")]
+            ult_fecha = max(fechas) if fechas else None
+            
+            satelite_resumen = {
+                "total_potreros": len(filas_sat),
+                "total_sar": total_sar,
+                "total_optico": total_s2,
+                "promedio_ndvi": round(prom_ndvi, 3),
+                "promedio_biomasa_kg_ha": round(prom_bio, 1) if prom_bio is not None else None,
+                "promedio_aforo_kg_m2": round(prom_af, 2) if prom_af is not None else None,
+                "ultima_fecha": ult_fecha,
+                "modo_activo": "Radar SAR Sentinel-1 (Todo Clima)" if total_sar > 0 else "Óptico Sentinel-2",
+                "cobertura_clima": "100% Todo Clima (Microondas C-band)" if total_sar > 0 else "Óptico (Sensible a nubes)"
+            }
+    except Exception as e:
+        logger.error("seccion satelite_resumen fallo", exc_info=True)
+        errores["satelite_resumen"] = str(e)
     try:
         pluviometria = _filas_dict(db.query(
             """SELECT fecha, mm_lluvia, observaciones FROM pluviometria 
@@ -525,12 +567,21 @@ def datos_pasturas(db: Database) -> dict:
         errores["pronostico"] = str(e)
         pronostico = None
 
+    try:
+        spi_sequia = _filas_dict(db.ultimos_spi_sequia())
+    except Exception as e:
+        logger.error("seccion spi_sequia fallo", exc_info=True)
+        errores["spi_sequia"] = str(e)
+        spi_sequia = []
+
     out: dict[str, Any] = {
         "potreros": potreros,
         "ndvi_reciente": ndvi,
+        "satelite_resumen": satelite_resumen,
         "pluviometria_reciente": pluviometria,
         "aforos_recientes": aforos,
         "pronostico": pronostico,
+        "spi_sequia": spi_sequia,
     }
     if errores:
         out["errores"] = errores

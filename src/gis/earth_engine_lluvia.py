@@ -146,3 +146,65 @@ def estimar_lluvia_finca(
         "fecha_fin": fecha_real_fin.isoformat(),
         "fuente": "CHIRPS (UCSB-CHG, vía Google Earth Engine)",
     }
+
+
+def _lluvia_acumulada_periodo(
+    lat: float, lon: float, fecha_ini: date, fecha_fin: date, radio_m: int = _RADIO_AOI_M,
+) -> Optional[float]:
+    """Suma la precipitación CHIRPS entre `fecha_ini` y `fecha_fin` (ambas
+    inclusive), sin buscar "la fecha más reciente disponible" -- a diferencia
+    de ``_lluvia_acumulada_chirps``, aquí el rango ya es histórico (años
+    atrás) y se asume que CHIRPS sí tiene cobertura completa. Usado para
+    construir la climatología del SPI, no para la lectura semanal actual."""
+    import ee
+
+    geom = ee.Geometry.Point([lon, lat]).buffer(radio_m)
+    coleccion = (
+        ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY")
+        .filterBounds(geom)
+        .filterDate(fecha_ini.isoformat(), (fecha_fin + timedelta(days=1)).isoformat())
+    )
+    acumulado = coleccion.select("precipitation").sum()
+    stats = acumulado.reduceRegion(
+        reducer=ee.Reducer.mean(), geometry=geom, scale=5566, maxPixels=1e9, bestEffort=True,
+    ).getInfo()
+    mm = stats.get("precipitation")
+    return None if mm is None else round(mm, 1)
+
+
+def climatologia_historica_chirps(
+    lat: float,
+    lon: float,
+    dias_ventana: int,
+    fecha_referencia: Optional[date] = None,
+    anos_historicos: int = 30,
+    radio_m: int = _RADIO_AOI_M,
+) -> list[float]:
+    """Lluvia acumulada de `dias_ventana` días en cada uno de los
+    `anos_historicos` años anteriores, terminando en el mismo día-del-año que
+    `fecha_referencia` (o hoy). CHIRPS cubre desde 1981, así que 30 años de
+    climatología son un rango realista. Es la muestra que ``engine.spi``
+    necesita para ajustar la distribución gamma del SPI -- sin esto, "SPI"
+    sería solo un nombre para comparar contra la nada.
+
+    Nunca lanza: un año sin cobertura se omite de la muestra en vez de
+    abortar toda la climatología por un solo hueco de datos."""
+    if not _gee_ndvi._inicializado:
+        inicializar_ee()
+
+    fecha_ref = fecha_referencia or date.today()
+    muestras: list[float] = []
+    for i in range(1, anos_historicos + 1):
+        try:
+            fin = fecha_ref.replace(year=fecha_ref.year - i)
+        except ValueError:  # 29 de febrero sin año bisiesto equivalente
+            fin = fecha_ref.replace(year=fecha_ref.year - i, day=28)
+        ini = fin - timedelta(days=dias_ventana)
+        try:
+            mm = _lluvia_acumulada_periodo(lat, lon, ini, fin, radio_m)
+        except Exception as e:
+            logger.warning("climatologia_historica_chirps: fallo año %s: %s", fin.year, e)
+            mm = None
+        if mm is not None:
+            muestras.append(mm)
+    return muestras

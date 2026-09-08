@@ -724,3 +724,55 @@ def test_edad_primer_parto_promedio_meses(db):
     assert 23.5 <= res["edad_primer_parto_meses"] <= 24.5
 
 
+# --- Climatología CHIRPS y SPI (Alerta Temprana de Sequía) ---------------
+def test_guardar_y_obtener_climatologia_lluvia(db):
+    muestra = [45.0, 60.5, 30.2, 80.0]
+    db.guardar_climatologia_lluvia(30, muestra, lat=3.4, lon=-74.1)
+    obtenida = db.obtener_climatologia_lluvia(30)
+    assert obtenida == muestra
+
+
+def test_guardar_climatologia_lluvia_reemplaza_la_anterior(db):
+    db.guardar_climatologia_lluvia(30, [1.0, 2.0])
+    db.guardar_climatologia_lluvia(30, [3.0, 4.0, 5.0])
+    obtenida = db.obtener_climatologia_lluvia(30)
+    assert obtenida == [3.0, 4.0, 5.0]
+    n = db.query_one("SELECT COUNT(*) n FROM climatologia_lluvia_chirps WHERE dias_ventana = 30")
+    assert n["n"] == 1  # no se acumulan filas viejas
+
+
+def test_obtener_climatologia_lluvia_ventanas_distintas_no_se_mezclan(db):
+    db.guardar_climatologia_lluvia(30, [1.0, 2.0])
+    db.guardar_climatologia_lluvia(60, [10.0, 20.0])
+    assert db.obtener_climatologia_lluvia(30) == [1.0, 2.0]
+    assert db.obtener_climatologia_lluvia(60) == [10.0, 20.0]
+
+
+def test_obtener_climatologia_lluvia_inexistente_devuelve_none(db):
+    assert db.obtener_climatologia_lluvia(90) is None
+
+
+def test_obtener_climatologia_lluvia_vieja_devuelve_none(db):
+    """Climatología calculada hace más de max_edad_dias se considera vencida
+    (recomendación: refrescar ~1 vez al año para sumar el año recién cerrado)."""
+    from datetime import date, timedelta
+    fid = db.guardar_climatologia_lluvia(30, [1.0, 2.0])
+    vieja = (date.today() - timedelta(days=400)).isoformat()
+    db.execute("UPDATE climatologia_lluvia_chirps SET calculado_en = ? WHERE id = ?", (vieja, fid))
+    assert db.obtener_climatologia_lluvia(30, max_edad_dias=365) is None
+
+
+def test_registrar_y_obtener_ultimos_spi_sequia(db):
+    db.registrar_spi_sequia(dias_ventana=30, mm_actual=10.0, spi_valor=-1.8, clasificacion="Sequía severa", fecha="2026-09-01")
+    db.registrar_spi_sequia(dias_ventana=60, mm_actual=80.0, spi_valor=0.2, clasificacion="Normal", fecha="2026-09-01")
+    # Segunda corrida del SPI-30: debe reemplazar cuál es "la última", no duplicarla.
+    db.registrar_spi_sequia(dias_ventana=30, mm_actual=12.0, spi_valor=-1.5, clasificacion="Sequía severa", fecha="2026-09-08")
+
+    filas = db.ultimos_spi_sequia()
+    por_ventana = {f["dias_ventana"]: f for f in filas}
+    assert len(filas) == 2  # una por ventana, no 3
+    assert por_ventana[30]["fecha"] == "2026-09-08"  # la más reciente
+    assert por_ventana[30]["mm_actual"] == 12.0
+    assert por_ventana[60]["spi_valor"] == 0.2
+
+

@@ -162,3 +162,66 @@ def test_estimar_lluvia_finca_maneja_error_de_earth_engine(monkeypatch):
 
     resultado = gee_lluvia.estimar_lluvia_finca(3.40, -74.08)
     assert resultado is None
+
+
+# --- Climatología histórica CHIRPS (SPI, docs/IDEAS_PROYECTOS.md ítem 2) ---
+
+def test_climatologia_historica_chirps_devuelve_una_muestra_por_ano(monkeypatch):
+    from datetime import date as _date
+    monkeypatch.setitem(sys.modules, "ee", _fake_ee_module(n_imagenes=1, mm_total=45.6))
+    gee_ndvi._inicializado = True
+
+    muestra = gee_lluvia.climatologia_historica_chirps(
+        3.40, -74.08, dias_ventana=30, fecha_referencia=_date(2026, 9, 7), anos_historicos=10,
+    )
+    assert len(muestra) == 10
+    assert all(m == pytest.approx(45.6) for m in muestra)
+
+
+def test_climatologia_historica_chirps_omite_anos_sin_cobertura(monkeypatch):
+    """Un año sin dato CHIRPS no debe tumbar toda la climatología -- se omite
+    y la muestra queda más corta (calcular_spi ya sabe rechazar muestras
+    insuficientes por su cuenta)."""
+    from datetime import date as _date
+
+    llamadas = {"n": 0}
+
+    class _FlakyAccumImage:
+        def reduceRegion(self, **kwargs):
+            llamadas["n"] += 1
+            if llamadas["n"] % 3 == 0:
+                return _V({"precipitation": None})  # simula un año sin cobertura
+            return _V({"precipitation": 50.0})
+
+    ee = types.SimpleNamespace()
+    ee.Geometry = types.SimpleNamespace(Point=lambda coords: types.SimpleNamespace(buffer=lambda r: None))
+    ee.ImageCollection = lambda nombre: types.SimpleNamespace(
+        filterBounds=lambda geom: types.SimpleNamespace(
+            filterDate=lambda ini, fin: types.SimpleNamespace(
+                select=lambda banda: types.SimpleNamespace(sum=lambda: _FlakyAccumImage())
+            )
+        )
+    )
+    ee.Reducer = types.SimpleNamespace(mean=lambda: object())
+    ee.ServiceAccountCredentials = lambda email, key: ("creds", email, key)
+    ee.Initialize = lambda creds, project=None: None
+    monkeypatch.setitem(sys.modules, "ee", ee)
+    gee_ndvi._inicializado = True
+
+    muestra = gee_lluvia.climatologia_historica_chirps(
+        3.40, -74.08, dias_ventana=30, fecha_referencia=_date(2026, 9, 7), anos_historicos=9,
+    )
+    assert len(muestra) == 6  # 9 años - 3 sin cobertura (cada 3ro)
+
+
+def test_climatologia_historica_chirps_maneja_29_febrero(monkeypatch):
+    """Si `fecha_referencia` es 29 de febrero, restar años puede caer en un
+    año no bisiesto -- no debe lanzar ValueError."""
+    from datetime import date as _date
+    monkeypatch.setitem(sys.modules, "ee", _fake_ee_module(n_imagenes=1, mm_total=10.0))
+    gee_ndvi._inicializado = True
+
+    muestra = gee_lluvia.climatologia_historica_chirps(
+        3.40, -74.08, dias_ventana=30, fecha_referencia=_date(2024, 2, 29), anos_historicos=3,
+    )
+    assert len(muestra) == 3

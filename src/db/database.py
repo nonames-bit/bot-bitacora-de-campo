@@ -265,12 +265,14 @@ class Database:
     def registrar_potrero(self, nombre=None, codigo=None, area_has=None,
                           tipo_pasto=None, aforo_kg_m2=None, fecha_entrada=None,
                           fecha_salida=None, dias_reposo=None,
-                          dias_ocupacion=None) -> int:
+                          dias_ocupacion=None, geom_wkt_4326=None,
+                          centroide_lat=None, centroide_lon=None) -> int:
         return self.insert("potreros", dict(
             nombre=nombre, codigo=codigo, area_has=area_has, tipo_pasto=tipo_pasto,
             aforo_kg_m2=aforo_kg_m2, fecha_entrada=iso(fecha_entrada),
             fecha_salida=iso(fecha_salida), dias_reposo=dias_reposo,
-            dias_ocupacion=dias_ocupacion,
+            dias_ocupacion=dias_ocupacion, geom_wkt_4326=geom_wkt_4326,
+            centroide_lat=centroide_lat, centroide_lon=centroide_lon,
         ))
 
     def get_potrero(self, potrero_id) -> Optional[sqlite3.Row]:
@@ -963,6 +965,68 @@ class Database:
         """Devuelve la lectura satelital de lluvia más reciente, si existe."""
         return self.query_one(
             "SELECT * FROM monitoreo_satelital_lluvia ORDER BY fecha DESC, id DESC LIMIT 1"
+        )
+
+    def guardar_climatologia_lluvia(self, dias_ventana: int, muestra: list[float],
+                                    lat: Optional[float] = None, lon: Optional[float] = None) -> int:
+        """Reemplaza la climatología histórica guardada para esa ventana de
+        días (solo se necesita la última: no es un historial, es una caché
+        de los ~30 años de CHIRPS que ya se descargaron)."""
+        import json
+        self.execute("DELETE FROM climatologia_lluvia_chirps WHERE dias_ventana = ?", (int(dias_ventana),))
+        return self.insert("climatologia_lluvia_chirps", dict(
+            dias_ventana=int(dias_ventana),
+            muestra_json=json.dumps(muestra),
+            lat=lat, lon=lon,
+            calculado_en=self._ahora(),
+        ))
+
+    def obtener_climatologia_lluvia(self, dias_ventana: int, max_edad_dias: int = 365) -> Optional[list[float]]:
+        """Muestra histórica cacheada para esa ventana, o None si no existe o
+        está más vieja que `max_edad_dias` (climatología recomendada:
+        refrescar ~1 vez al año para incorporar el año recién cerrado)."""
+        import json
+        fila = self.query_one(
+            "SELECT muestra_json, calculado_en FROM climatologia_lluvia_chirps WHERE dias_ventana = ?",
+            (int(dias_ventana),),
+        )
+        if not fila:
+            return None
+        try:
+            calculado = to_date(fila["calculado_en"])
+            if calculado and (date.today() - calculado).days > max_edad_dias:
+                return None
+        except Exception:
+            pass
+        try:
+            return json.loads(fila["muestra_json"])
+        except Exception:
+            return None
+
+    def registrar_spi_sequia(self, dias_ventana: int, mm_actual: Optional[float],
+                             spi_valor: Optional[float], clasificacion: Optional[str],
+                             fecha: Optional[str] = None) -> int:
+        """Guarda el SPI calculado para una ventana (30/60/90 días) en la
+        corrida semanal actual."""
+        return self.insert("monitoreo_spi_sequia", dict(
+            fecha=iso(fecha) or date.today().isoformat(),
+            dias_ventana=int(dias_ventana),
+            mm_actual=mm_actual,
+            spi_valor=spi_valor,
+            clasificacion=clasificacion,
+            creado_en=self._ahora(),
+        ))
+
+    def ultimos_spi_sequia(self) -> list[sqlite3.Row]:
+        """Última lectura de SPI por cada ventana de días (30/60/90), para el
+        panel de alerta de sequía en Pasturas."""
+        return self.query(
+            """SELECT m.* FROM monitoreo_spi_sequia m
+               INNER JOIN (
+                   SELECT dias_ventana, MAX(id) AS max_id
+                   FROM monitoreo_spi_sequia GROUP BY dias_ventana
+               ) ult ON ult.dias_ventana = m.dias_ventana AND ult.max_id = m.id
+               ORDER BY m.dias_ventana ASC"""
         )
 
     def registrar_lectura_ndvi(

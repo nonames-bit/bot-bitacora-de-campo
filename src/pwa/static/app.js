@@ -337,6 +337,59 @@
       }
     }
 
+    h += "<h4>" + icon("alert") + "Alerta Temprana de Sequía (SPI)</h4>";
+    if (!d.spi_sequia || !d.spi_sequia.length) {
+      h += vacio("Sin cálculo de SPI todavía (se genera en la corrida semanal del job de lluvia satelital).");
+    } else {
+      h += "<div style='display:flex; gap:10px; flex-wrap:wrap;'>";
+      d.spi_sequia.forEach(function (s) {
+        var spi = s.spi_valor;
+        var color = spi == null ? "gris" : spi <= -1.5 ? "rojo" : spi <= -1.0 ? "ambar" : spi >= 1.0 ? "verde" : "gris";
+        h += "<div class='card' style='flex:1; min-width:130px; padding:12px; text-align:center;'>"
+          + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>SPI " + esc(s.dias_ventana) + " días</div>"
+          + "<div style='font-size:22px; font-weight:700; margin:4px 0;'>" + (spi != null ? esc(spi) : "—") + "</div>"
+          + "<span class='chip " + color + "' style='font-size:11px;'>" + esc(s.clasificacion || "Sin datos") + "</span>"
+          + "<div style='font-size:10.5px; color:var(--texto-suave); margin-top:4px;'>" + (s.mm_actual != null ? esc(s.mm_actual) + " mm" : "—") + " · " + esc(fechaCorta(s.fecha)) + "</div>"
+          + "</div>";
+      });
+      h += "</div>";
+      h += "<p class='aviso' style='margin-top:8px;'>SPI: compara la lluvia acumulada actual contra el clima histórico de ~30 años de la zona (CHIRPS/Earth Engine). Valores por debajo de -1.0 indican sequía; por debajo de -1.5, sequía severa.</p>";
+    }
+
+    // Sección Satelital Todo Clima: Sentinel-1 SAR Radar + Sentinel-2 Óptico
+    var sat = d.satelite_resumen || {};
+    var tieneSat = sat.total_potreros > 0;
+
+    var btnSyncSar = "<button type='button' class='tema-btn' id='btn-sync-satelite-sar' style='font-size:12px; padding:6px 12px; background:linear-gradient(135deg, #1e3c72, #2a5298); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
+      + icon("sparkles", 13) + "📡 Radar SAR (Todo Clima)</button>";
+    var btnSyncAuto = "<button type='button' class='tema-btn' id='btn-sync-satelite-auto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
+      + icon("sparkles", 13) + "⚡ Auto (S2 + S1)</button>";
+
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin:18px 0 10px;'>"
+      + "<h4 style='margin:0;'>" + icon("chartLine") + "Monitoreo Satelital (Radar SAR Sentinel-1 & Óptico S2)</h4>"
+      + "<div style='display:flex; gap:6px;'>" + btnSyncSar + btnSyncAuto + "</div>"
+      + "</div>";
+
+    h += "<div id='satelite-status-box' style='display:none; margin:10px 0; padding:12px 16px; border-radius:8px; font-size:13px; transition:all 0.3s ease;'></div>";
+
+    if (tieneSat) {
+      var ndviProm = sat.promedio_ndvi != null ? sat.promedio_ndvi : "—";
+      var chipNdvi = Number(ndviProm) >= 0.6 ? "verde" : Number(ndviProm) >= 0.4 ? "ambar" : "rojo";
+      h += "<div class='kpis'>"
+        + kpi("<span class='chip " + chipNdvi + "' style='font-size:14px;'><b>" + esc(ndviProm) + "</b></span>", "NDVI Promedio Finca")
+        + kpi(esc(sat.modo_activo || "Radar SAR"), "Sensor Principal")
+        + (sat.promedio_biomasa_kg_ha != null ? kpi(esc(Math.round(sat.promedio_biomasa_kg_ha).toLocaleString()) + " kg/ha", "Biomasa Promedio MS") : "")
+        + (sat.promedio_aforo_kg_m2 != null ? kpi(esc(sat.promedio_aforo_kg_m2) + " kg/m²", "Aforo Promedio MV") : "")
+        + kpi(esc(sat.cobertura_clima || "100% Todo Clima"), "Cobertura Climática", "ok")
+        + "</div>";
+    }
+
+    h += "<div class='card' style='padding:10px 14px; margin-bottom:14px; background:rgba(30, 60, 114, 0.05); border-left:4px solid #2a5298;'>"
+      + "<div style='font-size:12.5px; line-height:1.45; color:var(--texto-color);'>"
+      + "<b>📡 Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
+      + "El radar SAR emite microondas que penetran nubes, lluvia y neblina, calculando el índice dual de vegetación (RVI) y biomasa estimada sin perder continuidad temporal."
+      + "</div></div>";
+
     h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
     h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
     if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
@@ -351,15 +404,37 @@
       }).join("");
       h += "</table></div>";
     }
-    h += "<h4>" + icon("chartLine") + "NDVI reciente (satélite)</h4>"
+    h += "<h4>" + icon("chartLine") + "Lecturas Satelitales Recientes por Potrero</h4>"
       + tabla(d.ndvi_reciente, [
-        ["potrero", "Potrero"], ["fecha", "Fecha"],
-        ["ndvi_promedio", "NDVI", "text", function (v) {
+        ["potrero", "Potrero"],
+        ["fuente", "Sensor / Modo", "text", function (v) {
+          var s = String(v || "");
+          if (s.indexOf("Sentinel-1") >= 0 || s.indexOf("SAR") >= 0 || s.indexOf("Radar") >= 0) {
+            return "<span class='chip azul' style='font-size:11px; font-weight:700;' title='" + esc(s) + "'>📡 Radar SAR (S1)</span>";
+          }
+          return "<span class='chip verde' style='font-size:11px;' title='" + esc(s) + "'>🛰️ Óptico (S2)</span>";
+        }],
+        ["fecha", "Fecha"],
+        ["ndvi_promedio", "NDVI / Proxy", "text", function (v) {
           var n = Number(v);
           var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
-          return "<span class='chip " + c + "'>" + esc(v) + "</span>";
+          return "<span class='chip " + c + "'><b>" + esc(Number(v).toFixed(3)) + "</b></span>";
+        }],
+        ["biomasa_estimada_kg_ha", "Biomasa MS", "text", function (v) {
+          return v != null ? esc(Math.round(v).toLocaleString()) + " kg/ha" : "—";
+        }],
+        ["aforo_estimado_kg_m2", "Aforo MV", "text", function (v) {
+          return v != null ? esc(Number(v).toFixed(2)) + " kg/m²" : "—";
+        }],
+        ["cobertura_nubes_pct", "Condición", "text", function (v, row) {
+          var f = String(row && row.fuente || "");
+          if (f.indexOf("Sentinel-1") >= 0 || f.indexOf("SAR") >= 0) {
+            return "<span style='font-size:11.5px; color:#1e3c72; font-weight:600;'>🛡️ Penetra nubes</span>";
+          }
+          var n = Number(v) || 0;
+          return n > 0 ? "<span style='font-size:11.5px;'>☁️ " + esc(n.toFixed(0)) + "% nubes</span>" : "<span style='font-size:11.5px; color:#2e7d32;'>☀️ Despejado</span>";
         }]
-      ], "Sin lecturas NDVI recientes.");
+      ], "Sin lecturas satelitales recientes.");
     h += "<h4>" + icon("rain") + "Pluviómetro Local Reciente</h4>"
       + tabla(d.pluviometria_reciente, [
         ["fecha", "Fecha"],
@@ -380,6 +455,92 @@
       ], "Sin aforos históricos registrados.");
     return h;
   }
+
+  function bindPasturas() {
+    function ejecutarSyncSatelite(modo) {
+      var btnSar = document.getElementById("btn-sync-satelite-sar");
+      var btnAuto = document.getElementById("btn-sync-satelite-auto");
+      var box = document.getElementById("satelite-status-box");
+
+      if (btnSar) btnSar.disabled = true;
+      if (btnAuto) btnAuto.disabled = true;
+
+      var textoModo = (modo === "radar" || modo === "s1")
+        ? "Radar SAR Sentinel-1 C-band (penetrando nubes)"
+        : "Multi-sensor Auto (Sentinel-2 Óptico con respaldo Radar SAR)";
+
+      if (box) {
+        box.style.display = "block";
+        box.style.background = "rgba(30, 60, 114, 0.1)";
+        box.style.border = "1px solid #2a5298";
+        box.style.color = "#1e3c72";
+        box.innerHTML = "<div style='display:flex; align-items:center; gap:10px;'>"
+          + "<span style='font-size:22px;'>🛰️</span>"
+          + "<div><b>Consultando Google Earth Engine en tiempo real...</b><br>"
+          + "<span style='font-size:12px;'>Procesando reflectancia " + esc(textoModo) + " para los 20 potreros de la finca. Esto toma ~10-15 segundos.</span></div>"
+          + "</div>";
+      }
+
+      fetch("/api/satelite/actualizar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modo: modo })
+      })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.json().then(function (err) { throw new Error(err.error || ("HTTP " + r.status)); });
+        }
+        return r.json();
+      })
+      .then(function (data) {
+        if (btnSar) btnSar.disabled = false;
+        if (btnAuto) btnAuto.disabled = false;
+        if (data.ok) {
+          if (box) {
+            box.style.background = "rgba(46, 125, 50, 0.1)";
+            box.style.border = "1px solid #2e7d32";
+            box.style.color = "#1b5e20";
+            box.innerHTML = "<b>✅ " + esc(data.mensaje || "Sincronización satelital exitosa.") + "</b>"
+              + "<div style='font-size:12px; margin-top:4px;'>Refrescando mapa de vigor satelital y tablas...</div>";
+          }
+          setTimeout(function () {
+            cargar(true);
+          }, 1500);
+        } else {
+          if (box) {
+            box.style.background = "rgba(211, 47, 47, 0.1)";
+            box.style.border = "1px solid #d32f2f";
+            box.style.color = "#c62828";
+            box.innerHTML = "<b>⚠️ Error:</b> " + esc(data.error || "No se pudo sincronizar");
+          }
+        }
+      })
+      .catch(function (err) {
+        if (btnSar) btnSar.disabled = false;
+        if (btnAuto) btnAuto.disabled = false;
+        if (box) {
+          box.style.background = "rgba(211, 47, 47, 0.1)";
+          box.style.border = "1px solid #d32f2f";
+          box.style.color = "#c62828";
+          box.innerHTML = "<b>❌ Error de sincronización satelital:</b> " + esc(err.message || err);
+        }
+      });
+    }
+
+    var btnSar = document.getElementById("btn-sync-satelite-sar");
+    if (btnSar) {
+      btnSar.addEventListener("click", function () {
+        ejecutarSyncSatelite("radar");
+      });
+    }
+    var btnAuto = document.getElementById("btn-sync-satelite-auto");
+    if (btnAuto) {
+      btnAuto.addEventListener("click", function () {
+        ejecutarSyncSatelite("auto");
+      });
+    }
+  }
+
   function renderLeche(d) {
     var total = 0;
     (d.serie_tanque || []).forEach(function (f) { total += Number(f.litros) || 0; });
@@ -4694,6 +4855,7 @@
       else if (actual === "agenda") html = renderAgenda(d);
       else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
+      if (actual === "pasturas") bindPasturas();
       if (actual === "leche") bindLeche();
       if (actual === "finanzas") bindFinanzas();
     }, animar ? vista : null);

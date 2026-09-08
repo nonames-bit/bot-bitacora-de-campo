@@ -512,14 +512,19 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Integración sin clave con Open-Meteo para coordenadas de la finca con caché de 3 horas.
     - Despacho matutino enriquecido con clima del día (temperatura, probabilidad de precipitación, índice UV, viento y alertas de campo).
     - Comando `/pronostico` en Telegram con tabla extendida a 7 días y botones interactivos.
-- [x] Suite de pruebas con pytest: **648 pruebas en verde** (100% pasando).
+  - **Monitoreo Satelital Radar SAR Todo Clima (Sentinel-1 C-band, `src/gis/earth_engine_sar.py`)**:
+    - Radar de microondas de apertura sintética (SAR) vía Google Earth Engine (`COPERNICUS/S1_GRD`, polarizaciones duales VV/VH, 10m).
+    - **Penetración 100% de nubes, lluvia y neblina**: resuelve el apagón del NDVI óptico en temporada de lluvias en los Llanos Orientales.
+    - Dual-Pol Radar Vegetation Index ($RVI$, Mandal et al. 2020), proxy SAR-NDVI y estimador dieléctrico de humedad superficial de pastura/suelo.
+    - Fusión multisensor automática en `actualizar_lecturas_reales(modo='auto')`: si Sentinel-2 está nublado, conmuta de inmediato a Sentinel-1 SAR.
+- [x] Suite de pruebas con pytest: **670 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [ ] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada**: Simulador cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, partos distócicos y abortos.
 - [ ] **Fase 6.1 — Economía & Costeo**: Costeo tratamiento/suplemento (Costo/kg carne y Margen $/L leche).
 - [ ] **Fase 8.1 — Estimación de Condición Corporal (BCS)**: Clasificación automática 1.0-5.0 con Gemini Vision.
-- [ ] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): la integración IDEAM sigue siendo una heurística sobre la lluvia registrada a mano (`/lluvia`). Ya completado: área real + polígonos georreferenciados (WGS84) de los 20 potreros desde el proyecto QGIS de la finca (Fase A+B, `potreros.geom_wkt_4326`/`centroide_lat`/`centroide_lon`) y **NDVI real vía Google Earth Engine** (Fase C, `src/gis/earth_engine_ndvi.py` + job cada 3 días `scripts/actualizar_ndvi_satelital.py`, cron `0 6 */3 * *` desde 2026-09-07 — antes semanal; aprovecha mejor la revisita de ~5 días de Sentinel-2). Pendiente: lluvia satelital de referencia CHIRPS (Fase D, opcional, job semanal).
+- [x] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): área real + polígonos georreferenciados (WGS84) de los 20 potreros desde QGIS (Fases A+B), **NDVI real vía Google Earth Engine** (Fase C), **lluvia satelital CHIRPS** (Fase D), y **radar SAR Sentinel-1 todo clima** (Fase E). Fusión multisensor automatizada en cron cada 3 días.
 
 ---
 

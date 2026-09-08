@@ -19,6 +19,13 @@ logger = logging.getLogger("bitacora.gis.earth_engine")
 _inicializado = False
 
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except Exception:
+    pass
+
+
 def inicializar_ee(
     service_account_email: Optional[str] = None,
     key_path: Optional[str] = None,
@@ -139,16 +146,28 @@ def _ndvi_region_sentinel2(
     return None
 
 
-def actualizar_lecturas_reales(potreros: list[dict], fecha: Optional[date] = None) -> list[dict]:
+def actualizar_lecturas_reales(
+    potreros: list[dict],
+    fecha: Optional[date] = None,
+    modo: str = "auto",
+) -> list[dict]:
     """Consulta Earth Engine para cada potrero con `geom_wkt_4326` y arma lecturas reales.
 
-    `potreros`: lista de dicts con al menos `id`, `nombre`, `area_has`, `geom_wkt_4326`.
-    Devuelve la misma forma que `SentinelNDVI.simular_lecturas_potreros`, pero solo
-    para los potreros con imagen Sentinel-2 real disponible en la ventana de nubosidad;
-    los que no tienen dato se omiten (el llamador decide si cae a la simulación
-    como respaldo, igual que hoy hace `Database.resumen_ndvi_finca`).
+    Parámetros:
+      potreros: lista de dicts con al menos `id`, `nombre`, `area_has`, `geom_wkt_4326`.
+      fecha: fecha de referencia (default: hoy).
+      modo:
+        - "auto" (default): Intenta Sentinel-2 óptico; si el potrero está cubierto
+          por nubes o sin revisita útil, recurre automáticamente al radar SAR
+          Sentinel-1 (todo clima, penetra nubes) para garantizar continuidad temporal.
+        - "s2": Solo Sentinel-2 óptico (omite potreros nublados).
+        - "s1" o "radar": Solo radar SAR Sentinel-1 (independiente de nubes).
     """
     from .sentinel_ndvi import clasificar_ndvi, estimar_aforo_kg_m2_desde_ndvi, estimar_biomasa_ms_ha
+
+    if modo in ("s1", "radar"):
+        from .earth_engine_sar import actualizar_lecturas_sar
+        return actualizar_lecturas_sar(potreros, fecha=fecha)
 
     if not _inicializado:
         inicializar_ee()
@@ -161,24 +180,55 @@ def actualizar_lecturas_reales(potreros: list[dict], fecha: Optional[date] = Non
         if not geom_wkt:
             continue
 
+        stats = None
+        fuente = "Sentinel-2 L2A (Copernicus, vía Google Earth Engine)"
+        sensor = "OPTICO_SENTINEL2"
+        detalles_radar = {}
+
         try:
             stats = _ndvi_region_sentinel2(geom_wkt, fecha_ref)
         except Exception as e:
             logger.error(
-                "Error consultando Earth Engine para potrero %s: %s", p.get("nombre"), e, exc_info=True
+                "Error consultando Sentinel-2 óptico para potrero %s: %s", p.get("nombre"), e, exc_info=True
             )
-            continue
+
+        # Si no hay imagen óptica limpia y modo es "auto", recurrir a Sentinel-1 SAR
+        if not stats and modo in ("auto", "fusion"):
+            try:
+                from .earth_engine_sar import _sar_region_sentinel1
+                sar_stats = _sar_region_sentinel1(geom_wkt, fecha_ref)
+                if sar_stats:
+                    logger.info(
+                        "Potrero %s cubierto de nubes en Sentinel-2; usando radar SAR Sentinel-1 como respaldo todo clima.",
+                        p.get("nombre"),
+                    )
+                    stats = sar_stats
+                    fuente = "Sentinel-1 SAR GRD (Radar C-band, vía Google Earth Engine)"
+                    sensor = "SAR_SENTINEL1"
+                    detalles_radar = {
+                        "rvi": sar_stats.get("rvi"),
+                        "vv_db": sar_stats.get("vv_db"),
+                        "vh_db": sar_stats.get("vh_db"),
+                        "cr_db": sar_stats.get("cr_db"),
+                        "humedad_pct": sar_stats.get("humedad_pct"),
+                        "humedad_desc": sar_stats.get("humedad_desc"),
+                        "orbit_pass": sar_stats.get("orbit_pass"),
+                    }
+            except Exception as e:
+                logger.error(
+                    "Error en respaldo Sentinel-1 SAR para potrero %s: %s", p.get("nombre"), e, exc_info=True
+                )
 
         if not stats:
             logger.warning(
-                "Sin imagen Sentinel-2 reciente para potrero %s (nubes o revisita)", p.get("nombre")
+                "Sin imagen satelital reciente para potrero %s (óptica bloqueada por nubes y radar sin adquisición)", p.get("nombre")
             )
             continue
 
         ndvi_val = stats["ndvi_promedio"]
         cls_info = clasificar_ndvi(ndvi_val)
 
-        resultados.append({
+        item = {
             "potrero_id": p.get("id"),
             "potrero_nombre": p.get("nombre") or f"Potrero {p.get('id')}",
             "area_has": p.get("area_has") or 5.0,
@@ -191,8 +241,12 @@ def actualizar_lecturas_reales(potreros: list[dict], fecha: Optional[date] = Non
             "categoria": cls_info["categoria"],
             "emoji": cls_info["emoji"],
             "alerta": cls_info["alerta"],
-            "cobertura_nubes_pct": stats["cobertura_nubes_pct"],
-            "fuente": "Sentinel-2 L2A (Copernicus, vía Google Earth Engine)",
-        })
+            "cobertura_nubes_pct": stats.get("cobertura_nubes_pct", 0.0),
+            "fuente": fuente,
+            "sensor": sensor,
+        }
+        if detalles_radar:
+            item.update(detalles_radar)
+        resultados.append(item)
 
     return resultados

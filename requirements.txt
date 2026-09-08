@@ -5,6 +5,7 @@ reportlab>=4.0
 faster-whisper>=1.0.0
 matplotlib>=3.8
 seaborn>=0.13
+scipy>=1.11  # ajuste gamma para el SPI (Alerta Temprana de Sequía, src/engine/spi.py)
 pypdf>=5.0
 Pillow>=10.0.0
 shapely>=2.1.0

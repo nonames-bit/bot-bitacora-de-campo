@@ -245,6 +245,22 @@ def test_pasturas_incluye_pronostico_del_clima(db_file, tmp_path, monkeypatch):
     assert "recomendaciones" in r["pronostico"]
 
 
+def test_pasturas_incluye_alerta_spi_sequia(db_file):
+    """Alerta Temprana de Sequía (docs/IDEAS_PROYECTOS.md ítem 2): una fila
+    por ventana de días (30/60/90) con el último SPI calculado."""
+    from src.db.database import Database
+    db = Database(db_file)
+    db.registrar_spi_sequia(dias_ventana=30, mm_actual=10.0, spi_valor=-1.8,
+                            clasificacion="Sequía severa", fecha="2026-09-01")
+    db.close()
+
+    r = datos_pasturas(db_file)
+    assert r["spi_sequia"]
+    fila = r["spi_sequia"][0]
+    assert fila["dias_ventana"] == 30
+    assert fila["clasificacion"] == "Sequía severa"
+
+
 def test_api_grafico_tipo_valido_devuelve_png_o_404_sin_datos(client):
     # No se afirma 200 estricto: sin datos suficientes el generador puede
     # devolver None (comportamiento ya existente de charts.py), y sin
@@ -1431,4 +1447,71 @@ def test_ficha_incluye_hierro_y_en_genealogia(db_file, client):
     cria_entry = next((c for c in crias if c["tag"] == "CRIA_HIE"), None)
     assert cria_entry is not None
     assert cria_entry["hierro"] == "SJ65"
+
+
+def test_pasturas_incluye_satelite_resumen(client, db_file):
+    """Verifica que /api/pasturas incluye el bloque satelite_resumen con soporte Sentinel-1 SAR."""
+    from src.db.database import Database
+
+    db = Database(db_file)
+    pot_id = db.registrar_potrero(nombre="Potrero Radar Test", area_has=10.0, geom_wkt_4326="POLYGON((-73.1 6.8, -73.0 6.8, -73.0 6.9, -73.1 6.9, -73.1 6.8))")
+    db.registrar_lectura_ndvi(
+        pot_id,
+        ndvi_promedio=0.742,
+        fecha="2026-09-01",
+        biomasa_estimada_kg_ha=2900.0,
+        aforo_estimado_kg_m2=1.35,
+        fuente="Sentinel-1 SAR GRD (Radar C-band, vía Google Earth Engine)",
+    )
+    db.close()
+
+    r = client.get("/api/pasturas")
+    assert r.status_code == 200
+    data = r.get_json()
+    assert "satelite_resumen" in data
+    resumen = data["satelite_resumen"]
+    assert resumen.get("total_potreros", 0) >= 1
+    assert resumen.get("total_sar", 0) >= 1
+    assert "Radar SAR" in resumen.get("modo_activo", "")
+    assert data["ndvi_reciente"][0]["fuente"].startswith("Sentinel-1 SAR")
+
+
+def test_api_satelite_actualizar_flujo_completo(client, db_file, monkeypatch):
+    """Verifica el endpoint POST /api/satelite/actualizar con mock de Earth Engine."""
+    from unittest.mock import MagicMock
+    import src.gis.earth_engine_ndvi as gee_ndvi
+
+    mock_lecturas = [
+        {
+            "potrero_id": 1,
+            "potrero_nombre": "Guayabal",
+            "area_has": 12.0,
+            "fecha": "2026-09-05",
+            "ndvi_promedio": 0.78,
+            "ndvi_min": 0.65,
+            "ndvi_max": 0.85,
+            "biomasa_estimada_kg_ha": 3100.0,
+            "aforo_estimado_kg_m2": 1.45,
+            "categoria": "EXCELENTE",
+            "emoji": "🌿",
+            "alerta": "normal",
+            "cobertura_nubes_pct": 0.0,
+            "fuente": "Sentinel-1 SAR GRD (Radar C-band, vía Google Earth Engine)",
+            "sensor": "SAR_SENTINEL1",
+            "rvi": 0.88,
+            "humedad_pct": 78.5,
+        }
+    ]
+
+    monkeypatch.setattr(gee_ndvi, "actualizar_lecturas_reales", MagicMock(return_value=mock_lecturas))
+
+    # Invocación con modo radar
+    r = client.post("/api/satelite/actualizar", json={"modo": "radar"})
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["ok"] is True
+    assert res["actualizados"] == 1
+    assert res["sar"] == 1
+    assert "Radar SAR Sentinel-1" in res["sensor_principal"]
+
 

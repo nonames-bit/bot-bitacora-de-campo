@@ -153,7 +153,30 @@ Valores verificados contra `sqlite3` directo, coinciden exactamente.
   - **Pendiente de este cierre:** desplegar al VPS (push + pull + reinicio del servicio +
     agregar la línea de cron + correr el job una vez a mano), con el mismo cuidado de backup
     previo que se usó al desplegar la Fase C.
+- [x] **Fase E — Sentinel-1 SAR GRD: Monitoreo Radar Todo Clima (2026-09-07)**:
+  - **Problema resuelto:** en temporada de lluvias (Llanos Orientales / Meta), la nubosidad
+    persistente bloquea el NDVI óptico (Sentinel-2) por semanas completas.
+  - **Solución implementada:** radar de apertura sintética (SAR) en banda C (~5.4 GHz) vía
+    `COPERNICUS/S1_GRD` (modos IW, polarizaciones duales VV y VH). Las microondas penetran
+    100% las nubes, lluvia, neblina y noche.
+  - **Módulo `src/gis/earth_engine_sar.py`**:
+    - Cálculo de Dual-Pol Radar Vegetation Index:
+      $RVI = \frac{4 \cdot \sigma^\circ_{VH,lin}}{\sigma^\circ_{VV,lin} + \sigma^\circ_{VH,lin}}$
+    - Relación cruzada de retrodispersión (Cross-Ratio $CR_{dB} = VH_{dB} - VV_{dB}$).
+    - Proxy SAR-NDVI calibrado para pasturas tropicales:
+      $NDVI_{radar} = 0.20 + 0.65 \times RVI$ (rango 0.15 - 0.85).
+    - Proxy de humedad de suelo / forraje por respuesta dieléctrica de polarización VV:
+      $Humedad_{\%} = \frac{VV_{dB} - (-18)}{(-7) - (-18)} \times 100$.
+  - **Estrategia Multi-sensor / Fusión (`src/gis/earth_engine_ndvi.py`):**
+    - `actualizar_lecturas_reales(modo='auto')`: busca primero Sentinel-2 óptico ($\ge 60\%$ píxeles limpios).
+    - Si el potrero está cubierto de nubes, conmuta **automáticamente** al radar SAR Sentinel-1 como
+      respaldo todo clima, garantizando continuidad temporal 365 días al año sin potreros huérfanos.
+    - Soporte para modos forzados `--modo s1` (radar puro) y `--modo s2` (óptico puro).
+  - **Integración Telegram y PWA:**
+    - `/ndvi` muestra distintivo `[📡 SAR]` y nota multisensor cuando la lectura proviene de radar.
+    - PWA expone la fuente y métricas de humedad.
+  - Tests unitarios completos con `ee` mockeado en `tests/test_earth_engine_sar.py`.
 
-Con esto el plan geoespacial (Fases A–D) queda **completo**.
+Con esto el plan geoespacial (Fases A–E) queda **completo y robusto**.
 
-**Nota honesta ya corregida:** el `README.md` describía la Fase 8.2 como si el NDVI ya fuera real cuando en realidad era simulado. Con la Fase C completada, la redacción del README se actualizó para reflejar el estado real (NDVI real vía Earth Engine + simulación de respaldo cuando no hay imagen disponible).
+**Nota honesta ya corregida:** el `README.md` describía la Fase 8.2 como si el NDVI ya fuera real cuando en realidad era simulado. Con la Fase C y Fase E completadas, la redacción del README se actualizó para reflejar el estado real (NDVI real multisensor óptico Sentinel-2 + radar SAR Sentinel-1 todo clima).

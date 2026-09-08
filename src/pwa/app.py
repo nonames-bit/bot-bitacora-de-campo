@@ -380,7 +380,7 @@ def datos_pasturas(db_path: str = DB_PATH_DEFAULT) -> dict:
             return _datos_pasturas(db)
         except Exception:
             logger.exception("datos_pasturas fallo completo")
-            return {"potreros": [], "ndvi_reciente": [],
+            return {"potreros": [], "ndvi_reciente": [], "satelite_resumen": {},
                     "errores": {"pasturas": "error interno"}}
     finally:
         try:
@@ -920,6 +920,90 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out = datos_pasturas(db_path)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.post("/api/satelite/actualizar")
+    def api_satelite_actualizar():
+        """Sincroniza lecturas satelitales (Sentinel-1 SAR Radar o Sentinel-2 Óptico)
+        directamente vía Google Earth Engine para los potreros con geometría real.
+        """
+        datos = request.get_json(silent=True) or {}
+        modo = str(datos.get("modo") or "auto").strip().lower()
+        if modo not in ("auto", "radar", "s1", "s2"):
+            modo = "auto"
+
+        db_s = _db(db_path)
+        try:
+            try:
+                from ..gis.earth_engine_ndvi import actualizar_lecturas_reales
+            except (ImportError, ValueError):
+                from src.gis.earth_engine_ndvi import actualizar_lecturas_reales
+
+            filas_pot = db_s.query(
+                "SELECT id, nombre, area_has, geom_wkt_4326 FROM potreros "
+                "WHERE geom_wkt_4326 IS NOT NULL ORDER BY nombre"
+            )
+            potreros = [dict(f) for f in filas_pot]
+            if not potreros:
+                return jsonify({"ok": False, "error": "No hay potreros con geometría WKT registrada."}), 400
+
+            lecturas = actualizar_lecturas_reales(potreros, modo=modo)
+            if not lecturas:
+                return jsonify({
+                    "ok": False,
+                    "error": "No se obtuvieron imágenes satelitales en la ventana de tiempo especificada."
+                }), 502
+
+            uid = session.get("user_id")
+            actualizados = 0
+            for r in lecturas:
+                db_s.registrar_lectura_ndvi(
+                    potrero_id_o_nom=r["potrero_id"],
+                    fecha=r["fecha"],
+                    ndvi_promedio=r["ndvi_promedio"],
+                    ndvi_min=r.get("ndvi_min"),
+                    ndvi_max=r.get("ndvi_max"),
+                    biomasa_estimada_kg_ha=r.get("biomasa_estimada_kg_ha"),
+                    aforo_estimado_kg_m2=r.get("aforo_estimado_kg_m2"),
+                    cobertura_nubes_pct=r.get("cobertura_nubes_pct", 0.0),
+                    fuente=r.get("fuente", "Sentinel-2 L2A"),
+                    registrado_por=uid,
+                )
+                actualizados += 1
+
+            # Invalidar cache de gráficos en disco para que el mapa de potreros se refresque inmediatamente
+            try:
+                if os.path.isdir(REPORTES_DIR_DEFAULT):
+                    for arch in os.listdir(REPORTES_DIR_DEFAULT):
+                        if arch.startswith("_pwa_cache_"):
+                            try:
+                                os.remove(os.path.join(REPORTES_DIR_DEFAULT, arch))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+
+            n_sar = sum(1 for r in lecturas if "SAR" in (r.get("fuente") or "").upper() or "SENTINEL-1" in (r.get("fuente") or "").upper())
+            n_opt = len(lecturas) - n_sar
+            sensor_principal = "Radar SAR Sentinel-1 (Todo Clima)" if n_sar > 0 else "Sentinel-2 Óptico"
+            msg = f"Sincronizados {actualizados} potreros ({n_sar} Radar SAR, {n_opt} Óptico)"
+            return jsonify({
+                "ok": True,
+                "actualizados": actualizados,
+                "sar": n_sar,
+                "optico": n_opt,
+                "sensor_principal": sensor_principal,
+                "modo": modo,
+                "mensaje": msg,
+            })
+        except Exception as e:
+            logger.exception("Error actualizando satelite desde PWA: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_s.close()
+            except Exception:
+                pass
+
 
     @app.get("/api/leche")
     def api_leche():
