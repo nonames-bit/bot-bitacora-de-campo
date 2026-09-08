@@ -288,6 +288,38 @@ def test_registrar_traslado_es_idempotente(db):
     assert id1 == id2
 
 
+def test_registrar_traslado_actualiza_el_potrero_actual_del_animal(db):
+    """Regresión: el traslado solo quedaba como nota histórica sin mover al
+    animal de verdad -- Inventario/Ficha/filtros leen animales.potrero_id
+    directo, no el último traslado, así que sin esto el animal seguía
+    apareciendo en su potrero viejo después de "moverlo"."""
+    origen = db.registrar_potrero("Olegario I")
+    destino = db.registrar_potrero("Olegario II")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=origen)
+    db.registrar_traslado("47", fecha="2026-08-01", potrero_origen=origen, potrero_destino=destino)
+    fila = db.query_one("SELECT potrero_id FROM animales WHERE tag = '47'")
+    assert fila["potrero_id"] == destino
+
+
+def test_registrar_traslado_sin_destino_no_toca_el_potrero_actual(db):
+    origen = db.registrar_potrero("Olegario I")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=origen)
+    db.registrar_traslado("47", fecha="2026-08-01", potrero_origen=origen)
+    fila = db.query_one("SELECT potrero_id FROM animales WHERE tag = '47'")
+    assert fila["potrero_id"] == origen
+
+
+def test_animales_activos_en_potrero(db):
+    p1 = db.registrar_potrero("Olegario I")
+    p2 = db.registrar_potrero("Olegario II")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("48", sexo="Macho", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("49", sexo="Hembra", estado="VENDIDO", potrero=p1)  # inactivo: no cuenta
+    db.registrar_animal("50", sexo="Hembra", estado="ACTIVO", potrero=p2)  # otro potrero: no cuenta
+    tags = db.animales_activos_en_potrero(p1)
+    assert sorted(tags) == ["47", "48"]
+
+
 def test_registrar_celo_es_idempotente_pero_permite_am_y_pm(db):
     id1 = db.registrar_celo("47", fecha="2026-08-01", am_pm="AM")
     id2 = db.registrar_celo("47", fecha="2026-08-01", am_pm="AM")

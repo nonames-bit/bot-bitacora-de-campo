@@ -1460,7 +1460,11 @@
         + "</div>"
         + "<label>Diagnóstico / Causa: <input id='cap-diag' placeholder='ej. Mastitis clínica cuarto anterior izquierdo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "traslado") {
-      h += "<label>Arete / Tag (o Lote): <input id='cap-tag' placeholder='ej. 47 o Todo el lote' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      h += "<label style='display:flex; align-items:flex-start; gap:8px; background:var(--superficie); padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-weight:600; cursor:pointer;'>"
+        + "<input type='checkbox' id='cap-trasl-masivo' style='width:auto; margin-top:3px;'>"
+        + "<span>Mover TODOS los animales activos de este potrero<span style='display:block; font-weight:400; font-size:12px; color:var(--texto-suave); margin-top:2px;'>Sin escribir cada arete: elegí solo Potrero Origen y Potrero Destino.</span></span>"
+        + "</label>"
+        + "<div id='cap-trasl-tag-wrap'><label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<label>Potrero Origen: <input id='cap-pot-orig' placeholder='ej. Guayabal' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Potrero Destino: <input id='cap-pot-dest' placeholder='ej. Morichal' list='dl-potreros' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Motivo de rotación: <input id='cap-motivo' placeholder='Rotación Voisin, cambio de pastura, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
@@ -2077,10 +2081,71 @@
       toggleLitros();
     }
 
+    function bindTrasladoMasivo() {
+      var chk = document.getElementById("cap-trasl-masivo");
+      var tagWrap = document.getElementById("cap-trasl-tag-wrap");
+      var fTag = document.getElementById("cap-tag");
+      var fOrigen = document.getElementById("cap-pot-orig");
+      if (!chk || !tagWrap) return;
+      function toggle() {
+        if (chk.checked) {
+          tagWrap.style.display = "none";
+          if (fTag) { fTag.required = false; fTag.value = ""; }
+          if (fOrigen) fOrigen.required = true;
+        } else {
+          tagWrap.style.display = "";
+          if (fTag) fTag.required = true;
+          if (fOrigen) fOrigen.required = false;
+        }
+      }
+      chk.addEventListener("change", toggle);
+      toggle();
+    }
+
+    function ejecutarTrasladoMasivo(fecha) {
+      var origen = (q("#cap-pot-orig") && q("#cap-pot-orig").value || "").trim();
+      var destino = (q("#cap-pot-dest") && q("#cap-pot-dest").value || "").trim();
+      var motivo = (q("#cap-motivo") && q("#cap-motivo").value) || null;
+      var feed = document.getElementById("captura-feedback");
+      if (!origen || !destino) {
+        if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ Elegí Potrero Origen y Potrero Destino.</div>";
+        return;
+      }
+      if (!window.confirm("¿Mover TODOS los animales activos de \"" + origen + "\" a \"" + destino + "\"?")) return;
+      if (feed) feed.innerHTML = "<div class='chip ambar' style='font-size:14px; padding:8px 12px;'>⏳ Moviendo animales...</div>";
+      fetch("/api/traslado/masivo", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ potrero_origen: origen, potrero_destino: destino, motivo: motivo, fecha: fecha }),
+      }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
+        .then(function (res) {
+          if (res.status >= 200 && res.status < 300 && res.body.ok) {
+            enviarTelemetriaSilenciosa("captura_traslado_masivo");
+            if (feed) {
+              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>✅ " + res.body.movidos
+                + " animal(es) movidos de " + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino) + ".</div>";
+            }
+            var formEl = document.getElementById("form-captura");
+            if (formEl) formEl.reset();
+            if (cCampos) {
+              cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+              bindFotoCaptura();
+              bindCamposFinanza();
+              bindTrasladoMasivo();
+            }
+            actualizarBadges();
+          } else if (feed) {
+            feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
+          }
+        }).catch(function (err) {
+          if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc(err && err.message || err) + "</div>";
+        });
+    }
+
     if (cCampos) {
       cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
       bindFotoCaptura();
       bindCamposFinanza();
+      bindTrasladoMasivo();
     }
 
     qa("button[data-cap-tipo]").forEach(function (b) {
@@ -2093,6 +2158,7 @@
           cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
           bindFotoCaptura();
           bindCamposFinanza();
+          bindTrasladoMasivo();
         }
         var fTag = document.getElementById("cap-tag");
         if (fTag) fTag.focus();
@@ -2104,6 +2170,13 @@
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var fecha = (q("#cap-fecha") && q("#cap-fecha").value) || new Date().toISOString().slice(0, 10);
+
+        var chkTrasladoMasivo = document.getElementById("cap-trasl-masivo");
+        if (_tipoCapturaActual === "traslado" && chkTrasladoMasivo && chkTrasladoMasivo.checked) {
+          ejecutarTrasladoMasivo(fecha);
+          return;
+        }
+
         var payload = {};
 
         if (_tipoCapturaActual === "parto") {
@@ -2185,6 +2258,7 @@
             cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
             bindFotoCaptura();
             bindCamposFinanza();
+            bindTrasladoMasivo();
           }
           actualizarBadges();
         }
@@ -5277,6 +5351,13 @@
     inpPotrero.addEventListener("focus", function () { cargarListaPotreros(); });
     inpPotrero.addEventListener("click", function () { cargarListaPotreros(); });
   }
+  // El datalist #dl-potreros es compartido por TODOS los campos de potrero de
+  // la app (filtro superior, Traslado, Finanzas, Manga, editar animal), pero
+  // antes solo se llenaba al tocar el campo del filtro superior -- si el
+  // usuario nunca pasaba por ahí, los demás campos (con list='dl-potreros'
+  // en su HTML) se veían sin autocompletar. Se precarga una vez al iniciar
+  // para que esté listo en cualquier campo desde el principio.
+  cargarListaPotreros();
 
   /* ---------- Online/offline + polling ---------- */
   var barra = document.getElementById("barra-red");

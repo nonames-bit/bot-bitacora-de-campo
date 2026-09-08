@@ -2063,6 +2063,56 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         finally:
             db_sync.close()
 
+    @app.post("/api/traslado/masivo")
+    def api_traslado_masivo():
+        # Mover TODOS los animales activos de un potrero a otro de una sola
+        # vez (rotación Voisin completa del lote), en vez de tener que
+        # escribir arete por arete. Solo potreros "reales" (con geometría
+        # georreferenciada) -- los códigos numéricos legacy de SG sin mapa no
+        # cuentan como ubicación real para este flujo.
+        datos = request.get_json(silent=True) or {}
+        nombre_origen = (datos.get("potrero_origen") or "").strip()
+        nombre_destino = (datos.get("potrero_destino") or "").strip()
+        fecha = datos.get("fecha") or date.today().isoformat()
+        motivo = (datos.get("motivo") or "").strip() or None
+        if not nombre_origen or not nombre_destino:
+            return jsonify({"ok": False, "error": "Potrero Origen y Potrero Destino son obligatorios."}), 400
+        if nombre_origen.strip().upper() == nombre_destino.strip().upper():
+            return jsonify({"ok": False, "error": "El potrero de origen y el de destino no pueden ser el mismo."}), 400
+
+        db_t = _db(db_path)
+        try:
+            fila_origen = db_t.query_one(
+                "SELECT id, nombre FROM potreros WHERE geom_wkt_4326 IS NOT NULL AND (nombre = ? OR codigo = ?)",
+                (nombre_origen, nombre_origen),
+            )
+            fila_destino = db_t.query_one(
+                "SELECT id, nombre FROM potreros WHERE geom_wkt_4326 IS NOT NULL AND (nombre = ? OR codigo = ?)",
+                (nombre_destino, nombre_destino),
+            )
+            if not fila_origen:
+                return jsonify({"ok": False, "error": f"'{nombre_origen}' no es un potrero real (sin mapa/geometría) o no existe."}), 404
+            if not fila_destino:
+                return jsonify({"ok": False, "error": f"'{nombre_destino}' no es un potrero real (sin mapa/geometría) o no existe."}), 404
+
+            tags = db_t.animales_activos_en_potrero(fila_origen["id"])
+            uid = session.get("user_id")
+            for tag in tags:
+                db_t.registrar_traslado(
+                    animal_tag=tag, fecha=fecha,
+                    potrero_origen=fila_origen["id"], potrero_destino=fila_destino["id"],
+                    motivo=motivo, registrado_por=uid,
+                )
+            return jsonify({
+                "ok": True, "movidos": len(tags), "animales": tags,
+                "potrero_origen": fila_origen["nombre"], "potrero_destino": fila_destino["nombre"],
+            })
+        except Exception as e:
+            logger.exception("Error en traslado masivo por potrero")
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_t.close()
+
     @app.post("/api/manga/pesaje")
     def api_manga_pesaje():
         datos = request.get_json(silent=True) or request.form

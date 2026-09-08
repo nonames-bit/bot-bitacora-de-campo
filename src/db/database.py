@@ -451,11 +451,26 @@ class Database:
         })
         if existente:
             return existente
-        return self.insert("traslados", dict(
+        tid = self.insert("traslados", dict(
             animal_id=animal_id, lote=lote, fecha=f,
             potrero_origen=origen, potrero_destino=destino, motivo=motivo,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+        # El traslado es el evento de "mover" un animal -- sin esto el registro
+        # queda solo como nota histórica y el animal sigue apareciendo en su
+        # potrero viejo en Inventario/Ficha/filtros (todos leen animales.potrero_id
+        # directo, no el último traslado).
+        if destino is not None:
+            self.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (destino, animal_id))
+        return tid
+
+    def animales_activos_en_potrero(self, potrero_id: int) -> list[str]:
+        """Tags de los animales ACTIVOS cuyo potrero actual es `potrero_id`."""
+        filas = self.query(
+            "SELECT tag FROM animales WHERE potrero_id = ? AND estado = 'ACTIVO' AND tag IS NOT NULL",
+            (potrero_id,),
+        )
+        return [f["tag"] for f in filas]
 
     def registrar_pesaje(self, animal_tag, fecha=None, peso_kg=None,
                          gmd_calculada=None, evento=None, registrado_por=None) -> int:

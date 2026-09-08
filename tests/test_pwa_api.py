@@ -817,6 +817,76 @@ def test_api_gps_potrero_y_rondas(client):
     assert len(r_list.get_json()["rondas"]) >= 1
 
 
+def test_api_traslado_masivo_mueve_todos_los_animales_activos(client, db_file):
+    from src.db.database import Database
+
+    db = Database(db_file)
+    pid_destino = db.registrar_potrero(nombre="Morichal", codigo="M1")
+    db.execute(
+        "UPDATE potreros SET geom_wkt_4326 = ?, centroide_lat = 3.4, centroide_lon = -74.06 WHERE id = ?",
+        (_WKT_TEST, pid_destino),
+    )
+    db.close()
+
+    r = client.post("/api/traslado/masivo", json={
+        "potrero_origen": "Guayabal", "potrero_destino": "Morichal", "fecha": "2026-09-08",
+        "motivo": "Rotación Voisin",
+    })
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["ok"] is True
+    # db_file fixture: "47" está ACTIVO en Guayabal, "99" está VENDIDO -- no cuenta.
+    assert body["movidos"] == 1
+    assert body["animales"] == ["47"]
+    assert body["potrero_destino"] == "Morichal"
+
+    db2 = Database(db_file)
+    fila = db2.query_one("SELECT potrero_id FROM animales WHERE tag = '47'")
+    assert fila["potrero_id"] == pid_destino
+    trasl = db2.query_one(
+        "SELECT * FROM traslados WHERE animal_id = (SELECT id_animal FROM animales WHERE tag = '47')"
+    )
+    assert trasl is not None
+    assert trasl["motivo"] == "Rotación Voisin"
+    db2.close()
+
+
+def test_api_traslado_masivo_sin_animales_activos_devuelve_cero(client, db_file):
+    from src.db.database import Database
+
+    db = Database(db_file)
+    pid_a = db.registrar_potrero(nombre="Vacio A")
+    pid_b = db.registrar_potrero(nombre="Vacio B")
+    db.execute("UPDATE potreros SET geom_wkt_4326 = ? WHERE id IN (?, ?)", (_WKT_TEST, pid_a, pid_b))
+    db.close()
+
+    r = client.post("/api/traslado/masivo", json={"potrero_origen": "Vacio A", "potrero_destino": "Vacio B"})
+    assert r.status_code == 200
+    assert r.get_json()["movidos"] == 0
+
+
+def test_api_traslado_masivo_rechaza_potrero_sin_geometria_real(client):
+    """'09' es un potrero legacy de SG sin mapa -- no cuenta como real para
+    este flujo, aunque exista en la tabla potreros."""
+    r = client.post("/api/traslado/masivo", json={"potrero_origen": "09", "potrero_destino": "Guayabal"})
+    assert r.status_code == 404
+
+
+def test_api_traslado_masivo_rechaza_potrero_inexistente(client):
+    r = client.post("/api/traslado/masivo", json={"potrero_origen": "Guayabal", "potrero_destino": "NoExiste"})
+    assert r.status_code == 404
+
+
+def test_api_traslado_masivo_rechaza_campos_faltantes(client):
+    assert client.post("/api/traslado/masivo", json={"potrero_origen": "Guayabal"}).status_code == 400
+    assert client.post("/api/traslado/masivo", json={"potrero_destino": "Guayabal"}).status_code == 400
+
+
+def test_api_traslado_masivo_rechaza_mismo_origen_y_destino(client):
+    r = client.post("/api/traslado/masivo", json={"potrero_origen": "Guayabal", "potrero_destino": "Guayabal"})
+    assert r.status_code == 400
+
+
 def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     import json
     users_data = [

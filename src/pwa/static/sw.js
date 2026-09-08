@@ -60,7 +60,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v66: Recibos y Planillas de Quincena (Leche) ahora es una sección colapsada al final de la vista (antes salía primero); fix del filtro que mezclaba facturas de Finanzas ahí.
 // v67: Editar y eliminar movimientos manuales de Finanzas (ingresos/gastos), exclusivo para OWNER, desde "Movimientos recientes".
 // v68: Eliminados los botones de sugerencias (chips inferiores) del modal de chat del Asistente IA para una interfaz más limpia.
-var CACHE = "pwa-ja-v68"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v69: Traslado masivo por potrero (mover TODOS los animales activos de un potrero a otro sin escribir cada arete) en Captura; autocompletado de potreros (solo reales) precargado desde el inicio en todos los campos; fix de fondo -- Traslado ahora sí actualiza el potrero actual del animal (antes solo quedaba como nota histórica).
+var CACHE = "pwa-ja-v69"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
