@@ -597,6 +597,62 @@ def test_registrar_finanza_vincula_animal_y_potrero_opcionales(db):
     assert fila["potrero_id"] == db.potrero_id("Olegario")
 
 
+def test_editar_finanza_actualiza_solo_los_campos_provistos(db):
+    fid = db.registrar_finanza(
+        fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO",
+        concepto="Sal mineralizada 40kg", monto=180000, contraparte="Agropecuaria X",
+    )
+    ok = db.editar_finanza(fid, monto=200000, concepto="Sal mineralizada 50kg")
+    assert ok is True
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["monto"] == 200000
+    assert fila["concepto"] == "Sal mineralizada 50kg"
+    # No tocados: siguen igual que al registrar.
+    assert fila["tipo"] == "EGRESO"
+    assert fila["categoria"] == "INSUMO"
+    assert fila["contraparte"] == "Agropecuaria X"
+
+
+def test_editar_finanza_cambia_tipo_y_categoria(db):
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO", monto=100000)
+    db.editar_finanza(fid, tipo="ingreso", categoria="otro_ingreso")
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["tipo"] == "INGRESO"
+    assert fila["categoria"] == "OTRO_INGRESO"
+
+
+def test_editar_finanza_vacia_campo_de_texto_con_string_vacio(db):
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO",
+                               monto=100000, contraparte="Agropecuaria X")
+    db.editar_finanza(fid, contraparte="")
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["contraparte"] == ""
+
+
+def test_editar_finanza_animal_tag_vacio_desvincula_el_animal(db):
+    db.registrar_animal("N069", sexo="Hembra", estado="ACTIVO")
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="VETERINARIO",
+                               monto=50000, animal_tag="N069")
+    db.editar_finanza(fid, animal_tag="")
+    fila = db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["animal_id"] is None
+
+
+def test_editar_finanza_id_inexistente_devuelve_false(db):
+    assert db.editar_finanza(99999, monto=1000) is False
+
+
+def test_eliminar_finanza_borra_el_registro(db):
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO", monto=100000)
+    ok = db.eliminar_finanza(fid)
+    assert ok is True
+    assert db.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,)) is None
+
+
+def test_eliminar_finanza_id_inexistente_devuelve_false(db):
+    assert db.eliminar_finanza(99999) is False
+
+
 def test_resumen_finanzas_calcula_utilidad_incluyendo_ventas_de_animales(db):
     # Ingresos: venta de leche (finanzas) + venta de un animal (movimientos).
     db.registrar_finanza(fecha="2026-09-05", tipo="INGRESO", categoria="VENTA_LECHE", monto=2000000, litros=1500)

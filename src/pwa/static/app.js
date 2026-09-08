@@ -659,7 +659,8 @@
 
     var movs = (d.recientes || []).map(function (f) {
       return {
-        fecha: f.fecha, tipo: f.tipo, categoria: etiquetaCategoriaFinanza(f.categoria),
+        id: f.id, origen: "finanza",
+        fecha: f.fecha, tipo: f.tipo, categoria: etiquetaCategoriaFinanza(f.categoria), categoria_raw: f.categoria,
         detalle: f.concepto || "", monto: f.monto, litros: f.litros,
         animal_tag: f.animal_tag || null,
         otro_txt: f.animal_tag ? "" : (f.contraparte || f.potrero_nombre || ""),
@@ -668,8 +669,9 @@
       };
     }).concat((d.ventas_compras || []).map(function (m) {
       return {
+        id: m.id, origen: "movimiento",
         fecha: m.fecha, tipo: m.tipo_movimiento === "VENTA" ? "INGRESO" : "EGRESO",
-        categoria: m.tipo_movimiento === "VENTA" ? "Venta de animales" : "Compra de animales",
+        categoria: m.tipo_movimiento === "VENTA" ? "Venta de animales" : "Compra de animales", categoria_raw: null,
         detalle: m.notas || "", monto: m.precio, litros: null,
         animal_tag: m.animal_tag || null,
         otro_txt: m.procedencia_destino || "",
@@ -678,6 +680,8 @@
       };
     })).sort(function (a, b) { return (b.fecha || "").localeCompare(a.fecha || ""); });
     _finanzasMovsActuales = movs;
+
+    var rolFin = window.__usuarioActual && window.__usuarioActual.rol;
 
     h += "<h4>" + icon("calendar") + "Movimientos recientes</h4>"
       + tabla(movs, [
@@ -692,10 +696,15 @@
         }],
         ["detalle", "Detalle"],
         ["monto", "Monto", "text", function (v) { return fmtMoneda(v); }],
-        ["fecha", "Ver", "text", function (v, fila) {
+        ["fecha", "Acciones", "text", function (v, fila) {
           var idx = movs.indexOf(fila);
           var conFoto = fila.foto_ruta ? icon("camera", 12) : "";
-          return "<button type='button' class='tema-btn' data-fin-ver='" + idx + "' style='font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;' title='Ver detalle'>" + icon("eye", 13) + conFoto + "</button>";
+          var btns = "<button type='button' class='tema-btn' data-fin-ver='" + idx + "' style='font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; gap:4px;' title='Ver detalle'>" + icon("eye", 13) + conFoto + "</button>";
+          if (rolFin === "OWNER" && fila.origen === "finanza") {
+            btns += " <button type='button' class='tema-btn' data-fin-editar='" + idx + "' style='font-size:11px; padding:4px 8px; display:inline-flex; align-items:center;' title='Editar'>" + icon("pencil", 13) + "</button>"
+              + " <button type='button' class='tema-btn' data-fin-eliminar='" + idx + "' style='font-size:11px; padding:4px 8px; display:inline-flex; align-items:center; color:var(--rojo-alerta, #c0392b);' title='Eliminar'>" + icon("xmark", 13) + "</button>";
+          }
+          return btns;
         }]
       ], "Sin movimientos recientes en este periodo.");
 
@@ -760,6 +769,116 @@
     });
   }
 
+  var CATEGORIAS_INGRESO_FINANZA = ["VENTA_LECHE", "OTRO_INGRESO"];
+
+  function mostrarEditarFinanza(fila) {
+    if (!fila) return;
+    var overlay = document.getElementById("fin-editar-modal");
+    if (overlay) overlay.remove();
+
+    var opcionesCategoria = ""
+      + "<optgroup label='💰 Ingresos'>"
+      + "<option value='VENTA_LECHE'>Venta de leche</option>"
+      + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
+      + "</optgroup>"
+      + "<optgroup label='💸 Egresos'>"
+      + "<option value='INSUMO'>Insumos (sal, alambre, herramienta, etc.)</option>"
+      + "<option value='NOMINA'>Nómina / Jornales</option>"
+      + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
+      + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
+      + "<option value='COMBUSTIBLE'>Combustible</option>"
+      + "<option value='OTRO_EGRESO'>Otro gasto</option>"
+      + "</optgroup>";
+
+    var cuerpoHtml = "<form id='form-editar-finanza' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<label>Fecha: <input type='date' id='ef-fecha' value='" + esc(fechaCorta(fila.fecha)) + "' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>Categoría: <select id='ef-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>" + opcionesCategoria + "</select></label>"
+      + "<label>Concepto: <input id='ef-concepto' value=\"" + esc(fila.detalle || "") + "\" style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>Monto ($): <input type='number' step='1' min='0.01' id='ef-monto' value='" + esc(fila.monto) + "' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<div id='ef-litros-wrap' style='display:none;'><label>Litros vendidos: <input type='number' step='0.5' id='ef-litros' value='" + esc(fila.litros != null ? fila.litros : "") + "' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+      + "<label>Proveedor / Comprador / Trabajador: <input id='ef-contraparte' value=\"" + esc(fila.contraparte || "") + "\" style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>Arete / Animal relacionado: <input id='ef-tag' value=\"" + esc(fila.animal_tag || "") + "\" list='dl-tags' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label>Notas: <input id='ef-notas' value=\"" + esc(fila.notas || "") + "\" style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<p id='ef-error' class='aviso' style='display:none; border-left:4px solid var(--rojo-alerta, #c0392b);'></p>"
+      + "<div style='display:flex; gap:8px; justify-content:flex-end; margin-top:6px;'>"
+      + "<button type='button' class='tema-btn' id='btn-cancelar-ef'>Cancelar</button>"
+      + "<button type='submit' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>" + icon("save", 14) + "Guardar cambios</button>"
+      + "</div></form>";
+
+    var html = "<div id='fin-editar-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido'>"
+      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Editar Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-editar'>✕</button></div>"
+      + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
+      + "</div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("fin-editar-modal");
+    function cerrarModal() { if (ov) ov.remove(); }
+    var btnCerrar = document.getElementById("btn-cerrar-fin-editar");
+    if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+    var btnCancelar = document.getElementById("btn-cancelar-ef");
+    if (btnCancelar) btnCancelar.addEventListener("click", cerrarModal);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
+
+    var selCat = document.getElementById("ef-categoria");
+    var wrapLitros = document.getElementById("ef-litros-wrap");
+    selCat.value = fila.categoria_raw || "OTRO_EGRESO";
+    function toggleLitros() { wrapLitros.style.display = selCat.value === "VENTA_LECHE" ? "block" : "none"; }
+    selCat.addEventListener("change", toggleLitros);
+    toggleLitros();
+
+    var form = document.getElementById("form-editar-finanza");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var categoria = selCat.value;
+      var payload = {
+        fecha: q("#ef-fecha").value,
+        categoria: categoria,
+        tipo: CATEGORIAS_INGRESO_FINANZA.indexOf(categoria) !== -1 ? "INGRESO" : "EGRESO",
+        concepto: q("#ef-concepto").value.trim(),
+        monto: parseFloat(q("#ef-monto").value) || 0,
+        litros: categoria === "VENTA_LECHE" ? (parseFloat(q("#ef-litros").value) || null) : null,
+        contraparte: q("#ef-contraparte").value.trim(),
+        animal_tag: q("#ef-tag").value.trim(),
+        notas: q("#ef-notas").value.trim(),
+      };
+      var errorEl = document.getElementById("ef-error");
+      fetch("/api/finanzas/" + fila.id, {
+        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
+        .then(function (res) {
+          if (res.status >= 200 && res.status < 300 && res.body.ok) {
+            cerrarModal();
+            cargarFinanzasPeriodo();
+          } else if (errorEl) {
+            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.style.display = "block";
+          }
+        }).catch(function (err) {
+          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+        });
+    });
+  }
+
+  function eliminarFinanzaConfirm(fila) {
+    if (!fila) return;
+    if (!window.confirm("¿Eliminar este movimiento (" + (fila.detalle || fila.categoria) + ", " + fmtMoneda(fila.monto) + ")? Esta acción no se puede deshacer.")) return;
+    fetch("/api/finanzas/" + fila.id, { method: "DELETE" })
+      .then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
+      .then(function (res) {
+        if (res.status >= 200 && res.status < 300 && res.body.ok) {
+          cargarFinanzasPeriodo();
+        } else {
+          window.alert("❌ " + (res.body.error || "No se pudo eliminar."));
+        }
+      }).catch(function (err) {
+        window.alert("❌ " + (err && err.message || err));
+      });
+  }
+
   function bindFinanzas() {
     var btnGasto = document.getElementById("btn-ir-captura-gasto");
     if (btnGasto) {
@@ -781,6 +900,18 @@
       btn.addEventListener("click", function () {
         var idx = parseInt(btn.getAttribute("data-fin-ver"), 10);
         mostrarDetalleFinanza(_finanzasMovsActuales[idx]);
+      });
+    });
+    qa("[data-fin-editar]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.getAttribute("data-fin-editar"), 10);
+        mostrarEditarFinanza(_finanzasMovsActuales[idx]);
+      });
+    });
+    qa("[data-fin-eliminar]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var idx = parseInt(btn.getAttribute("data-fin-eliminar"), 10);
+        eliminarFinanzaConfirm(_finanzasMovsActuales[idx]);
       });
     });
   }

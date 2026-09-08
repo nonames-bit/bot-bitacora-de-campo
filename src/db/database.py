@@ -516,6 +516,52 @@ class Database:
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
+    def editar_finanza(self, id_finanza: int, fecha=None, tipo=None, categoria=None,
+                       concepto=None, monto=None, litros=None, animal_tag=None,
+                       potrero=None, contraparte=None, notas=None) -> bool:
+        """Edita un movimiento de `finanzas` ya existente. Cada argumento en
+        None se deja tal cual estaba (no se toca); para vaciar un campo de
+        texto opcional (concepto/contraparte/notas) pase "" explícitamente.
+        Devuelve False si el id no existe."""
+        existente = self.query_one("SELECT id FROM finanzas WHERE id = ?", (id_finanza,))
+        if not existente:
+            return False
+        campos: dict[str, Any] = {}
+        if fecha is not None:
+            campos["fecha"] = iso(fecha) or fecha
+        if tipo is not None:
+            campos["tipo"] = str(tipo).strip().upper()
+        if categoria is not None:
+            campos["categoria"] = str(categoria).strip().upper()
+        if concepto is not None:
+            campos["concepto"] = concepto
+        if monto is not None:
+            campos["monto"] = float(monto)
+        if litros is not None:
+            campos["litros"] = float(litros) if litros != "" else None
+        if animal_tag is not None:
+            campos["animal_id"] = self.resolve_animal(animal_tag) if animal_tag else None
+        if potrero is not None:
+            campos["potrero_id"] = self.resolve_potrero(potrero) if potrero else None
+        if contraparte is not None:
+            campos["contraparte"] = contraparte
+        if notas is not None:
+            campos["notas"] = notas
+        if not campos:
+            return True
+        sets = ", ".join(f"{k} = ?" for k in campos)
+        self.execute(f"UPDATE finanzas SET {sets} WHERE id = ?", tuple(campos.values()) + (id_finanza,))
+        return True
+
+    def eliminar_finanza(self, id_finanza: int) -> bool:
+        """Borra un movimiento de `finanzas` (ingreso/gasto manual). No toca
+        `movimientos` (ventas/compras de animales), que se gestionan aparte."""
+        existente = self.query_one("SELECT id FROM finanzas WHERE id = ?", (id_finanza,))
+        if not existente:
+            return False
+        self.execute("DELETE FROM finanzas WHERE id = ?", (id_finanza,))
+        return True
+
     def resumen_finanzas(self, desde: str, hasta: str) -> dict:
         """Resumen de Ingresos/Egresos/Utilidad entre `desde` y `hasta` (ISO),
         combinando el libro de `finanzas` con las ventas/compras de animales

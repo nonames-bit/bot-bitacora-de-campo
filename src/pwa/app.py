@@ -1090,6 +1090,69 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         finally:
             db_f.close()
 
+    @app.put("/api/finanzas/<int:id_finanza>")
+    def api_finanzas_editar(id_finanza):
+        # Edición reservada a OWNER: un movimiento financiero manual editado
+        # sin control queda como si nunca se hubiese registrado bien --
+        # a diferencia de crear (ADMIN también puede), corregirlo/borrarlo
+        # queda solo para el Propietario.
+        if _rol_actual() != "OWNER":
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol OWNER (Propietario)."}), 403
+        datos = request.get_json(silent=True) or {}
+        tipo = datos.get("tipo")
+        if tipo is not None:
+            tipo = str(tipo).strip().upper()
+            if tipo not in ("INGRESO", "EGRESO"):
+                return jsonify({"ok": False, "error": "El campo 'tipo' debe ser INGRESO o EGRESO."}), 400
+        monto = datos.get("monto")
+        if monto is not None:
+            try:
+                monto = float(monto)
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "El monto debe ser un número."}), 400
+            if monto <= 0:
+                return jsonify({"ok": False, "error": "El monto debe ser mayor a 0."}), 400
+
+        db_f = _db(db_path)
+        try:
+            ok = db_f.editar_finanza(
+                id_finanza,
+                fecha=datos.get("fecha"),
+                tipo=tipo,
+                categoria=(str(datos.get("categoria")).strip().upper() if datos.get("categoria") is not None else None),
+                concepto=datos.get("concepto"),
+                monto=monto,
+                litros=datos.get("litros"),
+                animal_tag=datos.get("animal_tag"),
+                potrero=datos.get("potrero"),
+                contraparte=datos.get("contraparte"),
+                notas=datos.get("notas"),
+            )
+            if not ok:
+                return jsonify({"ok": False, "error": f"No existe ningún movimiento con id {id_finanza}."}), 404
+            return jsonify({"ok": True})
+        except Exception as e:
+            logger.exception("Error al editar finanza")
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_f.close()
+
+    @app.delete("/api/finanzas/<int:id_finanza>")
+    def api_finanzas_eliminar(id_finanza):
+        if _rol_actual() != "OWNER":
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol OWNER (Propietario)."}), 403
+        db_f = _db(db_path)
+        try:
+            ok = db_f.eliminar_finanza(id_finanza)
+            if not ok:
+                return jsonify({"ok": False, "error": f"No existe ningún movimiento con id {id_finanza}."}), 404
+            return jsonify({"ok": True})
+        except Exception as e:
+            logger.exception("Error al eliminar finanza")
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_f.close()
+
     def _guardar_foto_recibo_leche(foto_b64: str, periodo: str, fecha_ref: str) -> Optional[str]:
         """Guarda en disco + tabla fotos la imagen del recibo de leche. Devuelve
         la ruta relativa guardada, o None si falla (nunca lanza)."""

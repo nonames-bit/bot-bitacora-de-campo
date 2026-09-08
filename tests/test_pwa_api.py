@@ -1216,6 +1216,90 @@ def test_api_finanzas_incluye_kpis(client):
         assert clave in d["kpis"], clave
 
 
+def test_api_finanzas_editar_y_eliminar_requieren_rol_owner(tmp_path, db_file):
+    """Editar/eliminar un movimiento financiero manual queda reservado a
+    OWNER -- a diferencia de crearlo, que ADMIN también puede hacer."""
+    import json
+    from src.db.database import Database
+
+    db = Database(db_file)
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO",
+                               concepto="Sal", monto=100000)
+    db.close()
+
+    users_data = [
+        {"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234"},
+        {"user_id": 200, "nombre": "Admin", "rol": "ADMIN", "pin": "2222"},
+    ]
+    u_path = str(tmp_path / "users_test.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    app.config.update({"TESTING": True})
+
+    # ADMIN: 403 tanto para editar como para eliminar.
+    c_adm = app.test_client()
+    c_adm.post("/login", data={"pin": "2222"})
+    assert c_adm.put(f"/api/finanzas/{fid}", json={"monto": 200000}).status_code == 403
+    assert c_adm.delete(f"/api/finanzas/{fid}").status_code == 403
+
+    # OWNER: puede editar...
+    c_own = app.test_client()
+    c_own.post("/login", data={"pin": "1234"})
+    r_edit = c_own.put(f"/api/finanzas/{fid}", json={"monto": 250000, "concepto": "Sal mineralizada"})
+    assert r_edit.status_code == 200
+    assert r_edit.get_json()["ok"] is True
+
+    db2 = Database(db_file)
+    fila = db2.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,))
+    assert fila["monto"] == 250000
+    assert fila["concepto"] == "Sal mineralizada"
+    db2.close()
+
+    # ...y eliminar.
+    r_del = c_own.delete(f"/api/finanzas/{fid}")
+    assert r_del.status_code == 200
+    assert r_del.get_json()["ok"] is True
+
+    db3 = Database(db_file)
+    assert db3.query_one("SELECT * FROM finanzas WHERE id = ?", (fid,)) is None
+    db3.close()
+
+
+def test_api_finanzas_editar_id_inexistente_devuelve_404(tmp_path, db_file):
+    import json
+    users_data = [{"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234"}]
+    u_path = str(tmp_path / "users_test.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    app.config.update({"TESTING": True})
+    c = app.test_client()
+    c.post("/login", data={"pin": "1234"})
+    assert c.put("/api/finanzas/99999", json={"monto": 1000}).status_code == 404
+    assert c.delete("/api/finanzas/99999").status_code == 404
+
+
+def test_api_finanzas_editar_monto_invalido_devuelve_400(tmp_path, db_file):
+    import json
+    from src.db.database import Database
+    db = Database(db_file)
+    fid = db.registrar_finanza(fecha="2026-09-07", tipo="EGRESO", categoria="INSUMO", monto=100000)
+    db.close()
+    users_data = [{"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234"}]
+    u_path = str(tmp_path / "users_test.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    app.config.update({"TESTING": True})
+    c = app.test_client()
+    c.post("/login", data={"pin": "1234"})
+    assert c.put(f"/api/finanzas/{fid}", json={"monto": -5}).status_code == 400
+    assert c.put(f"/api/finanzas/{fid}", json={"monto": "no-numero"}).status_code == 400
+    assert c.put(f"/api/finanzas/{fid}", json={"tipo": "ALGO_RARO"}).status_code == 400
+
+
 def test_api_sync_gasto_con_foto_ruta_no_duplica_foto(client, db_file):
     """Si la factura ya se analizó con IA, la foto quedó guardada en ese
     momento -- el evento final de captura debe enlazarla por ruta en vez de
