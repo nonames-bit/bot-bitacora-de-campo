@@ -500,11 +500,37 @@ def datos_pasturas(db: Database) -> dict:
         logger.error("seccion aforos_recientes fallo", exc_info=True)
         errores["aforos_recientes"] = str(e)
         aforos = []
+    try:
+        from .pronostico import obtener_pronostico_para_despacho, interpretar_pronostico
+        _pron = obtener_pronostico_para_despacho(db)
+        if _pron:
+            pronostico = {
+                "dias": [
+                    {
+                        "fecha": d["fecha"].isoformat() if hasattr(d["fecha"], "isoformat") else str(d["fecha"]),
+                        "temp_max_c": d.get("temp_max_c"),
+                        "temp_min_c": d.get("temp_min_c"),
+                        "lluvia_mm": d.get("lluvia_mm"),
+                        "prob_lluvia_pct": d.get("prob_lluvia_pct"),
+                    }
+                    for d in _pron.get("dias", [])
+                ],
+                "recomendaciones": interpretar_pronostico(_pron),
+                "desactualizado_horas": _pron.get("desactualizado_horas"),
+            }
+        else:
+            pronostico = None
+    except Exception as e:
+        logger.error("seccion pronostico fallo", exc_info=True)
+        errores["pronostico"] = str(e)
+        pronostico = None
+
     out: dict[str, Any] = {
         "potreros": potreros,
         "ndvi_reciente": ndvi,
         "pluviometria_reciente": pluviometria,
         "aforos_recientes": aforos,
+        "pronostico": pronostico,
     }
     if errores:
         out["errores"] = errores

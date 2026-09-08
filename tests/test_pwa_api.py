@@ -216,6 +216,35 @@ def test_pasturas_excluye_potreros_sin_geometria_real(db_file):
     assert "09" not in nombres
 
 
+def test_pasturas_incluye_pronostico_del_clima(db_file, tmp_path, monkeypatch):
+    """El pronóstico del clima ya está en el Despacho Matutino del bot
+    (docs/IDEAS_PROYECTOS.md ítem 1) pero faltaba en la PWA -- usa las
+    mismas coordenadas (centroide de Guayabal, ya georreferenciado en el
+    fixture) y el mismo cache en disco, sin pegarle a la red en el test."""
+    import json as _json
+    from datetime import date, datetime
+
+    cache = str(tmp_path / "pron_cache.json")
+    monkeypatch.setenv("PRONOSTICO_CACHE", cache)
+    dias = [
+        {"fecha": f"2026-09-{d:02d}", "temp_max_c": 27.0, "temp_min_c": 17.0,
+         "lluvia_mm": 3.0, "prob_lluvia_pct": 20.0}
+        for d in range(1, 8)
+    ]
+    payload = {
+        "guardado_en": datetime.now().isoformat(),
+        "lat": 3.395, "lon": -74.065,
+        "pron": {"lat": 3.395, "lon": -74.065, "dias": dias},
+    }
+    with open(cache, "w", encoding="utf-8") as f:
+        _json.dump(payload, f)
+
+    r = datos_pasturas(db_file)
+    assert r["pronostico"] is not None
+    assert len(r["pronostico"]["dias"]) == 7
+    assert "recomendaciones" in r["pronostico"]
+
+
 def test_api_grafico_tipo_valido_devuelve_png_o_404_sin_datos(client):
     # No se afirma 200 estricto: sin datos suficientes el generador puede
     # devolver None (comportamiento ya existente de charts.py), y sin

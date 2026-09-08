@@ -307,6 +307,36 @@
   }
   function renderPasturas(d) {
     var h = "<h3>" + icon("grass") + "Pasturas (Voisin)</h3>" + erroresHtml(d);
+
+    var pron = d.pronostico;
+    h += "<h4>" + icon("rain") + "Pronóstico del clima (7 días)</h4>";
+    if (!pron || !pron.dias || !pron.dias.length) {
+      h += vacio("Sin pronóstico disponible (requiere al menos un potrero con geometría/coordenadas registradas).");
+    } else {
+      h += "<div style='display:flex; gap:8px; overflow-x:auto; padding-bottom:8px;'>";
+      pron.dias.forEach(function (dd) {
+        var prob = dd.prob_lluvia_pct;
+        var lluvia = Number(dd.lluvia_mm) || 0;
+        var alerta = (lluvia >= 10 || (prob != null && prob >= 70)) ? "rojo"
+          : (lluvia >= 2 || (prob != null && prob >= 40)) ? "ambar" : "verde";
+        h += "<div class='card' style='min-width:110px; flex-shrink:0; padding:10px; text-align:center;'>"
+          + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>" + esc(fechaCorta(dd.fecha)) + "</div>"
+          + "<div style='font-size:13px; font-weight:700; margin:4px 0;'>" + esc(Math.round(dd.temp_max_c)) + "° / " + esc(Math.round(dd.temp_min_c)) + "°</div>"
+          + "<span class='chip " + alerta + "' style='font-size:11px;'>" + icon("droplet", 11) + esc(lluvia.toFixed(1)) + " mm</span>"
+          + (prob != null ? "<div style='font-size:10.5px; color:var(--texto-suave); margin-top:4px;'>" + esc(Math.round(prob)) + "% prob.</div>" : "")
+          + "</div>";
+      });
+      h += "</div>";
+      if (pron.recomendaciones && pron.recomendaciones.length) {
+        h += "<div class='card' style='padding:10px 14px;'>"
+          + pron.recomendaciones.map(function (r) { return "<div style='font-size:13px; margin:3px 0;'>• " + esc(r) + "</div>"; }).join("")
+          + "</div>";
+      }
+      if (pron.desactualizado_horas != null) {
+        h += "<p class='aviso'>⚠️ Datos del pronóstico de hace " + Math.round(pron.desactualizado_horas) + " h (sin conexión a Open-Meteo en la última actualización).</p>";
+      }
+    }
+
     h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
     h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
     if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
