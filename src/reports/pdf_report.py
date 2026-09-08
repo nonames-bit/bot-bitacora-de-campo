@@ -10,6 +10,7 @@ pie con línea.
 from __future__ import annotations
 
 import os
+import re
 from datetime import date, timedelta
 from typing import Any, Optional
 
@@ -31,6 +32,7 @@ from .estilo_ja import (
     COLOR_VERDE_OK_BG,
     buscar_logo_path,
     crear_bloque_kpis,
+    dibujar_fondo_pagina,
     dibujar_running_footer,
     dibujar_running_header,
     estilo_normal,
@@ -366,11 +368,13 @@ def generar_pdf(
 
     def _primera_pagina_canvas(c, doc) -> None:
         """En la primera página el encabezado ya está en el flujo Platypus (tabla_encabezado_franja).
-        Aquí solo dibujamos el pie institucional con línea y número de página."""
+        Dibujamos el fondo de hoja ejecutivo, marco con esquineros, marca de agua y pie."""
+        dibujar_fondo_pagina(c, doc.pagesize[0], doc.pagesize[1], incluir_marco=True, incluir_marca_agua=True)
         dibujar_running_footer(c, doc, "Ganadería JA · Bitácora Zootécnica Oficial · Documento Certificado")
 
     def _paginas_posteriores_canvas(c, doc) -> None:
-        """En páginas 2+, dibuja la cabecera compacta institucional sin solapar el contenido."""
+        """En páginas 2+, dibuja fondo de hoja ejecutivo, cabecera compacta y pie institucional."""
+        dibujar_fondo_pagina(c, doc.pagesize[0], doc.pagesize[1], incluir_marco=True, incluir_marca_agua=True)
         p_str = f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}  ·  Emisión: {fecha_hoy.isoformat()}"
         dibujar_running_header(c, doc, "GANADERÍA JA · INFORME ZOOTÉCNICO DE CAMPO", p_str)
         dibujar_running_footer(c, doc, "Ganadería JA · Bitácora Zootécnica Oficial · Documento Certificado")
@@ -575,9 +579,12 @@ def generar_pdf(
                 tabla_g.setStyle(TableStyle([
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(COLOR_BORDE_SUAVE)),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor(COLOR_BORDE_SUAVE)),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                 ]))
                 story.append(tabla_g)
@@ -593,7 +600,8 @@ def generar_pdf(
         story.append(Spacer(1, 3))
         if recs_clima:
             for r in recs_clima:
-                story.append(Paragraph(f"• {r}", est_normal))
+                r_clean = re.sub(r"[\U00010000-\U0010ffff\u2600-\u26ff\u2700-\u27bf\ufe0f\u25a0\u25aa\u25b6]", "", str(r)).strip()
+                story.append(Paragraph(f"• {r_clean}", est_normal))
             story.append(Spacer(1, 3))
         if spi_rows:
             tabla_spi_datos = [["Ventana", "SPI", "Clasificación", "Lluvia acumulada"]]

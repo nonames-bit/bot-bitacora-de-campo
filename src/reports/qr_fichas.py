@@ -84,6 +84,7 @@ from .estilo_ja import (
     COLOR_VERDE_OK,
     COLOR_VERDE_OK_BG,
     dibujar_encabezado,
+    dibujar_fondo_pagina,
     dibujar_logo_circular,
     dibujar_pie,
     dibujar_seccion_hdr,
@@ -294,6 +295,7 @@ def generar_fichas_lote(
     """
     from reportlab.lib import colors as _colors_lote
     from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
     try:
@@ -320,6 +322,11 @@ def generar_fichas_lote(
 
     c = canvas.Canvas(ruta, pagesize=A4)
 
+    def _dibujar_fondo_lote():
+        dibujar_fondo_pagina(c, W, H, incluir_marco=True, incluir_marca_agua=False, margen_marco=6 * mm)
+
+    _dibujar_fondo_lote()
+
     def _dibujar_guias_corte():
         """Líneas punteadas sutiles que facilitan el corte de las 6 tarjetas."""
         c.saveState()
@@ -341,6 +348,7 @@ def generar_fichas_lote(
         if idx and pos == 0:
             _dibujar_guias_corte()
             c.showPage()
+            _dibujar_fondo_lote()
         col, row = pos % 2, pos // 2
         x0 = margen + col * (cw + gap)
         y0 = H - margen - (row + 1) * ch - row * gap
@@ -508,6 +516,7 @@ def generar_ficha_qr_individual(
     """
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.units import mm
     from reportlab.lib.utils import ImageReader
     from reportlab.pdfgen import canvas
     try:
@@ -551,9 +560,20 @@ def generar_ficha_qr_individual(
     x0 = m
     y0 = m
 
-    # 1. Borde perimetral exterior
+    # 1. Fondo de hoja ejecutivo suave, marca de agua y marco con esquineros
+    col_izq_w = 210
+    dibujar_fondo_pagina(
+        c, W, H, incluir_marco=True, incluir_marca_agua=True,
+        margen_marco=6 * mm,
+        cx=x0 + col_izq_w + (cw - col_izq_w) / 2.0,
+        cy=y0 + ch / 2.0,
+        watermark_diam=110 * mm,
+        watermark_opacity=0.038,
+    )
+
+    # Contenedor perimetral de contenido
     c.setStrokeColor(colors.HexColor(COLOR_BORDE_SUAVE))
-    c.setLineWidth(1.2)
+    c.setLineWidth(1.1)
     c.roundRect(x0, y0, cw, ch, 6, stroke=1, fill=0)
 
     # 2. Encabezado corporativo institucional (con medalla circular y aro dorado)

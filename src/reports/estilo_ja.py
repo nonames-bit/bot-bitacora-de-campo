@@ -23,7 +23,7 @@ from reportlab.platypus import Flowable, Image, Paragraph, Table, TableStyle
 COLOR_MARCA = "#1B4D3E"            # Verde bosque institucional profundo
 COLOR_MARCA_OSCURO = "#12352B"     # Fondo verde noche para contrastes
 COLOR_MARCA_CLARA = "#E8F0EC"      # Banda de sección suave / tint sage
-COLOR_MARCA_ZEBRA = "#F7FAF8"      # Zebra stripe en tablas (muy sutil)
+COLOR_MARCA_ZEBRA = "#EDF3EF"      # Zebra stripe en tablas (sutil y contrastada)
 COLOR_MARCA_HEADER = "#A3D9A5"     # Texto secundario en header oscuro
 COLOR_BORDE_SUAVE = "#D5E2D7"      # Borde sutil para tarjetas y tablas
 COLOR_TIERRA = "#8D6E63"           # Tono tierra zootécnico
@@ -55,6 +55,10 @@ COLOR_DESCARTADO = "#B45309"
 COLOR_TOTALES_BG = "#DCEBE0"       # Fila de totales
 COLOR_QR_BORDE = "#CBD5E1"         # Borde sutil contenedor QR
 COLOR_MEDALLA_BORDE = "#D4AF37"    # Borde dorado sutil medalla logo
+COLOR_FONDO_HOJA = "#F5F8F6"        # Fondo suave marfil/salvia institucional (sustituye el blanco plano)
+COLOR_BORDE_PAGINA = "#CFDDD3"      # Marco perimetral fino de la hoja
+COLOR_BORDE_PAGINA_INNER = "#E2ECE5"# Filete interior doble sutil
+COLOR_ESQUINERO = "#1B4D3E"         # Acento en esquinas estilo documento oficial/diploma
 
 __all__ = [
     "COLOR_MARCA", "COLOR_MARCA_OSCURO", "COLOR_MARCA_CLARA", "COLOR_MARCA_ZEBRA",
@@ -67,6 +71,7 @@ __all__ = [
     "COLOR_FOTO_PLACEHOLDER", "COLOR_FOTO_BORDE", "COLOR_FOTO_TEXTO",
     "COLOR_VENDIDO", "COLOR_MUERTO", "COLOR_DESCARTADO",
     "COLOR_TOTALES_BG", "COLOR_QR_BORDE", "COLOR_MEDALLA_BORDE",
+    "COLOR_FONDO_HOJA", "COLOR_BORDE_PAGINA", "COLOR_BORDE_PAGINA_INNER", "COLOR_ESQUINERO",
     "estilo_titulo", "estilo_subtitulo", "estilo_seccion",
     "estilo_subseccion_grafico", "estilo_normal", "estilo_pie",
     "estilo_encabezado_titulo", "estilo_encabezado_sub",
@@ -74,6 +79,7 @@ __all__ = [
     "tabla_style_header_verde", "tabla_style_moderna",
     "dibujar_encabezado", "dibujar_pie", "dibujar_seccion_hdr",
     "dibujar_logo_circular", "dibujar_running_header", "dibujar_running_footer",
+    "dibujar_fondo_pagina",
     "buscar_logo_path", "logo_image",
     "banda_seccion", "tabla_encabezado_franja", "tabla_pie",
     "crear_bloque_kpis",
@@ -405,6 +411,122 @@ def dibujar_pie(c, x0: float, y_pie: float, cw: float, texto_izq: str, texto_der
     c.restoreState()
 
 
+def dibujar_fondo_pagina(
+    c,
+    width: float,
+    height: float,
+    incluir_marco: bool = True,
+    incluir_marca_agua: bool = True,
+    margen_marco: float = 8 * mm,
+    bg_color: str = COLOR_FONDO_HOJA,
+    watermark_opacity: float = 0.042,
+    watermark_diam: float = 92 * mm,
+    cx: Optional[float] = None,
+    cy: Optional[float] = None,
+) -> None:
+    """Dibuja un fondo de hoja de alta gama estética (reemplazando el blanco plano)
+    con acabado de papel membretado ejecutivo/certificación ganadera:
+    1. Base de hoja completa en tono suave marfil/salvia institucional (COLOR_FONDO_HOJA).
+    2. Marco perimetral doble fino con esquineros ornamentales en L estilo documento oficial.
+    3. Marca de agua de seguridad institucional en el centro con transparencia suave y anillos concéntricos.
+    """
+    c.saveState()
+    # 1. Fondo de hoja completo en tono suave marfil/salvia
+    c.setFillColor(colors.HexColor(bg_color))
+    c.rect(0, 0, width, height, stroke=0, fill=1)
+
+    # 2. Marco perimetral de seguridad con esquineros
+    if incluir_marco:
+        xm = margen_marco
+        ym = margen_marco
+        wm = width - 2 * margen_marco
+        hm = height - 2 * margen_marco
+
+        # Marco exterior fino
+        c.setStrokeColor(colors.HexColor(COLOR_BORDE_PAGINA))
+        c.setLineWidth(0.6)
+        c.rect(xm, ym, wm, hm, stroke=1, fill=0)
+
+        # Filete interior tenue
+        c.setStrokeColor(colors.HexColor(COLOR_BORDE_PAGINA_INNER))
+        c.setLineWidth(0.35)
+        c.rect(xm + 1.2 * mm, ym + 1.2 * mm, wm - 2.4 * mm, hm - 2.4 * mm, stroke=1, fill=0)
+
+        # Esquineros ornamentales de precisión en las 4 esquinas
+        c.setStrokeColor(colors.HexColor(COLOR_ESQUINERO))
+        c.setLineWidth(1.1)
+        c.setLineCap(0)
+        clen = 4.5 * mm
+
+        # Inferior izquierda
+        c.line(xm, ym, xm + clen, ym)
+        c.line(xm, ym, xm, ym + clen)
+        # Inferior derecha
+        c.line(xm + wm, ym, xm + wm - clen, ym)
+        c.line(xm + wm, ym, xm + wm, ym + clen)
+        # Superior izquierda
+        c.line(xm, ym + hm, xm + clen, ym + hm)
+        c.line(xm, ym + hm, xm, ym + hm - clen)
+        # Superior derecha
+        c.line(xm + wm, ym + hm, xm + wm - clen, ym + hm)
+        c.line(xm + wm, ym + hm, xm + wm, ym + clen)
+
+    # 3. Marca de agua de seguridad institucional
+    if incluir_marca_agua:
+        pos_x = cx if cx is not None else width / 2.0
+        pos_y = cy if cy is not None else height / 2.0
+        r = watermark_diam / 2.0
+
+        c.saveState()
+        try:
+            c.setFillAlpha(watermark_opacity)
+            c.setStrokeAlpha(watermark_opacity)
+        except Exception:
+            pass
+
+        logo_path = buscar_logo_path()
+        if logo_path and os.path.exists(logo_path):
+            from reportlab.lib.utils import ImageReader
+            clip = c.beginPath()
+            clip.circle(pos_x, pos_y, r)
+            c.clipPath(clip, stroke=0, fill=0)
+            try:
+                c.drawImage(
+                    ImageReader(logo_path),
+                    pos_x - r, pos_y - r,
+                    width=watermark_diam, height=watermark_diam,
+                    preserveAspectRatio=True, mask="auto"
+                )
+            except Exception:
+                pass
+            c.restoreState()
+
+            # Anillos concéntricos de seguridad
+            c.saveState()
+            try:
+                c.setStrokeAlpha(watermark_opacity * 1.3)
+            except Exception:
+                pass
+            c.setStrokeColor(colors.HexColor(COLOR_ESQUINERO))
+            c.setLineWidth(0.8)
+            c.circle(pos_x, pos_y, r + 2 * mm, stroke=1, fill=0)
+            c.setLineWidth(0.4)
+            c.setDash([2, 2])
+            c.circle(pos_x, pos_y, r + 4 * mm, stroke=1, fill=0)
+            c.restoreState()
+        else:
+            c.translate(pos_x, pos_y)
+            c.rotate(35)
+            c.setFillColor(colors.HexColor(COLOR_MARCA))
+            c.setFont("Helvetica-Bold", 32)
+            c.drawCentredString(0, 0, "GANADERÍA JA")
+            c.setFont("Helvetica", 11)
+            c.drawCentredString(0, -18, "SISTEMA OFICIAL · BITÁCORA DE CAMPO")
+            c.restoreState()
+
+    c.restoreState()
+
+
 # --------------------------------------------------------------------------- #
 # Logo
 # --------------------------------------------------------------------------- #
@@ -460,7 +582,7 @@ def crear_bloque_kpis(kpis: Sequence[tuple[str, str, str, str]], ancho_total: fl
 
     t = Table([celdas], colWidths=col_widths)
     t.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAF9")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#FFFFFF")),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor(COLOR_BORDE_SUAVE)),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 6),
