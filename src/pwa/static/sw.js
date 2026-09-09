@@ -67,7 +67,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v74: Ícono de Destete cambiado a cabeza de cría + flecha (antes reusaba el mismo ícono que "Cría", sin distinguirse a simple vista en el botón de Captura ni en el feed de eventos).
 // v75: Unificación de Mapa Satelital y Rutas GPS en un solo módulo para ADMIN y OWNER (bloqueado para TRABAJADOR); dock de chat flotante/expandible con dictado de voz estilo WhatsApp; depuración de terminología zootécnica.
 // v77: Unificación definitiva de Mapa Satelital y Rutas GPS (ADMIN y OWNER), dock de chat WhatsApp con notas de voz y depuración integral de terminología.
-var CACHE = "pwa-ja-v77"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v78: "Distribución por potrero" del Tablero sube justo después de "Evolución del rebaño" (antes quedaba al final, después del feed de eventos); se quita el gráfico de torta duplicado con Inventario.
+var CACHE = "pwa-ja-v78"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

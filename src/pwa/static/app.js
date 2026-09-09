@@ -167,6 +167,9 @@
     h += erroresHtml(d);
     h += grafico("evolucion", "Evolución del rebaño");
 
+    h += "<h4>" + icon("grass") + "Distribución por potrero (toca para filtrar)</h4>";
+    h += barraDistribucionPotreros(d.por_potrero);
+
     // Últimos Eventos de la Finca (Partos, Muertes, Ventas, Traslados, Pesajes...)
     var eventos = d.eventos_recientes || [];
     h += "<div class='card' style='padding:16px; margin-top:16px; margin-bottom:16px;'>"
@@ -238,9 +241,6 @@
       h += "</table></div>";
     }
     h += "</div>";
-
-    h += "<h4>" + icon("grass") + "Distribución por potrero (toca para filtrar)</h4>";
-    h += barraDistribucionPotreros(d.por_potrero);
     return h;
   }
   function renderRepro(d) {
