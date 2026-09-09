@@ -165,7 +165,7 @@
       + kpi(d.celos_7d, "Celos 7d") + kpi(d.servicios_7d, "Serv. 7d")
       + kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : "") + "</div>";
     h += erroresHtml(d);
-    h += grafico("evolucion", "Evolución del rebaño") + grafico("categorias", "Categorías del hato");
+    h += grafico("evolucion", "Evolución del rebaño");
 
     // Últimos Eventos de la Finca (Partos, Muertes, Ventas, Traslados, Pesajes...)
     var eventos = d.eventos_recientes || [];
@@ -240,19 +240,7 @@
     h += "</div>";
 
     h += "<h4>" + icon("grass") + "Distribución por potrero (toca para filtrar)</h4>";
-    if (!d.por_potrero || !d.por_potrero.length) {
-      h += vacio("Ningún potrero con animales.");
-    } else {
-      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Cabezas</th></tr>";
-      (d.por_potrero || []).forEach(function (f) {
-        var nom = String(f.potrero || "");
-        var celda = (nom && nom.toLowerCase() !== "sin potrero")
-          ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "'>" + esc(nom) + "</a>"
-          : esc(nom);
-        h += "<tr><td>" + celda + "</td><td>" + esc(f.n) + "</td></tr>";
-      });
-      h += "</table></div>";
-    }
+    h += barraDistribucionPotreros(d.por_potrero);
     return h;
   }
   function renderRepro(d) {
@@ -1055,6 +1043,33 @@
     return "<div style='display:flex; height:30px; border-radius:7px; overflow:hidden; border:1px solid var(--borde-fuerte); margin-bottom:12px;'>" + segs + "</div>"
       + "<div style='display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; margin-bottom:6px;'>" + leyenda + "</div>";
   }
+  // Lista de potreros con barra proporcional al más cargado (reemplaza la
+  // tabla plana "Potrero | Cabezas" -- de un vistazo se ve cuál potrero
+  // concentra más animales, sin tener que leer y comparar números).
+  function barraDistribucionPotreros(filas) {
+    if (!filas || !filas.length) return vacio("Ningún potrero con animales.");
+    var max = 0;
+    filas.forEach(function (f) { max = Math.max(max, Number(f.n) || 0); });
+    var h = "<div style='display:flex; flex-direction:column; gap:7px;'>";
+    filas.forEach(function (f) {
+      var nom = String(f.potrero || "");
+      var n = Number(f.n) || 0;
+      var pct = max > 0 ? Math.max(4, Math.round((n / max) * 100)) : 0;
+      var esReal = nom && nom.toLowerCase() !== "sin potrero";
+      var etiqueta = esReal
+        ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "' style='font-weight:600; font-size:13px; text-decoration:none; color:var(--texto-color);'>" + esc(nom) + "</a>"
+        : "<span style='font-weight:600; font-size:13px; color:var(--texto-suave);'>" + esc(nom) + "</span>";
+      h += "<div style='display:flex; align-items:center; gap:10px;'>"
+        + "<div style='min-width:130px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title=\"" + esc(nom) + "\">" + etiqueta + "</div>"
+        + "<div style='flex:1; background:var(--superficie); border-radius:6px; height:20px; overflow:hidden; border:1px solid var(--borde-suave);'>"
+        + "<div style='width:" + pct + "%; height:100%; background:var(--verde-marca); border-radius:6px;'></div>"
+        + "</div>"
+        + "<b style='min-width:32px; text-align:right; font-size:13px;'>" + esc(n) + "</b>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
     var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
@@ -1092,19 +1107,7 @@
     });
     h += "</table></div>";
     h += "<h4>" + icon("grass") + "Distribución por potrero</h4>";
-    if (!d.por_potrero || !d.por_potrero.length) {
-      h += vacio("Ningún potrero con animales.");
-    } else {
-      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Cabezas</th></tr>";
-      (d.por_potrero || []).forEach(function (f) {
-        var nom = String(f.potrero || "");
-        var celda = (nom && nom.toLowerCase() !== "sin potrero")
-          ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "'>" + esc(nom) + "</a>"
-          : esc(nom);
-        h += "<tr><td>" + celda + "</td><td>" + esc(f.n) + "</td></tr>";
-      });
-      h += "</table></div>";
-    }
+    h += barraDistribucionPotreros(d.por_potrero);
     // Pirámide de edades
     var maxP = 1;
     (d.piramide || []).forEach(function (f) { maxP = Math.max(maxP, Number(f.hembras) || 0, Number(f.machos) || 0); });
