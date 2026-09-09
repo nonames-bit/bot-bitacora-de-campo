@@ -19,7 +19,19 @@ Fórmulas biofísicas de microondas:
   3. Relación cruzada de polarización (Cross-Ratio CR):
        CR_dB = VH_dB - VV_dB
   4. Proxy SAR-NDVI (NDVI equivalente estimado por radar):
-       NDVI_radar = clip(0.20 + 0.65 * min(1.0, RVI), 0.15, 0.85)
+       NDVI_radar = clip(0.40 + 0.17 * RVI, 0.10, 0.88)
+
+       Calibrado por regresión lineal (mínimos cuadrados) contra NDVI óptico
+       REAL de Sentinel-2 en los 20 potreros con geometría de la finca
+       (2026-09-08, imágenes despejadas 2026-08-25/2026-09-04; RVI observado
+       0.80-1.01, NDVI real 0.42-0.63). La fórmula anterior (0.20 + 0.65*RVI,
+       sin respaldo empírico) sobreestimaba sistemáticamente ~0.15-0.30
+       puntos de NDVI y, al truncar RVI en min(1.0, RVI), aplanaba a todos
+       los potreros con vegetación densa en el mismo valor techo (0.85) --
+       el mapa mostraba "EXCELENTE" parejo aunque hubiera diferencias reales
+       entre potreros. Ver scripts/diag_calibracion_sar.py para repetir el
+       ajuste cuando haya más muestras (sobre todo de pastura degradada/RVI
+       bajo, fuera del rango 0.80-1.01 cubierto por esta calibración).
   5. Proxy de humedad de suelo / forraje (sensibilidad dieléctrica de banda C en VV):
        humedad_pct = clip(((VV_dB - (-18.0)) / ((-7.0) - (-18.0))) * 100.0, 0.0, 100.0)
 """
@@ -56,13 +68,17 @@ def estimar_humedad_sar(vv_db: float) -> tuple[float, str]:
 def calcular_sar_ndvi(rvi: float) -> float:
     """Calcula el proxy SAR-NDVI a partir del Dual-Pol Radar Vegetation Index (RVI).
 
-    Mapea el rango biofísico de RVI en pasturas tropicales a la escala estándar
-    de NDVI óptico (0.15 - 0.85) para mantener coherencia en las alertas de aforo
-    y capacidad de carga de la finca.
+    Regresión lineal ajustada contra NDVI óptico real de Sentinel-2 (ver
+    módulo, sección 4) -- NO es una fórmula estándar de la literatura, es una
+    calibración empírica de esta finca. La fórmula anterior (0.20 + 0.65*RVI,
+    sin validar) truncaba RVI en 1.0 antes de escalarlo, así que cualquier
+    potrero con vegetación densa (RVI real observado hasta 1.01) caía en el
+    mismo valor techo -- el mapa no podía distinguir "bueno" de "muy bueno"
+    entre potreros, aunque el NDVI óptico real sí variaba entre ellos.
     """
-    rvi_clamped = max(0.0, min(1.05, float(rvi)))
-    ndvi = 0.20 + 0.65 * min(1.0, rvi_clamped)
-    return round(max(0.15, min(0.85, ndvi)), 3)
+    rvi_clamped = max(0.0, min(3.0, float(rvi)))
+    ndvi = 0.40 + 0.17 * rvi_clamped
+    return round(max(0.10, min(0.88, ndvi)), 3)
 
 
 def _sar_region_sentinel1(
@@ -138,7 +154,7 @@ def _sar_region_sentinel1(
         return {
             "rvi": round(rvi_val, 3),
             "ndvi_promedio": ndvi_proxy,
-            "ndvi_min": max(0.15, round(ndvi_proxy - 0.04, 3)),
+            "ndvi_min": max(0.10, round(ndvi_proxy - 0.04, 3)),
             "ndvi_max": min(0.88, round(ndvi_proxy + 0.04, 3)),
             "vv_db": round(vv_val, 2),
             "vh_db": round(vh_val, 2),

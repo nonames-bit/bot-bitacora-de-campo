@@ -152,21 +152,29 @@ def test_estimar_humedad_sar():
 
 
 def test_calcular_sar_ndvi():
-    # RVI bajo (suelo desnudo / sobrepastoreo)
-    ndvi_bajo = gee_sar.calcular_sar_ndvi(0.10)
-    assert 0.20 <= ndvi_bajo <= 0.30
+    # Fórmula recalibrada por regresión contra NDVI óptico real de Sentinel-2
+    # (2026-09-08, 20 potreros con geometría, RVI observado 0.80-1.01, NDVI
+    # real 0.42-0.63) -- ver docstring del módulo. La fórmula anterior
+    # (0.20 + 0.65*RVI) sobreestimaba sistemáticamente y truncaba RVI en 1.0,
+    # aplanando a todos los potreros con vegetación densa en el mismo techo.
+    ndvi_rvi_bajo = gee_sar.calcular_sar_ndvi(0.10)
+    assert round(ndvi_rvi_bajo, 2) == 0.42
 
-    # RVI medio (pastura en rebrote)
-    ndvi_medio = gee_sar.calcular_sar_ndvi(0.50)
-    assert 0.50 <= ndvi_medio <= 0.55
+    ndvi_rvi_medio = gee_sar.calcular_sar_ndvi(0.50)
+    assert round(ndvi_rvi_medio, 2) == 0.48
 
-    # RVI alto (pastura densa y vigorosa en reposo)
-    ndvi_alto = gee_sar.calcular_sar_ndvi(0.90)
-    assert 0.75 <= ndvi_alto <= 0.80
+    # RVI observado en la finca (pastura vigorosa real, 0.80-1.01): debe
+    # reproducir aproximadamente el NDVI real medido por Sentinel-2 (~0.53-0.57).
+    ndvi_rvi_finca = gee_sar.calcular_sar_ndvi(0.90)
+    assert 0.50 <= ndvi_rvi_finca <= 0.60
+
+    # Regresión: dos potreros con RVI real distinto (>1.0, antes ambos
+    # truncaban al mismo techo) ahora deben dar valores distintos.
+    assert gee_sar.calcular_sar_ndvi(1.00) != gee_sar.calcular_sar_ndvi(1.20)
 
     # Clamping
-    assert gee_sar.calcular_sar_ndvi(2.0) == 0.85
-    assert gee_sar.calcular_sar_ndvi(-0.5) == 0.20
+    assert gee_sar.calcular_sar_ndvi(3.0) == 0.88
+    assert gee_sar.calcular_sar_ndvi(-0.5) == 0.40
 
 
 def test_sar_region_sentinel1_exito(monkeypatch):
@@ -183,7 +191,7 @@ def test_sar_region_sentinel1_exito(monkeypatch):
     res = gee_sar._sar_region_sentinel1(WKT_POTRERO, date(2026, 8, 25))
     assert res is not None
     assert res["rvi"] == 0.946
-    assert 0.75 <= res["ndvi_promedio"] <= 0.85
+    assert 0.55 <= res["ndvi_promedio"] <= 0.60
     assert res["vv_db"] == -9.87
     assert res["vh_db"] == -15.40
     assert res["cr_db"] == -5.53
