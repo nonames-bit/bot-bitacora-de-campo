@@ -63,7 +63,9 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v70: Mapa Satelital Interactivo con Leaflet, polígonos de potreros, vigor NDVI/SAR y ubicación en vivo de operarios; Indicadores económicos de costo y margen unitario para leche y carne; Soporte de Notificaciones Web Push nativas en celular.
 // v71: Botón "Ver simple/técnico" en Pasturas -- Modo Simple (por defecto) muestra SPI y monitoreo satelital como semáforo en palabras (Excelente/Regular/Bajo), sin jerga (NDVI, RVI, SAR, kg/ha); Modo Técnico mantiene el detalle completo de siempre.
 // v72: Nuevo evento "Destete" en Captura (separar la cría, pesarla, moverla a levante y opcionalmente secar/mover a la madre -- equivalente a "Secados/Destetos" de SG); Parto ahora permite fijar el potrero de la cría y/o de la madre en el momento del nacimiento.
-var CACHE = "pwa-ja-v72"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v73: Vaquita decorativa pastando en el header (SVG inline COW_HEAD + pasto, solo CSS @keyframes, respeta reduced-motion y queda estática en Sol de Campo).
+// v74: Ícono de Destete cambiado a cabeza de cría + flecha (antes reusaba el mismo ícono que "Cría", sin distinguirse a simple vista en el botón de Captura ni en el feed de eventos).
+var CACHE = "pwa-ja-v74"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

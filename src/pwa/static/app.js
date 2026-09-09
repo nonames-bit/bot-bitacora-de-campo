@@ -58,6 +58,8 @@
   // Combina dos estilos en un mismo <svg> viewBox 24x24: cada <g> fija su propio fill/stroke,
   // independiente del wrapper (que por defecto es trazo/sin relleno para el resto de íconos).
   var PARTO_HEADS = '<g transform="translate(-2.3, 2.5) scale(0.058)" fill="currentColor" stroke="none">' + COW_BODY_FILL + '</g><g transform="translate(11.5, 8.3) scale(0.48)" fill="none" stroke="currentColor" stroke-width="2.8">' + CALF_HEAD + '</g>';
+  // Evento de Destete: cabeza de cría + flecha (se separa de la madre y se va a levante).
+  var DESTETE_ICON = '<g transform="translate(-2, 4) scale(0.62)">' + CALF_HEAD + '</g><path d="M15 12h6M18 9l3 3-3 3"/>';
   function icon(name, size) {
     var s = size || 18;
     // "cow" usa un dibujo de cuerpo completo con relleno (viewBox/estilo propio);
@@ -70,6 +72,7 @@
       cria: CALF_HEAD,
       cowCalf: PARTO_HEADS,
       parto: PARTO_HEADS,
+      destete: DESTETE_ICON,
       grid: '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',
       calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
       chartBar: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
@@ -196,7 +199,7 @@
         } else if (tipo === "TRASLADO") {
           chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("grass", 13) + " Traslado</span>";
         } else if (tipo === "DESTETE") {
-          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("calf", 13) + " Destete</span>";
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("destete", 13) + " Destete</span>";
         } else if (tipo === "PESAJE") {
           chipHtml = "<span class='chip gris' style='font-weight:700;'>" + icon("scale", 13) + " Pesaje</span>";
         } else if (tipo === "TRATAMIENTO") {
@@ -1692,7 +1695,7 @@
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
-      { id: "destete", nom: "Destete", ico: "calf" },
+      { id: "destete", nom: "Destete", ico: "destete" },
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
