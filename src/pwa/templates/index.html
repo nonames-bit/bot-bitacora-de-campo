@@ -14,12 +14,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="/static/leaflet/leaflet.css">
-<link rel="stylesheet" href="/static/style.css?v=69">
+<link rel="stylesheet" href="/static/style.css?v=73">
 </head>
 <body>
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
   <span class="marca-titulo"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="28" height="28"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
+  <span class="header-pasto" aria-hidden="true"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><svg class="vaca-svg" viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/></svg><svg class="pasto-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span></span></span></span>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
     <button id="btn-instalar-app" class="tema-btn btn-instalar" title="Instalar Bitácora JA como App en tu celular o PC" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="txt-instalar">Instalar App</span></button>
@@ -41,8 +42,7 @@
 <button data-v="tablero" class="nav-primario act"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="nav-txt">Tablero</span></button>
 <button data-v="manga" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/></svg><span class="nav-txt">Manga Corral</span></button>
 <button data-v="captura" class="nav-primario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg><span class="nav-txt">Captura</span></button>
-<button data-v="mapa" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><span class="nav-txt">Mapa</span></button>
-<button data-v="gps" id="btn-nav-gps" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg><span class="nav-txt">GPS Rutas</span></button>
+<button data-v="mapa" id="btn-nav-mapa" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><span class="nav-txt">Mapa &amp; GPS</span></button>
 <button data-v="agenda" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="nav-txt">Agenda</span></button>
 <button data-v="inventario" class="nav-primario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="nav-txt">Inventario</span></button>
 <button data-v="genetica" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg><span class="nav-txt">Genética</span></button>
@@ -66,19 +66,53 @@
 </div>
 <div id="vista" class="card">Cargando…</div>
 
-<!-- Modal Asistente IA (Chat) -->
-<div id="modal-chat" class="modal-overlay" style="display:none">
-  <div class="modal-contenido chat-modal">
-    <div class="modal-header">
-      <span style="display:inline-flex; align-items:center; gap:8px;"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="22" height="22"><b>Asistente IA · Ganadería JA</b></span>
-      <button class="modal-cerrar" id="btn-cerrar-chat">✕</button>
+<!-- Chat Dock Flotante / Expansible (Estilo WhatsApp con Micrófono) -->
+<div id="chat-dock" class="chat-dock colapsado">
+  <!-- Cabecera del Chat (visible cuando está expandido) -->
+  <div class="chat-dock-header">
+    <div class="chat-dock-titulo">
+      <img src="/static/logo.jpg" class="logo-ja" alt="Logo" width="20" height="20">
+      <span><b>Asistente IA</b> · Ganadería JA</span>
     </div>
-    <div id="chat-historial" class="chat-cuerpo">
-      <div class="chat-msg bot">Hola. Soy el asistente zootécnico de la finca. Puedes hacerme preguntas como <i>"¿cuántas vacas hay en Guayabal?"</i> o <i>"¿qué animales están en retiro?"</i>.</div>
+    <div class="chat-dock-controles">
+      <button type="button" id="btn-limpiar-chat" class="chat-btn-min" title="Limpiar conversación">🧹</button>
+      <button type="button" id="btn-colapsar-chat" class="chat-btn-min" title="Minimizar">▼</button>
+      <button type="button" id="btn-cerrar-chat" class="chat-btn-min" title="Cerrar" style="display:none">✕</button>
     </div>
-    <form id="form-chat" class="chat-footer">
-      <input type="text" id="chat-input" placeholder="Pregunta algo sobre el ganado o potreros..." autocomplete="off">
-      <button type="submit" id="btn-enviar-chat">Enviar</button>
+  </div>
+
+  <!-- Historial de Conversación -->
+  <div id="chat-historial" class="chat-cuerpo">
+    <div class="chat-msg bot">Hola. Soy el asistente inteligente de la finca. Puedes hacerme preguntas sobre el ganado o dictarme notas de voz con el micrófono 🎙️.</div>
+  </div>
+
+  <!-- Barra de Entrada y Grabación Estilo WhatsApp -->
+  <div class="chat-dock-footer">
+    <!-- Estado de Grabación de Audio (oculto por defecto) -->
+    <div id="chat-audio-grabando" class="chat-audio-bar" style="display:none">
+      <div class="chat-audio-info">
+        <span class="chat-audio-dot"></span>
+        <span id="chat-audio-timer">0:00</span>
+        <span class="chat-audio-txt">Grabando audio…</span>
+      </div>
+      <div class="chat-audio-btns">
+        <button type="button" id="btn-cancelar-audio" class="btn-audio-cancelar" title="Descartar">✕</button>
+        <button type="button" id="btn-enviar-audio" class="btn-audio-enviar" title="Enviar nota de voz">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Formulario de Texto Normal -->
+    <form id="form-chat" class="chat-dock-form">
+      <button type="button" id="btn-expandir-chat" class="chat-btn-ico toggle" title="Expandir/Minimizar chat">💬</button>
+      <input type="text" id="chat-input" placeholder="Pregunta algo o pulsa 🎙️..." autocomplete="off">
+      <button type="button" id="chat-btn-mic" class="chat-btn-ico mic" title="Dictar nota de voz (estilo WhatsApp)">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+      </button>
+      <button type="submit" id="btn-enviar-chat" class="chat-btn-ico send" title="Enviar mensaje">
+        <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
     </form>
   </div>
 </div>
@@ -157,27 +191,19 @@
             </div>
           </button>
 
-          <button class="modulo-item" data-v="mapa">
+          <button class="modulo-item" data-v="mapa" id="sheet-item-mapa" style="display:none">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></span>
             <div class="modulo-info">
-              <b>Mapa Satelital</b>
-              <small>Potreros, vigor y operarios en vivo</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="gps" id="sheet-item-gps" style="display:none">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg></span>
-            <div class="modulo-info">
-              <b>GPS Rutas</b>
-              <small>Trazado y mapas de potreros</small>
+              <b>Mapa Satelital &amp; Rutas GPS</b>
+              <small>Potreros, operarios en vivo y auditoría</small>
             </div>
           </button>
         </div>
       </div>
 
-      <!-- Grupo 2: Zootecnia & Producción -->
+      <!-- Grupo 2: Ganadería & Producción -->
       <div class="modulo-seccion">
-        <div class="modulo-seccion-titulo">🐄 Zootecnia &amp; Producción</div>
+        <div class="modulo-seccion-titulo">🐄 Ganadería &amp; Producción</div>
         <div class="modulos-grid">
           <button class="modulo-item" data-v="inventario">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
@@ -271,7 +297,7 @@
 </div>
 </main>
 <script src="/static/leaflet/leaflet.js"></script>
-<script src="/static/app.js?v=69"></script>
+<script src="/static/app.js?v=73"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {

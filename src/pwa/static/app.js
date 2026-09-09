@@ -2712,7 +2712,7 @@
       + "<div class='ayuda-badge-ico'>" + icon("camera", 20) + "</div>"
       + "<div>"
       + "<h4 style='margin:0;'>📸 Captura Rápida & Respaldo Fotográfico</h4>"
-      + "<small style='color:var(--texto-suave);'>Eventos zootécnicos con foto de evidencia opcional</small>"
+      + "<small style='color:var(--texto-suave);'>Eventos de manejo y campo con foto de evidencia opcional</small>"
       + "</div>"
       + "</div>"
       + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
@@ -2740,7 +2740,7 @@
       + "<ol style='padding-left:18px; margin:6px 0;'>"
       + "<li>Entra en la pestaña <b>'Voz'</b> y presiona el micrófono.</li>"
       + "<li>Habla claro, por ejemplo: <i>'Ayer parió la vaca 47 ternero macho vivo de 34 kilos'</i> o <i>'Pesé la novilla 102 con 380 kilos'</i>.</li>"
-      + "<li>El motor de transcripción e IA zootécnica estructurará el registro automáticamente para que solo confirmes con un toque.</li>"
+      + "<li>El motor de transcripción e inteligencia artificial estructurará el registro automáticamente para que solo confirmes con un toque.</li>"
       + "</ol>"
       + "</div></div>";
 
@@ -2749,7 +2749,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("chat", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>🤖 Asistente Zootécnico IA & Chat</h4>"
+      + "<h4 style='margin:0;'>🤖 Asistente Inteligente IA & Chat</h4>"
       + "<small style='color:var(--texto-suave);'>Pregunta sobre tus animales o sobre el funcionamiento de la app</small>"
       + "</div>"
       + "</div>"
@@ -2940,6 +2940,92 @@
       });
       h += "</div>";
     }
+    h += "</div>";
+
+    // Sección de Auditoría de Rutas, Desplazamientos y Rondas GPS (Unificada)
+    var rutas = (d && d.rutas) || [];
+    var rondas = (d && d.rondas) || [];
+    var fFecha = (d && d.fecha_filtro) || _fechaFiltroRutas || new Date().toISOString().slice(0, 10);
+
+    h += "<div class='card' style='padding:14px; margin-top:14px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("pin", 16) + "Auditoría de Rutas, Desplazamientos &amp; Telemetría</h4>"
+      + "<div style='display:flex; flex-wrap:wrap; gap:8px; align-items:center;'>"
+      + "<label style='font-size:12px; font-weight:600; color:var(--texto-suave); display:flex; align-items:center; gap:6px;'>"
+      + icon("calendar", 14) + "Fecha: "
+      + "<input type='date' id='filtro-fecha-rutas' value='" + esc(fFecha) + "' style='padding:4px 8px; border-radius:6px; border:1px solid var(--borde); font-size:12px;'>"
+      + "</label>"
+      + "<button type='button' id='btn-refrescar-rutas' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("search", 13) + "Consultar Rutas</button>"
+      + (rutas.length ? "<button type='button' id='btn-exportar-rutas-csv' class='tema-btn' style='font-size:12px; padding:4px 10px;'>" + icon("download", 13) + "Exportar CSV</button>" : "")
+      + "</div>"
+      + "</div>";
+
+    if (!rutas.length) {
+      h += vacio("No hay desplazamientos registrados para la fecha " + fechaCorta(fFecha) + ". Los puntos GPS se capturan en segundo plano al interactuar con la app en campo.");
+    } else {
+      rutas.forEach(function (r, rIdx) {
+        var rolBadge = r.rol === "OWNER" ? "rojo" : (r.rol === "ADMIN" ? "ambar" : "verde");
+        h += "<div class='card-operario-ruta' style='margin-bottom:10px; border:1px solid var(--borde); padding:10px; border-radius:8px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+          + "<div><b style='font-size:15px;'>" + esc(r.usuario_nombre) + "</b> <span class='chip " + rolBadge + "' style='font-size:10.5px;'>" + esc(r.rol) + "</span></div>"
+          + "<div style='display:flex; align-items:center; gap:8px;'>"
+          + "<span style='font-size:12px; color:var(--texto-suave);'>🕒 " + esc(r.hora_inicio || "—") + " a " + esc(r.hora_fin || "—") + " · 📍 <b>" + r.total_puntos + " puntos</b></span>"
+          + (r.puntos && r.puntos.length ? "<button type='button' class='tema-btn' data-trazar-ruta-mapa='" + rIdx + "' style='font-size:11.5px; padding:3px 9px;'>🗺️ Ver rastro en mapa</button>" : "")
+          + "</div>"
+          + "</div>";
+
+        // Timeline de potreros
+        h += "<div class='timeline-rutas' style='margin-bottom:6px;'>";
+        if (!r.secuencia_potreros || !r.secuencia_potreros.length) {
+          h += "<span style='font-size:12px; color:var(--texto-suave);'>Sin visitas a potreros registradas</span>";
+        } else {
+          r.secuencia_potreros.forEach(function (s, sIdx) {
+            if (sIdx > 0) h += "<span class='chip-flecha'>➔</span>";
+            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> 🌾 " + esc(s.potrero) + "</span>";
+          });
+        }
+        h += "</div>";
+
+        // Desglose de coordenadas colapsable
+        var tablaId = "tabla-pts-" + rIdx;
+        h += "<details style='font-size:12px; margin-top:6px;'>"
+          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:3px 0;'>🔍 Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
+          + "<div class='tabla-scroll' style='margin-top:6px;'>"
+          + "<table id='" + tablaId + "'><tr><th>Hora</th><th>Potrero</th><th>Latitud</th><th>Longitud</th><th>Precisión</th><th>Evento</th><th>Google Maps</th></tr>";
+        (r.puntos || []).forEach(function (pt) {
+          var mapsUrl = "https://maps.google.com/?q=" + pt.lat + "," + pt.lon;
+          h += "<tr>"
+            + "<td><b>" + esc(pt.hora) + "</b></td>"
+            + "<td><b>" + esc(pt.potrero_nombre || "Área de la Finca") + "</b></td>"
+            + "<td>" + Number(pt.lat).toFixed(6) + "</td>"
+            + "<td>" + Number(pt.lon).toFixed(6) + "</td>"
+            + "<td>±" + (pt.precision_m ? Math.round(pt.precision_m) + " m" : "—") + "</td>"
+            + "<td><span class='chip gris' style='font-size:10.5px;'>" + esc(pt.evento_origen || "auto") + "</span></td>"
+            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:10.5px; text-decoration:none;'>🗺️ Maps</a></td>"
+            + "</tr>";
+        });
+        h += "</table></div></details></div>";
+      });
+    }
+
+    // Rondas manuales de campo
+    if (rondas && rondas.length) {
+      h += "<div style='margin-top:16px; border-top:1px solid var(--borde); padding-top:12px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;'>"
+        + "<h5 style='margin:0;'>" + icon("calendar", 14) + "Puntos de Ronda Manuales (" + rondas.length + ")</h5>"
+        + "<button type='button' id='btn-exportar-rondas-csv' class='tema-btn' style='font-size:11px; padding:3px 8px;'>Exportar Rondas CSV</button>"
+        + "</div>"
+        + "<div class='tabla-scroll'><table id='tabla-rondas'><tr><th>Hora</th><th>Potrero</th><th>Punto</th><th>Usuario</th><th>Notas</th></tr>";
+      rondas.forEach(function (ro) {
+        h += "<tr><td><b>" + esc(ro.hora || fechaCorta(ro.fecha)) + "</b></td>"
+          + "<td><b>" + esc(ro.potrero_nombre || "—") + "</b></td>"
+          + "<td><span class='chip verde'>" + esc(ro.punto_control || "recorrido") + "</span></td>"
+          + "<td>" + esc(ro.usuario_nombre || "—") + "</td>"
+          + "<td>" + esc(ro.notas || "—") + "</td></tr>";
+      });
+      h += "</table></div></div>";
+    }
+
     h += "</div>";
 
     return h;
@@ -3287,6 +3373,127 @@
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
       });
     });
+
+    // Trazar ruta de operario en el mapa satelital
+    qa("button[data-trazar-ruta-mapa]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var rIdx = parseInt(b.getAttribute("data-trazar-ruta-mapa"), 10);
+        var r = d.rutas && d.rutas[rIdx];
+        if (!r || !r.puntos || !r.puntos.length || !_mapaCapaRastros || !_mapaInstancia) return;
+
+        _mapaCapaRastros.clearLayers();
+        var latlngs = r.puntos.map(function (pt) { return [pt.lat, pt.lon]; });
+        var poly = L.polyline(latlngs, {
+          color: "#e67e22",
+          weight: 4,
+          dashArray: "6, 8",
+          opacity: 0.95
+        });
+        _mapaCapaRastros.addLayer(poly);
+        _mapaInstancia.fitBounds(poly.getBounds(), { padding: [35, 35] });
+
+        var mapEl = document.getElementById("mapa-finca");
+        if (mapEl) {
+          try { mapEl.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+        }
+      });
+    });
+
+    // Control de fecha y recarga de auditoría de rutas
+    var btnRefrescarRutas = document.getElementById("btn-refrescar-rutas");
+    var inpFechaRutas = document.getElementById("filtro-fecha-rutas");
+    if (btnRefrescarRutas && inpFechaRutas) {
+      btnRefrescarRutas.addEventListener("click", function () {
+        _fechaFiltroRutas = inpFechaRutas.value;
+        cargar(true);
+      });
+      inpFechaRutas.addEventListener("change", function () {
+        _fechaFiltroRutas = inpFechaRutas.value;
+        cargar(true);
+      });
+    }
+
+    // Ping manual de GPS para prueba
+    var btnPingManual = document.getElementById("btn-ping-manual-gps");
+    if (btnPingManual) {
+      btnPingManual.addEventListener("click", function () {
+        if (!navigator.geolocation) {
+          alert("Geolocalización no disponible en este dispositivo.");
+          return;
+        }
+        btnPingManual.textContent = "📡 Obteniendo GPS...";
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          var lat = pos.coords.latitude;
+          var lon = pos.coords.longitude;
+          var acc = Math.round(pos.coords.accuracy || 0);
+          fetch("/api/telemetria/ping", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              lat: lat,
+              lon: lon,
+              precision_m: acc,
+              evento_origen: "prueba_manual_gps"
+            })
+          }).then(function (r) { return r.json(); })
+            .then(function (res) {
+              btnPingManual.textContent = "✅ Posición Registrada";
+              setTimeout(function () { cargar(false); }, 800);
+            }).catch(function (err) {
+              btnPingManual.textContent = "❌ Error: " + err.message;
+            });
+        }, function (err) {
+          btnPingManual.textContent = "❌ " + err.message;
+        }, { enableHighAccuracy: true, timeout: 10000 });
+      });
+    }
+
+    // Exportación CSV de Rutas
+    var btnCsvRutas = document.getElementById("btn-exportar-rutas-csv");
+    if (btnCsvRutas) {
+      btnCsvRutas.addEventListener("click", function () {
+        var fFechaSel = _fechaFiltroRutas || new Date().toISOString().slice(0, 10);
+        var lineas = [["Usuario", "Rol", "Fecha", "Hora", "Potrero", "Latitud", "Longitud", "Precision_m", "Evento_Origen"]];
+        (d.rutas || []).forEach(function (r) {
+          (r.puntos || []).forEach(function (p) {
+            lineas.push([
+              r.usuario_nombre || "",
+              r.rol || "",
+              p.fecha || fFechaSel,
+              p.hora || "",
+              p.potrero_nombre || "Área de la Finca",
+              p.lat || "",
+              p.lon || "",
+              p.precision_m != null ? p.precision_m : "",
+              p.evento_origen || ""
+            ]);
+          });
+        });
+        var csvContent = "\uFEFF" + lineas.map(function (row) {
+          return row.map(function (val) {
+            return '"' + String(val).replace(/"/g, '""') + '"';
+          }).join(";");
+        }).join("\r\n");
+        var blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = "rutas_telemetria_ja_" + fFechaSel + ".csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    // Exportación CSV de Rondas
+    var btnCsvRondas = document.getElementById("btn-exportar-rondas-csv");
+    if (btnCsvRondas) {
+      btnCsvRondas.addEventListener("click", function () {
+        var fFechaSel = _fechaFiltroRutas || new Date().toISOString().slice(0, 10);
+        exportarTablaCSV("rondas_campo_" + fFechaSel, "#tabla-rondas");
+      });
+    }
   }
 
   var _fechaFiltroRutas = null;
@@ -4244,31 +4451,71 @@
     return str;
   }
 
-  function setupChatModal() {
+  /* ---------- Chat Dock Flotante Expansible Estilo WhatsApp con Micrófono ---------- */
+  var _chatMediaRecorder = null;
+  var _chatAudioChunks = [];
+  var _chatAudioTimerInterval = null;
+  var _chatAudioSegundos = 0;
+
+  function setupChatDock() {
+    var dock = document.getElementById("chat-dock") || document.getElementById("modal-chat");
     var btnChat = document.getElementById("btn-chat");
-    var modal = document.getElementById("modal-chat");
+    var btnExpandir = document.getElementById("btn-expandir-chat");
+    var btnColapsar = document.getElementById("btn-colapsar-chat");
     var btnCerrar = document.getElementById("btn-cerrar-chat");
+    var btnLimpiar = document.getElementById("btn-limpiar-chat");
     var form = document.getElementById("form-chat");
     var inp = document.getElementById("chat-input");
     var hist = document.getElementById("chat-historial");
+    var btnMic = document.getElementById("chat-btn-mic");
+    var btnHeaderMic = document.getElementById("btn-mic");
+    var barAudio = document.getElementById("chat-audio-grabando");
+    var timerAudio = document.getElementById("chat-audio-timer");
+    var btnCancelarAudio = document.getElementById("btn-cancelar-audio");
+    var btnEnviarAudio = document.getElementById("btn-enviar-audio");
 
-    if (!btnChat || !modal) return;
+    if (!dock) return;
 
-    btnChat.addEventListener("click", function () {
-      modal.style.display = "flex";
-      if (inp) inp.focus();
-    });
+    function expandirChat(enfocar) {
+      dock.classList.remove("colapsado");
+      dock.classList.add("expandido");
+      if (dock.classList.contains("modal-overlay")) dock.style.display = "flex";
+      if (hist) hist.scrollTop = hist.scrollHeight;
+      if (enfocar && inp) setTimeout(function () { inp.focus(); }, 120);
+    }
 
-    if (btnCerrar) {
-      btnCerrar.addEventListener("click", function () {
-        modal.style.display = "none";
+    function colapsarChat() {
+      dock.classList.remove("expandido");
+      dock.classList.add("colapsado");
+      detenerAudioGrabacion(true);
+    }
+
+    function toggleChat() {
+      if (dock.classList.contains("expandido")) colapsarChat();
+      else expandirChat(true);
+    }
+
+    if (btnChat) btnChat.addEventListener("click", function () { expandirChat(true); });
+    if (btnExpandir) btnExpandir.addEventListener("click", function (e) { e.preventDefault(); toggleChat(); });
+    if (btnColapsar) btnColapsar.addEventListener("click", function (e) { e.preventDefault(); colapsarChat(); });
+    if (btnCerrar) btnCerrar.addEventListener("click", function (e) { e.preventDefault(); colapsarChat(); });
+
+    if (inp) {
+      inp.addEventListener("focus", function () {
+        if (dock.classList.contains("colapsado")) expandirChat(false);
+      });
+      inp.addEventListener("click", function () {
+        if (dock.classList.contains("colapsado")) expandirChat(false);
       });
     }
 
-    modal.addEventListener("click", function (e) {
-      if (e.target === modal) modal.style.display = "none";
-    });
+    if (btnLimpiar && hist) {
+      btnLimpiar.addEventListener("click", function () {
+        hist.innerHTML = "<div class='chat-msg bot'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div>";
+      });
+    }
 
+    // Copiar bloques de código/tablas en el chat
     if (hist) {
       hist.addEventListener("click", function (e) {
         var btn = e.target && e.target.closest ? e.target.closest(".btn-pre-copy") : null;
@@ -4284,7 +4531,7 @@
       });
     }
 
-    qa(".chip-sug", modal).forEach(function (chip) {
+    qa(".chip-sug", dock).forEach(function (chip) {
       chip.addEventListener("click", function () {
         var p = chip.getAttribute("data-p");
         if (inp) inp.value = p;
@@ -4292,18 +4539,21 @@
       });
     });
 
+    // Envío de mensaje escrito
     if (form) {
       form.addEventListener("submit", function (e) {
         e.preventDefault();
         var txt = (inp && inp.value || "").trim();
         if (!txt) return;
 
+        expandirChat(false);
+
         var botPlaceholder;
         if (hist) {
           hist.innerHTML += "<div class='chat-msg user'>" + esc(txt) + "</div>";
           botPlaceholder = document.createElement("div");
           botPlaceholder.className = "chat-msg bot";
-          botPlaceholder.innerHTML = "<i>Consultando información zootécnica...</i>";
+          botPlaceholder.innerHTML = "<i>Consultando información ganadera...</i>";
           hist.appendChild(botPlaceholder);
           hist.scrollTop = hist.scrollHeight;
         }
@@ -4325,7 +4575,150 @@
           });
       });
     }
+
+    // Grabación de Audio Estilo WhatsApp
+    function detenerAudioGrabacion(descartar) {
+      if (_chatAudioTimerInterval) {
+        clearInterval(_chatAudioTimerInterval);
+        _chatAudioTimerInterval = null;
+      }
+      _chatAudioSegundos = 0;
+      if (barAudio) barAudio.style.display = "none";
+      if (form) form.style.display = "";
+
+      if (_chatMediaRecorder) {
+        if (descartar) {
+          _chatAudioChunks = [];
+          try {
+            if (_chatMediaRecorder.stream) {
+              _chatMediaRecorder.stream.getTracks().forEach(function (t) { t.stop(); });
+            }
+          } catch (e) {}
+          try { _chatMediaRecorder.stop(); } catch (e) {}
+          _chatMediaRecorder = null;
+        }
+      }
+    }
+
+    function iniciarGrabacionWhatsApp() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert("Tu navegador no soporta captura de audio desde el micrófono.");
+        return;
+      }
+
+      expandirChat(false);
+
+      if (form) form.style.display = "none";
+      if (barAudio) barAudio.style.display = "flex";
+      _chatAudioSegundos = 0;
+      if (timerAudio) timerAudio.textContent = "0:00";
+      if (_chatAudioTimerInterval) clearInterval(_chatAudioTimerInterval);
+      _chatAudioTimerInterval = setInterval(function () {
+        _chatAudioSegundos++;
+        var m = Math.floor(_chatAudioSegundos / 60);
+        var s = _chatAudioSegundos % 60;
+        if (timerAudio) timerAudio.textContent = m + ":" + (s < 10 ? "0" : "") + s;
+      }, 1000);
+
+      _chatAudioChunks = [];
+      navigator.mediaDevices.getUserMedia({ audio: true }).then(function (stream) {
+        _chatMediaRecorder = new MediaRecorder(stream);
+        _chatMediaRecorder.ondataavailable = function (e) {
+          if (e.data && e.data.size > 0) _chatAudioChunks.push(e.data);
+        };
+        _chatMediaRecorder.onstop = function () {
+          stream.getTracks().forEach(function (t) { t.stop(); });
+        };
+        _chatMediaRecorder.start();
+      }).catch(function (err) {
+        detenerAudioGrabacion(true);
+        alert("No fue posible acceder al micrófono: " + err.message);
+      });
+    }
+
+    if (btnMic) btnMic.addEventListener("click", function (e) { e.preventDefault(); iniciarGrabacionWhatsApp(); });
+    if (btnHeaderMic) {
+      btnHeaderMic.addEventListener("click", function (e) {
+        e.preventDefault();
+        iniciarGrabacionWhatsApp();
+      });
+    }
+
+    if (btnCancelarAudio) {
+      btnCancelarAudio.addEventListener("click", function (e) {
+        e.preventDefault();
+        detenerAudioGrabacion(true);
+      });
+    }
+
+    if (btnEnviarAudio) {
+      btnEnviarAudio.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (!_chatMediaRecorder || _chatMediaRecorder.state !== "recording") {
+          detenerAudioGrabacion(true);
+          return;
+        }
+
+        if (_chatAudioTimerInterval) {
+          clearInterval(_chatAudioTimerInterval);
+          _chatAudioTimerInterval = null;
+        }
+
+        // Crear placeholders en chat mientras procesa
+        var userMsgPlaceholder = document.createElement("div");
+        userMsgPlaceholder.className = "chat-msg user";
+        userMsgPlaceholder.innerHTML = "🎙️ <i>Audio enviado (procesando nota de voz)...</i>";
+        if (hist) {
+          hist.appendChild(userMsgPlaceholder);
+          hist.scrollTop = hist.scrollHeight;
+        }
+
+        var botPlaceholder = document.createElement("div");
+        botPlaceholder.className = "chat-msg bot";
+        botPlaceholder.innerHTML = "<i>Transcribiendo con Whisper y consultando información ganadera...</i>";
+        if (hist) {
+          hist.appendChild(botPlaceholder);
+          hist.scrollTop = hist.scrollHeight;
+        }
+
+        _chatMediaRecorder.addEventListener("stop", function () {
+          if (!_chatAudioChunks.length) {
+            userMsgPlaceholder.innerHTML = "🎙️ <i>Audio vacío.</i>";
+            botPlaceholder.innerHTML = "⚠️ No se detectó sonido.";
+            detenerAudioGrabacion(true);
+            return;
+          }
+
+          var blob = new Blob(_chatAudioChunks, { type: _chatMediaRecorder.mimeType || "audio/webm" });
+          detenerAudioGrabacion(false);
+
+          var fd = new FormData();
+          fd.append("audio", blob, "nota_campo.webm");
+
+          fetch("/api/voz", { method: "POST", body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (data.ok) {
+                userMsgPlaceholder.innerHTML = "🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b>";
+                botPlaceholder.innerHTML = formatearMensajeChat(data.respuesta || "Registrado correctamente.");
+                actualizarBadges();
+              } else {
+                userMsgPlaceholder.innerHTML = "🎙️ <i>Nota de voz</i>";
+                botPlaceholder.innerHTML = "⚠️ " + esc(data.error || "No se pudo procesar el audio.");
+              }
+              if (hist) hist.scrollTop = hist.scrollHeight;
+            }).catch(function (err) {
+              userMsgPlaceholder.innerHTML = "🎙️ <i>Nota de voz</i>";
+              botPlaceholder.innerHTML = "❌ Error de conexión: " + esc(err.message);
+              if (hist) hist.scrollTop = hist.scrollHeight;
+            });
+        }, { once: true });
+
+        try { _chatMediaRecorder.stop(); } catch (e) { detenerAudioGrabacion(true); }
+      });
+    }
   }
+  var setupChatModal = setupChatDock;
 
   /* ---------- Dictado por Voz (Whisper) ---------- */
   var _mediaRecorder = null;
@@ -4619,28 +5012,39 @@
     var btnSistema = document.getElementById("btn-nav-sistema");
     var btnUsuarios = document.getElementById("btn-nav-usuarios");
     var btnGps = document.getElementById("btn-nav-gps");
+    var btnMapa = document.getElementById("btn-nav-mapa");
     var sheetSistema = document.getElementById("sheet-item-sistema");
     var sheetUsuarios = document.getElementById("sheet-item-usuarios");
     var sheetGps = document.getElementById("sheet-item-gps");
+    var sheetMapa = document.getElementById("sheet-item-mapa");
 
     if (rol === "OWNER") {
       if (btnSistema) btnSistema.style.display = "";
       if (btnUsuarios) btnUsuarios.style.display = "";
-      if (btnGps) btnGps.style.display = "";
+      if (btnGps) btnGps.style.display = "none";
+      if (btnMapa) btnMapa.style.display = "";
       if (sheetSistema) sheetSistema.style.display = "";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
-      if (sheetGps) sheetGps.style.display = "";
-      qa("#nav-principal > button").forEach(function (b) { b.style.display = ""; });
+      if (sheetGps) sheetGps.style.display = "none";
+      if (sheetMapa) sheetMapa.style.display = "";
+      qa("#nav-principal > button").forEach(function (b) {
+        var v = b.getAttribute("data-v");
+        if (v === "gps") b.style.display = "none";
+        else b.style.display = "";
+      });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v !== "sistema" && v !== "usuarios" && v !== "gps") m.style.display = "";
+        if (v === "gps") m.style.display = "none";
+        else if (v !== "sistema" && v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
       if (btnSistema) btnSistema.style.display = "none";
       if (btnGps) btnGps.style.display = "none";
+      if (btnMapa) btnMapa.style.display = "";
       if (btnUsuarios) btnUsuarios.style.display = "";
       if (sheetSistema) sheetSistema.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
+      if (sheetMapa) sheetMapa.style.display = "";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
       qa("#nav-principal > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
@@ -4656,9 +5060,11 @@
       if (btnSistema) btnSistema.style.display = "none";
       if (btnUsuarios) btnUsuarios.style.display = "none";
       if (btnGps) btnGps.style.display = "none";
+      if (btnMapa) btnMapa.style.display = "none";
       if (sheetSistema) sheetSistema.style.display = "none";
       if (sheetUsuarios) sheetUsuarios.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
+      if (sheetMapa) sheetMapa.style.display = "none";
       var permitidas = ["captura", "manga", "ficha"];
       qa("#nav-principal > button").forEach(function (b) {
         var v = b.getAttribute("data-v");
@@ -4808,7 +5214,7 @@
         + "<div style='font-size:20px;'>" + cIcon + "</div>"
         + "<div style='flex:1; font-size:13px;'>"
         + "<b>Control de Consanguinidad Parental:</b> <span class='chip " + cClase + "'>" + esc(cTxt) + "</span>"
-        + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:3px;'>Regla zootécnica de 3 generaciones antes de autorizar cruzamiento o servicio de monta/I.A.</div>"
+        + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:3px;'>Regla de control de 3 generaciones antes de autorizar cruzamiento o servicio de monta/I.A.</div>"
         + "</div>"
         + "</div>";
 
@@ -5079,7 +5485,7 @@
 
     h += "<div class='kpis' style='margin-bottom:14px;'>"
       + kpi(potreroKpiVal, potreroKpiLabel)
-      + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad Zootécnica")
+      + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad")
       + kpi(ultPesoTxt, "Último Pesaje")
       + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
       + "</div>";
@@ -5200,7 +5606,7 @@
     h += "<div class='card' style='padding:16px; margin-top:14px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px;'>"
       + "<div style='display:flex; gap:16px; align-items:center; flex-wrap:wrap;'>"
       + "<div style='flex:1; min-width:220px;'>"
-      + "<h4 style='margin-top:0;'>" + icon("camera") + "Código QR & Ficha Técnica Zootécnica</h4>"
+      + "<h4 style='margin-top:0;'>" + icon("camera") + "Código QR & Ficha Técnica del Animal</h4>"
       + "<p style='font-size:12.5px; color:var(--texto-suave); margin:6px 0 12px 0; line-height:1.4;'>"
       + "El código QR contiene el enlace web directo a la PWA. Al escanearlo con la cámara de cualquier teléfono en el campo o manga, abre de inmediato esta ficha viva e interactiva. "
       + "Para llevar el registro impreso a la manga o carpeta de potrero, descargue la <b>Ficha Técnica A4 Oficial</b> con semáforos, genealogía y pesajes."
@@ -5802,13 +6208,8 @@
     }
 
     if (actual === "gps") {
-      if (animar) skeleton(vista, "gps");
-      var fFecha = _fechaFiltroRutas || (q("#filtro-fecha-rutas") && q("#filtro-fecha-rutas").value) || new Date().toISOString().slice(0, 10);
-      fetchJSON("/api/telemetria/rutas?fecha=" + encodeURIComponent(fFecha), function (d) {
-        if (!vista) return;
-        montarVista(vista, renderGps(d, fFecha), animar);
-        bindGps(d, fFecha);
-      }, animar ? vista : null);
+      irAVista("mapa");
+      cargar(animar);
       return;
     }
 
@@ -5841,7 +6242,8 @@
         return;
       }
       if (animar) skeleton(vista, "mapa");
-      fetchJSON("/api/mapa/datos", function (d) {
+      var fFecha = _fechaFiltroRutas || (q("#filtro-fecha-rutas") && q("#filtro-fecha-rutas").value) || new Date().toISOString().slice(0, 10);
+      fetchJSON("/api/mapa/datos?fecha=" + encodeURIComponent(fFecha), function (d) {
         if (!vista) return;
         montarVista(vista, renderMapa(d), animar);
         bindMapa(d);
@@ -5995,7 +6397,7 @@
     captura: "Captura",
     inventario: "Inventario",
     finanzas: "Finanzas",
-    mapa: "Mapa",
+    mapa: "Mapa & GPS",
     manga: "Manga",
     agenda: "Agenda",
     repro: "Repro",
@@ -6004,7 +6406,7 @@
     pasturas: "Pasturas",
     genetica: "Genética",
     ficha: "Ficha",
-    gps: "GPS",
+    gps: "Mapa & GPS",
     usuarios: "Usuarios",
     sistema: "Sistema",
     ayuda: "Ayuda"

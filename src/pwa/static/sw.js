@@ -66,8 +66,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v73: Vaquita decorativa pastando en el header (SVG inline COW_HEAD + pasto, solo CSS @keyframes, respeta reduced-motion y queda estática en Sol de Campo).
 // v74: Ícono de Destete cambiado a cabeza de cría + flecha (antes reusaba el mismo ícono que "Cría", sin distinguirse a simple vista en el botón de Captura ni en el feed de eventos).
 // v75: Unificación de Mapa Satelital y Rutas GPS en un solo módulo para ADMIN y OWNER (bloqueado para TRABAJADOR); dock de chat flotante/expandible con dictado de voz estilo WhatsApp; depuración de terminología zootécnica.
-// v76: Quitado el gráfico "Categorías del hato" del Tablero (duplicaba la Estructura del hato de Inventario); "Distribución por potrero" (Tablero e Inventario) pasa de tabla plana a lista con barra proporcional, más fácil de comparar de un vistazo.
-var CACHE = "pwa-ja-v76"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v77: Unificación definitiva de Mapa Satelital y Rutas GPS (ADMIN y OWNER), dock de chat WhatsApp con notas de voz y depuración integral de terminología.
+var CACHE = "pwa-ja-v77"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

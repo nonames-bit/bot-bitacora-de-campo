@@ -656,7 +656,7 @@ def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
     total_alertas = len(partos_prox) + len(vacas_secar) + len(crias_destete) + len(perdiendo_peso) + len(en_retiro) + len(alertas_db)
 
     lineas = [
-        "🚨 <b>CENTRO DE CONTROL & ALERTAS ZOOTÉCNICAS</b>",
+        "🚨 <b>CENTRO DE CONTROL & ALERTAS GANADERAS</b>",
         f"📅 <i>Fecha: {hoy_iso} · Hacienda GANADERIA-JA (340)</i>",
         "────────────────────────────────────────",
         f"• 🔴 <b>Partos Próximos (≤30d):</b> {len(partos_prox)} vacas",
@@ -709,7 +709,7 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
     n_dias_abiertos = da["n"] if da else 0
 
     lineas = [
-        "📊 <b>TABLERO POBLACIONAL & KPIs ZOOTÉCNICOS</b>",
+        "📊 <b>TABLERO POBLACIONAL & KPIs DEL HATO</b>",
         f"🏷️ <i>Finca: 01-JA-GANADERIA-JA · Total: {activos} Cabezas</i>",
         "────────────────────────────────────────",
         "🐄 <b>ESTRUCTURA DE POBLACIÓN:</b>",
@@ -1160,7 +1160,7 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
             listos_reposo.append(raw_nom)
 
     salida = [
-        "🐮 <b>Tablero de Control Zootécnico — Ganadería JA</b>",
+        "🐮 <b>Tablero de Control — Ganadería JA</b>",
         "────────────────────────────────────────",
         f"🐄 <b>HATO ACTIVO:</b> {_fmt_es_co(n_activos)} animales (♀ {n_hembras} · ♂ {n_machos})",
         "",
@@ -1339,7 +1339,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
         return (
             "👑 <b>MANUAL DE COMANDOS (Propietario / OWNER)</b>\n"
             "────────────────────────────────────────\n\n"
-            "🐮 <b>1. Consultas y Fichas Zootécnicas:</b>\n"
+            "🐮 <b>1. Consultas y Fichas de Animales:</b>\n"
             "• Escribe el arete directo: <code>47</code>, <code>N069</code>, <code>A060</code>\n"
             "• <code>/ficha [tag]</code> o <code>/consulta [tag]</code> — Ficha interactiva con pestañas\n"
             "• <code>/alertas</code> — Semáforo de partos, secados, destetes y retiros\n"
@@ -1361,7 +1361,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• 💉 <i>Remedios:</i> «le puse 20ml de oxitetraciclina a la 47»\n"
             "• 🚚 <i>Traslados:</i> «pase el lote 1 de santa martha a versalles»\n\n"
             "⚙️ <b>3. Administración & Sistema:</b>\n"
-            "• <code>/status</code> — Tablero zootécnico ejecutivo de la finca\n"
+            "• <code>/status</code> — Tablero ejecutivo de la finca\n"
             "• <code>/sistema</code> — Métricas del servidor VPS y base SQLite\n"
             "• <code>/reporte</code> — Generar reporte semanal en PDF\n"
             "• <code>/exportar</code> — Descargar backup del sistema (paquete ZIP)\n"
@@ -1397,7 +1397,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
         return (
             "🛠️ <b>MANUAL DE COMANDOS (Administrador / ADMIN)</b>\n"
             "────────────────────────────────────────\n\n"
-            "🐮 <b>1. Consultas y Fichas Zootécnicas:</b>\n"
+            "🐮 <b>1. Consultas y Fichas de Animales:</b>\n"
             "• Escribe el arete directo: <code>47</code>, <code>N069</code>, <code>A060</code>\n"
             "• <code>/ficha [tag]</code> o <code>/consulta [tag]</code> — Ficha interactiva con pestañas\n"
             "• <code>/alertas</code> — Semáforo de partos, secados, destetes y retiros\n"
@@ -1412,7 +1412,7 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "• <code>/grafico_leche [tag]</code> — Curva de lactancia (litros vs días en leche)\n"
             "• <code>/graficos</code> — Panel de gráficos generales de la finca\n\n"
             "⚙️ <b>2. Informes y Sincronización:</b>\n"
-            "• <code>/status</code> — Tablero zootécnico ejecutivo de la finca\n"
+            "• <code>/status</code> — Tablero ejecutivo de la finca\n"
             "• <code>/reporte</code> — Generar reporte semanal en PDF\n"
             "• <code>/exportar</code> — Descargar backup del sistema (paquete ZIP)\n"
             "• <code>/importar</code> — Instrucciones para importar backup DBF\n"
@@ -1496,7 +1496,7 @@ def texto_ejemplo_evento(tipo: str) -> str:
             "🔥 <b>Ejemplo de Celo (Regla AM-PM):</b>\n"
             "<code>celo en la mañana la 33</code>\n"
             "<code>celo en la tarde la vaca 12</code>\n\n"
-            "💡 <i>Regla zootécnica:</i> Celo en la mañana se insemina en la tarde; celo en la tarde se insemina en la mañana siguiente."
+            "💡 <i>Regla de manejo:</i> Celo en la mañana se insemina en la tarde; celo en la tarde se insemina en la mañana siguiente."
         ),
         "servicio": (
             "🐂 <b>Ejemplo de Inseminación / Servicio:</b>\n"
@@ -1580,7 +1580,7 @@ def texto_guia_chat_hub() -> str:
     return (
         "💬 <b>CENTRO DE GUÍA: CÓMO PREGUNTAR AL BOT</b>\n"
         "────────────────────────────────────────\n"
-        "¡Bienvenido! Este bot cuenta con Inteligencia Artificial Zootécnica y entiende <b>español normal de campo</b>.\n\n"
+        "¡Bienvenido! Este bot cuenta con Inteligencia Artificial Ganadera y entiende <b>español normal de campo</b>.\n\n"
         "✨ <b>Ventajas del Chat Inteligente:</b>\n"
         "• No necesitas memorizar comandos complicados con barras (/).\n"
         "• Puedes escribir con minúsculas, sin tildes ni signos de interrogación.\n"
@@ -1711,7 +1711,7 @@ def texto_guia_voz_fotos() -> str:
         "   • <i>«Pasé el lote 2 del potrero bajo al potrero olegario»</i>\n"
         "3. Suelta el botón y el bot procesará y registrará todo automáticamente.\n\n"
         "📷 <b>Reconocimiento de Fotografías (OCR):</b>\n"
-        "• <b>Fotos de Aretes:</b> Envía una foto clara del arete y el bot abre su ficha zootécnica de inmediato.\n"
+        "• <b>Fotos de Aretes:</b> Envía una foto clara del arete y el bot abre su ficha de inmediato.\n"
         "• <b>Fotos de Medicamentos:</b> Envía una foto de la etiqueta del frasco y el bot calculará los días de retiro y dosis automáticamente."
     )
 
@@ -1743,7 +1743,7 @@ def texto_guia_audios() -> str:
         "   • <i>«Inseminé la novilla 15 con pajuela toro brahman 502»</i>\n"
         "   • <i>«Pasé el lote 2 del potrero bajo al potrero olegario 1»</i>\n"
         "3. Suelte el botón para enviar.\n"
-        "4. El bot transcribe sus palabras, reconoce el evento zootécnico y lo registra automáticamente en la base de datos."
+        "4. El bot transcribe sus palabras, reconoce el evento de campo y lo registra automáticamente en la base de datos."
     )
 
 
@@ -2026,7 +2026,7 @@ def formatear_panel_medicamentos(db: Database) -> str:
 
 def formatear_panel_buscar_animal_texto() -> str:
     return (
-        "🔍 <b>Buscador de Animales & Fichas Zootécnicas</b>\n"
+        "🔍 <b>Buscador de Animales & Fichas Técnicas</b>\n"
         "────────────────────────────────────────\n"
         "Puede consultar cualquier animal de dos formas:\n\n"
         "1. <b>Escribiendo directamente en el chat</b> su número o nombre:\n"
@@ -2039,7 +2039,7 @@ def formatear_panel_preguntas_rapidas_texto() -> str:
     return (
         "❓ <b>Consultas Rápidas de Campo (1-Toque)</b>\n"
         "────────────────────────────────────────\n"
-        "Seleccione una pregunta para obtener la respuesta zootécnica al instante:"
+        "Seleccione una pregunta para obtener la respuesta al instante:"
     )
 
 
@@ -2546,7 +2546,7 @@ def formatear_clima_panel(db: Database, hoy: Optional[date] = None) -> str:
         f"{info['icono']} <b>Temporada Actual:</b> <b>{info['estacion']}</b>",
         f"🌿 <b>Factor Rebrote Forrajero:</b> <b>{info['factor_clima']}x</b>",
         f"⏳ <b>Descanso Sugerido Voisin:</b> <b>{info['dias_reposo_sugeridos']} días</b>",
-        f"💡 <b>Manejo Zootécnico:</b> <i>{info['recomendacion']}</i>",
+        f"💡 <b>Manejo Ganadero:</b> <i>{info['recomendacion']}</i>",
     ]
 
     if hist:

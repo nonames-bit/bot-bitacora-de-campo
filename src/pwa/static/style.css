@@ -1674,7 +1674,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 }
 
 /* ==========================================================================
-   Sección de Ayuda & Centro de Guías Zootécnicas PWA
+   Sección de Ayuda & Centro de Guías Ganaderas PWA
    ========================================================================== */
 .ayuda-grid {
   display: grid;
@@ -2189,4 +2189,315 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   background: var(--verde-marca);
   transition: width .3s ease;
 }
+
+/* --- Vaquita pastando en el header (decorativa, 100% CSS/SVG inline, sin requests) ---
+   Reutiliza la iconografía canónica COW_HEAD (cabeza de ternero) + brizna de pasto.
+   Sutil y profesional: deambula ±14px en 12s y cabecea a pastar en 4s. */
+.header-pasto {
+  flex: 1 1 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 80px;
+  max-width: 320px;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--header-txt);
+  opacity: .8;
+  user-select: none;
+}
+.vaca-pista { display: inline-flex; align-items: flex-end; }
+.vaca-ambula { display: inline-flex; animation: vacaAmbla 12s ease-in-out infinite; }
+.vaca-pasta { display: inline-flex; align-items: flex-end; gap: 1px; animation: vacaPasta 4s ease-in-out infinite; transform-origin: 50% 90%; }
+.vaca-svg { display: block; width: 32px; height: 32px; }
+.header-pasto-ficha .vaca-svg { width: 28px; height: 28px; }
+.pasto-svg { display: block; width: 14px; height: 14px; opacity: .75; margin-bottom: 1px; }
+.header-pasto-ficha .pasto-svg { width: 12px; height: 12px; }
+@keyframes vacaAmbla {
+  0%, 100% { transform: translateX(-14px); }
+  50% { transform: translateX(14px); }
+}
+@keyframes vacaPasta {
+  0%, 55%, 100% { transform: rotate(0deg) translateY(0); }
+  65%, 85% { transform: rotate(9deg) translateY(2px); }
+}
+/* Tema claro: el header es blanco, el currentColor ya es oscuro; se baja un poco la opacidad. */
+:root[data-theme="light"] .header-pasto { opacity: .65; }
+:root[data-theme="dark"] .header-pasto { opacity: .85; }
+/* Sol de Campo (alto contraste B/N): se muestra estática, sin movimiento. */
+:root[data-theme="sun"] .vaca-ambula, :root[data-theme="sun"] .vaca-pasta { animation: none; }
+:root[data-theme="sun"] .header-pasto { opacity: 1; }
+@media (max-width: 640px) {
+  .header-pasto { min-width: 56px; max-width: 140px; }
+  .vaca-svg { width: 28px; height: 28px; }
+  @keyframes vacaAmbla {
+    0%, 100% { transform: translateX(-8px); }
+    50% { transform: translateX(8px); }
+  }
+}
+@media (max-width: 360px) {
+  .header-pasto { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vaca-ambula, .vaca-pasta { animation: none; }
+}
+
+/* ========================================================================== */
+/* Chat Dock Flotante / Expansible Estilo WhatsApp con Micrófono             */
+/* ========================================================================== */
+.chat-dock {
+  position: fixed;
+  z-index: 1040;
+  display: flex;
+  flex-direction: column;
+  background: var(--superficie);
+  border: 1px solid var(--borde-fuerte);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.16);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+/* Estado Colapsado (Barra / Pill disponible siempre) */
+.chat-dock.colapsado {
+  bottom: 20px;
+  right: 24px;
+  width: min(460px, calc(100vw - 32px));
+  height: 48px;
+  border-radius: 28px;
+  background: var(--superficie);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.chat-dock.colapsado .chat-dock-header {
+  display: none !important;
+}
+.chat-dock.colapsado .chat-cuerpo {
+  display: none !important;
+}
+.chat-dock.colapsado .chat-dock-footer {
+  border-top: none;
+  padding: 4px 6px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+/* Estado Expandido */
+.chat-dock.expandido {
+  bottom: 20px;
+  right: 24px;
+  width: min(480px, calc(100vw - 32px));
+  height: min(600px, 75vh);
+  border-radius: 18px;
+}
+.chat-dock.expandido .chat-dock-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--fondo);
+  border-bottom: 1px solid var(--borde);
+}
+.chat-dock.expandido .chat-cuerpo {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  max-height: none;
+}
+.chat-dock.expandido .chat-dock-footer {
+  border-top: 1px solid var(--borde);
+  padding: 8px 10px;
+  background: var(--superficie);
+}
+
+/* Cabecera del Dock */
+.chat-dock-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  color: var(--texto);
+}
+.chat-dock-controles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-btn-min {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  color: var(--texto-suave);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.chat-btn-min:hover {
+  background: var(--superficie);
+  color: var(--texto);
+  border-color: var(--borde);
+}
+
+/* Formulario de Entrada y Botones Estilo WhatsApp */
+.chat-dock-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.chat-dock-form input {
+  flex: 1;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 20px;
+  border: 1px solid var(--borde);
+  background: var(--fondo);
+  color: var(--texto);
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.chat-dock-form input:focus {
+  border-color: var(--verde-marca);
+}
+.chat-btn-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.chat-btn-ico:active {
+  transform: scale(0.92);
+}
+.chat-btn-ico.toggle {
+  background: transparent;
+  color: var(--verde-marca);
+  font-size: 16px;
+}
+.chat-btn-ico.mic {
+  background: var(--fondo);
+  color: var(--texto);
+  border: 1px solid var(--borde);
+}
+.chat-btn-ico.mic:hover {
+  background: var(--verde-marca-pastel);
+  color: var(--verde-marca);
+}
+.chat-btn-ico.send {
+  background: var(--verde-marca);
+  color: #ffffff;
+}
+.chat-btn-ico.send:hover {
+  filter: brightness(1.08);
+}
+
+/* Barra de Grabación de Audio en Vivo (WhatsApp style) */
+.chat-audio-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border-radius: 20px;
+  background: #fde8e8;
+  border: 1px solid #f8b4b4;
+}
+:root[data-theme="dark"] .chat-audio-bar {
+  background: rgba(185, 28, 28, 0.25);
+  border-color: rgba(239, 68, 68, 0.5);
+}
+.chat-audio-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+:root[data-theme="dark"] .chat-audio-info {
+  color: #fca5a5;
+}
+.chat-audio-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: pulso-rojo 0.8s infinite alternate;
+}
+.chat-audio-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-audio-cancelar {
+  background: transparent;
+  border: none;
+  color: #dc2626;
+  font-size: 16px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.btn-audio-cancelar:hover {
+  background: rgba(220, 38, 38, 0.12);
+}
+.btn-audio-enviar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #ffffff;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.btn-audio-enviar:active {
+  transform: scale(0.9);
+}
+
+/* En Móvil: Anclar sobre la barra de navegación inferior */
+@media (max-width: 768px) {
+  .chat-dock.colapsado {
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    left: 8px;
+    right: 8px;
+    width: auto;
+    height: 46px;
+    border-radius: 24px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+  }
+  .chat-dock.expandido {
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    left: 6px;
+    right: 6px;
+    width: auto;
+    height: 72vh;
+    max-height: calc(100vh - 75px);
+    border-radius: 16px;
+  }
+  main {
+    padding-bottom: 125px !important;
+  }
+}
+@media (min-width: 769px) {
+  main {
+    padding-bottom: 75px !important;
+  }
+}
+
 

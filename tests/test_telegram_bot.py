@@ -475,7 +475,7 @@ def test_formatear_tablero_finca(db):
     db.registrar_potrero(nombre="Potrero 1", dias_reposo=40)
 
     resp = formatear_tablero_finca(db, hoy=hoy)
-    assert "Tablero de Control Zootécnico" in resp
+    assert "Tablero de Control" in resp
     assert "HATO ACTIVO" in resp
     assert "NOVEDADES DE LA SEMANA" in resp
     assert "Partos:" in resp
@@ -543,7 +543,7 @@ def test_paneles_textos_guia():
         formatear_panel_preguntas_rapidas_texto,
     )
     t_buscar = formatear_panel_buscar_animal_texto()
-    assert "Buscador de Animales & Fichas Zootécnicas" in t_buscar
+    assert "Buscador de Animales & Fichas Técnicas" in t_buscar
     assert "patricia" in t_buscar
 
     t_faq = formatear_panel_preguntas_rapidas_texto()

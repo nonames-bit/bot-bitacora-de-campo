@@ -362,7 +362,7 @@ def construir_application(
                 await update.message.reply_text(respuesta, reply_markup=reply_markup)
                 return
 
-            if "FICHA ZOOTÉCNICA" in respuesta:
+            if "FICHA ZOOTÉCNICA" in respuesta or "FICHA TÉCNICA" in respuesta:
                 tag = nlu.extraer_tag(raw_text)
                 if not tag:
                     m_tag = re.search(r"(?:🐄|🐮|🐂|🍼)\s*(?:Vaca|Toro|Novilla|Ternero|Ternera|Novillo|Cría|Cria)?\s*([A-Za-z0-9\-_]+)", respuesta)
@@ -850,7 +850,7 @@ def construir_application(
 
                 texto = (
                     "🌳 <b>ÁRBOL GENEALÓGICO & TRAZABILIDAD (3G)</b>\n\n"
-                    "El módulo de trazabilidad y genética zootécnica verifica automáticamente el árbol genealógico "
+                    "El módulo de trazabilidad y genética ganadera verifica automáticamente el árbol genealógico "
                     "en 3 generaciones (padres, abuelos, bisabuelos), las crías registradas y la consanguinidad parental.\n\n"
                     "💡 <b>Cómo usar:</b>\n"
                     "• Escriba: <code>/arbol &lt;arete&gt;</code> (ej: <code>/arbol A007</code> o <code>/arbol JA238</code>)\n"

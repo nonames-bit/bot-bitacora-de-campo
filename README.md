@@ -524,7 +524,16 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Autolocalización GPS en Tiempo Real**: Al abrir el mapa, la app detecta automáticamente la posición del usuario (`watchPosition`), dibuja el punto pulsante azul (`.self-pulse-dot`) y su halo de precisión en metros, y sincroniza la telemetría con el servidor.
     - **Visualización Satelital Realzada & Tooltips Permanentes**: El modo Satelital resalta los linderos de potrero en tono dorado vibrante (`#f1c40f`) con tenue velo esmeralda translúcido, manteniendo visibles los nombres de cada potrero y conteos de animales (`.mapa-tooltip-potrero`) directamente sobre la foto satelital.
     - **Ampliación de Perímetro para Instalaciones y Filtrado de Telemetría**: El motor geoespacial reconoce corrales, vaquera y casa de la finca hasta 650 m de los potreros, descartando puntos de prueba remotos fuera del área ganadera.
-- [x] Suite de pruebas con pytest: **725 pruebas en verde** (100% pasando).
+  - **Unificación de Módulos Mapa & GPS (PWA v77)**:
+    - Fusión de las vistas antes separadas de Mapa Satelital y Auditoría GPS en una sola experiencia consolidada (`Mapa & GPS`).
+    - Visible exclusivamente para roles directivos (`OWNER` y `ADMIN`); completamente oculto y bloqueado (HTTP 403) para `TRABAJADOR`.
+    - Integración de auditoría de desplazamientos, cronología por operario, tabla de coordenadas, rondas de campo manuales y botón directo `"🗺️ Ver rastro en mapa"` que traza la polilínea del recorrido sobre la foto satelital con centrado automático.
+  - **Dock de Chat Expandible con Dictado de Voz Estilo WhatsApp (PWA v77)**:
+    - Sustitución del modal emergente centrado por una barra/dock acoplada en la parte inferior, siempre disponible para escribir o expandirse suavemente hacia arriba.
+    - Grabación de notas de voz estilo WhatsApp con cronómetro en vivo, indicador rojo pulsante, descarte (`✕`) y envío inmediato (`✓`) hacia el motor Whisper con inclusión automática de la transcripción y respuesta en el hilo.
+  - **Depuración Integral de Terminología**:
+    - Erradicación de términos no deseados ("zootécnico", "zootecnia") en interfaces de usuario, paneles de control, comandos de Telegram y manuales de ayuda, sustituyéndolos por un lenguaje ganadero natural, directo y ejecutivo.
+- [x] Suite de pruebas con pytest: **739 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

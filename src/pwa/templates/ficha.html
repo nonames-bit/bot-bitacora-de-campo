@@ -12,12 +12,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="/static/style.css?v=68">
+<link rel="stylesheet" href="/static/style.css?v=73">
 </head>
 <body data-tag="{{ tag }}">
 <div id="barra-red">📡 Sin conexión — mostrando datos guardados. Reconectando…</div>
 <header>
   <span class="marca-titulo"><a href="/" style="text-decoration:none; color:inherit; display:inline-flex; align-items:center; gap:6px;"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="22" height="22">← Tablero</a> · <span style="display:inline-flex; align-items:center; gap:5px;"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/></svg><span>Ficha</span></span> <b>{{ tag }}</b></span>
+  <span class="header-pasto header-pasto-ficha" aria-hidden="true"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><svg class="vaca-svg" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.8 15.1a10 10 0 0 0 .9-7.1h.3c1.7 0 3-1.3 3-3V3h-3c-1.3 0-2.4.8-2.8 1.9a10 10 0 0 0-8.4 0C7.4 3.8 6.3 3 5 3H2v2c0 1.7 1.3 3 3 3h.3a10 10 0 0 0 .9 7.1M9 9.5v.5m6-.5v.5"/><path d="M15 22a4 4 0 1 0-3-6.6A4 4 0 1 0 9 22Zm-6-4h.01M15 18h.01"/></svg><svg class="pasto-svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span></span></span></span>
   <span class="acciones">
     <button id="btn-chat" class="tema-btn" title="Asistente IA (Chat)"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
     <button id="btn-ayuda" class="tema-btn" title="Centro de Ayuda y Manuales" aria-label="Ayuda"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></button>
@@ -33,24 +34,53 @@
 <main>
   <div id="ficha" class="card">Cargando…</div>
 
-  <!-- Modal Asistente IA (Chat) -->
-  <div id="modal-chat" class="modal-overlay" style="display:none">
-    <div class="modal-contenido chat-modal">
-      <div class="modal-header">
-        <span style="display:inline-flex; align-items:center; gap:8px;"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="22" height="22"><b>Asistente IA · Ganadería JA</b></span>
-        <button class="modal-cerrar" id="btn-cerrar-chat">✕</button>
+  <!-- Chat Dock Flotante / Expansible (Estilo WhatsApp con Micrófono) -->
+  <div id="chat-dock" class="chat-dock colapsado">
+    <div class="chat-dock-header">
+      <div class="chat-dock-titulo">
+        <img src="/static/logo.jpg" class="logo-ja" alt="Logo" width="20" height="20">
+        <span><b>Asistente IA</b> · Ganadería JA</span>
       </div>
-      <div id="chat-historial" class="chat-cuerpo">
-        <div class="chat-msg bot">Hola. Soy el asistente zootécnico de la finca. Puedes hacerme preguntas sobre este animal <b>{{ tag }}</b> o la finca en general.</div>
+      <div class="chat-dock-controles">
+        <button type="button" id="btn-limpiar-chat" class="chat-btn-min" title="Limpiar conversación">🧹</button>
+        <button type="button" id="btn-colapsar-chat" class="chat-btn-min" title="Minimizar">▼</button>
+        <button type="button" id="btn-cerrar-chat" class="chat-btn-min" title="Cerrar" style="display:none">✕</button>
       </div>
-      <form id="form-chat" class="chat-footer">
-        <input type="text" id="chat-input" placeholder="Pregunta algo sobre este animal o la finca..." autocomplete="off">
-        <button type="submit" id="btn-enviar-chat">Enviar</button>
+    </div>
+
+    <div id="chat-historial" class="chat-cuerpo">
+      <div class="chat-msg bot">Hola. Soy el asistente inteligente de la finca. Puedes hacerme preguntas sobre este animal <b>{{ tag }}</b> o dictarme notas con el micrófono 🎙️.</div>
+    </div>
+
+    <div class="chat-dock-footer">
+      <div id="chat-audio-grabando" class="chat-audio-bar" style="display:none">
+        <div class="chat-audio-info">
+          <span class="chat-audio-dot"></span>
+          <span id="chat-audio-timer">0:00</span>
+          <span class="chat-audio-txt">Grabando audio…</span>
+        </div>
+        <div class="chat-audio-btns">
+          <button type="button" id="btn-cancelar-audio" class="btn-audio-cancelar" title="Descartar">✕</button>
+          <button type="button" id="btn-enviar-audio" class="btn-audio-enviar" title="Enviar nota de voz">
+            <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <form id="form-chat" class="chat-dock-form">
+        <button type="button" id="btn-expandir-chat" class="chat-btn-ico toggle" title="Expandir/Minimizar chat">💬</button>
+        <input type="text" id="chat-input" placeholder="Pregunta sobre {{ tag }} o pulsa 🎙️..." autocomplete="off">
+        <button type="button" id="chat-btn-mic" class="chat-btn-ico mic" title="Dictar nota de voz (estilo WhatsApp)">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
+        </button>
+        <button type="submit" id="btn-enviar-chat" class="chat-btn-ico send" title="Enviar mensaje">
+          <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
       </form>
     </div>
   </div>
 </main>
-<script src="/static/app.js?v=68"></script>
+<script src="/static/app.js?v=73"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {

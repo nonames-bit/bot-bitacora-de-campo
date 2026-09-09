@@ -1131,11 +1131,11 @@ def test_telemetria_gps_ping_y_rutas(tmp_path):
     r_rutas_trab = c_trab.get("/api/telemetria/rutas")
     assert r_rutas_trab.status_code == 403
 
-    # 3. Admin tampoco tiene acceso a rutas (restringido a OWNER)
+    # 3. Admin sí tiene acceso a rutas (permitido para administradores y dueños)
     c_adm = app.test_client()
     c_adm.post("/login", data={"pin": "2222"})
     r_rutas_adm = c_adm.get("/api/telemetria/rutas")
-    assert r_rutas_adm.status_code == 403
+    assert r_rutas_adm.status_code == 200
 
     # 4. Owner sí tiene acceso y ve la ruta del trabajador
     c_owner = app.test_client()
@@ -1812,6 +1812,17 @@ def test_api_mapa_datos_restringido_a_trabajador(client):
         sess["rol"] = "TRABAJADOR"
     r = client.get("/api/mapa/datos")
     assert r.status_code == 403
+
+
+def test_api_mapa_datos_permitido_a_admin(client):
+    with client.session_transaction() as sess:
+        sess["rol"] = "ADMIN"
+    r = client.get("/api/mapa/datos")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert "potreros_geojson" in d
+    assert "rutas" in d
+
 
 
 

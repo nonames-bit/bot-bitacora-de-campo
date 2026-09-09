@@ -2699,10 +2699,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/telemetria/rutas")
     def api_telemetria_rutas():
-        """Consulta rutas y desplazamientos de operarios (EXCLUSIVO OWNER)."""
+        """Consulta rutas y desplazamientos de operarios (ADMIN y OWNER)."""
         rol = _rol_actual()
-        if rol != "OWNER":
-            return jsonify({"error": "Acceso denegado. Solo el rol OWNER tiene acceso a la auditoría de rutas."}), 403
+        if rol == "TRABAJADOR":
+            return jsonify({"error": "Acceso denegado. Las rutas y mapa GPS son exclusivos para administración y gerencia."}), 403
 
         fecha = request.args.get("fecha")
         db_tele = _db(db_path)
@@ -2715,10 +2715,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/mapa/datos")
     def api_mapa_datos():
-        """Retorna GeoJSON de potreros, vigor NDVI/SAR, ocupación y operarios en vivo."""
+        """Retorna GeoJSON de potreros, vigor NDVI/SAR, ocupación, operarios en vivo y rutas."""
         mi_rol = _rol_actual()
         if mi_rol == "TRABAJADOR":
-            return jsonify({"error": "Acceso denegado. El mapa satelital es exclusivo para administración y gerencia."}), 403
+            return jsonify({"error": "Acceso denegado. El mapa y rutas GPS son exclusivos para administración y gerencia."}), 403
         db_map = _db(db_path)
         try:
             try:
@@ -2727,6 +2727,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 from src.engine.mapa_data import datos_mapa_finca
             res = datos_mapa_finca(db_map)
             res["rol"] = mi_rol
+            fecha_req = request.args.get("fecha")
+            res["rutas"] = db_map.resumen_rutas_operarios(fecha=fecha_req)
+            res["rondas"] = [dict(r) for r in db_map.listar_rondas_campo(fecha=fecha_req, limite=50)]
             return jsonify(res)
         finally:
             db_map.close()
