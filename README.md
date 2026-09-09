@@ -518,18 +518,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Dual-Pol Radar Vegetation Index ($RVI$, Mandal et al. 2020), proxy SAR-NDVI y estimador dieléctrico de humedad superficial de pastura/suelo.
     - Fusión multisensor automática en `actualizar_lecturas_reales(modo='auto')`: si Sentinel-2 está nublado, conmuta de inmediato a Sentinel-1 SAR.
   - **Depuración de UI: Asistente IA Limpio en PWA (v68)**: Remoción completa de los botones/chips inferiores de sugerencias del modal de chat en el Tablero principal y en la Ficha Animal, brindando un área despejada y enfocada exclusivamente en el historial de conversación y entrada de texto.
-  - **Mapa Satelital Interactivo de Potreros & Operarios en Vivo (`src/engine/mapa_data.py`, Leaflet PWA v70)**:
-    - Cartografía satelital de alta resolución (Esri World Imagery) con los polígonos GeoJSON georreferenciados de los 20 potreros de la finca.
-    - Conmutador de modos visuales: Vigor Forrajero (Sentinel-2 NDVI / Sentinel-1 SAR), Rotación Voisin (Ocupación ≤3d, Reposo ≥30d, Alerta >3d sobrepastoreo) y Linderos Ópticos.
-    - Presencia y telemetría de múltiples usuarios/operarios en tiempo real: marcadores con avatar, rol (OWNER, ADMIN, TRABAJADOR), potrero donde se encuentran, hora del último ping, botón de centrado y trazado del rastro de la jornada con polilíneas GPS.
-    - Botón "Mi GPS" para geolocalización en campo con precisión en metros y reporte telemático instantáneo.
-  - **Indicadores Económicos Dinámicos Unitarios de Leche y Carne (`src/db/database.py`, PWA Finanzas)**:
-    - Desglose unitario lechero: Costo por litro, Precio promedio de venta por litro recibido, Margen neto por litro y % de margen.
-    - Desglose unitario ganadero (Carne): Costo unitario por kg, Precio promedio recibido por kg de carne vendida, Margen por kg y % de margen comercial.
-  - **Notificaciones Nativas Web Push en PWA (`src/db/models.py`, `src/pwa/static/sw.js`, `src/pwa/app.py`)**:
-    - Alertas críticas automáticas para campo: retiros sanitarios de carne y leche, regla AM-PM de inseminación artificial, sobrepastoreo Voisin (>3 días) y nivel crítico de nitrógeno en termo de pajuelas.
-    - Panel de activación y prueba inmediata en Agenda y campana del header, con service worker v70 y almacenamiento de suscripciones en base de datos.
-- [x] Suite de pruebas con pytest: **724 pruebas en verde** (100% pasando).
+  - **Optimización de Interfaz Móvil y Mapa Satelital de Precisión (Leaflet PWA v71)**:
+    - **Barra de Navegación Móvil Compacta**: Menú inferior preservado estrictamente en 1 sola fila con 5 botones primarios (`Tablero`, `Captura`, `Inventario`, `Finanzas`, `Más`). Acceso al Mapa Satelital delegado a navegación secundaria ("Más" / Trabajo de Campo) para no desbordar el alto en smartphones.
+    - **Control de Acceso RBAC para Mapa**: Restricción estricta a roles directivos (`OWNER` y `ADMIN`); redirección automática y respuesta HTTP 403 para usuarios de rol `TRABAJADOR`.
+    - **Autolocalización GPS en Tiempo Real**: Al abrir el mapa, la app detecta automáticamente la posición del usuario (`watchPosition`), dibuja el punto pulsante azul (`.self-pulse-dot`) y su halo de precisión en metros, y sincroniza la telemetría con el servidor.
+    - **Visualización Satelital Realzada & Tooltips Permanentes**: El modo Satelital resalta los linderos de potrero en tono dorado vibrante (`#f1c40f`) con tenue velo esmeralda translúcido, manteniendo visibles los nombres de cada potrero y conteos de animales (`.mapa-tooltip-potrero`) directamente sobre la foto satelital.
+    - **Ampliación de Perímetro para Instalaciones y Filtrado de Telemetría**: El motor geoespacial reconoce corrales, vaquera y casa de la finca hasta 650 m de los potreros, descartando puntos de prueba remotos fuera del área ganadera.
+- [x] Suite de pruebas con pytest: **725 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

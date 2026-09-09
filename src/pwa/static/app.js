@@ -2809,11 +2809,14 @@
   var _mapaModoActual = "vigor"; // 'vigor', 'voisin', 'satelite'
   var _mapaVerOperarios = true;
   var _mapaMarkerSelf = null;
+  var _mapaCircleSelf = null;
+  var _mapaCapaSelf = null;
+  var _mapaWatchGpsId = null;
   var _mapaTimerRefresh = null;
 
   function renderMapa(d) {
     var totalPot = (d && d.finca && d.finca.total_potreros) || (d && d.potreros_geojson && d.potreros_geojson.features ? d.potreros_geojson.features.length : 0);
-    var uActivos = (d && d.usuarios_activos) || [];
+    var uActivos = (d && d.usuarios_activos) ? d.usuarios_activos.filter(function (u) { return u.dist_finca_km == null || u.dist_finca_km <= 35.0; }) : [];
 
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>"
@@ -2945,9 +2948,13 @@
     _mapaCapaPotreros = L.layerGroup().addTo(map);
     _mapaCapaUsuarios = L.layerGroup().addTo(map);
     _mapaCapaRastros = L.layerGroup().addTo(map);
+    _mapaCapaSelf = L.layerGroup().addTo(map);
+
+    setTimeout(function () { if (_mapaInstancia) _mapaInstancia.invalidateSize(); }, 150);
+    setTimeout(function () { if (_mapaInstancia) _mapaInstancia.invalidateSize(); }, 500);
 
     function colorParaPotrero(props) {
-      if (_mapaModoActual === "satelite") return { fill: false, color: "#ffffff", weight: 2, fillOpacity: 0 };
+      if (_mapaModoActual === "satelite") return { fill: true, fillColor: "#2ecc71", color: "#f1c40f", weight: 2.2, fillOpacity: 0.12 };
       if (_mapaModoActual === "voisin") return { fill: true, fillColor: props.color_voisin || "#2e7d32", color: "#ffffff", weight: 1.5, fillOpacity: 0.5 };
       return { fill: true, fillColor: props.color_ndvi || "#2e7d32", color: "#ffffff", weight: 1.5, fillOpacity: 0.55 };
     }
@@ -2973,7 +2980,7 @@
           var labelTxt = p.nombre + (nAnim > 0 ? " (" + nAnim + " anim)" : "");
 
           lyr.bindTooltip(labelTxt, {
-            permanent: false,
+            permanent: _mapaModoActual === "satelite",
             direction: "center",
             className: "mapa-tooltip-potrero"
           });
@@ -2995,10 +3002,10 @@
           popHtml += "</div>";
           lyr.bindPopup(popHtml);
 
-          lyr.on("mouseover", function () { lyr.setStyle({ weight: 3, color: "#f1c40f" }); });
+          lyr.on("mouseover", function () { lyr.setStyle({ weight: 3.5, color: "#ffffff" }); });
           lyr.on("mouseout", function () {
             var orig = colorParaPotrero(p);
-            lyr.setStyle({ weight: orig.weight, color: orig.color });
+            lyr.setStyle({ weight: orig.weight, color: orig.color, fillColor: orig.fillColor, fillOpacity: orig.fillOpacity });
           });
         }
       });
@@ -3010,6 +3017,9 @@
       if (!_mapaVerOperarios || !d.usuarios_activos) return;
 
       d.usuarios_activos.forEach(function (u, idx) {
+        if (u.dist_finca_km != null && u.dist_finca_km > 35.0) return;
+        if (!u.lat || !u.lon) return;
+
         var rolClase = (u.rol === "OWNER") ? "owner" : ((u.rol === "ADMIN") ? "admin" : "trabajador");
         var pulseClase = u.en_linea ? "" : " offline";
         var htmlPin = "<div class='user-marker-pin' data-uidx='" + idx + "'>"
@@ -3037,8 +3047,71 @@
       });
     }
 
+    function actualizarPosicionPropia(myLat, myLon, myAcc, centrarSiCerca) {
+      if (!_mapaInstancia || !_mapaCapaSelf) return;
+      _mapaCapaSelf.clearLayers();
+
+      if (myAcc && myAcc > 5) {
+        _mapaCircleSelf = L.circle([myLat, myLon], {
+          radius: myAcc,
+          color: "#0288d1",
+          fillColor: "#0288d1",
+          fillOpacity: 0.12,
+          weight: 1.2
+        }).addTo(_mapaCapaSelf);
+      }
+
+      var iconSelf = L.divIcon({
+        className: "self-gps-icon",
+        html: "<div class='self-pulse-dot' title='Mi ubicación GPS'></div>",
+        iconSize: [20, 20],
+        iconAnchor: [10, 10]
+      });
+
+      _mapaMarkerSelf = L.marker([myLat, myLon], { icon: iconSelf }).addTo(_mapaCapaSelf);
+
+      var cFinca = (d.finca && d.finca.centroide) || [3.402, -74.088];
+      var distFincaKm = Math.sqrt(Math.pow((myLat - cFinca[0]) * 111.0, 2) + Math.pow((myLon - cFinca[1]) * 111.0, 2));
+      var textoUbic = distFincaKm <= 3.5
+        ? "<b>📍 Estás en la Finca</b>"
+        : ("<b>📍 Tu ubicación actual</b><br><small style='color:#666;'>A " + distFincaKm.toFixed(1) + " km de la finca</small>");
+
+      _mapaMarkerSelf.bindPopup(
+        "<div style='font-family:sans-serif; min-width:160px; padding:4px;'>"
+        + textoUbic + "<br>"
+        + "<span style='font-size:11.5px;'>Precisión: ±" + Math.round(myAcc) + "m</span>"
+        + "</div>"
+      );
+
+      if (centrarSiCerca && distFincaKm <= 5.0) {
+        _mapaInstancia.setView([myLat, myLon], 16);
+      }
+
+      fetch("/api/telemetria/ping", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: myLat, lon: myLon, accuracy: myAcc, evento: "mapa_activo" })
+      }).catch(function () {});
+    }
+
+    function iniciarRastreoGps(centrarSiCerca) {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        actualizarPosicionPropia(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy || 0, centrarSiCerca);
+      }, function (err) {
+        console.warn("GPS no disponible:", err && err.message);
+      }, { enableHighAccuracy: true, timeout: 10000 });
+
+      if (!_mapaWatchGpsId) {
+        _mapaWatchGpsId = navigator.geolocation.watchPosition(function (pos) {
+          actualizarPosicionPropia(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy || 0, false);
+        }, function () {}, { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 });
+      }
+    }
+
     pintarPotreros();
     pintarUsuarios();
+    iniciarRastreoGps(true);
 
     // Botones de selector de modo
     qa(".mapa-btn[data-modo-mapa]").forEach(function (btn) {
@@ -3132,24 +3205,11 @@
           var myLat = pos.coords.latitude;
           var myLon = pos.coords.longitude;
           var myAcc = pos.coords.accuracy || 0;
-
-          if (_mapaMarkerSelf) _mapaCapaUsuarios.removeLayer(_mapaMarkerSelf);
-
-          var iconSelf = L.divIcon({
-            className: "self-gps-icon",
-            html: "<div style='width:18px; height:18px; background:#0288d1; border:3px solid #fff; border-radius:50%; box-shadow:0 0 10px #0288d1;'></div>",
-            iconSize: [18, 18],
-            iconAnchor: [9, 9]
-          });
-          _mapaMarkerSelf = L.marker([myLat, myLon], { icon: iconSelf }).addTo(_mapaCapaUsuarios);
-          _mapaMarkerSelf.bindPopup("<b>Tu Ubicación Actual</b><br>Precisión: ±" + Math.round(myAcc) + "m").openPopup();
-          map.setView([myLat, myLon], 16);
-
-          fetch("/api/telemetria/ping", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ lat: myLat, lon: myLon, accuracy: myAcc, evento: "mapa_activo" })
-          }).catch(function () {});
+          actualizarPosicionPropia(myLat, myLon, myAcc, false);
+          if (_mapaInstancia) {
+            _mapaInstancia.setView([myLat, myLon], 16);
+            if (_mapaMarkerSelf) _mapaMarkerSelf.openPopup();
+          }
         }, function (err) {
           btnMiGps.textContent = "📍 Mi GPS";
           alert("No fue posible obtener tu ubicación GPS: " + (err.message || "Permiso denegado."));
@@ -5999,6 +6059,13 @@
         clearInterval(_mapaTimerRefresh);
         _mapaTimerRefresh = null;
       }
+      if (_mapaWatchGpsId && navigator.geolocation) {
+        navigator.geolocation.clearWatch(_mapaWatchGpsId);
+        _mapaWatchGpsId = null;
+      }
+      _mapaMarkerSelf = null;
+      _mapaCircleSelf = null;
+      _mapaCapaSelf = null;
       if (_mapaInstancia) {
         try { _mapaInstancia.remove(); } catch (e) {}
         _mapaInstancia = null;

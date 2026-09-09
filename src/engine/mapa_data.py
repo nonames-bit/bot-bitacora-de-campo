@@ -210,15 +210,22 @@ def datos_mapa_finca(db: Database) -> dict[str, Any]:
             (pt["user_id"], hoy_iso)
         )
 
+        lat_u = float(pt["lat"])
+        lon_u = float(pt["lon"])
+        dist_finca_km = (((lat_u - centroide_finca[0]) ** 2 + (lon_u - centroide_finca[1]) ** 2) ** 0.5) * 111.0
+        en_finca = dist_finca_km <= 15.0
+
         usuarios_activos.append({
             "user_id": pt["user_id"],
             "nombre": meta.get("nombre") or pt["usuario_nombre"] or f"Usuario {pt['user_id']}",
             "rol": meta.get("rol") or pt["rol"] or "TRABAJADOR",
             "avatar": meta.get("avatar") or "vaquero_clasico",
-            "lat": float(pt["lat"]),
-            "lon": float(pt["lon"]),
+            "lat": lat_u,
+            "lon": lon_u,
             "precision_m": round(float(pt["precision_m"] or 0), 1),
-            "potrero_actual": pt["potrero_nombre"] or "Área de la Finca",
+            "potrero_actual": pt["potrero_nombre"] or ("Área de la Finca" if en_finca else "Fuera de la Finca"),
+            "en_finca": en_finca,
+            "dist_finca_km": round(dist_finca_km, 1),
             "fecha": pt["fecha"],
             "hora": pt["hora"],
             "minutos_hace": minutos_hace,

@@ -2074,6 +2074,37 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
 }
 
+.mapa-tooltip-potrero {
+  background: rgba(15, 23, 42, 0.85) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4) !important;
+  pointer-events: none !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+}
+.mapa-tooltip-potrero::before {
+  display: none !important;
+}
+
+@keyframes userPulseBlue {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(2, 136, 209, 0.8); }
+  70% { transform: scale(1.2); box-shadow: 0 0 0 14px rgba(2, 136, 209, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(2, 136, 209, 0); }
+}
+
+.self-pulse-dot {
+  width: 14px;
+  height: 14px;
+  background: #0288d1;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  animation: userPulseBlue 1.8s infinite;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Tarjetas de Eficiencia Económica (Lechería & Carne)                        */
 /* -------------------------------------------------------------------------- */

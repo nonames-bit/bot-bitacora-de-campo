@@ -2183,14 +2183,17 @@ class Database:
 
             # 1 grado aprox 111.000 metros en el ecuador
             dist_metros = dist_min_grados * 111320.0
-            if candidato_cercano and dist_metros <= 150.0:
+            if candidato_cercano and dist_metros <= 650.0:
+                nom = candidato_cercano.get("nombre") or candidato_cercano.get("codigo") or f"Potrero {candidato_cercano['id']}"
+                if dist_metros > 120.0:
+                    nom = f"Cerca a {nom} (Instalaciones)"
                 return {
                     "id": candidato_cercano["id"],
-                    "nombre": candidato_cercano.get("nombre") or candidato_cercano.get("codigo") or f"Potrero {candidato_cercano['id']}",
+                    "nombre": nom,
                     "codigo": candidato_cercano.get("codigo"),
                     "area_has": candidato_cercano.get("area_has"),
                     "distancia_m": round(dist_metros, 1),
-                    "dentro": False,
+                    "dentro": dist_metros <= 25.0,
                 }
         except Exception as e:
             logger.warning("Fallo al evaluar WKT con shapely en detectar_potrero_gps: %s", e)
@@ -2210,10 +2213,13 @@ class Database:
                 min_dist_m = d_m
                 candidato = dp
 
-        if candidato and min_dist_m <= 300.0:
+        if candidato and min_dist_m <= 850.0:
+            nom = candidato.get("nombre") or candidato.get("codigo") or f"Potrero {candidato['id']}"
+            if min_dist_m > 150.0:
+                nom = f"Cerca a {nom} (Instalaciones)"
             return {
                 "id": candidato["id"],
-                "nombre": candidato.get("nombre") or candidato.get("codigo") or f"Potrero {candidato['id']}",
+                "nombre": nom,
                 "codigo": candidato["codigo"],
                 "area_has": candidato["area_has"],
                 "distancia_m": round(min_dist_m, 1),
@@ -2292,8 +2298,19 @@ class Database:
 
         det = self.detectar_potrero_gps(lat_f, lon_f)
         if not det:
-            logger.info("Telemetría GPS descartada: coordenadas (%.6f, %.6f) fuera del perímetro de la finca.", lat_f, lon_f)
-            return None
+            c_finca = self.query_one("SELECT AVG(centroide_lat) as clat, AVG(centroide_lon) as clon FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+            if c_finca and c_finca["clat"] is not None and c_finca["clon"] is not None:
+                d_c = (((lat_f - float(c_finca["clat"])) ** 2 + (lon_f - float(c_finca["clon"])) ** 2) ** 0.5) * 111320.0
+                if d_c <= 3500.0:
+                    det = {
+                        "id": None,
+                        "nombre": "Casa / Corrales / Finca",
+                        "distancia_m": round(d_c, 1),
+                        "dentro": False,
+                    }
+            if not det:
+                logger.info("Telemetría GPS descartada: coordenadas (%.6f, %.6f) fuera del perímetro de la finca.", lat_f, lon_f)
+                return None
 
         pot_id = det["id"]
         pot_nom = det["nombre"]

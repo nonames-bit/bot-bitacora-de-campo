@@ -2654,14 +2654,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
         db_tele = _db(db_path)
         try:
-            det = db_tele.detectar_potrero_gps(lat, lon)
-            if not det:
-                return jsonify({
-                    "ok": True,
-                    "ignorado": True,
-                    "motivo": "Ubicación fuera del área de la finca (no se registra telemetría)",
-                    "potrero": None
-                })
             t_id = db_tele.registrar_telemetria_gps(
                 user_id=uid,
                 usuario_nombre=nombre,
@@ -2671,6 +2663,14 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 precision_m=acc_f,
                 evento_origen=evento,
             )
+            if not t_id:
+                return jsonify({
+                    "ok": True,
+                    "ignorado": True,
+                    "motivo": "Ubicación fuera del área de la finca (no se registra telemetría)",
+                    "potrero": None
+                })
+            det = db_tele.detectar_potrero_gps(lat, lon) or {"nombre": "Casa / Corrales / Finca", "dentro": False}
             return jsonify({"ok": True, "telemetria_id": t_id, "potrero": det})
         finally:
             db_tele.close()
