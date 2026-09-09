@@ -390,6 +390,19 @@ CREATE INDEX IF NOT EXISTS idx_finanzas_fecha ON finanzas(fecha);
 CREATE INDEX IF NOT EXISTS idx_finanzas_tipo ON finanzas(tipo);
 CREATE INDEX IF NOT EXISTS idx_finanzas_categoria ON finanzas(categoria);
 CREATE INDEX IF NOT EXISTS idx_finanzas_potrero ON finanzas(potrero_id);
+
+-- Suscripciones para notificaciones Web Push de la PWA
+CREATE TABLE IF NOT EXISTS push_suscripciones (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT,
+    endpoint TEXT UNIQUE,
+    p256dh TEXT,
+    auth TEXT,
+    creado_en TEXT,
+    ultimo_uso TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_user ON push_suscripciones(user_id);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -400,7 +413,7 @@ TABLAS = [
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
-    "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia",
+    "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
 ]
 
 

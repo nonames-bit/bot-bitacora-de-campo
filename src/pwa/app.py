@@ -2691,6 +2691,79 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         finally:
             db_tele.close()
 
+    @app.get("/api/mapa/datos")
+    def api_mapa_datos():
+        """Retorna GeoJSON de potreros, vigor NDVI/SAR, ocupación y operarios en vivo."""
+        db_map = _db(db_path)
+        try:
+            try:
+                from ..engine.mapa_data import datos_mapa_finca
+            except (ImportError, ValueError):
+                from src.engine.mapa_data import datos_mapa_finca
+            res = datos_mapa_finca(db_map)
+            res["rol"] = _rol_actual()
+            return jsonify(res)
+        finally:
+            db_map.close()
+
+    @app.post("/api/push/suscribir")
+    def api_push_suscribir():
+        """Registra una suscripción de navegador para notificaciones Web Push."""
+        datos = request.get_json(silent=True) or {}
+        endpoint = str(datos.get("endpoint") or "").strip()
+        if not endpoint:
+            return jsonify({"ok": False, "error": "Endpoint requerido."}), 400
+        keys = datos.get("keys") or {}
+        p256dh = str(keys.get("p256dh") or "").strip() or None
+        auth_key = str(keys.get("auth") or "").strip() or None
+        uid = session.get("user_id")
+
+        db_p = _db(db_path)
+        try:
+            sid = db_p.guardar_push_suscripcion(endpoint, user_id=uid, p256dh=p256dh, auth=auth_key)
+            return jsonify({"ok": True, "suscripcion_id": sid})
+        finally:
+            db_p.close()
+
+    @app.post("/api/push/desuscribir")
+    def api_push_desuscribir():
+        """Elimina una suscripción de notificaciones Web Push."""
+        datos = request.get_json(silent=True) or {}
+        endpoint = str(datos.get("endpoint") or "").strip()
+        if not endpoint:
+            return jsonify({"ok": False, "error": "Endpoint requerido."}), 400
+        db_p = _db(db_path)
+        try:
+            ok = db_p.eliminar_push_suscripcion(endpoint)
+            return jsonify({"ok": ok})
+        finally:
+            db_p.close()
+
+    @app.get("/api/push/alertas")
+    def api_push_alertas():
+        """Retorna alertas activas de alta prioridad para notificación en campo."""
+        db_p = _db(db_path)
+        try:
+            alertas = db_p.alertas_pendientes_push()
+            return jsonify({"ok": True, "alertas": alertas, "total": len(alertas)})
+        finally:
+            db_p.close()
+
+    @app.post("/api/push/probar")
+    def api_push_probar():
+        """Genera un aviso de prueba para verificar el funcionamiento en el celular."""
+        return jsonify({
+            "ok": True,
+            "notificacion": {
+                "titulo": "🔔 Notificación Bitácora JA",
+                "cuerpo": "¡Prueba exitosa! Las notificaciones nativas de campo están activas en tu celular.",
+                "tag": "prueba-pwa",
+                "icono": "/static/icon-192.png",
+                "url": "/",
+            }
+        })
+
+
 
     @app.get("/api/ficha/<tag>/qr.pdf")
     @app.get("/api/ficha/<tag>/pdf")

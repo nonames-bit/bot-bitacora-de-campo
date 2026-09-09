@@ -66,12 +66,13 @@
 - **Notas:** La mejor inversión física de la lista. El pluviómetro manual sigue siendo respaldo.
 
 ### 6. Sentinel-1 (radar SAR) — monitoreo que funciona con nubes
-- **Estado:** 💭 Idea
+- **Estado:** ✔️ Completada (2026-09-08) — bot y PWA
 - **Impacto:** 🟢 Alto — resuelve de raíz el problema real: en época de lluvias el NDVI óptico se queda semanas sin imagen despejada
 - **Costo:** 💲 (gratis vía Google Earth Engine, que ya se usa)
 - **Esfuerzo:** M
 - **Descripción:** El radar SAR de Sentinel-1 penetra las nubes → biomasa/humedad de suelo estimada **sin importar el cielo**. Complementa Sentinel-2: cuando no hay imagen óptica, el radar da continuidad temporal.
-- **Dependencias:** Misma infraestructura Earth Engine actual (`src/gis/earth_engine_ndvi.py`).
+- **Dependencias:** Misma infraestructura Earth Engine actual (`src/gis/earth_engine_ndvi.py` y `src/gis/earth_engine_sar.py`).
+- **Notas:** Implementado en `src/gis/earth_engine_sar.py` con índice RVI dual-pol y estimación de humedad dieléctrica. Fusión multisensor automatizada en modo auto.
 
 ### 7. Sensores de humedad de suelo
 - **Estado:** 💭 Idea
@@ -132,16 +133,47 @@
 
 ---
 
+## 🧬 Zootecnia, Genética & Gestión Comercial
+
+### 15. Simulador de Cruzamiento y Consanguinidad 3G en PWA (Fase 5.2)
+- **Estado:** 💭 Pendiente
+- **Impacto:** 🟢 Alto — previene depresión por endogamia antes de aplicar la pajuela en campo
+- **Costo:** 💲 Solo software
+- **Esfuerzo:** S-M
+- **Descripción:** Selector táctil en PWA donde el usuario elige la vaca receptora y el toro/pajuela del termo. El sistema calcula al vuelo el coeficiente de parentesco/consanguinidad de Wright ($F$) en 3 generaciones (3G) y muestra un semáforo (Verde < 3.12%, Amarillo 3.12-6.25%, Rojo > 6.25% con ancestros comunes destacados).
+- **Dependencias:** Tablas `genealogia`, `animales`, `pajuelas_inventario` existentes.
+
+### 16. Estimación de Condición Corporal (BCS) asistida por Visión IA (Fase 8.1)
+- **Estado:** 💭 Pendiente
+- **Impacto:** 🟡 Medio-Alto — monitoreo nutricional no invasivo y balance energético de vacas
+- **Costo:** 💲 Software (Gemini Vision API)
+- **Esfuerzo:** M
+- **Descripción:** Capturar o subir fotografía dorsal/isquion de la vaca en la PWA. Gemini Vision evalúa la prominencia ósea de espina dorsal, costillas, ganchos e isquiones para estimar la condición corporal en escala zootécnica 1.0 a 5.0 (con precisión de 0.25).
+- **Dependencias:** Gemini Vision / OpenAI vision, tabla `condicion_corporal`.
+
+### 17. Catálogo Digital de Venta de Ganado (Modo Feria / WhatsApp)
+- **Estado:** 💭 Pendiente
+- **Impacto:** 🟢 Alto — herramienta comercial inmediata para negociar lotes o reproductores
+- **Costo:** 💲 Solo software
+- **Esfuerzo:** S
+- **Descripción:** Selección de animales para la venta en la PWA con generación en 1 clic de ficha publicitaria web o PDF de presentación para compradores: fotos, hierro/fierro, peso actual, GMD, árbol genealógico de padres/abuelos y estado reproductivo.
+- **Dependencias:** Fichas zootécnicas existentes, fotos y reportes PDF.
+
+---
+
 ## 🗂️ Prioridad sugerida (orden de ejecución recomendado)
 
 | Orden | Idea | Por qué primero |
 |---|---|---|
-| 1️⃣ | #1 Pronóstico al despacho | Rápido, gratis, valor diario inmediato |
-| 2️⃣ | #2 Alerta de sequía SPI | Reusa datos CHIRPS que ya se descargan |
-| 3️⃣ | #4 Rotación automática recomendada | Convierte datos existentes en decisiones |
-| 4️⃣ | #5 Estación meteorológica | Mejor inversión física: clima real de la finca |
-| 5️⃣ | #6 Sentinel-1 radar | Resuelve el problema de las nubes, gratis |
-| 6️⃣ | #3 Balance forrajero predictivo | Depende de #1; cierra el círculo forrajero |
+| 1️⃣ | #1 Pronóstico al despacho | ✔️ Completada: rápido, gratis, valor diario inmediato |
+| 2️⃣ | #2 Alerta de sequía SPI | ✔️ Completada: reusa datos CHIRPS que ya se descargan |
+| 3️⃣ | #6 Sentinel-1 radar SAR | ✔️ Completada: resuelve monitoreo con cielo nublado |
+| 4️⃣ | **Mapa Satelital con usuarios en vivo** | 🚧 En progreso: visualización espacial táctil de los 20 potreros y operarios |
+| 5️⃣ | **Costo/kg Carne y Margen/L Leche** | 🚧 En progreso: control económico dinámico en Finanzas |
+| 6️⃣ | **Notificaciones Web Push PWA** | 🚧 En progreso: alertas nativas en celulares de campo |
+| 7️⃣ | #15 Simulador Cruzamiento 3G | 💭 Pendiente: seguridad genética al inseminar |
+| 8️⃣ | #17 Catálogo Venta Ganado | 💭 Pendiente: valor comercial directo |
+| 9️⃣ | #16 BCS Corporal con IA | 💭 Pendiente: monitoreo nutricional |
 
 ---
 
@@ -149,7 +181,9 @@
 
 | Fecha | Decisión |
 |---|---|
-| 2026-09-07 | Documento creado. Ideas de monitoreo potreros/clima capturadas. NDVI cambiado a job cada 3 días (commit `1375fe4`). |
+| 2026-09-07 | Documento creado. Ideas de monitoreo potreros/clima capturadas. NDVI cambiado a job cada 3 días. |
+| 2026-09-08 | Sentinel-1 SAR implementado y en producción (Fusión multisensor S1+S2). |
+| 2026-09-08 | Aprobadas para desarrollo inmediato: 1) Mapa Satelital Interactivo con usuarios en vivo en PWA, 2) Indicadores económicos dinámicos (Costo/kg y Margen/L), 3) Notificaciones Web Push en PWA. Las ideas de Simulador 3G (#15), BCS corporal (#16) y Catálogo de venta (#17) quedan registradas como pendientes. |
 
 ---
 

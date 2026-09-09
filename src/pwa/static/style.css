@@ -1930,3 +1930,232 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
     grid-template-columns: 1fr;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Mapa Satelital Interactivo & Operarios en Vivo                             */
+/* -------------------------------------------------------------------------- */
+.mapa-wrap {
+  position: relative;
+  width: 100%;
+  margin-top: 10px;
+}
+
+#mapa-finca {
+  width: 100%;
+  height: 68vh;
+  min-height: 480px;
+  border-radius: 12px;
+  border: 1px solid var(--borde);
+  z-index: 10;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+.mapa-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+
+.mapa-grupos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapa-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--texto);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+
+.mapa-btn:hover {
+  background: var(--fondo);
+  border-color: var(--verde-marca);
+}
+
+.mapa-btn.act {
+  background: var(--verde-marca);
+  color: #fff;
+  border-color: var(--verde-marca);
+}
+
+.mapa-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 11.5px;
+  margin-top: 8px;
+}
+
+.mapa-leyenda-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.leyenda-muestra {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.2);
+  display: inline-block;
+}
+
+/* Pines de operarios en el mapa */
+.user-marker-pin {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+.user-marker-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #1b4d3e;
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  white-space: nowrap;
+  border: 1.5px solid #fff;
+}
+
+.user-marker-badge.owner { background: #c0392b; }
+.user-marker-badge.admin { background: #d35400; }
+.user-marker-badge.trabajador { background: #27ae60; }
+
+.user-pulse-dot {
+  width: 12px;
+  height: 12px;
+  background: #27ae60;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  margin-top: 3px;
+  box-shadow: 0 0 0 rgba(39, 174, 96, 0.4);
+  animation: pulseMarker 1.8s infinite;
+}
+
+.user-pulse-dot.offline {
+  background: #7f8c8d;
+  animation: none;
+}
+
+@keyframes pulseMarker {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+  70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tarjetas de Eficiencia Económica (Lechería & Carne)                        */
+/* -------------------------------------------------------------------------- */
+.grid-economia {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  margin: 14px 0;
+}
+
+.card-economia {
+  background: var(--superficie);
+  border: 1.5px solid var(--borde);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.card-economia-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--borde);
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+
+.card-economia-titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.kpis-economia {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.kpi-eco-box {
+  background: var(--fondo);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--borde);
+}
+
+.kpi-eco-val {
+  font-size: 18px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  color: var(--texto);
+}
+
+.kpi-eco-etiq {
+  font-size: 11px;
+  color: var(--texto-suave);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.progreso-margen-wrap {
+  margin-top: 10px;
+}
+
+.progreso-margen-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--borde);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.progreso-margen-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--verde-marca);
+  transition: width .3s ease;
+}
+

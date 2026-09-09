@@ -1690,3 +1690,50 @@ def test_api_satelite_actualizar_flujo_completo(client, db_file, monkeypatch):
     assert "Radar SAR Sentinel-1" in res["sensor_principal"]
 
 
+def test_api_mapa_datos_devuelve_geojson_y_finca(client):
+    r = client.get("/api/mapa/datos")
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["ok"] is True
+    assert "finca" in res
+    assert "potreros_geojson" in res
+    assert res["potreros_geojson"]["type"] == "FeatureCollection"
+    assert len(res["potreros_geojson"]["features"]) >= 1
+    nombres = [f["properties"]["nombre"] for f in res["potreros_geojson"]["features"]]
+    assert "Guayabal" in nombres
+    p0 = next(f["properties"] for f in res["potreros_geojson"]["features"] if f["properties"]["nombre"] == "Guayabal")
+    assert "color_voisin" in p0
+    assert "color_ndvi" in p0
+
+
+def test_api_push_suscribir_alertas_y_desuscribir(client):
+    # Suscribir
+    r_sub = client.post("/api/push/suscribir", json={
+        "endpoint": "https://push.test.com/token123",
+        "keys": {"p256dh": "key1", "auth": "auth1"}
+    })
+    assert r_sub.status_code == 200
+    assert r_sub.get_json()["ok"] is True
+
+    # Consultar alertas push
+    r_alt = client.get("/api/push/alertas")
+    assert r_alt.status_code == 200
+    res_alt = r_alt.get_json()
+    assert res_alt["ok"] is True
+    assert "alertas" in res_alt
+
+    # Probar endpoint de prueba
+    r_prb = client.post("/api/push/probar")
+    assert r_prb.status_code == 200
+    assert r_prb.get_json()["ok"] is True
+    assert "notificacion" in r_prb.get_json()
+
+    # Desuscribir
+    r_del = client.post("/api/push/desuscribir", json={
+        "endpoint": "https://push.test.com/token123"
+    })
+    assert r_del.status_code == 200
+    assert r_del.get_json()["ok"] is True
+
+
+

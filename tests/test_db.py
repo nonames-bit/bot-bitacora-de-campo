@@ -864,3 +864,36 @@ def test_registrar_y_obtener_ultimos_spi_sequia(db):
     assert por_ventana[60]["spi_valor"] == 0.2
 
 
+def test_kpis_financieros_margenes_unitarios_dinamicos(db):
+    # Registrar lechería
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=200.0, animal_tag="47")
+    db.registrar_finanza(fecha="2026-09-01", tipo="INGRESO", categoria="VENTA_LECHE", monto=400000, litros=200.0)
+    db.registrar_finanza(fecha="2026-09-02", tipo="EGRESO", categoria="INSUMO", monto=100000)
+
+    # Registrar venta de carne
+    db.registrar_animal("T1", sexo="Macho", estado="VENDIDO")
+    db.registrar_pesaje(animal_tag="T1", fecha="2026-08-25", peso_kg=400.0)
+    db.registrar_movimiento("T1", fecha="2026-09-03", tipo_movimiento="VENTA", precio=3200000)
+
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+
+    # Verificaciones de leche
+    assert k["litros_producidos"] == 200.0
+    assert k["ingresos_leche"] == 400000.0
+    assert k["precio_promedio_litro_leche"] == 2000.0
+    assert k["costo_por_litro_leche"] == 500.0
+    assert k["margen_por_litro_leche"] == 1500.0
+    assert k["margen_leche_pct"] == 75.0
+
+    # Verificaciones de carne
+    assert k["ingresos_carne"] == 3200000.0
+    assert k["animales_vendidos"] == 1
+    assert k["kg_carne_estimados"] == 400.0
+    assert k["precio_promedio_kg_carne"] == 8000.0  # 3200000 / 400
+    assert k["costo_por_kg_carne"] == 250.0  # 100000 / 400
+    assert k["margen_por_kg_carne"] == 7750.0  # 8000 - 250
+    assert k["margen_carne_pct"] == 96.9
+
+
+

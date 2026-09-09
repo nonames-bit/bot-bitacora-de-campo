@@ -311,8 +311,18 @@
       ], "Sin tratamientos registrados.");
     return h;
   }
+  // Modo Simple (default) vs Técnico para SPI y Monitoreo Satelital en Pasturas:
+  // los números crudos (NDVI, RVI, SPI, kg/ha) son ilegibles para un ganadero
+  // que no es agrónomo -- Simple muestra solo el semáforo/palabra clave,
+  // Técnico muestra todo el detalle igual que antes. Se recuerda por navegador.
+  function modoPasturasEsSimple() {
+    return localStorage.getItem("modoPasturasSimple") !== "tecnico";
+  }
   function renderPasturas(d) {
-    var h = "<h3>" + icon("grass") + "Pasturas (Voisin)</h3>" + erroresHtml(d);
+    var simple = modoPasturasEsSimple();
+    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px;'>"
+      + (simple ? "🔬 Ver técnico" : "😊 Ver simple") + "</button>";
+    var h = "<h3>" + icon("grass") + "Pasturas (Voisin)" + btnModo + "</h3>" + erroresHtml(d);
 
     var pron = d.pronostico;
     h += "<h4>" + icon("rain") + "Pronóstico del clima (7 días)</h4>";
@@ -343,14 +353,23 @@
       }
     }
 
-    h += "<h4>" + icon("alert") + "Alerta Temprana de Sequía (SPI)</h4>";
+    h += "<h4>" + icon("alert") + (simple ? "¿Cómo viene la lluvia?" : "Alerta Temprana de Sequía (SPI)") + "</h4>";
     if (!d.spi_sequia || !d.spi_sequia.length) {
       h += vacio("Sin cálculo de SPI todavía (se genera en la corrida semanal del job de lluvia satelital).");
     } else {
+      var ETIQUETAS_VENTANA_SPI = { 30: "Último mes", 60: "Últimos 2 meses", 90: "Últimos 3 meses" };
       h += "<div style='display:flex; gap:10px; flex-wrap:wrap;'>";
       d.spi_sequia.forEach(function (s) {
         var spi = s.spi_valor;
         var color = spi == null ? "gris" : spi <= -1.5 ? "rojo" : spi <= -1.0 ? "ambar" : spi >= 1.0 ? "verde" : "gris";
+        if (simple) {
+          h += "<div class='card' style='flex:1; min-width:130px; padding:14px; text-align:center;'>"
+            + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>" + esc(ETIQUETAS_VENTANA_SPI[s.dias_ventana] || (s.dias_ventana + " días")) + "</div>"
+            + "<span class='chip " + color + "' style='font-size:14px; font-weight:700; padding:6px 14px; margin:8px 0; display:inline-block;'>" + esc(s.clasificacion || "Sin datos") + "</span>"
+            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:4px;'>" + (s.mm_actual != null ? esc(s.mm_actual) + " mm de lluvia" : "—") + "</div>"
+            + "</div>";
+          return;
+        }
         h += "<div class='card' style='flex:1; min-width:130px; padding:12px; text-align:center;'>"
           + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>SPI " + esc(s.dias_ventana) + " días</div>"
           + "<div style='font-size:22px; font-weight:700; margin:4px 0;'>" + (spi != null ? esc(spi) : "—") + "</div>"
@@ -359,7 +378,9 @@
           + "</div>";
       });
       h += "</div>";
-      h += "<p class='aviso' style='margin-top:8px;'>SPI: compara la lluvia acumulada actual contra el clima histórico de ~30 años de la zona (CHIRPS/Earth Engine). Valores por debajo de -1.0 indican sequía; por debajo de -1.5, sequía severa.</p>";
+      h += simple
+        ? "<p class='aviso' style='margin-top:8px;'>Compara la lluvia reciente contra lo normal para esta época del año en la finca (últimos ~30 años).</p>"
+        : "<p class='aviso' style='margin-top:8px;'>SPI: compara la lluvia acumulada actual contra el clima histórico de ~30 años de la zona (CHIRPS/Earth Engine). Valores por debajo de -1.0 indican sequía; por debajo de -1.5, sequía severa.</p>";
     }
 
     // Sección Satelital Todo Clima: Sentinel-1 SAR Radar + Sentinel-2 Óptico
@@ -367,34 +388,43 @@
     var tieneSat = sat.total_potreros > 0;
 
     var btnSyncSar = "<button type='button' class='tema-btn' id='btn-sync-satelite-sar' style='font-size:12px; padding:6px 12px; background:linear-gradient(135deg, #1e3c72, #2a5298); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
-      + icon("sparkles", 13) + "📡 Radar SAR (Todo Clima)</button>";
+      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (con nubes)" : "📡 Radar SAR (Todo Clima)") + "</button>";
     var btnSyncAuto = "<button type='button' class='tema-btn' id='btn-sync-satelite-auto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
-      + icon("sparkles", 13) + "⚡ Auto (S2 + S1)</button>";
+      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (rápido)" : "⚡ Auto (S2 + S1)") + "</button>";
 
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin:18px 0 10px;'>"
-      + "<h4 style='margin:0;'>" + icon("chartLine") + "Monitoreo Satelital (Radar SAR Sentinel-1 & Óptico S2)</h4>"
+      + "<h4 style='margin:0;'>" + icon("chartLine") + (simple ? "Estado del Pasto (satélite)" : "Monitoreo Satelital (Radar SAR Sentinel-1 & Óptico S2)") + "</h4>"
       + "<div style='display:flex; gap:6px;'>" + btnSyncSar + btnSyncAuto + "</div>"
       + "</div>";
 
     h += "<div id='satelite-status-box' style='display:none; margin:10px 0; padding:12px 16px; border-radius:8px; font-size:13px; transition:all 0.3s ease;'></div>";
 
     if (tieneSat) {
-      var ndviProm = sat.promedio_ndvi != null ? sat.promedio_ndvi : "—";
-      var chipNdvi = Number(ndviProm) >= 0.6 ? "verde" : Number(ndviProm) >= 0.4 ? "ambar" : "rojo";
-      h += "<div class='kpis'>"
-        + kpi("<span class='chip " + chipNdvi + "' style='font-size:14px;'><b>" + esc(ndviProm) + "</b></span>", "NDVI Promedio Finca")
-        + kpi(esc(sat.modo_activo || "Radar SAR"), "Sensor Principal")
-        + (sat.promedio_biomasa_kg_ha != null ? kpi(esc(Math.round(sat.promedio_biomasa_kg_ha).toLocaleString()) + " kg/ha", "Biomasa Promedio MS") : "")
-        + (sat.promedio_aforo_kg_m2 != null ? kpi(esc(sat.promedio_aforo_kg_m2) + " kg/m²", "Aforo Promedio MV") : "")
-        + kpi(esc(sat.cobertura_clima || "100% Todo Clima"), "Cobertura Climática", "ok")
-        + "</div>";
+      var ndviProm = sat.promedio_ndvi != null ? sat.promedio_ndvi : null;
+      var chipNdvi = ndviProm == null ? "gris" : Number(ndviProm) >= 0.6 ? "verde" : Number(ndviProm) >= 0.4 ? "ambar" : "rojo";
+      if (simple) {
+        var etiquetaEstado = ndviProm == null ? "Sin datos" : Number(ndviProm) >= 0.6 ? "Excelente" : Number(ndviProm) >= 0.4 ? "Regular" : "Bajo";
+        h += "<div class='kpis'>"
+          + kpi("<span class='chip " + chipNdvi + "' style='font-size:16px; padding:6px 14px;'><b>" + esc(etiquetaEstado) + "</b></span>", "Estado general del pasto")
+          + "</div>";
+      } else {
+        h += "<div class='kpis'>"
+          + kpi("<span class='chip " + chipNdvi + "' style='font-size:14px;'><b>" + esc(ndviProm != null ? ndviProm : "—") + "</b></span>", "NDVI Promedio Finca")
+          + kpi(esc(sat.modo_activo || "Radar SAR"), "Sensor Principal")
+          + (sat.promedio_biomasa_kg_ha != null ? kpi(esc(Math.round(sat.promedio_biomasa_kg_ha).toLocaleString()) + " kg/ha", "Biomasa Promedio MS") : "")
+          + (sat.promedio_aforo_kg_m2 != null ? kpi(esc(sat.promedio_aforo_kg_m2) + " kg/m²", "Aforo Promedio MV") : "")
+          + kpi(esc(sat.cobertura_clima || "100% Todo Clima"), "Cobertura Climática", "ok")
+          + "</div>";
+      }
     }
 
-    h += "<div class='card' style='padding:10px 14px; margin-bottom:14px; background:rgba(30, 60, 114, 0.05); border-left:4px solid #2a5298;'>"
-      + "<div style='font-size:12.5px; line-height:1.45; color:var(--texto-color);'>"
-      + "<b>📡 Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
-      + "El radar SAR emite microondas que penetran nubes, lluvia y neblina, calculando el índice dual de vegetación (RVI) y biomasa estimada sin perder continuidad temporal."
-      + "</div></div>";
+    if (!simple) {
+      h += "<div class='card' style='padding:10px 14px; margin-bottom:14px; background:rgba(30, 60, 114, 0.05); border-left:4px solid #2a5298;'>"
+        + "<div style='font-size:12.5px; line-height:1.45; color:var(--texto-color);'>"
+        + "<b>📡 Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
+        + "El radar SAR emite microondas que penetran nubes, lluvia y neblina, calculando el índice dual de vegetación (RVI) y biomasa estimada sin perder continuidad temporal."
+        + "</div></div>";
+    }
 
     h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
     h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
@@ -410,37 +440,47 @@
       }).join("");
       h += "</table></div>";
     }
-    h += "<h4>" + icon("chartLine") + "Lecturas Satelitales Recientes por Potrero</h4>"
-      + tabla(d.ndvi_reciente, [
-        ["potrero", "Potrero"],
-        ["fuente", "Sensor / Modo", "text", function (v) {
-          var s = String(v || "");
-          if (s.indexOf("Sentinel-1") >= 0 || s.indexOf("SAR") >= 0 || s.indexOf("Radar") >= 0) {
-            return "<span class='chip azul' style='font-size:11px; font-weight:700;' title='" + esc(s) + "'>📡 Radar SAR (S1)</span>";
-          }
-          return "<span class='chip verde' style='font-size:11px;' title='" + esc(s) + "'>🛰️ Óptico (S2)</span>";
-        }],
-        ["fecha", "Fecha"],
-        ["ndvi_promedio", "NDVI / Proxy", "text", function (v) {
-          var n = Number(v);
-          var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
-          return "<span class='chip " + c + "'><b>" + esc(Number(v).toFixed(3)) + "</b></span>";
-        }],
-        ["biomasa_estimada_kg_ha", "Biomasa MS", "text", function (v) {
-          return v != null ? esc(Math.round(v).toLocaleString()) + " kg/ha" : "—";
-        }],
-        ["aforo_estimado_kg_m2", "Aforo MV", "text", function (v) {
-          return v != null ? esc(Number(v).toFixed(2)) + " kg/m²" : "—";
-        }],
-        ["cobertura_nubes_pct", "Condición", "text", function (v, row) {
-          var f = String(row && row.fuente || "");
-          if (f.indexOf("Sentinel-1") >= 0 || f.indexOf("SAR") >= 0) {
-            return "<span style='font-size:11.5px; color:#1e3c72; font-weight:600;'>🛡️ Penetra nubes</span>";
-          }
-          var n = Number(v) || 0;
-          return n > 0 ? "<span style='font-size:11.5px;'>☁️ " + esc(n.toFixed(0)) + "% nubes</span>" : "<span style='font-size:11.5px; color:#2e7d32;'>☀️ Despejado</span>";
-        }]
-      ], "Sin lecturas satelitales recientes.");
+    var columnasNdvi = simple ? [
+      ["potrero", "Potrero"],
+      ["ndvi_promedio", "Estado", "text", function (v) {
+        var n = Number(v);
+        var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
+        var etq = n >= 0.6 ? "Excelente" : n >= 0.4 ? "Regular" : n > 0 ? "Bajo" : "Sin datos";
+        return "<span class='chip " + c + "'><b>" + esc(etq) + "</b></span>";
+      }],
+      ["fecha", "Fecha"],
+    ] : [
+      ["potrero", "Potrero"],
+      ["fuente", "Sensor / Modo", "text", function (v) {
+        var s = String(v || "");
+        if (s.indexOf("Sentinel-1") >= 0 || s.indexOf("SAR") >= 0 || s.indexOf("Radar") >= 0) {
+          return "<span class='chip azul' style='font-size:11px; font-weight:700;' title='" + esc(s) + "'>📡 Radar SAR (S1)</span>";
+        }
+        return "<span class='chip verde' style='font-size:11px;' title='" + esc(s) + "'>🛰️ Óptico (S2)</span>";
+      }],
+      ["fecha", "Fecha"],
+      ["ndvi_promedio", "NDVI / Proxy", "text", function (v) {
+        var n = Number(v);
+        var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
+        return "<span class='chip " + c + "'><b>" + esc(Number(v).toFixed(3)) + "</b></span>";
+      }],
+      ["biomasa_estimada_kg_ha", "Biomasa MS", "text", function (v) {
+        return v != null ? esc(Math.round(v).toLocaleString()) + " kg/ha" : "—";
+      }],
+      ["aforo_estimado_kg_m2", "Aforo MV", "text", function (v) {
+        return v != null ? esc(Number(v).toFixed(2)) + " kg/m²" : "—";
+      }],
+      ["cobertura_nubes_pct", "Condición", "text", function (v, row) {
+        var f = String(row && row.fuente || "");
+        if (f.indexOf("Sentinel-1") >= 0 || f.indexOf("SAR") >= 0) {
+          return "<span style='font-size:11.5px; color:#1e3c72; font-weight:600;'>🛡️ Penetra nubes</span>";
+        }
+        var n = Number(v) || 0;
+        return n > 0 ? "<span style='font-size:11.5px;'>☁️ " + esc(n.toFixed(0)) + "% nubes</span>" : "<span style='font-size:11.5px; color:#2e7d32;'>☀️ Despejado</span>";
+      }]
+    ];
+    h += "<h4>" + icon("chartLine") + (simple ? "Estado Reciente por Potrero" : "Lecturas Satelitales Recientes por Potrero") + "</h4>"
+      + tabla(d.ndvi_reciente, columnasNdvi, "Sin lecturas satelitales recientes.");
     h += "<h4>" + icon("rain") + "Pluviómetro Local Reciente</h4>"
       + tabla(d.pluviometria_reciente, [
         ["fecha", "Fecha"],
@@ -463,6 +503,13 @@
   }
 
   function bindPasturas() {
+    var btnToggleModoPasturas = document.getElementById("btn-toggle-modo-pasturas");
+    if (btnToggleModoPasturas) {
+      btnToggleModoPasturas.addEventListener("click", function () {
+        localStorage.setItem("modoPasturasSimple", modoPasturasEsSimple() ? "tecnico" : "simple");
+        cargar(true);
+      });
+    }
     function ejecutarSyncSatelite(modo) {
       var btnSar = document.getElementById("btn-sync-satelite-sar");
       var btnAuto = document.getElementById("btn-sync-satelite-auto");
@@ -636,12 +683,66 @@
       + "</div>";
 
     var kf = d.kpis || {};
-    h += "<h4>" + icon("chartLine") + "Indicadores de rentabilidad</h4>";
+    h += "<h4>" + icon("chartLine") + "Indicadores de rentabilidad y eficiencia unitaria</h4>";
+
+    // Tarjetas de Eficiencia Lechería y Carne
+    h += "<div class='grid-economia'>";
+
+    // Card 1: Lechería
+    var prLeche = kf.precio_promedio_litro_leche;
+    var costLeche = kf.costo_por_litro_leche;
+    var mgLeche = kf.margen_por_litro_leche;
+    var mgLechePct = kf.margen_leche_pct;
+    var chipMgLeche = mgLeche != null
+      ? ("<span class='chip " + (mgLeche >= 0 ? "verde" : "rojo") + "' style='font-weight:700;'>" + (mgLeche >= 0 ? "+" : "") + fmtMoneda(mgLeche) + "/L (" + mgLechePct + "%)</span>")
+      : "<span class='chip gris'>Sin ventas registradas</span>";
+
+    h += "<div class='card-economia'>"
+      + "<div class='card-economia-header'>"
+      + "<div class='card-economia-titulo'>" + icon("milk", 20) + "Línea de Producción: Leche</div>"
+      + chipMgLeche
+      + "</div>"
+      + "<div class='kpis-economia'>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val'>" + (kf.litros_producidos != null ? kf.litros_producidos.toLocaleString("es-CO") : "0") + " L</div><div class='kpi-eco-etiq'>Volumen Producido</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val'>" + (prLeche != null ? fmtMoneda(prLeche) : "—") + "</div><div class='kpi-eco-etiq'>Precio Venta / Litro</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val' style='color:var(--rojo-alerta);'>" + (costLeche != null ? fmtMoneda(costLeche) : "—") + "</div><div class='kpi-eco-etiq'>Costo Operativo / L</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val' style='color:" + (mgLeche >= 0 ? "var(--verde-marca)" : "var(--rojo-alerta)") + ";'>" + (mgLeche != null ? fmtMoneda(mgLeche) : "—") + "</div><div class='kpi-eco-etiq'>Margen Neto / Litro</div></div>"
+      + "</div>"
+      + "<div class='progreso-margen-wrap'><div style='display:flex; justify-content:space-between; font-size:11.5px;'><span>Ingresos Leche: <b>" + fmtMoneda(kf.ingresos_leche || 0) + "</b></span><span>Rentabilidad: <b>" + (mgLechePct != null ? mgLechePct + "%" : "—") + "</b></span></div>"
+      + "<div class='progreso-margen-bar'><div class='progreso-margen-fill' style='width:" + Math.min(100, Math.max(0, mgLechePct || 0)) + "%; background:" + (mgLeche >= 0 ? "var(--verde-marca)" : "var(--rojo-alerta)") + ";'></div></div></div>"
+      + "</div>";
+
+    // Card 2: Carne
+    var prCarne = kf.precio_promedio_kg_carne;
+    var costCarne = kf.costo_por_kg_carne;
+    var mgCarne = kf.margen_por_kg_carne;
+    var mgCarnePct = kf.margen_carne_pct;
+    var chipMgCarne = mgCarne != null
+      ? ("<span class='chip " + (mgCarne >= 0 ? "verde" : "rojo") + "' style='font-weight:700;'>" + (mgCarne >= 0 ? "+" : "") + fmtMoneda(mgCarne) + "/kg (" + mgCarnePct + "%)</span>")
+      : "<span class='chip gris'>Sin ventas con peso</span>";
+
+    h += "<div class='card-economia'>"
+      + "<div class='card-economia-header'>"
+      + "<div class='card-economia-titulo'>" + icon("scale", 20) + "Línea de Ganado: Carne &amp; Levante</div>"
+      + chipMgCarne
+      + "</div>"
+      + "<div class='kpis-economia'>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val'>" + (kf.animales_vendidos != null ? kf.animales_vendidos : 0) + " cab (" + (kf.kg_carne_estimados != null ? Math.round(kf.kg_carne_estimados) : 0) + " kg)</div><div class='kpi-eco-etiq'>Ventas Realizadas</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val'>" + (prCarne != null ? fmtMoneda(prCarne) : (kf.precio_promedio_animal ? fmtMoneda(kf.precio_promedio_animal) + "/cab" : "—")) + "</div><div class='kpi-eco-etiq'>Precio Venta / kg</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val' style='color:var(--rojo-alerta);'>" + (costCarne != null ? fmtMoneda(costCarne) : "—") + "</div><div class='kpi-eco-etiq'>Costo Producción / kg</div></div>"
+      + "<div class='kpi-eco-box'><div class='kpi-eco-val' style='color:" + (mgCarne >= 0 ? "var(--verde-marca)" : "var(--rojo-alerta)") + ";'>" + (mgCarne != null ? fmtMoneda(mgCarne) : "—") + "</div><div class='kpi-eco-etiq'>Margen Neto / kg</div></div>"
+      + "</div>"
+      + "<div class='progreso-margen-wrap'><div style='display:flex; justify-content:space-between; font-size:11.5px;'><span>Ingresos Venta Ganado: <b>" + fmtMoneda(kf.ingresos_carne || 0) + "</b></span><span>Rentabilidad: <b>" + (mgCarnePct != null ? mgCarnePct + "%" : "—") + "</b></span></div>"
+      + "<div class='progreso-margen-bar'><div class='progreso-margen-fill' style='width:" + Math.min(100, Math.max(0, mgCarnePct || 0)) + "%; background:" + (mgCarne >= 0 ? "var(--verde-marca)" : "var(--rojo-alerta)") + ";'></div></div></div>"
+      + "</div>";
+
+    h += "</div>";
+
+    // Resumen Global de Rentabilidad
     h += "<div class='kpis'>"
-      + kpi(kf.margen_utilidad_pct != null ? kf.margen_utilidad_pct + "%" : "—", "Margen de utilidad", kf.margen_utilidad_pct != null && kf.margen_utilidad_pct < 0 ? "alerta" : "ok")
-      + kpi(kf.costo_por_litro_leche != null ? fmtMoneda(kf.costo_por_litro_leche) : "—", "Costo por litro de leche (" + (kf.litros_producidos != null ? kf.litros_producidos : 0) + " L)")
-      + kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)")
-      + kpi(kf.costo_por_kg_carne != null ? fmtMoneda(kf.costo_por_kg_carne) : "—", "Costo por kg de carne (estimado)")
+      + kpi(kf.margen_utilidad_pct != null ? kf.margen_utilidad_pct + "%" : "—", "Margen global de utilidad", kf.margen_utilidad_pct != null && kf.margen_utilidad_pct < 0 ? "alerta" : "ok")
+      + kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza hato (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)")
+      + kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta")
       + "</div>";
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
       h += "<p class='aviso' style='margin-top:-6px;'>⚠️ Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
@@ -1091,7 +1192,196 @@
       });
       h += "</table></div>";
     }
+
+    // Panel de Notificaciones Web Push (Alertas Sanitarias, Celos AM-PM, Voisin, Nitrógeno)
+    h += "<div class='card' style='margin-top:16px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;'>"
+      + "<div style='flex:1; min-width:240px;'>"
+      + "<h4 style='margin:0 0 4px 0; display:flex; align-items:center; gap:6px;'>" + icon("bell", 16) + "Notificaciones Push en este Celular / Dispositivo</h4>"
+      + "<p id='push-estado-txt' style='margin:0; font-size:12.5px; color:var(--texto-suave);'>Consultando permisos del dispositivo...</p>"
+      + "</div>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<button type='button' id='btn-activar-push' class='tema-btn' style='padding:6px 12px; font-size:12px;'>" + icon("bell", 14) + "Activar Alertas</button>"
+      + "<button type='button' id='btn-probar-push' class='tema-btn' style='padding:6px 12px; font-size:12px; background:var(--bg-suave); color:var(--texto-base);'>" + icon("send", 14) + "Probar Notificación</button>"
+      + "</div>"
+      + "</div>"
+      + "</div>";
+
     return h;
+  }
+
+  /* ---------- Notificaciones Nativas & Web Push ---------- */
+  function mostrarNotificacionNativa(titulo, opts) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    opts = opts || {};
+    opts.icon = opts.icon || "/static/icon-192.png";
+    opts.badge = opts.badge || "/static/icon-192.png";
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (reg && reg.showNotification) {
+          reg.showNotification(titulo, opts);
+        } else {
+          new Notification(titulo, opts);
+        }
+      }).catch(function () {
+        try { new Notification(titulo, opts); } catch (e) {}
+      });
+    } else {
+      try { new Notification(titulo, opts); } catch (e) {}
+    }
+  }
+
+  function registrarSuscripcionPushEnServidor(endpoint, keys) {
+    fetch("/api/push/suscribir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: endpoint,
+        keys: keys || {}
+      })
+    }).catch(function () {});
+  }
+
+  function iniciarWebPush(mostrarFeedback) {
+    if (!("Notification" in window)) {
+      if (mostrarFeedback) alert("Este navegador no soporta notificaciones Web Push.");
+      return Promise.reject("no_support");
+    }
+    return Notification.requestPermission().then(function (perm) {
+      if (perm === "granted") {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.ready.then(function (reg) {
+            if ("PushManager" in window && reg.pushManager) {
+              reg.pushManager.getSubscription().then(function (sub) {
+                if (sub) {
+                  var sJson = sub.toJSON ? sub.toJSON() : {};
+                  registrarSuscripcionPushEnServidor(sub.endpoint, sJson.keys);
+                } else {
+                  var devEndpoint = "pwa-local://" + (localStorage.getItem("bitacora_dev_id") || (function () {
+                    var nid = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                    localStorage.setItem("bitacora_dev_id", nid);
+                    return nid;
+                  })());
+                  registrarSuscripcionPushEnServidor(devEndpoint, {});
+                }
+              }).catch(function () {
+                var devEndpoint = "pwa-local://" + (localStorage.getItem("bitacora_dev_id") || "dev_default");
+                registrarSuscripcionPushEnServidor(devEndpoint, {});
+              });
+            }
+          });
+        }
+        if (mostrarFeedback) {
+          mostrarNotificacionNativa("🔔 Notificaciones Activadas", {
+            body: "¡Listo! Recibirás alertas sanitarias, celos AM-PM y avisos de potrero en este dispositivo.",
+            tag: "push-bienvenida"
+          });
+        }
+        verificarAlertasPush();
+      } else if (mostrarFeedback) {
+        alert("Las notificaciones fueron denegadas o bloqueadas.");
+      }
+      return perm;
+    });
+  }
+
+  function verificarAlertasPush() {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    fetch("/api/push/alertas").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      if (!d || !d.alertas || !d.alertas.length) return;
+      var storageKey = "bitacora_push_notified";
+      var notificados = {};
+      try { notificados = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch (e) {}
+
+      d.alertas.forEach(function (al) {
+        var idAl = al.tipo + "_" + (al.tag || al.potrero || "finca") + "_" + (al.mensaje || "");
+        var lastTime = notificados[idAl] || 0;
+        var now = Date.now();
+        // Notificar como máximo una vez cada 8 horas por la misma alerta
+        if (now - lastTime < 8 * 3600 * 1000) return;
+
+        notificados[idAl] = now;
+        var targetUrl = "/?v=agenda";
+        if (al.tipo === "voisin_sobrepastoreo") targetUrl = "/?v=mapa";
+        else if (al.tipo === "celo_am_pm") targetUrl = "/?v=repro";
+
+        mostrarNotificacionNativa(al.titulo || "Alerta Bitácora JA", {
+          body: al.mensaje,
+          tag: idAl,
+          data: { url: targetUrl }
+        });
+      });
+
+      try { localStorage.setItem(storageKey, JSON.stringify(notificados)); } catch (e) {}
+    }).catch(function () {});
+  }
+
+  function bindAgenda() {
+    var estadoEl = document.getElementById("push-estado-txt");
+    var btnActivar = document.getElementById("btn-activar-push");
+    var btnProbar = document.getElementById("btn-probar-push");
+
+    function actualizarTextoEstado() {
+      if (!estadoEl) return;
+      if (!("Notification" in window)) {
+        estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>❌ Tu navegador no soporta notificaciones nativas.</span>";
+        if (btnActivar) btnActivar.style.display = "none";
+        if (btnProbar) btnProbar.style.display = "none";
+        return;
+      }
+      if (Notification.permission === "granted") {
+        estadoEl.innerHTML = "<span style='color:var(--verde-marca); font-weight:600;'>✅ Notificaciones activas en este dispositivo.</span> Recibirás alertas de retiros de carne/leche, celos AM-PM, termo criogénico y Voisin.";
+        if (btnActivar) btnActivar.textContent = "Re-sincronizar";
+      } else if (Notification.permission === "denied") {
+        estadoEl.innerHTML = "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Notificaciones bloqueadas.</span> Habilita los permisos en la barra de direcciones o ajustes del navegador.";
+        if (btnActivar) btnActivar.disabled = true;
+      } else {
+        estadoEl.innerHTML = "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Desactivadas.</span> Actívalas para recibir alertas de retiros sanitarios, celos e inventario crítico.";
+        if (btnActivar) btnActivar.disabled = false;
+      }
+    }
+
+    actualizarTextoEstado();
+
+    if (btnActivar) {
+      btnActivar.addEventListener("click", function () {
+        btnActivar.disabled = true;
+        iniciarWebPush(true).finally(function () {
+          btnActivar.disabled = false;
+          actualizarTextoEstado();
+        });
+      });
+    }
+
+    if (btnProbar) {
+      btnProbar.addEventListener("click", function () {
+        if (!("Notification" in window) || Notification.permission !== "granted") {
+          iniciarWebPush(true).then(function (perm) {
+            if (perm === "granted") lanzarPruebaPush();
+          });
+        } else {
+          lanzarPruebaPush();
+        }
+      });
+    }
+
+    function lanzarPruebaPush() {
+      fetch("/api/push/probar", { method: "POST" })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res && res.notificacion) {
+            var n = res.notificacion;
+            mostrarNotificacionNativa(n.titulo, {
+              body: n.cuerpo,
+              tag: n.tag,
+              data: { url: n.url }
+            });
+          }
+        });
+    }
   }
 
   /* ---------- Modo Manga de Corral (Pesajes, Tratamientos Masivos, BLE) ---------- */
@@ -2509,6 +2799,395 @@
     } catch (e) {
       // Ignorar de forma silenciosa
     }
+  }
+
+  /* ---------- Vista Mapa Satelital Interactivo & Operarios ---------- */
+  var _mapaInstancia = null;
+  var _mapaCapaPotreros = null;
+  var _mapaCapaUsuarios = null;
+  var _mapaCapaRastros = null;
+  var _mapaModoActual = "vigor"; // 'vigor', 'voisin', 'satelite'
+  var _mapaVerOperarios = true;
+  var _mapaMarkerSelf = null;
+  var _mapaTimerRefresh = null;
+
+  function renderMapa(d) {
+    var totalPot = (d && d.finca && d.finca.total_potreros) || (d && d.potreros_geojson && d.potreros_geojson.features ? d.potreros_geojson.features.length : 0);
+    var uActivos = (d && d.usuarios_activos) || [];
+
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>"
+      + icon("grid", 20) + "Mapa Satelital de Potreros &amp; Operarios"
+      + "</h3>"
+      + "<span class='meta' style='font-size:12px; font-weight:600;'>🌾 " + totalPot + " potreros · 🤠 " + uActivos.length + " operarios con señal</span>"
+      + "</div>";
+
+    // Barra de herramientas del Mapa
+    h += "<div class='mapa-toolbar'>"
+      + "<div class='mapa-grupos'>"
+      + "<span style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-right:4px;'>Capa:</span>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "vigor" ? " act" : "") + "' data-modo-mapa='vigor'>🌿 Vigor NDVI/SAR</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "voisin" ? " act" : "") + "' data-modo-mapa='voisin'>🐄 Ocupación &amp; Voisin</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "satelite" ? " act" : "") + "' data-modo-mapa='satelite'>🛰️ Satelital</button>"
+      + "</div>"
+      + "<div class='mapa-grupos'>"
+      + "<button type='button' class='mapa-btn" + (_mapaVerOperarios ? " act" : "") + "' id='btn-toggle-operarios'>🤠 Operarios (" + uActivos.length + ")</button>"
+      + "<button type='button' class='mapa-btn' id='btn-mi-ubicacion-mapa'>📍 Mi GPS</button>"
+      + "<button type='button' class='mapa-btn' id='btn-centrar-finca'>🌾 Toda la Finca</button>"
+      + "<button type='button' class='mapa-btn' id='btn-refrescar-mapa' title='Actualizar posiciones y datos'>🔄</button>"
+      + "</div>"
+      + "</div>";
+
+    // Contenedor del Mapa
+    h += "<div class='mapa-wrap'>"
+      + "<div id='mapa-finca'></div>"
+      + "</div>";
+
+    // Barra de Leyenda Dinámica
+    h += "<div id='mapa-leyenda-dinamica' class='mapa-leyenda'>";
+    if (_mapaModoActual === "voisin") {
+      h += "<span style='font-weight:700; margin-right:6px;'>Leyenda Voisin:</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#2e7d32;'></span> Ocupado (≤3d)</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#c62828;'></span> Alerta (>3d Sobrepastoreo)</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#1565c0;'></span> Reposado (≥30d Listo)</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#00838f;'></span> En descanso (20-29d)</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#ef6c00;'></span> Recién salido (&lt;20d)</span>";
+    } else if (_mapaModoActual === "vigor") {
+      h += "<span style='font-weight:700; margin-right:6px;'>Vigor Forrajero:</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#1b5e20;'></span> Excelente / Denso</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#388e3c;'></span> Bueno / Creciendo</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#fbc02d;'></span> Medio</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#f57c00;'></span> Bajo / Reposo</span>"
+        + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#d32f2f;'></span> Crítico</span>";
+    } else {
+      h += "<span style='font-weight:700; margin-right:6px;'>Capa:</span> Vista satelital óptica de alta resolución (Esri World Imagery) con linderos de potrero.";
+    }
+    h += "</div>";
+
+    // Panel de Operarios en Campo
+    h += "<div class='card' style='padding:14px; margin-top:14px;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("users", 16) + "Operarios &amp; Personal de Campo (" + uActivos.length + ")</h4>"
+      + "<span style='font-size:12px; color:var(--texto-suave);'>Posiciones satelitales en tiempo real</span>"
+      + "</div>";
+
+    if (!uActivos.length) {
+      h += vacio("No hay posiciones GPS registradas recientemente. Al abrir la app en potrero, los vaqueros y administradores transmiten su ubicación.");
+    } else {
+      h += "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:10px;'>";
+      uActivos.forEach(function (u, uIdx) {
+        var rolClase = (u.rol === "OWNER") ? "rojo" : ((u.rol === "ADMIN") ? "ambar" : "verde");
+        var estadoTxt = u.en_linea
+          ? "<span class='chip verde' style='font-size:11px;'>🟢 En línea (" + (u.minutos_hace != null ? "hace " + u.minutos_hace + "m" : "ahora") + ")</span>"
+          : "<span class='chip gris' style='font-size:11px;'>⚪ " + esc(u.fecha) + " " + esc(u.hora ? u.hora.slice(0, 5) : "") + "</span>";
+
+        h += "<div class='card' style='padding:10px; margin:0; border:1px solid var(--borde); display:flex; flex-direction:column; justify-content:space-between;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;'>"
+          + "<div><b>" + esc(u.nombre) + "</b> <span class='chip " + rolClase + "' style='font-size:10.5px;'>" + esc(u.rol) + "</span></div>"
+          + estadoTxt
+          + "</div>"
+          + "<div style='font-size:12.5px; color:var(--texto-suave); margin-bottom:8px;'>"
+          + "📍 Potrero: <b style='color:var(--texto);'>" + esc(u.potrero_actual) + "</b>"
+          + (u.precision_m ? " <small>(±" + Math.round(u.precision_m) + "m)</small>" : "")
+          + "</div>"
+          + "<div style='display:flex; gap:6px;'>"
+          + "<button type='button' class='tema-btn' data-ir-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>🎯 Enfocar</button>"
+          + (u.rastro_hoy && u.rastro_hoy.length ? "<button type='button' class='tema-btn' data-rastro-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>👣 Ver rastro (" + u.rastro_hoy.length + ")</button>" : "")
+          + "</div>"
+          + "</div>";
+      });
+      h += "</div>";
+    }
+    h += "</div>";
+
+    return h;
+  }
+
+  function bindMapa(d) {
+    if (typeof L === "undefined") {
+      var mapEl = document.getElementById("mapa-finca");
+      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>⚠️ Cargando componente de mapas Leaflet… Si no carga, verifica tu conexión.</p>";
+      return;
+    }
+
+    var mapEl = document.getElementById("mapa-finca");
+    if (!mapEl) return;
+
+    if (_mapaInstancia) {
+      try { _mapaInstancia.remove(); } catch (e) {}
+      _mapaInstancia = null;
+    }
+    if (_mapaTimerRefresh) {
+      clearInterval(_mapaTimerRefresh);
+      _mapaTimerRefresh = null;
+    }
+
+    var centro = (d.finca && d.finca.centroide) || [3.402, -74.088];
+    var map = L.map("mapa-finca", {
+      zoomControl: true,
+      attributionControl: true
+    }).setView(centro, 14);
+    _mapaInstancia = map;
+
+    // Capa base satelital Esri
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: "Tiles &copy; Esri &mdash; Ganader&iacute;a JA"
+    }).addTo(map);
+
+    // Ajustar zoom a los límites de la finca
+    if (d.finca && d.finca.bbox) {
+      try {
+        map.fitBounds(d.finca.bbox, { padding: [25, 25] });
+      } catch (e) {}
+    }
+
+    _mapaCapaPotreros = L.layerGroup().addTo(map);
+    _mapaCapaUsuarios = L.layerGroup().addTo(map);
+    _mapaCapaRastros = L.layerGroup().addTo(map);
+
+    function colorParaPotrero(props) {
+      if (_mapaModoActual === "satelite") return { fill: false, color: "#ffffff", weight: 2, fillOpacity: 0 };
+      if (_mapaModoActual === "voisin") return { fill: true, fillColor: props.color_voisin || "#2e7d32", color: "#ffffff", weight: 1.5, fillOpacity: 0.5 };
+      return { fill: true, fillColor: props.color_ndvi || "#2e7d32", color: "#ffffff", weight: 1.5, fillOpacity: 0.55 };
+    }
+
+    function pintarPotreros() {
+      _mapaCapaPotreros.clearLayers();
+      if (!d.potreros_geojson || !d.potreros_geojson.features) return;
+
+      var layer = L.geoJSON(d.potreros_geojson, {
+        style: function (feat) {
+          var est = colorParaPotrero(feat.properties);
+          return {
+            fill: est.fill,
+            fillColor: est.fillColor,
+            fillOpacity: est.fillOpacity,
+            color: est.color,
+            weight: est.weight
+          };
+        },
+        onEachFeature: function (feat, lyr) {
+          var p = feat.properties;
+          var nAnim = p.animales_count || 0;
+          var labelTxt = p.nombre + (nAnim > 0 ? " (" + nAnim + " anim)" : "");
+
+          lyr.bindTooltip(labelTxt, {
+            permanent: false,
+            direction: "center",
+            className: "mapa-tooltip-potrero"
+          });
+
+          // Popup al tocar potrero
+          var popHtml = "<div style='font-family:sans-serif; min-width:200px; padding:4px;'>"
+            + "<h4 style='margin:0 0 6px 0; color:#1b4d3e; font-size:15px; border-bottom:1px solid #ddd; padding-bottom:4px;'>" + esc(p.nombre) + "</h4>"
+            + "<div style='font-size:12px; line-height:1.5;'>"
+            + "📐 <b>Área:</b> " + p.area_has + " ha<br>"
+            + "🐄 <b>Ocupación:</b> " + (nAnim > 0 ? ("<b>" + nAnim + " cabezas</b>") : "Desocupado") + "<br>"
+            + "⏱️ <b>Voisin:</b> " + esc(p.estado_voisin || "—") + "<br>"
+            + "🌿 <b>Vigor NDVI:</b> " + (p.ndvi_valor != null ? ("<b>" + p.ndvi_valor.toFixed(3) + "</b> (" + esc(p.categoria_ndvi) + ")") : "—") + "<br>"
+            + (p.biomasa_kg_ha ? ("🌾 <b>Biomasa:</b> " + Math.round(p.biomasa_kg_ha) + " kg MS/ha<br>") : "")
+            + "</div>";
+
+          if (p.animales_tags && p.animales_tags.length) {
+            popHtml += "<div style='margin-top:6px; font-size:11px; color:#666;'>Tags: " + esc(p.animales_tags.join(", ")) + (nAnim > p.animales_tags.length ? "..." : "") + "</div>";
+          }
+          popHtml += "</div>";
+          lyr.bindPopup(popHtml);
+
+          lyr.on("mouseover", function () { lyr.setStyle({ weight: 3, color: "#f1c40f" }); });
+          lyr.on("mouseout", function () {
+            var orig = colorParaPotrero(p);
+            lyr.setStyle({ weight: orig.weight, color: orig.color });
+          });
+        }
+      });
+      _mapaCapaPotreros.addLayer(layer);
+    }
+
+    function pintarUsuarios() {
+      _mapaCapaUsuarios.clearLayers();
+      if (!_mapaVerOperarios || !d.usuarios_activos) return;
+
+      d.usuarios_activos.forEach(function (u, idx) {
+        var rolClase = (u.rol === "OWNER") ? "owner" : ((u.rol === "ADMIN") ? "admin" : "trabajador");
+        var pulseClase = u.en_linea ? "" : " offline";
+        var htmlPin = "<div class='user-marker-pin' data-uidx='" + idx + "'>"
+          + "<div class='user-marker-badge " + rolClase + "'>🤠 " + esc(u.nombre) + "</div>"
+          + "<div class='user-pulse-dot" + pulseClase + "'></div>"
+          + "</div>";
+
+        var iconCustom = L.divIcon({
+          className: "user-div-icon",
+          html: htmlPin,
+          iconSize: [120, 42],
+          iconAnchor: [60, 42]
+        });
+
+        var m = L.marker([u.lat, u.lon], { icon: iconCustom });
+        var popU = "<div style='font-family:sans-serif; min-width:180px; padding:4px;'>"
+          + "<b style='font-size:14px;'>" + esc(u.nombre) + "</b> <span style='font-size:11px;'>(" + esc(u.rol) + ")</span><br>"
+          + "<div style='font-size:12px; margin-top:4px; line-height:1.4;'>"
+          + "📍 Potrero: <b>" + esc(u.potrero_actual) + "</b><br>"
+          + "🕒 Hora: <b>" + esc(u.hora || u.fecha) + "</b>" + (u.minutos_hace != null ? " (hace " + u.minutos_hace + "m)" : "") + "<br>"
+          + (u.precision_m ? "📡 Precisión: ±" + Math.round(u.precision_m) + "m<br>" : "")
+          + "</div></div>";
+        m.bindPopup(popU);
+        _mapaCapaUsuarios.addLayer(m);
+      });
+    }
+
+    pintarPotreros();
+    pintarUsuarios();
+
+    // Botones de selector de modo
+    qa(".mapa-btn[data-modo-mapa]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        qa(".mapa-btn[data-modo-mapa]").forEach(function (b) { b.classList.remove("act"); });
+        btn.classList.add("act");
+        _mapaModoActual = btn.getAttribute("data-modo-mapa");
+        pintarPotreros();
+        var leyEl = document.getElementById("mapa-leyenda-dinamica");
+        if (leyEl) {
+          if (_mapaModoActual === "voisin") {
+            leyEl.innerHTML = "<span style='font-weight:700; margin-right:6px;'>Leyenda Voisin:</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#2e7d32;'></span> Ocupado (≤3d)</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#c62828;'></span> Alerta (>3d Sobrepastoreo)</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#1565c0;'></span> Reposado (≥30d Listo)</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#00838f;'></span> En descanso (20-29d)</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#ef6c00;'></span> Recién salido (&lt;20d)</span>";
+          } else if (_mapaModoActual === "vigor") {
+            leyEl.innerHTML = "<span style='font-weight:700; margin-right:6px;'>Vigor Forrajero:</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#1b5e20;'></span> Excelente / Denso</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#388e3c;'></span> Bueno / Creciendo</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#fbc02d;'></span> Medio</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#f57c00;'></span> Bajo / Reposo</span>"
+              + "<span class='mapa-leyenda-item'><span class='leyenda-muestra' style='background:#d32f2f;'></span> Crítico</span>";
+          } else {
+            leyEl.innerHTML = "<span style='font-weight:700; margin-right:6px;'>Capa:</span> Vista satelital óptica de alta resolución (Esri World Imagery) con linderos de potrero.";
+          }
+        }
+      });
+    });
+
+    // Toggle ver operarios
+    var btnToggleOp = document.getElementById("btn-toggle-operarios");
+    if (btnToggleOp) {
+      btnToggleOp.addEventListener("click", function () {
+        _mapaVerOperarios = !_mapaVerOperarios;
+        if (_mapaVerOperarios) btnToggleOp.classList.add("act");
+        else btnToggleOp.classList.remove("act");
+        pintarUsuarios();
+      });
+    }
+
+    // Centrar en toda la finca
+    var btnCentrar = document.getElementById("btn-centrar-finca");
+    if (btnCentrar) {
+      btnCentrar.addEventListener("click", function () {
+        if (d.finca && d.finca.bbox) map.fitBounds(d.finca.bbox, { padding: [30, 30] });
+        else map.setView(centro, 14);
+      });
+    }
+
+    // Botón refrescar
+    var btnRefrescar = document.getElementById("btn-refrescar-mapa");
+    if (btnRefrescar) {
+      btnRefrescar.addEventListener("click", function () {
+        btnRefrescar.textContent = "⏳";
+        fetchJSON("/api/mapa/datos", function (nuevoD) {
+          btnRefrescar.textContent = "🔄";
+          d = nuevoD;
+          pintarPotreros();
+          pintarUsuarios();
+        });
+      });
+    }
+
+    // Auto-refresh silencioso de operarios cada 25 segundos
+    _mapaTimerRefresh = setInterval(function () {
+      if (actual !== "mapa") {
+        clearInterval(_mapaTimerRefresh);
+        _mapaTimerRefresh = null;
+        return;
+      }
+      fetchJSON("/api/mapa/datos", function (nuevoD) {
+        if (!nuevoD || !_mapaInstancia) return;
+        d = nuevoD;
+        pintarUsuarios();
+      });
+    }, 25000);
+
+    // Botón "Mi Ubicación GPS"
+    var btnMiGps = document.getElementById("btn-mi-ubicacion-mapa");
+    if (btnMiGps) {
+      btnMiGps.addEventListener("click", function () {
+        if (!navigator.geolocation) {
+          alert("Geolocalización no soportada en este navegador.");
+          return;
+        }
+        btnMiGps.textContent = "📡 Buscando...";
+        navigator.geolocation.getCurrentPosition(function (pos) {
+          btnMiGps.textContent = "📍 Mi GPS";
+          var myLat = pos.coords.latitude;
+          var myLon = pos.coords.longitude;
+          var myAcc = pos.coords.accuracy || 0;
+
+          if (_mapaMarkerSelf) _mapaCapaUsuarios.removeLayer(_mapaMarkerSelf);
+
+          var iconSelf = L.divIcon({
+            className: "self-gps-icon",
+            html: "<div style='width:18px; height:18px; background:#0288d1; border:3px solid #fff; border-radius:50%; box-shadow:0 0 10px #0288d1;'></div>",
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+          });
+          _mapaMarkerSelf = L.marker([myLat, myLon], { icon: iconSelf }).addTo(_mapaCapaUsuarios);
+          _mapaMarkerSelf.bindPopup("<b>Tu Ubicación Actual</b><br>Precisión: ±" + Math.round(myAcc) + "m").openPopup();
+          map.setView([myLat, myLon], 16);
+
+          fetch("/api/telemetria/ping", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: myLat, lon: myLon, accuracy: myAcc, evento: "mapa_activo" })
+          }).catch(function () {});
+        }, function (err) {
+          btnMiGps.textContent = "📍 Mi GPS";
+          alert("No fue posible obtener tu ubicación GPS: " + (err.message || "Permiso denegado."));
+        }, { enableHighAccuracy: true, timeout: 10000 });
+      });
+    }
+
+    // Delegación para botones "Enfocar" y "Ver rastro"
+    qa("button[data-ir-usuario]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var idx = parseInt(b.getAttribute("data-ir-usuario"), 10);
+        var u = d.usuarios_activos && d.usuarios_activos[idx];
+        if (u && map) {
+          map.setView([u.lat, u.lon], 17);
+          try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+        }
+      });
+    });
+
+    qa("button[data-rastro-usuario]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var idx = parseInt(b.getAttribute("data-rastro-usuario"), 10);
+        var u = d.usuarios_activos && d.usuarios_activos[idx];
+        if (!u || !u.rastro_hoy || !u.rastro_hoy.length) return;
+
+        _mapaCapaRastros.clearLayers();
+        var latlngs = u.rastro_hoy.map(function (pt) { return [pt[0], pt[1]]; });
+        var poly = L.polyline(latlngs, {
+          color: "#f39c12",
+          weight: 3.5,
+          dashArray: "6, 8",
+          opacity: 0.85
+        });
+        _mapaCapaRastros.addLayer(poly);
+        map.fitBounds(poly.getBounds(), { padding: [40, 40] });
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+      });
+    });
   }
 
   var _fechaFiltroRutas = null;
@@ -5055,6 +5734,16 @@
       return;
     }
 
+    if (actual === "mapa") {
+      if (animar) skeleton(vista, "mapa");
+      fetchJSON("/api/mapa/datos", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderMapa(d), animar);
+        bindMapa(d);
+      }, animar ? vista : null);
+      return;
+    }
+
     var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
     var url = "/api/" + actual + (pot && actual === "tablero" ? "?potrero=" + encodeURIComponent(pot) : "");
     if (animar) skeleton(vista, actual);
@@ -5075,6 +5764,7 @@
       if (actual === "pasturas") bindPasturas();
       if (actual === "leche") bindLeche();
       if (actual === "finanzas") bindFinanzas();
+      if (actual === "agenda") bindAgenda();
     }, animar ? vista : null);
   }
 
@@ -5162,6 +5852,7 @@
           } catch (e) { /* noop */ }
         }
         window.__agendaPrev = nA;
+        verificarAlertasPush();
       }).catch(function () { /* sin red: se ocultan */ });
   }
 
@@ -5170,11 +5861,7 @@
     if (!camp) return;
     camp.addEventListener("click", function () {
       if ("Notification" in window && Notification.permission === "default") {
-        Notification.requestPermission().then(function (p) {
-          // concedida o denegada: se guarda implícito en el navegador
-          var s = document.getElementById("notif-dot");
-          if (s) s.title = p === "granted" ? "Notificaciones activadas" : "Notificaciones apagadas";
-        });
+        iniciarWebPush(false).catch(function () {});
       }
       var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
       if (destino) destino.click();
@@ -5203,6 +5890,7 @@
     captura: "Captura",
     inventario: "Inventario",
     finanzas: "Finanzas",
+    mapa: "Mapa",
     manga: "Manga",
     agenda: "Agenda",
     repro: "Repro",
@@ -5300,6 +5988,16 @@
 
   // Cambia de pestaña activa sin recargar
   function irAVista(v) {
+    if (actual === "mapa" && v !== "mapa") {
+      if (_mapaTimerRefresh) {
+        clearInterval(_mapaTimerRefresh);
+        _mapaTimerRefresh = null;
+      }
+      if (_mapaInstancia) {
+        try { _mapaInstancia.remove(); } catch (e) {}
+        _mapaInstancia = null;
+      }
+    }
     actual = v;
     qa("#nav-principal > button").forEach(function (x) { x.classList.remove("act"); });
     var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];

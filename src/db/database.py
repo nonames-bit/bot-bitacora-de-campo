@@ -720,16 +720,52 @@ class Database:
                 ventas_sin_peso += 1
         costo_por_kg_carne = round(total_egresos / kg_total, 2) if kg_total > 0 else None
 
+        # Desglose dinámico de ingresos y márgenes de lechería
+        ing_leche_row = self.query_one(
+            "SELECT SUM(monto) AS total, SUM(litros) AS total_l FROM finanzas "
+            "WHERE fecha >= ? AND fecha <= ? AND tipo = 'INGRESO' AND UPPER(categoria) = 'VENTA_LECHE'",
+            (desde, hasta),
+        )
+        ingresos_leche = float(ing_leche_row["total"] or 0.0) if ing_leche_row else 0.0
+        litros_finanzas = float(ing_leche_row["total_l"] or 0.0) if ing_leche_row else 0.0
+        base_litros_precio = litros_finanzas if litros_finanzas > 0 else litros_producidos
+        precio_promedio_litro_leche = round(ingresos_leche / base_litros_precio, 2) if (ingresos_leche > 0 and base_litros_precio > 0) else None
+        margen_por_litro_leche = round(precio_promedio_litro_leche - costo_por_litro_leche, 2) if (precio_promedio_litro_leche is not None and costo_por_litro_leche is not None) else None
+        margen_leche_pct = round((margen_por_litro_leche / precio_promedio_litro_leche) * 100, 1) if (margen_por_litro_leche is not None and precio_promedio_litro_leche > 0) else None
+
+        # Desglose dinámico de ingresos y márgenes de carne (ventas de ganado)
+        ing_carne_row = self.query_one(
+            "SELECT SUM(precio) AS total, COUNT(*) AS n FROM movimientos "
+            "WHERE fecha >= ? AND fecha <= ? AND UPPER(tipo_movimiento) = 'VENTA' AND precio IS NOT NULL AND precio > 0",
+            (desde, hasta),
+        )
+        ingresos_carne = float(ing_carne_row["total"] or 0.0) if ing_carne_row else 0.0
+        animales_vendidos = int(ing_carne_row["n"] or 0) if ing_carne_row else 0
+        precio_promedio_kg_carne = round(ingresos_carne / kg_total, 2) if (ingresos_carne > 0 and kg_total > 0) else None
+        precio_promedio_animal = round(ingresos_carne / animales_vendidos, 2) if (ingresos_carne > 0 and animales_vendidos > 0) else None
+        margen_por_kg_carne = round(precio_promedio_kg_carne - costo_por_kg_carne, 2) if (precio_promedio_kg_carne is not None and costo_por_kg_carne is not None) else None
+        margen_carne_pct = round((margen_por_kg_carne / precio_promedio_kg_carne) * 100, 1) if (margen_por_kg_carne is not None and precio_promedio_kg_carne > 0) else None
+
         return {
             "litros_producidos": round(litros_producidos, 1),
             "costo_por_litro_leche": costo_por_litro_leche,
+            "ingresos_leche": ingresos_leche,
+            "precio_promedio_litro_leche": precio_promedio_litro_leche,
+            "margen_por_litro_leche": margen_por_litro_leche,
+            "margen_leche_pct": margen_leche_pct,
             "margen_utilidad_pct": margen_utilidad_pct,
             "total_activos": total_activos,
             "costo_por_cabeza": costo_por_cabeza,
             "kg_carne_estimados": round(kg_total, 1),
             "ventas_con_peso": ventas_con_peso,
             "ventas_sin_peso": ventas_sin_peso,
+            "ingresos_carne": ingresos_carne,
+            "animales_vendidos": animales_vendidos,
+            "precio_promedio_kg_carne": precio_promedio_kg_carne,
+            "precio_promedio_animal": precio_promedio_animal,
             "costo_por_kg_carne": costo_por_kg_carne,
+            "margen_por_kg_carne": margen_por_kg_carne,
+            "margen_carne_pct": margen_carne_pct,
             "flujo_mensual": self.flujo_caja_mensual(desde, hasta),
         }
 
@@ -2443,5 +2479,148 @@ class Database:
                 "detalles": r["detalles"] or "",
             }
         return res
+
+    # ------------------------------------------------------------------ #
+    # Web Push Notifications (PWA)
+    # ------------------------------------------------------------------ #
+    def _ensure_push_table(self) -> None:
+        try:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS push_suscripciones (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT,
+                    endpoint TEXT UNIQUE,
+                    p256dh TEXT,
+                    auth TEXT,
+                    creado_en TEXT,
+                    ultimo_uso TEXT
+                )
+            """)
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_push_user ON push_suscripciones(user_id)")
+        except Exception:
+            pass
+
+    def guardar_push_suscripcion(self, endpoint: str, user_id: Optional[str] = None,
+                                 p256dh: Optional[str] = None, auth: Optional[str] = None) -> int:
+        """Registra o actualiza una suscripción de navegador para notificaciones Web Push."""
+        self._ensure_push_table()
+        ahora = datetime.utcnow().isoformat()
+        sql = """
+            INSERT INTO push_suscripciones (user_id, endpoint, p256dh, auth, creado_en, ultimo_uso)
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(endpoint) DO UPDATE SET
+                user_id = CASE WHEN excluded.user_id IS NOT NULL THEN excluded.user_id ELSE push_suscripciones.user_id END,
+                p256dh = CASE WHEN excluded.p256dh IS NOT NULL THEN excluded.p256dh ELSE push_suscripciones.p256dh END,
+                auth = CASE WHEN excluded.auth IS NOT NULL THEN excluded.auth ELSE push_suscripciones.auth END,
+                ultimo_uso = excluded.ultimo_uso
+        """
+        cursor = self.execute(sql, (str(user_id) if user_id else None, endpoint, p256dh, auth, ahora, ahora))
+        return cursor.lastrowid or 1
+
+    def eliminar_push_suscripcion(self, endpoint: str) -> bool:
+        """Elimina una suscripción de notificaciones Web Push."""
+        self._ensure_push_table()
+        cursor = self.execute("DELETE FROM push_suscripciones WHERE endpoint = ?", (endpoint,))
+        return cursor.rowcount > 0
+
+    def listar_push_suscripciones(self) -> list[dict[str, Any]]:
+        """Retorna todas las suscripciones push activas."""
+        self._ensure_push_table()
+        filas = self.query("SELECT * FROM push_suscripciones ORDER BY id DESC")
+        return [dict(f) for f in filas]
+
+    def alertas_pendientes_push(self) -> list[dict[str, Any]]:
+        """Genera la lista de notificaciones de alta prioridad para campo (retiros, celos, Voisin, termo)."""
+        hoy_iso = date.today().isoformat()
+        alertas = []
+
+        # 1. Retiros sanitarios activos
+        try:
+            retiros = self.retiros_activos()
+            if retiros:
+                c_carne = sum(1 for r in retiros if r.get("dias_carne", 0) > 0)
+                c_leche = sum(1 for r in retiros if r.get("dias_leche", 0) > 0)
+                tags_str = ", ".join(r["tag"] for r in retiros[:3])
+                if len(retiros) > 3:
+                    tags_str += f" (+{len(retiros)-3})"
+                alertas.append({
+                    "id": f"retiro-{hoy_iso}",
+                    "tipo": "SANIDAD",
+                    "titulo": f"⚠️ {len(retiros)} animales en Retiro Sanitario",
+                    "cuerpo": f"Animales tratados: {tags_str}. Leche bloqueada: {c_leche}, Carne: {c_carne}.",
+                    "tag": "retiro-sanitario",
+                    "icono": "/static/icon-192.png",
+                    "url": "/?v=sanidad",
+                    "urgencia": "alta",
+                })
+        except Exception as e:
+            logger.debug("Error obteniendo retiros para push: %s", e)
+
+        # 2. Celos detectados para inseminar hoy (Regla AM-PM)
+        try:
+            celos_hoy = self.query(
+                "SELECT c.id, c.hora, c.momento, a.tag FROM celos c "
+                "JOIN animales a ON a.id_animal = c.animal_id "
+                "WHERE c.fecha = ? ORDER BY c.hora DESC LIMIT 5",
+                (hoy_iso,)
+            )
+            for ch in celos_hoy:
+                tag_vaca = ch["tag"]
+                momento = (ch["momento"] or "manana").lower()
+                turno = "en la tarde de hoy (16:00-18:00)" if "man" in momento else "en la mañana siguiente (06:00-08:00)"
+                alertas.append({
+                    "id": f"celo-{ch['id']}",
+                    "tipo": "REPRO",
+                    "titulo": f"🧬 Inseminar Vaca {tag_vaca} (Regla AM-PM)",
+                    "cuerpo": f"Celo detectado en la {momento}. Proceder con servicio {turno}.",
+                    "tag": f"celo-{tag_vaca}",
+                    "icono": "/static/icon-192.png",
+                    "url": f"/ficha/{tag_vaca}",
+                    "urgencia": "alta",
+                })
+        except Exception as e:
+            logger.debug("Error obteniendo celos para push: %s", e)
+
+        # 3. Potreros con sobrepastoreo Voisin (> 3 días ocupados)
+        try:
+            pot_sobre = self.query(
+                "SELECT nombre, dias_ocupacion FROM potreros WHERE dias_ocupacion > 3 ORDER BY dias_ocupacion DESC LIMIT 3"
+            )
+            for p in pot_sobre:
+                alertas.append({
+                    "id": f"voisin-{p['nombre']}-{hoy_iso}",
+                    "tipo": "PASTURAS",
+                    "titulo": f"🌿 Rotación Voisin: Potrero {p['nombre']}",
+                    "cuerpo": f"Lleva {p['dias_ocupacion']} días ocupado. Trasladar lote para evitar sobrepastoreo.",
+                    "tag": f"voisin-{p['nombre']}",
+                    "icono": "/static/icon-192.png",
+                    "url": "/?v=pasturas",
+                    "urgencia": "media",
+                })
+        except Exception as e:
+            logger.debug("Error obteniendo potreros para push: %s", e)
+
+        # 4. Alerta de termo de nitrógeno (recarga <= 3 días)
+        try:
+            t_row = self.query_one(
+                "SELECT dias_restantes_estimados FROM termo_nitrogeno ORDER BY id DESC LIMIT 1"
+            )
+            if t_row and t_row["dias_restantes_estimados"] is not None and t_row["dias_restantes_estimados"] <= 3:
+                d_rest = t_row["dias_restantes_estimados"]
+                alertas.append({
+                    "id": f"termo-n2-{hoy_iso}",
+                    "tipo": "TERMO",
+                    "titulo": "❄️ N₂ Crítico en Termo Criogénico",
+                    "cuerpo": f"Quedan ~{d_rest} días de autonomía. Programar recarga urgente de nitrógeno líquido.",
+                    "tag": "termo-n2",
+                    "icono": "/static/icon-192.png",
+                    "url": "/?v=repro",
+                    "urgencia": "alta",
+                })
+        except Exception as e:
+            logger.debug("Error obteniendo termo para push: %s", e)
+
+        return alertas
+
 
 

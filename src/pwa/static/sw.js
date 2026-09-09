@@ -59,9 +59,10 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v65: Fix Diagnóstico General en Sistema -- las etiquetas <b>/<i> del texto salían literales en vez de renderizarse en negrita/cursiva.
 // v66: Recibos y Planillas de Quincena (Leche) ahora es una sección colapsada al final de la vista (antes salía primero); fix del filtro que mezclaba facturas de Finanzas ahí.
 // v67: Editar y eliminar movimientos manuales de Finanzas (ingresos/gastos), exclusivo para OWNER, desde "Movimientos recientes".
-// v68: Eliminados los botones de sugerencias (chips inferiores) del modal de chat del Asistente IA para una interfaz más limpia.
 // v69: Traslado masivo por potrero (mover TODOS los animales activos de un potrero a otro sin escribir cada arete) en Captura; autocompletado de potreros (solo reales) precargado desde el inicio en todos los campos; fix de fondo -- Traslado ahora sí actualiza el potrero actual del animal (antes solo quedaba como nota histórica).
-var CACHE = "pwa-ja-v69"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v70: Mapa Satelital Interactivo con Leaflet, polígonos de potreros, vigor NDVI/SAR y ubicación en vivo de operarios; Indicadores económicos de costo y margen unitario para leche y carne; Soporte de Notificaciones Web Push nativas en celular.
+// v71: Botón "Ver simple/técnico" en Pasturas -- Modo Simple (por defecto) muestra SPI y monitoreo satelital como semáforo en palabras (Excelente/Regular/Bajo), sin jerga (NDVI, RVI, SAR, kg/ha); Modo Técnico mantiene el detalle completo de siempre.
+var CACHE = "pwa-ja-v71"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -69,6 +70,8 @@ var PRECACHE = [
   "/manifest.json",
   "/static/style.css",
   "/static/app.js",
+  "/static/leaflet/leaflet.css",
+  "/static/leaflet/leaflet.js",
   "/static/favicon.svg",
   "/static/favicon.png",
   "/static/logo.jpg",
@@ -150,3 +153,54 @@ self.addEventListener("fetch", function (e) {
     })
   );
 });
+
+// -----------------------------------------------------------------------------
+// Web Push Notifications
+// -----------------------------------------------------------------------------
+self.addEventListener("push", function (event) {
+  var data = {
+    titulo: "Bitácora JA",
+    cuerpo: "Aviso importante de campo o sanidad",
+    icono: "/static/icon-192.png",
+    tag: "bitacora-notif",
+    url: "/"
+  };
+  if (event.data) {
+    try {
+      var parsed = event.data.json();
+      data = Object.assign(data, parsed);
+    } catch (e) {
+      data.cuerpo = event.data.text();
+    }
+  }
+  var options = {
+    body: data.cuerpo || data.body || "",
+    icon: data.icono || data.icon || "/static/icon-192.png",
+    badge: "/static/icon-192.png",
+    tag: data.tag || "bitacora-push",
+    renotify: true,
+    data: { url: data.url || "/" }
+  };
+  event.waitUntil(
+    self.registration.showNotification(data.titulo || data.title || "Bitácora JA", options)
+  );
+});
+
+self.addEventListener("notificationclick", function (event) {
+  event.notification.close();
+  var targetUrl = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (clientList) {
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        if (client.url && client.url.indexOf(targetUrl) !== -1 && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+
