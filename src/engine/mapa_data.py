@@ -16,15 +16,18 @@ from ..db.database import Database
 
 logger = logging.getLogger(__name__)
 
-# Paleta de colores para Vigor Forrajero (NDVI / SAR)
+# Paleta de colores para Vigor Forrajero (NDVI / SAR) -- mismas 4 categorías y
+# colores que clasificar_ndvi() (src/gis/sentinel_ndvi.py) y el mapa de
+# potreros en matplotlib (src/engine/charts.py::_COLOR_POR_CATEGORIA_NDVI).
+# Las claves deben calzar EXACTO con lo que devuelve clasificar_ndvi(): antes
+# tenían nombres distintos ("EXCELENTE / DENSO", "BUENO / EN CRECIMIENTO",
+# etc.) que nunca hacían match, así que todo potrero cadía al color por
+# defecto (verde) sin importar su vigor real.
 COLORES_NDVI = {
-    "EXCELENTE / DENSO": "#1b5e20",  # Verde oscuro
-    "BUENO / EN CRECIMIENTO": "#388e3c",  # Verde medio
-    "MEDIO / RECUPERACIÓN": "#fbc02d",  # Amarillo
-    "BAJO / EN REPOSO": "#f57c00",  # Naranja
-    "CRÍTICO / ESCASO": "#d32f2f",  # Rojo
-    "ÓPTIMO / REPOSO": "#2e7d32",
-    "ALERTA / REPOSO PROLONGADO": "#e65100",
+    "EXCELENTE": "#2e7d32",  # Verde
+    "ÓPTIMO / REPOSO": "#f9a825",  # Amarillo
+    "ESTRÉS / BAJA BIOMASA": "#ef6c00",  # Naranja
+    "CRÍTICO / SUELO DESNUDO": "#c62828",  # Rojo
 }
 
 def color_voisin(n_animales: int, dias_ocupacion: Optional[int], dias_reposo: Optional[int]) -> tuple[str, str]:
