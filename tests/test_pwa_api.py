@@ -638,6 +638,77 @@ def test_api_sync_offline(client):
     assert d["procesados"] == 3
 
 
+def test_api_sync_destete_mueve_a_la_cria_y_opcionalmente_a_la_madre(client, db_file):
+    from src.db.database import Database
+
+    db = Database(db_file)
+    pid_levante = db.registrar_potrero(nombre="Levante")
+    pid_secas = db.registrar_potrero(nombre="Vacas Secas")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "tipo": "destete", "fecha": "2026-09-08",
+        "payload": {
+            "cria_tag": "47-1", "peso_kg": 120.0, "potrero_cria": "Levante",
+            "potrero_madre": "Vacas Secas", "peso_madre_kg": 410.0, "cond_corporal_madre": 3.0,
+            "notas": "Destete normal",
+        },
+    }]})
+    assert r.status_code == 200
+    assert r.get_json()["procesados"] == 1
+
+    db2 = Database(db_file)
+    cria = db2.get_animal("47-1")
+    madre = db2.get_animal("47")
+    assert cria["potrero_id"] == pid_levante
+    assert madre["potrero_id"] == pid_secas
+    db2.close()
+
+
+def test_api_sync_parto_con_potrero_cria_y_madre(client, db_file):
+    from src.db.database import Database
+
+    db = Database(db_file)
+    pid_cria = db.registrar_potrero(nombre="Corral Maternidad")
+    pid_madre = db.registrar_potrero(nombre="Potrero Postparto")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "tipo": "parto", "fecha": "2026-09-08",
+        "payload": {
+            "vaca_tag": "47", "id_cria_tag": "47-2", "sexo_cria": "Hembra",
+            "potrero_cria": "Corral Maternidad", "potrero_madre": "Potrero Postparto",
+        },
+    }]})
+    assert r.status_code == 200
+    assert r.get_json()["procesados"] == 1
+
+    db2 = Database(db_file)
+    cria = db2.get_animal("47-2")
+    madre = db2.get_animal("47")
+    assert cria["potrero_id"] == pid_cria
+    assert madre["potrero_id"] == pid_madre
+    db2.close()
+
+
+def test_tablero_incluye_destete_en_eventos_recientes(client, db_file):
+    from src.db.database import Database
+
+    db = Database(db_file)
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    db.registrar_destete("47-1", fecha="2026-09-08", peso_kg=120.0)
+    db.close()
+
+    r = client.get("/api/tablero")
+    assert r.status_code == 200
+    tipos = [e["tipo"] for e in r.get_json()["eventos_recientes"]]
+    assert "DESTETE" in tipos
+
+
 def test_api_sync_solo_confirma_ids_ok_de_eventos_realmente_guardados(client):
     """Bug real: el cliente borraba TODA su cola offline con un solo HTTP 200,
     aunque un evento individual del lote hubiera fallado -- ese evento

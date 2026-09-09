@@ -62,7 +62,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v69: Traslado masivo por potrero (mover TODOS los animales activos de un potrero a otro sin escribir cada arete) en Captura; autocompletado de potreros (solo reales) precargado desde el inicio en todos los campos; fix de fondo -- Traslado ahora sí actualiza el potrero actual del animal (antes solo quedaba como nota histórica).
 // v70: Mapa Satelital Interactivo con Leaflet, polígonos de potreros, vigor NDVI/SAR y ubicación en vivo de operarios; Indicadores económicos de costo y margen unitario para leche y carne; Soporte de Notificaciones Web Push nativas en celular.
 // v71: Botón "Ver simple/técnico" en Pasturas -- Modo Simple (por defecto) muestra SPI y monitoreo satelital como semáforo en palabras (Excelente/Regular/Bajo), sin jerga (NDVI, RVI, SAR, kg/ha); Modo Técnico mantiene el detalle completo de siempre.
-var CACHE = "pwa-ja-v71"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v72: Nuevo evento "Destete" en Captura (separar la cría, pesarla, moverla a levante y opcionalmente secar/mover a la madre -- equivalente a "Secados/Destetos" de SG); Parto ahora permite fijar el potrero de la cría y/o de la madre en el momento del nacimiento.
+var CACHE = "pwa-ja-v72"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

@@ -195,6 +195,8 @@
           chipHtml = "<span class='chip ambar' style='font-weight:700;'>" + icon("truck", 13) + " " + esc(tipo) + "</span>";
         } else if (tipo === "TRASLADO") {
           chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("grass", 13) + " Traslado</span>";
+        } else if (tipo === "DESTETE") {
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("calf", 13) + " Destete</span>";
         } else if (tipo === "PESAJE") {
           chipHtml = "<span class='chip gris' style='font-weight:700;'>" + icon("scale", 13) + " Pesaje</span>";
         } else if (tipo === "TRATAMIENTO") {
@@ -1690,6 +1692,7 @@
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
+      { id: "destete", nom: "Destete", ico: "calf" },
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
@@ -1732,7 +1735,24 @@
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
         + "<label>Observaciones / Notas: <input id='cap-notas' placeholder='Parto distócico, ternero vigoroso, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "destete") {
+      h += "<label>Arete de la Cría a Destetar: <input id='cap-cria-tag' placeholder='ej. 47-1' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Peso al destete (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 120' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Potrero nuevo de la Cría: <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional -- útil si también se seca):</p>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Peso de la Madre (kg): <input type='number' step='0.5' id='cap-peso-madre' placeholder='ej. 410' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Cond. Corporal Madre (1-5): <select id='cap-cc-madre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
+        + "</div>"
+        + "<label>Potrero nuevo de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Vacas Secas' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Observaciones / Motivo: <input id='cap-notas' placeholder='Destete normal, adelantado por sequía, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "pesaje") {
       h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -1805,6 +1825,9 @@
     if (tipo === "parto") {
       titFoto = "Foto del Parto / Cría";
       hintFoto = "Foto de la cría recién nacida, ubre o condición de la madre";
+    } else if (tipo === "destete") {
+      titFoto = "Foto del Destete";
+      hintFoto = "Foto de la cría destetada o de la madre en ese momento";
     } else if (tipo === "muerte") {
       titFoto = "Foto del Hallazgo / Necropsia";
       hintFoto = "Foto del animal fallecido, necropsia o causa de muerte";
@@ -2475,6 +2498,16 @@
           payload.sexo_cria = (q("#cap-sexo") && q("#cap-sexo").value) || "HEMBRA";
           payload.estado_cria = (q("#cap-estado-cria") && q("#cap-estado-cria").value) || "VIVO";
           payload.peso_nacimiento = parseFloat(q("#cap-peso-nacer") && q("#cap-peso-nacer").value) || null;
+          payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
+          payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+        } else if (_tipoCapturaActual === "destete") {
+          payload.cria_tag = (q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim();
+          payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
+          payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
+          payload.peso_madre_kg = parseFloat(q("#cap-peso-madre") && q("#cap-peso-madre").value) || null;
+          payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
+          payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();

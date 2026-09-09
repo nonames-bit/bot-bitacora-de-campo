@@ -90,6 +90,86 @@ def test_registrar_parto_no_hereda_potrero_legacy_sin_geometria(db):
     assert cria["potrero_id"] is None
 
 
+def test_registrar_parto_potrero_cria_explicito_pisa_la_herencia(db):
+    pid_madre = db.registrar_potrero(nombre="ORDENO SANTA MARTHA")
+    pid_cria = db.registrar_potrero(nombre="LEVANTE")
+    db.registrar_animal("JA379", sexo="Hembra", potrero=pid_madre, estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA379", fecha="2026-08-24", sexo_cria="Hembra",
+                       id_cria_tag="NO65", potrero_cria="LEVANTE")
+    cria = db.get_animal("NO65")
+    assert cria["potrero_id"] == pid_cria
+
+
+def test_registrar_parto_potrero_madre_la_mueve(db):
+    pid_origen = db.registrar_potrero(nombre="Potrero Origen")
+    pid_maternidad = db.registrar_potrero(nombre="Maternidad")
+    db.registrar_animal("JA379", sexo="Hembra", potrero=pid_origen, estado="ACTIVO")
+    db.registrar_parto(vaca_tag="JA379", fecha="2026-08-24", potrero_madre="Maternidad")
+    madre = db.get_animal("JA379")
+    assert madre["potrero_id"] == pid_maternidad
+
+
+def test_registrar_destete_actualiza_potrero_de_la_cria_y_registra_pesaje(db):
+    pid_madre = db.registrar_potrero(nombre="Ordeño")
+    pid_levante = db.registrar_potrero(nombre="Levante")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=pid_madre)
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+
+    did = db.registrar_destete("47-1", fecha="2026-09-01", peso_kg=120.0, potrero_cria="Levante")
+    assert isinstance(did, int)
+
+    cria = db.get_animal("47-1")
+    assert cria["potrero_id"] == pid_levante
+    pesajes = db.query("SELECT * FROM pesajes WHERE animal_id = ?", (cria["id_animal"],))
+    assert len(pesajes) == 1
+    assert pesajes[0]["peso_kg"] == 120.0
+    assert pesajes[0]["evento"] == "DESTETE"
+    traslados = db.query("SELECT * FROM traslados WHERE animal_id = ?", (cria["id_animal"],))
+    assert len(traslados) == 1
+    assert traslados[0]["motivo"] == "Destete"
+
+
+def test_registrar_destete_mueve_tambien_a_la_madre_si_se_indica(db):
+    pid_ordeno = db.registrar_potrero(nombre="Ordeño")
+    pid_secas = db.registrar_potrero(nombre="Vacas Secas")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=pid_ordeno)
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+
+    db.registrar_destete("47-1", fecha="2026-09-01", potrero_madre="Vacas Secas",
+                         peso_madre_kg=410.0, cond_corporal_madre=3.0)
+
+    madre = db.get_animal("47")
+    assert madre["potrero_id"] == pid_secas
+    traslados_madre = db.query("SELECT * FROM traslados WHERE animal_id = ?", (madre["id_animal"],))
+    assert len(traslados_madre) == 1
+    assert traslados_madre[0]["motivo"] == "Destete de cría"
+
+
+def test_registrar_destete_es_idempotente(db):
+    db.registrar_animal("47-1", sexo="Macho", estado="ACTIVO")
+    id1 = db.registrar_destete("47-1", fecha="2026-09-01", peso_kg=120.0)
+    id2 = db.registrar_destete("47-1", fecha="2026-09-01", peso_kg=120.0)
+    assert id1 == id2
+
+
+def test_registrar_destete_sin_potreros_no_falla(db):
+    db.registrar_animal("47-1", sexo="Macho", estado="ACTIVO")
+    did = db.registrar_destete("47-1", fecha="2026-09-01", notas="Destete simple, sin cambio de lote")
+    assert isinstance(did, int)
+
+
+def test_historial_incluye_destetes_propios_y_de_crias(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    db.registrar_destete("47-1", fecha="2026-09-01", peso_kg=120.0)
+
+    h_cria = db.historial("47-1")
+    assert len(h_cria["destetes"]) == 1
+
+    h_madre = db.historial("47")
+    assert len(h_madre["destetes_crias"]) == 1
+
+
 def test_registrar_parto_autorreferenciado_proteccion(db):
     # Intentar registrar parto donde vaca_tag == id_cria_tag
     res = db.registrar_parto(vaca_tag="V009", fecha="2026-03-02", sexo_cria="Macho", id_cria_tag="V009")

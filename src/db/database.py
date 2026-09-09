@@ -21,7 +21,7 @@ class Database:
     # son "eventos de campo" puntuales en el mismo sentido).
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
-        "traslados", "pesajes", "movimientos", "condicion_corporal",
+        "traslados", "destetes", "pesajes", "movimientos", "condicion_corporal",
         "produccion_leche", "diagnosticos_gestacion", "pluviometria",
         "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia",
         "rondas_campo",
@@ -283,7 +283,8 @@ class Database:
 
     def registrar_parto(self, vaca_tag, fecha=None, sexo_cria=None,
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
-                        notas=None, registrado_por=None) -> int:
+                        notas=None, potrero_cria=None, potrero_madre=None,
+                        registrado_por=None) -> int:
         tag_vaca_clean = str(vaca_tag).strip() if vaca_tag is not None else ""
         tag_cria_clean = str(id_cria_tag).strip() if id_cria_tag is not None else ""
 
@@ -331,6 +332,19 @@ class Database:
                 self.execute(
                     "UPDATE animales SET fecha_nacimiento = COALESCE(fecha_nacimiento, ?) WHERE id_animal = ?", (iso(fecha), id_cria)
                 )
+            # Potrero explícito de la cría (ej. la separan de la madre a otro
+            # lote desde el nacimiento): pisa la herencia automática de arriba,
+            # a diferencia de esa que solo aplica si la cría no tenía potrero.
+            if potrero_cria:
+                pid_cria = self.resolve_potrero(potrero_cria)
+                if pid_cria:
+                    self.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (pid_cria, id_cria))
+        # Potrero nuevo de la madre en el momento del parto (ej. la pasan a un
+        # potrero de maternidad/postparto).
+        if potrero_madre and vaca_id:
+            pid_madre = self.resolve_potrero(potrero_madre)
+            if pid_madre:
+                self.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (pid_madre, vaca_id))
         return self.insert("partos", dict(
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,
@@ -463,6 +477,45 @@ class Database:
         if destino is not None:
             self.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (destino, animal_id))
         return tid
+
+    def registrar_destete(self, cria_tag, fecha=None, peso_kg=None,
+                          potrero_cria=None, potrero_madre=None, cond_corporal_madre=None,
+                          peso_madre_kg=None, notas=None, registrado_por=None) -> int:
+        """Registra el destete de una cría (se separa de la madre, suele pasar
+        a potrero de levante) y opcionalmente el estado de la madre en ese
+        mismo momento (peso, condición corporal, nuevo potrero -- muchas
+        veces coincide con el secado de la vaca antes del próximo parto).
+        Equivalente a la pantalla "Secados/Destetos" de Software Ganadero."""
+        cria_id = self.resolve_animal(cria_tag, crear=True)
+        f = iso(fecha)
+        existente = self._id_si_ya_existe("destetes", {"animal_id": cria_id, "fecha": f})
+        if existente:
+            return existente
+
+        fila_cria = self.get_animal(cria_id)
+        madre_id = fila_cria["madre_id"] if fila_cria else None
+
+        pot_cria_id = self.resolve_potrero(potrero_cria) if potrero_cria else None
+        pot_madre_id = self.resolve_potrero(potrero_madre) if potrero_madre else None
+
+        did = self.insert("destetes", dict(
+            animal_id=cria_id, madre_id=madre_id, fecha=f, peso_kg=peso_kg,
+            potrero_cria=pot_cria_id, potrero_madre=pot_madre_id,
+            peso_madre_kg=peso_madre_kg, cond_corporal_madre=cond_corporal_madre,
+            notas=notas, creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+        if peso_kg is not None:
+            self.registrar_pesaje(cria_tag, fecha=f, peso_kg=peso_kg, evento="DESTETE", registrado_por=registrado_por)
+        if potrero_cria:
+            self.registrar_traslado(cria_tag, fecha=f, potrero_destino=potrero_cria,
+                                    motivo="Destete", registrado_por=registrado_por)
+        if potrero_madre and madre_id:
+            madre_fila = self.get_animal(madre_id)
+            if madre_fila:
+                self.registrar_traslado(madre_fila["tag"], fecha=f, potrero_destino=potrero_madre,
+                                        motivo="Destete de cría", registrado_por=registrado_por)
+        return did
 
     def animales_activos_en_potrero(self, potrero_id: int) -> list[str]:
         """Tags de los animales ACTIVOS cuyo potrero actual es `potrero_id`."""
@@ -1945,6 +1998,11 @@ class Database:
                        tr.creado_en, tr.registrado_por
                 FROM traslados tr LEFT JOIN animales a ON a.id_animal = tr.animal_id
                 UNION ALL
+                SELECT 'destetes', de.id, a.tag, de.fecha,
+                       ('Destete' || CASE WHEN de.peso_kg IS NOT NULL THEN ' - ' || de.peso_kg || 'kg' ELSE '' END),
+                       de.creado_en, de.registrado_por
+                FROM destetes de LEFT JOIN animales a ON a.id_animal = de.animal_id
+                UNION ALL
                 SELECT 'pesajes', pe.id, a.tag, pe.fecha,
                        ('Pesaje' || CASE WHEN pe.peso_kg IS NOT NULL THEN ' ' || pe.peso_kg || 'kg' ELSE '' END),
                        pe.creado_en, pe.registrado_por
@@ -1996,6 +2054,7 @@ class Database:
             "celos": lambda f: f"Celo de {tag} ({f['am_pm'] or '?'})",
             "tratamientos": lambda f: f"Tratamiento de {tag}" + (f" — {f['producto']}" if f["producto"] else ""),
             "traslados": lambda f: f"Traslado de {tag} (lote {f['lote'] or '?'})",
+            "destetes": lambda f: f"Destete de {tag}" + (f" — {f['peso_kg']}kg" if f["peso_kg"] is not None else ""),
             "pesajes": lambda f: f"Pesaje de {tag}" + (f" — {f['peso_kg']}kg" if f["peso_kg"] is not None else ""),
             "movimientos": lambda f: f"Movimiento de {tag} ({f['tipo_movimiento'] or '?'})",
             "condicion_corporal": lambda f: f"Condición corporal de {tag}" + (f" — {f['valor']}" if f["valor"] is not None else ""),
@@ -2059,6 +2118,10 @@ class Database:
             "muertes": self.query("SELECT * FROM muertes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "tratamientos": self.query("SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "traslados": self.query("SELECT * FROM traslados WHERE animal_id = ? ORDER BY fecha", (aid,)),
+            "destetes": self.query("SELECT * FROM destetes WHERE animal_id = ? ORDER BY fecha", (aid,)),
+            "destetes_crias": [] if es_macho else self.query(
+                "SELECT * FROM destetes WHERE madre_id = ? ORDER BY fecha", (aid,)
+            ),
             "pesajes": self.query("SELECT * FROM pesajes WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "movimientos": self.query("SELECT * FROM movimientos WHERE animal_id = ? ORDER BY fecha", (aid,)),
             "condicion_corporal": self.query(

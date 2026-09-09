@@ -106,6 +106,24 @@ CREATE TABLE IF NOT EXISTS traslados (
     motivo TEXT
 );
 
+-- Destete de una cría (se separa de la madre, pasa a potrero de levante) y,
+-- opcionalmente, el estado de la madre en ese mismo momento (peso, condición
+-- corporal, nuevo potrero) -- equivalente a "Secados/Destetos" en SG.
+CREATE TABLE IF NOT EXISTS destetes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER NOT NULL,
+    madre_id INTEGER,
+    fecha TEXT,
+    peso_kg REAL,
+    potrero_cria INTEGER,
+    potrero_madre INTEGER,
+    peso_madre_kg REAL,
+    cond_corporal_madre REAL,
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS pesajes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER,
@@ -262,6 +280,7 @@ CREATE INDEX IF NOT EXISTS idx_servicios_vaca_fecha ON servicios(vaca_id, fecha)
 CREATE INDEX IF NOT EXISTS idx_celos_vaca_fecha ON celos(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_tratamientos_animal_fecha ON tratamientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_traslados_animal_fecha ON traslados(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_destetes_animal_fecha ON destetes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
@@ -408,7 +427,7 @@ CREATE INDEX IF NOT EXISTS idx_push_user ON push_suscripciones(user_id);
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "pesajes", "movimientos", "condicion_corporal",
+    "tratamientos", "traslados", "destetes", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",

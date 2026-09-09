@@ -241,6 +241,20 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 UNION ALL
 
+                SELECT 'DESTETE' AS tipo, de.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       '' AS detalle_label,
+                       'Destete' ||
+                       CASE WHEN de.peso_kg IS NOT NULL THEN ' · ' || de.peso_kg || ' kg' ELSE '' END ||
+                       CASE WHEN pd_cria.nombre IS NOT NULL OR pd_cria.codigo IS NOT NULL
+                            THEN ' ➔ ' || COALESCE(pd_cria.nombre, pd_cria.codigo) ELSE '' END AS descripcion,
+                       COALESCE(de.notas, '') AS notas, de.id AS id
+                FROM destetes de
+                JOIN animales a ON a.id_animal = de.animal_id
+                LEFT JOIN potreros pd_cria ON pd_cria.id = de.potrero_cria
+
+                UNION ALL
+
                 SELECT 'PESAJE' AS tipo, pe.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
                        '' AS detalle_label,
