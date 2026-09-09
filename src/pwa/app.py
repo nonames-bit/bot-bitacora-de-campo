@@ -2694,6 +2694,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/api/mapa/datos")
     def api_mapa_datos():
         """Retorna GeoJSON de potreros, vigor NDVI/SAR, ocupación y operarios en vivo."""
+        mi_rol = _rol_actual()
+        if mi_rol == "TRABAJADOR":
+            return jsonify({"error": "Acceso denegado. El mapa satelital es exclusivo para administración y gerencia."}), 403
         db_map = _db(db_path)
         try:
             try:
@@ -2701,7 +2704,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except (ImportError, ValueError):
                 from src.engine.mapa_data import datos_mapa_finca
             res = datos_mapa_finca(db_map)
-            res["rol"] = _rol_actual()
+            res["rol"] = mi_rol
             return jsonify(res)
         finally:
             db_map.close()

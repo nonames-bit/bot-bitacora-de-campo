@@ -5735,6 +5735,12 @@
     }
 
     if (actual === "mapa") {
+      var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
+      if (rol === "TRABAJADOR") {
+        irAVista("captura");
+        cargar(true);
+        return;
+      }
       if (animar) skeleton(vista, "mapa");
       fetchJSON("/api/mapa/datos", function (d) {
         if (!vista) return;

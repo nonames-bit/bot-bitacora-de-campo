@@ -1736,4 +1736,12 @@ def test_api_push_suscribir_alertas_y_desuscribir(client):
     assert r_del.get_json()["ok"] is True
 
 
+def test_api_mapa_datos_restringido_a_trabajador(client):
+    with client.session_transaction() as sess:
+        sess["rol"] = "TRABAJADOR"
+    r = client.get("/api/mapa/datos")
+    assert r.status_code == 403
+
+
+
 
