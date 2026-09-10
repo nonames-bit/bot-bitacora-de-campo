@@ -1512,36 +1512,6 @@
     });
   }
 
-  function renderMercado(d) {
-    _mercadoDatos = d;
-    var rol = (d.rol || (window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase();
-    var puedeEditar = (rol === "OWNER" || rol === "ADMIN" || rol === "ADMINISTRADOR");
-
-    var btnActPrecios = puedeEditar
-      ? "<button type='button' class='tema-btn' id='btn-actualizar-precios-mercado' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("pencil", 13) + "Actualizar Precios</button>"
-      : "";
-
-    var btnSincronizar = puedeEditar
-      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Sincronizar Ahora</button>"
-      : "";
-
-    var badgeSync = "<div style='display:inline-flex; align-items:center; gap:6px; font-size:11.5px; background:rgba(30,126,52,0.12); color:#155724; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid rgba(30,126,52,0.25);'>"
-      + "<span style='display:inline-block; width:7px; height:7px; border-radius:50%; background:#28a745;'></span>"
-      + "Auto-sincronizado: <b>" + esc(fechaCorta(d.ultima_actualizacion || d.fecha_consulta)) + "</b>"
-      + (d.trm_actual ? " · TRM: <b>" + fmtMoneda(d.trm_actual) + " COP</b>" : "")
-      + "</div>";
-
-    var headerHtml = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<div>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("chartLine", 22) + "Indicadores Económicos &amp; Subastas Ganaderas</h3>"
-      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;'>"
-      + "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("pin", 12) + "Finca: <b>" + esc(d.ubicacion_finca || "Mesetas, Meta") + "</b></span>"
-      + badgeSync
-      + "</div>"
-      + "</div>"
-      + "<div style='display:flex; gap:8px; align-items:center; flex-wrap:wrap;'>"
-      + "<button type='button' class='tema-btn' id='btn-fuentes-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("clipboard", 13) + "Fuentes Oficiales</button>"
-      + btnSincronizar
   function renderKpisMercado(d) {
     var res = d.resumen_tendencias || {};
     var cats = [
