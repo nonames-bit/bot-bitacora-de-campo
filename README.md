@@ -539,7 +539,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Grabación de notas de voz estilo WhatsApp con cronómetro en vivo, indicador rojo pulsante, descarte (`✕`) y envío inmediato (`✓`) hacia el motor Whisper con inclusión automática de la transcripción y respuesta en el hilo.
   - **Depuración Integral de Terminología**:
     - Erradicación de términos no deseados ("zootécnico", "zootecnia") en interfaces de usuario, paneles de control, comandos de Telegram y manuales de ayuda, sustituyéndolos por un lenguaje ganadero natural, directo y ejecutivo.
-  - **Vaquita pastando en header PWA (2026-09-09, validada en VPS)**: SVG inline COW_HEAD + pasto en `index.html`/`ficha.html`, animada (`vacaAmbla 12s` + `vacaPasta 4s`), visible 360-640px (oculta solo <320px), estática en Sol de Campo y `reduced-motion`; SW `pwa-ja-v78`.
+  - **Vaquita Pastando y Moviéndose en Header PWA (`vaca.jpg`, PWA v81)**:
+    - Extracción y recorte de alta precisión desde imagen personalizada (`vaca.jpg`) con remoción de fondo y recorte de bolsas de aire translúcidas bajo el vientre y cuello con anti-aliasing, manteniendo pelaje blanco opaco, manchas negras y franja de pasto verde.
+    - Animación dual CSS fluida: patrullaje horizontal continuo con cambio de dirección (`vacaAmbla 14s ease-in-out infinite`) sincronizado con cabeceo realista de pastoreo comiendo bocado en el pasto (`vacaCome 2.4s infinite`).
+    - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v81`), adaptada a pantallas móviles y desktop.
   - **Módulo de Mercado, Subastas Ganaderas & TRM 100% Automatizado ("Nada Manual", PWA v79)**:
     - **Sincronización Automática Diaria**: Robot en background (`src/integrations/mercado_sync.py`) y script cron (`scripts/actualizar_precios_mercado.py`, programado diario a las 06:00 AM COT) que actualiza cotizaciones oficiales sin requerir digitación ni intervención manual.
     - **Dólar TRM Oficial en Tiempo Real**: Consumo directo de la API de Datos Abiertos de Colombia (Superintendencia Financiera / Banco de la República con fallback automático a DolarAPI).
