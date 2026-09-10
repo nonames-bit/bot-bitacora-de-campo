@@ -8,6 +8,33 @@
   function q(s) { return document.querySelector(s); }
   function qa(s, ctx) { return Array.prototype.slice.call((ctx || document).querySelectorAll(s)); }
   function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+
+  // Toast flotante + vibración: confirmación de guardado que no depende de
+  // mirar un lugar específico de la pantalla -- pensado para uso en el
+  // potrero, a veces con guantes y sin poder fijar la vista en el celular.
+  function mostrarToast(mensaje, tipo) {
+    var cont = document.getElementById("toast-contenedor");
+    if (!cont) {
+      cont = document.createElement("div");
+      cont.id = "toast-contenedor";
+      document.body.appendChild(cont);
+    }
+    var t = document.createElement("div");
+    t.className = "toast toast-" + (tipo || "verde");
+    t.textContent = mensaje;
+    cont.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add("visible"); });
+    setTimeout(function () {
+      t.classList.remove("visible");
+      setTimeout(function () { if (t.parentNode) t.parentNode.removeChild(t); }, 300);
+    }, 2800);
+  }
+
+  function vibrarConfirmacion() {
+    if (navigator.vibrate) {
+      try { navigator.vibrate(60); } catch (e) { /* algunos navegadores lo bloquean sin gesto reciente */ }
+    }
+  }
   // Chips semáforo por estado.
   function chipEstado(v) {
     var t = String(v == null ? "" : v);
@@ -3122,6 +3149,8 @@
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
               + (online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
           }
+          mostrarToast(online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal", online ? "verde" : "ambar");
+          vibrarConfirmacion();
           _fotoActual = null;
           form.reset();
           if (cCampos) {
@@ -3570,6 +3599,42 @@
     h += "</div>";
 
     return h;
+  }
+
+  var _leafletCargando = false;
+  var _leafletCallbacksEnEspera = [];
+
+  // Leaflet (CSS+JS, ~150KB) ya no va fijo en el <head>/</body> -- se pedía
+  // en TODAS las páginas aunque el 90% de las visitas nunca abren Mapa &
+  // GPS. Se inyecta bajo demanda solo la primera vez que se entra a ese
+  // módulo, y queda cacheado por el Service Worker para las siguientes.
+  function cargarLeafletSiFalta(callback) {
+    if (typeof L !== "undefined") { callback(); return; }
+    _leafletCallbacksEnEspera.push(callback);
+    if (_leafletCargando) return;
+    _leafletCargando = true;
+
+    if (!document.getElementById("leaflet-css")) {
+      var link = document.createElement("link");
+      link.id = "leaflet-css";
+      link.rel = "stylesheet";
+      link.href = "/static/leaflet/leaflet.css";
+      document.head.appendChild(link);
+    }
+    var script = document.createElement("script");
+    script.src = "/static/leaflet/leaflet.js";
+    script.onload = function () {
+      var pendientes = _leafletCallbacksEnEspera;
+      _leafletCallbacksEnEspera = [];
+      _leafletCargando = false;
+      pendientes.forEach(function (cb) { cb(); });
+    };
+    script.onerror = function () {
+      _leafletCargando = false;
+      var mapEl = document.getElementById("mapa-finca");
+      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>⚠️ No se pudo cargar el componente de mapas. Verifica tu conexión e intenta de nuevo.</p>";
+    };
+    document.body.appendChild(script);
   }
 
   function bindMapa(d) {
@@ -6790,7 +6855,7 @@
       fetchJSON("/api/mapa/datos?fecha=" + encodeURIComponent(fFecha), function (d) {
         if (!vista) return;
         montarVista(vista, renderMapa(d), animar);
-        bindMapa(d);
+        cargarLeafletSiFalta(function () { bindMapa(d); });
       }, animar ? vista : null);
       return;
     }

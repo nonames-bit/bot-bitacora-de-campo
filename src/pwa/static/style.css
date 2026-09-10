@@ -87,7 +87,7 @@
   --borde-fuerte: #EAEAEA;
   
   --texto: #1C1E21;
-  --texto-suave: #787774;
+  --texto-suave: #6E6E6A; /* antes #787774: contraste AA 4.48:1 (fallaba por poco), ahora 5.12:1 */
   
   --verde-marca: #111111; /* Accentos en negro minimalista */
   --verde-marca-hover: #333333;
@@ -1039,6 +1039,35 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 :root[data-theme="sun"] td {
   border-color: #000000 !important;
   font-weight: 600;
+}
+/* Sol de Campo: objetivos táctiles >=44px y texto mínimo 12px -- pensado
+   para usarse afuera, con sol directo y a veces con guantes de trabajo. */
+:root[data-theme="sun"] header .tema-btn,
+:root[data-theme="sun"] header a.salir {
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+:root[data-theme="sun"] #nav-principal button {
+  min-height: 44px;
+}
+:root[data-theme="sun"] .chat-btn-ico,
+:root[data-theme="sun"] .chat-dock-burbuja {
+  min-width: 44px;
+  min-height: 44px;
+}
+:root[data-theme="sun"] .user-badge {
+  font-size: 12px;
+}
+@media (max-width: 640px) {
+  :root[data-theme="sun"] #nav-principal button .nav-txt {
+    font-size: 12px;
+  }
+  :root[data-theme="sun"] header .tema-btn {
+    min-height: 44px;
+    height: 44px;
+    font-size: 12px;
+  }
 }
 /* --- Badge de Usuario & Sincronización en Header --- */
 .marca-titulo { display: inline-flex; align-items: center; gap: 8px; }
@@ -2675,3 +2704,42 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 }
 
 
+
+/* --- Toast de confirmación de guardado (flotante, no depende de mirar
+   un lugar específico) --- */
+#toast-contenedor {
+  position: fixed;
+  left: 50%;
+  bottom: 88px;
+  transform: translateX(-50%);
+  z-index: 3000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  width: min(360px, calc(100vw - 32px));
+}
+.toast {
+  background: #1B5E20;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.28);
+  text-align: center;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(12px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast.visible { opacity: 1; transform: translateY(0); }
+.toast-ambar { background: #8A5A00; }
+.toast-rojo { background: #B3261E; }
+@media (max-width: 640px) {
+  #toast-contenedor { bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: opacity 0.15s ease; }
+}
