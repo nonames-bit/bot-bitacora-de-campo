@@ -38,8 +38,34 @@ class Database:
                 self.conn.execute("PRAGMA synchronous = NORMAL;")
             except Exception:
                 pass
+            self._migrar_columnas_esenciales()
         try:
             self.conn.execute("PRAGMA foreign_keys = ON;")
+        except Exception:
+            pass
+
+    def _migrar_columnas_esenciales(self) -> None:
+        """Añade columnas nuevas a bases de datos existentes de forma segura e idempotente."""
+        try:
+            tablas = {r[0] for r in self.conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+            if "partos" in tablas:
+                cols_p = {r[1] for r in self.conn.execute("PRAGMA table_info(partos)").fetchall()}
+                if "tipo_evento" not in cols_p:
+                    self.conn.execute("ALTER TABLE partos ADD COLUMN tipo_evento TEXT DEFAULT 'PARTO'")
+                if "grupo_parto_id" not in cols_p:
+                    self.conn.execute("ALTER TABLE partos ADD COLUMN grupo_parto_id INTEGER")
+            if "animales" in tablas:
+                cols_a = {r[1] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()}
+                if "hierro" not in cols_a:
+                    self.conn.execute("ALTER TABLE animales ADD COLUMN hierro TEXT")
+                if "chip" not in cols_a:
+                    self.conn.execute("ALTER TABLE animales ADD COLUMN chip TEXT")
+                if "color" not in cols_a:
+                    self.conn.execute("ALTER TABLE animales ADD COLUMN color TEXT")
+            if "fotos" in tablas:
+                cols_f = {r[1] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()}
+                if "ocr_text" not in cols_f:
+                    self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
         except Exception:
             pass
 
@@ -47,6 +73,7 @@ class Database:
     # Ciclo de vida y utilidades de bajo nivel
     # ------------------------------------------------------------------ #
     def create_tables(self) -> "Database":
+        self._migrar_columnas_esenciales()
         self.conn.executescript(SCHEMA_SQL)
         # Migración idempotente para columnas añadidas
         try:
