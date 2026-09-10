@@ -28,6 +28,8 @@ from src.engine.charts import (
     generar_grafico_prenadas_vacias_potrero,
     generar_grafico_ranking_vacas_leche,
     generar_grafico_rendimiento_padre,
+    generar_grafico_subastas_comparativa,
+    generar_grafico_subastas_tendencia,
     generar_grafico_waterfall_inventario,
     graficos_disponibles,
 )
@@ -474,3 +476,40 @@ def test_generar_grafico_carga_animal_potrero_sin_area_devuelve_none(db, tmp_pat
     p1 = db.registrar_potrero("Norte")  # sin area_has
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2022-01-01")
     assert generar_grafico_carga_animal_potrero(db, output_dir=str(tmp_path), hoy=date(2026, 8, 30)) is None
+
+
+# ---------------------------------------------------------------------------
+# Subastas Ganaderas: Comparativa de Plazas y Curvas de Tendencia
+# ---------------------------------------------------------------------------
+def test_generar_grafico_subastas_comparativa(db, tmp_path):
+    ruta = generar_grafico_subastas_comparativa(
+        db, categoria="MACHO_GORDO", output_dir=str(tmp_path), hoy=date(2026, 9, 10)
+    )
+    assert ruta is not None
+    assert os.path.exists(ruta)
+    assert ruta.endswith(".png")
+    assert os.path.getsize(ruta) > 0
+
+
+def test_generar_grafico_subastas_comparativa_categoria_vacia_devuelve_none(db, tmp_path):
+    ruta = generar_grafico_subastas_comparativa(
+        db, categoria="CATEGORIA_INEXISTENTE", output_dir=str(tmp_path)
+    )
+    assert ruta is None
+
+
+def test_generar_grafico_subastas_tendencia(db, tmp_path):
+    ruta = generar_grafico_subastas_tendencia(
+        db, categoria="MACHO_GORDO", output_dir=str(tmp_path), hoy=date(2026, 9, 10)
+    )
+    assert ruta is not None
+    assert os.path.exists(ruta)
+    assert ruta.endswith(".png")
+    assert os.path.getsize(ruta) > 0
+
+
+def test_generar_grafico_subastas_tendencia_categoria_vacia_devuelve_none(db, tmp_path):
+    ruta = generar_grafico_subastas_tendencia(
+        db, categoria="CATEGORIA_INEXISTENTE", output_dir=str(tmp_path)
+    )
+    assert ruta is None

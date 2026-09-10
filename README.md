@@ -550,7 +550,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Calculadora Interactiva de Flete, Merma & Utilidad Neta**: Simulación instantánea para lotes de venta desde Mesetas calculando merma por desbaste de viaje, flete por camión y comisión de subasta (2.5%).
     - **Poder Adquisitivo de Insumos del Ariari**: Relación de intercambio kg de novillo vs. insumos críticos (urea 46%, sal mineralizada 8% y 10%, alambre de púas) indexados a TRM, y precio real liquidado de leche finca desde el módulo de Finanzas.
     - **Monitoreo de Titulares y Boletines**: Ticker informativo de boletines semanales de FEDEGÁN y CONtexto Ganadero vía RSS oficial.
-- [x] Suite de pruebas con pytest: **745+ pruebas en verde** (100% pasando).
+  - **Tablero Visual Interactivo de Subastas & Tendencias Semanales (PWA v82)**:
+    - **Gráficas Comparativas de Barras Horizontales**: Ranking visual de las 8 plazas ordenadas por precio según la categoría seleccionada (`Macho Gordo`, `Macho Levante`, `Ternero Desteto`, `Hembra Levante`, `Vaca Gorda`), destacando la plaza local (Granada / Ariari) y la plaza líder (Catama / Bogotá) con diferencial explícito en $/kg y respecto a la media nacional.
+    - **Curvas de Tendencia Temporal Semanal (7 semanas)**: Evolución multi-plaza en SVG y PNG alta definición (`src/engine/charts.py`) mostrando con claridad si el mercado viene subiendo, bajando o estable, con marcadores interactivos en Granada, Catama, Bogotá y Promedio Nacional.
+    - **Badges y Chips de Tendencia Zootécnica**: Indicadores visuales en cada plaza y producto (`▲ +X.X%`, `▼ -X.X%`, `▬ 0.0%`) calculados con funciones de ventana SQL (`LAG` / `ROW_NUMBER`).
+    - **KPIs y Diagnóstico Ejecutivo de Comercialización**: Resumen con semáforo alcista/bajista, cotización de Granada, líder regional, líder terminal y recomendación estratégica para venta de lotes desde Mesetas.
+    - **Endpoints de Gráficos de Servidor**: `/api/grafico/subastas_comparativa` y `/api/grafico/subastas_tendencia` para reportes PNG y visualización de alta resolución.
+- [x] Suite de pruebas con pytest: **755 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

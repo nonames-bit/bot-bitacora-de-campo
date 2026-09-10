@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Optional, Union
 
+from ..db.models import TIPOS_EVENTO_SIN_CRIA
 from ..utils import iso, normalizar, parse_fecha
 from . import nlp_engine as nlu
 
@@ -69,6 +70,20 @@ def es_tipo_evento_llm_valido(tipo: Optional[str]) -> bool:
 
 # Palabras que marcan una cría muerta / aborto.
 MUERTE_CRIA_RE = re.compile(r"\b(?:nacio muert|naci[oó] muert|aborto|muert[oa])\b")
+
+# Subtipos de pérdida gestacional (catálogo TIPOS_EVENTO_SIN_CRIA), en orden
+# de especificidad -- "aborto" es el más genérico y va al final para no
+# tapar términos clínicos más precisos si ambos aparecen en la misma nota.
+TIPO_EVENTO_PARTO_RE: list[tuple[str, re.Pattern]] = [
+    ("REABSORCION", re.compile(r"\breabsor")),
+    ("MOMIFICACION", re.compile(r"\bmomific")),
+    ("MACERACION", re.compile(r"\bmacer")),
+    ("MUERTE_FETAL", re.compile(r"\bmuerte\s+fetal\b")),
+    ("ABORTO", re.compile(r"\babort")),
+]
+
+# Parto múltiple (no implica pérdida): "parió mellizos/gemelos".
+GEMELAR_RE = re.compile(r"\bgemel|\bmelliz")
 
 
 def _causa_muerte(texto_norm: str) -> Optional[str]:
@@ -192,9 +207,18 @@ class EventParser:
     # Handlers por evento
     # ------------------------------------------------------------------ #
     def _parse_parto(self, ev: ParsedEvent, t: str) -> None:
+        tipo_evento = "PARTO"
+        for nombre, patron in TIPO_EVENTO_PARTO_RE:
+            if patron.search(t):
+                tipo_evento = nombre
+                break
+        if tipo_evento == "PARTO" and GEMELAR_RE.search(t):
+            tipo_evento = "GEMELAR"
+
         sexo = nlu.extraer_sexo_cria(t)
-        estado = "MUERTO" if MUERTE_CRIA_RE.search(t) else "VIVO"
+        estado = "MUERTO" if (tipo_evento in TIPOS_EVENTO_SIN_CRIA or MUERTE_CRIA_RE.search(t)) else "VIVO"
         peso = nlu.extraer_peso(t)
+        ev.datos["tipo_evento"] = tipo_evento
         ev.datos["sexo_cria"] = sexo
         ev.datos["estado_cria"] = estado
         ev.datos["peso_nacimiento"] = peso

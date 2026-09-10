@@ -129,14 +129,18 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
     try:
         query_eventos = """
             SELECT * FROM (
-                SELECT CASE WHEN p.id_cria IS NULL AND UPPER(COALESCE(p.estado_cria, '')) = 'MUERTO'
-                            THEN 'ABORTO' ELSE 'PARTO' END AS tipo,
+                SELECT COALESCE(p.tipo_evento, 'PARTO') AS tipo,
                        p.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        COALESCE(c.tag, '') AS detalle_tag,
                        'Cría' AS detalle_label,
-                       CASE
-                           WHEN p.id_cria IS NULL AND UPPER(COALESCE(p.estado_cria, '')) = 'MUERTO' THEN 'Aborto registrado'
-                           WHEN p.sexo_cria IS NOT NULL THEN 'Cría ' || p.sexo_cria
+                       CASE COALESCE(p.tipo_evento, 'PARTO')
+                           WHEN 'GEMELAR' THEN 'Parto gemelar'
+                           WHEN 'ABORTO' THEN 'Aborto registrado'
+                           WHEN 'REABSORCION' THEN 'Reabsorción embrionaria'
+                           WHEN 'MOMIFICACION' THEN 'Momificación fetal'
+                           WHEN 'MACERACION' THEN 'Maceración fetal'
+                           WHEN 'MUERTE_FETAL' THEN 'Muerte fetal'
+                           WHEN 'PARTO' THEN CASE WHEN p.sexo_cria IS NOT NULL THEN 'Cría ' || p.sexo_cria ELSE 'Parto registrado' END
                            ELSE 'Parto registrado'
                        END ||
                        CASE WHEN p.peso_nacimiento IS NOT NULL THEN ' (' || ROUND(p.peso_nacimiento, 1) || ' kg)' ELSE '' END AS descripcion,

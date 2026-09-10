@@ -1782,3 +1782,206 @@ def generar_grafico_carga_animal_potrero(db, output_dir: str = "data/reportes",
     _estilo_ejes(ax, margin_x=0.06, margin_y=0.02)
 
     return _guardar(fig, output_dir, f"grafico_carga_animal_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+
+
+def generar_grafico_subastas_comparativa(db, output_dir: str = "data/reportes",
+                                        hoy: Optional[date] = None, dpi: int = 130,
+                                        placeholder_si_vacio: bool = False,
+                                        producto: str = "MACHO_GORDO",
+                                        categoria: Optional[str] = None) -> Optional[str]:
+    """Barras horizontales comparativas de precios de subastas ganaderas ($/kg en pie)
+    en 8 plazas comerciales relevantes para la finca."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    producto = categoria or producto
+    datos = db.obtener_datos_mercado_completos()
+    comp = datos.get("comparativa_por_categoria", {}).get(producto, [])
+    if not comp:
+        if placeholder_si_vacio:
+            return generar_grafico_placeholder(
+                titulo="Subastas Ganaderas · Comparativa de Precios",
+                subtitulo=f"Sin cotizaciones registradas para {producto}.",
+                output_dir=output_dir,
+                nombre_archivo=f"grafico_subastas_comparativa_{producto.lower()}_{hoy.isoformat()}.png",
+                hoy=hoy, dpi=dpi,
+            )
+        return None
+
+    # Ordenar de menor a mayor precio para barh (los más altos quedan arriba)
+    comp_sorted = sorted(comp, key=lambda x: x["precio_promedio"])
+    nombres = []
+    precios = []
+    colores = []
+    textos_valores = []
+
+    # Encontrar el promedio nacional para la línea de referencia
+    prom_nal = next((x["precio_promedio"] for x in comp if x["plaza_key"] == "PROMEDIO_NACIONAL"), None)
+
+    for item in comp_sorted:
+        pz_key = item["plaza_key"]
+        dist = f"{item['distancia_km']}km" if item.get("distancia_km") else "Nacional"
+        nombre_label = f"{item['nombre']} ({dist})"
+        nombres.append(nombre_label)
+        p = item["precio_promedio"]
+        precios.append(p)
+
+        # Colorear según relevancia: Granada (local) verde oscuro, Mejor precio verde brillante, Promedio gris, resto tierra/pizarra
+        if pz_key == "GRANADA":
+            colores.append(_COLOR_MARCA)  # Verde institucional
+        elif item.get("es_mejor_precio"):
+            colores.append(_COLOR_VERDE)  # Verde acento mejor precio
+        elif pz_key == "PROMEDIO_NACIONAL":
+            colores.append(_COLOR_GRIS)
+        else:
+            colores.append("#52796F")
+
+        # Texto del valor con indicador de tendencia
+        tend = item.get("tendencia", "ESTABLE")
+        flecha = "▲" if tend == "SUBIENDO" else ("▼" if tend == "BAJANDO" else "▬")
+        var_txt = f"{flecha}{'+' if item.get('variacion_pct', 0) > 0 else ''}{item.get('variacion_pct', 0):.1f}%"
+        textos_valores.append(f" ${p:,.0f} ({var_txt})")
+
+    fig, ax = plt.subplots(figsize=(8.5, max(4.0, 0.45 * len(nombres))), dpi=dpi)
+    bars = ax.barh(nombres, precios, color=colores, height=0.62)
+
+    # Anotar valores al final de cada barra
+    max_p = max(precios)
+    min_p = min(precios)
+    rango = max_p - min_p if max_p > min_p else 1000
+    ax.set_xlim(left=max(0, min_p - rango * 0.4), right=max_p + rango * 0.35)
+
+    for bar, txt, p in zip(bars, textos_valores, precios):
+        ax.text(p + rango * 0.02, bar.get_y() + bar.get_height() / 2, txt,
+                va="center", ha="left", fontsize=9.5, fontweight="bold", color="#333333")
+
+    if prom_nal:
+        ax.axvline(prom_nal, color=_COLOR_GRIS, linestyle="--", linewidth=1.2,
+                   label=f"Promedio Nacional: ${prom_nal:,.0f}/kg")
+        ax.legend(loc="lower right", fontsize=9.0)
+
+    cat_labels = {
+        "MACHO_GORDO": "Macho Gordo (400+ kg)",
+        "MACHO_LEVANTE": "Macho 1 ½ años (Levante)",
+        "TERNERO_DESTETO": "Ternero(a) Desteto",
+        "HEMBRA_LEVANTE": "Hembra Levante",
+        "VACA_GORDA": "Vaca Descarte / Gorda",
+    }
+    cat_nom = cat_labels.get(producto, producto)
+    _titulo_y_subtitulo(fig, ax, f"Subastas Ganaderas · {cat_nom}",
+                        "Cotizaciones oficiales semanales ($/kg en pie) · Referencia desde Mesetas, Meta")
+    ax.set_xlabel("Precio en pie ($/kg)")
+    _estilo_ejes(ax, margin_x=0.08, margin_y=0.03)
+
+    return _guardar(fig, output_dir, f"grafico_subastas_comparativa_{producto.lower()}_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+
+
+def generar_grafico_subastas_tendencia(db, output_dir: str = "data/reportes",
+                                       hoy: Optional[date] = None, dpi: int = 130,
+                                       placeholder_si_vacio: bool = False,
+                                       producto: str = "MACHO_GORDO",
+                                       categoria: Optional[str] = None) -> Optional[str]:
+    """Líneas de tendencia histórica semanal de precios de subastas ($/kg) en mercados clave."""
+    if not _MATPLOTLIB_OK:
+        return None
+    hoy = hoy or date.today()
+    producto = categoria or producto
+    datos = db.obtener_datos_mercado_completos()
+    subastas = datos.get("subastas", [])
+
+    # Plazas clave para la comparativa temporal
+    PLAZAS_CLAVE = [
+        ("GRANADA", "Granada (Ariari - Local)", _COLOR_MARCA, "o", "-"),
+        ("CATAMA", "Catama (Villavicencio)", _COLOR_VERDE, "s", "-"),
+        ("BOGOTA", "Bogotá (Guadalupe)", "#1E88E5", "^", "-"),
+        ("PROMEDIO_NACIONAL", "Promedio Nacional FEDEGÁN", _COLOR_GRIS, "D", "--"),
+    ]
+
+    series_a_graficar = []
+    todas_fechas = set()
+
+    for pz_key, pz_nombre, col, marker, lstyle in PLAZAS_CLAVE:
+        pz_obj = next((s for s in subastas if s["plaza_key"] == pz_key), None)
+        if not pz_obj:
+            continue
+        p_obj = pz_obj.get("productos", {}).get(producto)
+        if not p_obj:
+            continue
+        hist = p_obj.get("historico_semanal", [])
+        if not hist:
+            continue
+        fechas = [h["fecha"] for h in hist]
+        precios = [h["precio"] for h in hist]
+        todas_fechas.update(fechas)
+        series_a_graficar.append({
+            "key": pz_key,
+            "nombre": pz_nombre,
+            "color": col,
+            "marker": marker,
+            "linestyle": lstyle,
+            "fechas": fechas,
+            "precios": precios,
+        })
+
+    if not series_a_graficar or len(todas_fechas) < 2:
+        if placeholder_si_vacio:
+            return generar_grafico_placeholder(
+                titulo="Tendencia Histórica de Precios de Subasta",
+                subtitulo=f"Se requieren al menos 2 semanas de cotizaciones para {producto}.",
+                output_dir=output_dir,
+                nombre_archivo=f"grafico_subastas_tendencia_{producto.lower()}_{hoy.isoformat()}.png",
+                hoy=hoy, dpi=dpi,
+            )
+        return None
+
+    fechas_ordenadas = sorted(list(todas_fechas))
+    fechas_etiquetas = []
+    for f in fechas_ordenadas:
+        try:
+            d_obj = to_date(f)
+            fechas_etiquetas.append(f"{d_obj.day:02d} {_MESES_ES[d_obj.month]}")
+        except Exception:
+            fechas_etiquetas.append(f)
+
+    fig, ax = plt.subplots(figsize=(8.5, 4.8), dpi=dpi)
+
+    for s in series_a_graficar:
+        x_pts = []
+        y_pts = []
+        for i, f in enumerate(fechas_ordenadas):
+            if f in s["fechas"]:
+                idx_h = s["fechas"].index(f)
+                x_pts.append(i)
+                y_pts.append(s["precios"][idx_h])
+
+        if not x_pts:
+            continue
+
+        ax.plot(x_pts, y_pts, label=s["nombre"], color=s["color"],
+                marker=s["marker"], linestyle=s["linestyle"], linewidth=2.2, markersize=6.5)
+
+        if x_pts:
+            ult_x = x_pts[-1]
+            ult_y = y_pts[-1]
+            _marcar_ultimo_valor(ax, ult_x, ult_y, f"${ult_y:,.0f}", color=s["color"])
+
+    ax.set_xticks(range(len(fechas_ordenadas)))
+    ax.set_xticklabels(fechas_etiquetas, fontsize=9.5)
+    ax.set_ylabel("Precio en pie ($/kg)", fontsize=10.5)
+
+    cat_labels = {
+        "MACHO_GORDO": "Macho Gordo (400+ kg)",
+        "MACHO_LEVANTE": "Macho 1 ½ años (Levante)",
+        "TERNERO_DESTETO": "Ternero(a) Desteto",
+        "HEMBRA_LEVANTE": "Hembra Levante",
+        "VACA_GORDA": "Vaca Descarte / Gorda",
+    }
+    cat_nom = cat_labels.get(producto, producto)
+    _titulo_y_subtitulo(fig, ax, f"Tendencia de Precios en Subasta · {cat_nom}",
+                        "Evolución semanal ($/kg en pie) · Plazas clave para Ganadería JA (Mesetas)")
+
+    ax.legend(loc="upper left", fontsize=9.0, framealpha=0.92)
+    _estilo_ejes(ax, margin_x=0.06, margin_y=0.12)
+
+    return _guardar(fig, output_dir, f"grafico_subastas_tendencia_{producto.lower()}_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
+

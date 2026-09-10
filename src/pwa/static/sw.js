@@ -69,7 +69,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v77: Unificación definitiva de Mapa Satelital y Rutas GPS (ADMIN y OWNER), dock de chat WhatsApp con notas de voz y depuración integral de terminología.
 // v78: "Distribución por potrero" del Tablero sube justo después de "Evolución del rebaño" (antes quedaba al final, después del feed de eventos); se quita el gráfico de torta duplicado con Inventario.
 // v81: Vaquita realista comiendo pasto en el header (vaca_comiendo.png con animación de pastar y caminar).
-var CACHE = "pwa-ja-v81"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v82: Tablero visual interactivo de subastas ganaderas con comparativa de plazas, barras de precios relativos a Granada y curvas de tendencia semanal.
+var CACHE = "pwa-ja-v82"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

@@ -324,6 +324,8 @@ def _generadores_graficos_pwa():
         "gmd_hato": charts.generar_grafico_gmd_hato,
         "ranking_vacas_leche": charts.generar_grafico_ranking_vacas_leche,
         "waterfall_inventario": charts.generar_grafico_waterfall_inventario,
+        "subastas_comparativa": charts.generar_grafico_subastas_comparativa,
+        "subastas_tendencia": charts.generar_grafico_subastas_tendencia,
     }
 
 
@@ -2028,7 +2030,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
                 try:
                     if tipo == "parto":
-                        db_sync.registrar_parto(
+                        tipo_evento = str(payload.get("tipo_evento") or "PARTO").upper()
+                        primer_id = db_sync.registrar_parto(
                             vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
                             fecha=fecha,
                             sexo_cria=payload.get("sexo_cria"),
@@ -2039,11 +2042,32 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             potrero_cria=payload.get("potrero_cria"),
                             potrero_madre=payload.get("potrero_madre"),
                             registrado_por=uid,
+                            tipo_evento=tipo_evento,
                         )
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                        # Parto gemelar: el segundo gemelo viaja en
+                        # payload.gemelo y se registra como una segunda fila
+                        # de partos agrupada por grupo_parto_id (ver
+                        # Database.registrar_parto, que ya dejó grupo_parto_id
+                        # = primer_id en la primera fila).
+                        gemelo = payload.get("gemelo") if tipo_evento == "GEMELAR" else None
+                        if gemelo and primer_id:
+                            db_sync.registrar_parto(
+                                vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
+                                fecha=fecha,
+                                sexo_cria=gemelo.get("sexo_cria"),
+                                estado_cria=gemelo.get("estado_cria", "VIVO"),
+                                peso_nacimiento=gemelo.get("peso_nacimiento"),
+                                id_cria_tag=gemelo.get("id_cria_tag"),
+                                notas=payload.get("notas"),
+                                potrero_cria=payload.get("potrero_cria"),
+                                registrado_por=uid,
+                                tipo_evento="GEMELAR",
+                                grupo_parto_id=primer_id,
+                            )
                     elif tipo == "destete":
                         db_sync.registrar_destete(
                             cria_tag=payload.get("cria_tag") or payload.get("animal_tag") or payload.get("tag"),

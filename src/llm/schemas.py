@@ -46,6 +46,11 @@ SCHEMA_REPRODUCCION = _lista_eventos(
     ["parto", "servicio", "celo", "diagnostico_gestacion"],
     {
         # parto
+        "tipo_evento": {
+            "type": "string",
+            "enum": ["PARTO", "GEMELAR", "ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"],
+            "nullable": True,
+        },
         "sexo_cria": {"type": "string", "enum": ["Macho", "Hembra"], "nullable": True},
         "estado_cria": {"type": "string", "enum": ["VIVO", "MUERTO"], "nullable": True},
         "peso_nacimiento": {"type": "number", "nullable": True},

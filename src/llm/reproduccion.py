@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Optional
 
+from ..db.models import TIPOS_EVENTO_PARTO, TIPOS_EVENTO_SIN_CRIA
 from ..parsers.event_parser import ParsedEvent, es_tipo_evento_llm_valido
 from ..utils import a_float, iso, parse_fecha, to_date
 from .gemini_client import GeminiClient
@@ -20,10 +21,23 @@ Los tipos de evento posibles en este dominio son:
 1. 'parto':
    - animal_tag: tag/arete de la vaca madre (ej: '47', 'n069')
    - datos:
-     - sexo_cria: 'Macho' o 'Hembra' (o null)
-     - estado_cria: 'VIVO' o 'MUERTO' (por defecto 'VIVO', 'MUERTO' si fue aborto o nació muerto)
+     - tipo_evento: uno de 'PARTO', 'GEMELAR', 'ABORTO', 'REABSORCION',
+       'MOMIFICACION', 'MACERACION', 'MUERTE_FETAL' (por defecto 'PARTO').
+       Usa 'GEMELAR' si se mencionan dos crías del mismo parto ("parió
+       mellizos/gemelos"). Usa 'ABORTO' para pérdida gestacional genérica sin
+       más detalle. Usa 'REABSORCION' si se dice "reabsorbió" o "se resorbió"
+       (pérdida temprana, sin signos visibles). Usa 'MOMIFICACION' si se dice
+       "se momificó" el feto (feto seco/deshidratado retenido). Usa
+       'MACERACION' si se dice "se maceró" (feto descompuesto con
+       infección). Usa 'MUERTE_FETAL' si se dice "murió el feto"/"muerte
+       fetal" sin especificar más.
+     - sexo_cria: 'Macho' o 'Hembra' (o null; no aplica si tipo_evento no es
+       'PARTO' ni 'GEMELAR')
+     - estado_cria: 'VIVO' o 'MUERTO' (por defecto 'VIVO'; 'MUERTO' si nació
+       muerto o si tipo_evento no es 'PARTO'/'GEMELAR')
      - peso_nacimiento: float en kg (o null)
-     - id_cria: tag de la cría si se menciona (o null)
+     - id_cria: tag de la cría si se menciona (o null; no aplica salvo en
+       'PARTO'/'GEMELAR')
 
 2. 'servicio':
    - animal_tag: tag de la vaca
@@ -96,6 +110,11 @@ def parse(
 
 def _limpiar_datos(tipo: str, datos: dict) -> dict:
     if tipo == "parto":
+        tipo_evento = str(datos.get("tipo_evento") or "PARTO").strip().upper()
+        if tipo_evento not in TIPOS_EVENTO_PARTO:
+            tipo_evento = "PARTO"
+        datos["tipo_evento"] = tipo_evento
+
         sexo = datos.get("sexo_cria")
         if sexo:
             s_str = str(sexo).strip().capitalize()
@@ -104,7 +123,10 @@ def _limpiar_datos(tipo: str, datos: dict) -> dict:
             elif s_str.startswith("H"):
                 datos["sexo_cria"] = "Hembra"
         estado = datos.get("estado_cria")
-        if estado and "muert" in str(estado).lower():
+        if tipo_evento in TIPOS_EVENTO_SIN_CRIA:
+            datos["estado_cria"] = "MUERTO"
+            datos["id_cria"] = None
+        elif estado and "muert" in str(estado).lower():
             datos["estado_cria"] = "MUERTO"
         else:
             datos["estado_cria"] = "VIVO"

@@ -211,7 +211,16 @@ def export_partos_dbf(db: Database) -> bytes:
         if vaca and cria_tag and vaca == cria_tag:
             continue
         sexo = "H" if (p["sexo_cria"] or "").lower().startswith("h") else ("M" if p["sexo_cria"] else "")
+        tipo_evento = (p["tipo_evento"] or "PARTO").upper() if "tipo_evento" in p.keys() else "PARTO"
         aborto = "T" if (p["estado_cria"] or "").upper() == "MUERTO" else ""
+        # Software Ganadero solo tiene el booleano ABORTO -- para no perder
+        # la granularidad de nuestro catálogo (Gemelar/Reabsorción/
+        # Momificación/Maceración/Muerte fetal) en el round-trip, se codifica
+        # como prefijo "[TIPO]" en DETALLE; dbf_importer.py lo reconoce al
+        # reimportar.
+        notas = p["notas"] or ""
+        if tipo_evento not in ("PARTO", "ABORTO"):
+            notas = f"[{tipo_evento}] {notas}".strip()
         w.add_record([
             vaca,
             p["fecha"] or "",
@@ -219,7 +228,7 @@ def export_partos_dbf(db: Database) -> bytes:
             cria_tag,
             p["peso_nacimiento"] or "",
             aborto,
-            p["notas"] or "",
+            notas[:30],
         ])
     return w.write_bytes()
 

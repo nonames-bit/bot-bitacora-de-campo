@@ -223,8 +223,12 @@
         var chipHtml = "";
         if (tipo === "PARTO") {
           chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("cowCalf", 13) + " Parto</span>";
+        } else if (tipo === "GEMELAR") {
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("cowCalf", 13) + " Gemelar</span>";
         } else if (tipo === "ABORTO") {
           chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("alert", 13) + " Aborto</span>";
+        } else if (tipo === "REABSORCION" || tipo === "MOMIFICACION" || tipo === "MACERACION" || tipo === "MUERTE_FETAL") {
+          chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("alert", 13) + " " + esc(tipo.replace("_", " ")) + "</span>";
         } else if (tipo === "MUERTE") {
           chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("skull", 13) + " Muerte</span>";
         } else if (tipo === "VENTA" || tipo === "DESCARTE" || tipo === "COMPRA") {
@@ -1071,14 +1075,21 @@
   var _calcCat = "MACHO_GORDO";
   var _calcPeso = 420;
   var _calcCabezas = 15;
+  var _mercadoCatGrafico = "MACHO_GORDO";
+  var _mercadoVistaSubastas = "graficas"; // "graficas" o "fichas"
+  var _mercadoTipoGrafico = "barras"; // "barras", "tendencia_tiempo", "oficial_ja"
 
   var CATEGORIAS_MERCADO_LABEL = {
     MACHO_GORDO: "Macho Gordo (400+ kg)",
     MACHO_1_1_2: "Macho 1 ½ años (Levante)",
+    MACHO_LEVANTE: "Macho 1 ½ años (Levante)",
     HEMBRA_GORDA: "Hembra Gorda",
     HEMBRA_1_1_2: "Hembra 1 ½ años",
+    HEMBRA_LEVANTE: "Hembra 1 ½ años",
     TERNERO_DESTETE: "Ternero(a) Destete",
+    TERNERO_DESTETO: "Ternero(a) Destete",
     VACAS_DESCARTE: "Vaca Descarte",
+    VACA_GORDA: "Vaca Descarte / Gorda",
     LECHE_QUESERA: "Leche Quesera Artesanal",
     LECHE_INDUSTRIA: "Leche Industria Pasteurizadora",
     LECHE_RESOLUCION_USP: "Resolución MinAgricultura USP Región 2",
@@ -1107,12 +1118,21 @@
         }
         var iconKey = "scale";
         if (k.indexOf("MACHO") !== -1) iconKey = "cow";
-        else if (k.indexOf("HEMBRA") !== -1 || k.indexOf("VACAS") !== -1) iconKey = "cow";
+        else if (k.indexOf("HEMBRA") !== -1 || k.indexOf("VACAS") !== -1 || k.indexOf("VACA_") !== -1) iconKey = "cow";
         else if (k.indexOf("TERNERO") !== -1) iconKey = "calf";
+
+        var tendBadge = "";
+        if (it.tendencia === "SUBIENDO") {
+          tendBadge = " <span class='chip-tendencia subiendo' title='Subió $" + Math.abs(it.variacion_pesos) + "/kg vs semana anterior'>▲ +" + (it.variacion_pct > 0 ? it.variacion_pct : "") + "%</span>";
+        } else if (it.tendencia === "BAJANDO") {
+          tendBadge = " <span class='chip-tendencia bajando' title='Bajó $" + Math.abs(it.variacion_pesos) + "/kg vs semana anterior'>▼ " + it.variacion_pct + "%</span>";
+        } else if (it.precio_anterior) {
+          tendBadge = " <span class='chip-tendencia estable' title='Sin variación vs semana anterior'>▬ 0%</span>";
+        }
 
         filasProdHtml += "<div class='fila-precio'>"
           + "<div class='fila-precio-etiq'>" + icon(iconKey, 14) + "<span>" + esc(etiquetaMercado(k)) + "</span></div>"
-          + "<div class='fila-precio-val'>" + precioTxt + rangoTxt + "</div>"
+          + "<div class='fila-precio-val'><span>" + precioTxt + rangoTxt + "</span>" + tendBadge + "</div>"
           + "</div>";
       });
     }
@@ -1522,6 +1542,381 @@
       + "<div style='display:flex; gap:8px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='tema-btn' id='btn-fuentes-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("clipboard", 13) + "Fuentes Oficiales</button>"
       + btnSincronizar
+  function renderKpisMercado(d) {
+    var res = d.resumen_tendencias || {};
+    var cats = [
+      ["MACHO_GORDO", "Macho Gordo", "cow"],
+      ["MACHO_LEVANTE", "Macho Levante", "cow"],
+      ["TERNERO_DESTETO", "Ternero Desteto", "calf"],
+      ["VACA_GORDA", "Vaca Descarte", "cow"]
+    ];
+
+    var htmlCards = cats.map(function (c) {
+      var k = res[c[0]];
+      if (!k) return "";
+      var tendBadge = "";
+      if (k.tendencia === "SUBIENDO") {
+        tendBadge = "<span class='chip-tendencia subiendo'>▲ +" + (k.variacion_pct > 0 ? k.variacion_pct : "") + "% (+$" + Math.abs(k.variacion_pesos) + ")</span>";
+      } else if (k.tendencia === "BAJANDO") {
+        tendBadge = "<span class='chip-tendencia bajando'>▼ " + k.variacion_pct + "% (-$" + Math.abs(k.variacion_pesos) + ")</span>";
+      } else {
+        tendBadge = "<span class='chip-tendencia estable'>▬ 0.0% ($0)</span>";
+      }
+
+      var grTxt = k.precio_granada ? ("Granada: <b>" + fmtMoneda(k.precio_granada) + "</b>") : "";
+      var topTxt = k.plaza_top ? ("Top: <b>" + esc(k.plaza_top.split("(")[0].trim()) + " " + fmtMoneda(k.precio_top) + "</b>") : "";
+
+      return "<div class='mercado-kpi-card'>"
+        + "<div class='mercado-kpi-tit'>" + icon(c[2], 13) + "<span>" + esc(c[1]) + "</span></div>"
+        + "<div class='mercado-kpi-val'>" + fmtMoneda(k.promedio_mercado) + "<span style='font-size:12px; font-weight:normal; color:var(--texto-suave);'>/kg</span> " + tendBadge + "</div>"
+        + "<div class='mercado-kpi-sub'><span>" + grTxt + "</span><span>·</span><span>" + topTxt + "</span></div>"
+        + "</div>";
+    }).join("");
+
+    return "<div class='mercado-kpi-grid'>" + htmlCards + "</div>";
+  }
+
+  function renderPillsCategoriasMercado() {
+    var cats = [
+      ["MACHO_GORDO", "Macho Gordo (400+ kg)", "cow"],
+      ["MACHO_LEVANTE", "Macho Levante", "cow"],
+      ["TERNERO_DESTETO", "Ternero Desteto", "calf"],
+      ["HEMBRA_LEVANTE", "Hembra Levante", "cow"],
+      ["VACA_GORDA", "Vaca Descarte", "cow"]
+    ];
+    return "<div class='mercado-cat-pills'>"
+      + cats.map(function (c) {
+        var act = (c[0] === _mercadoCatGrafico) ? " act" : "";
+        return "<button type='button' class='mercado-pill" + act + "' data-cat-pill='" + c[0] + "'>"
+          + icon(c[2], 14) + "<span>" + esc(c[1]) + "</span>"
+          + "</button>";
+      }).join("")
+      + "</div>";
+  }
+
+  function renderBarrasComparativasHtml(d, cat) {
+    var comp = (d.comparativa_por_categoria && d.comparativa_por_categoria[cat]) || [];
+    if (!comp.length) {
+      return "<div class='aviso'>No hay cotizaciones registradas para " + esc(etiquetaMercado(cat)) + "</div>";
+    }
+
+    var precios = comp.map(function (c) { return c.precio_promedio; });
+    var maxPrecio = Math.max.apply(null, precios);
+    var minPrecio = Math.min.apply(null, precios);
+    var rango = maxPrecio - minPrecio;
+    if (rango <= 0) rango = 1000;
+    var baseMin = Math.max(0, minPrecio - rango * 0.35);
+
+    var filasHtml = comp.map(function (c, idx) {
+      var p = c.precio_promedio;
+      var pctAncho = Math.round(((p - baseMin) / (maxPrecio - baseMin)) * 75 + 25);
+      pctAncho = Math.min(100, Math.max(15, pctAncho));
+
+      var esGranada = (c.plaza_key === "GRANADA");
+      var esTop = (idx === 0);
+      var esNal = (c.plaza_key === "PROMEDIO_NACIONAL");
+
+      var claseRow = "mercado-bar-row";
+      if (esGranada) claseRow += " destacado-granada";
+      if (esTop && !esGranada) claseRow += " destacado-top";
+
+      var badgePlaza = "";
+      if (esGranada) {
+        badgePlaza = " <span class='chip verde' style='font-size:10px; font-weight:700;'>📍 Plaza Local Finca</span>";
+      } else if (esTop) {
+        badgePlaza = " <span class='chip ambar' style='font-size:10px; font-weight:700;'>👑 Mayor Precio</span>";
+      } else if (esNal) {
+        badgePlaza = " <span class='chip gris' style='font-size:10px; font-weight:600;'>🇨🇴 Consolidado</span>";
+      }
+
+      var colFill = "#3b7a57";
+      if (esGranada) colFill = "var(--verde-marca)";
+      else if (esTop) colFill = "#16a34a";
+      else if (esNal) colFill = "#64748b";
+
+      var tendBadge = "";
+      if (c.tendencia === "SUBIENDO") {
+        tendBadge = "<span class='chip-tendencia subiendo'>▲ +" + (c.variacion_pct > 0 ? c.variacion_pct : "") + "% (+$" + Math.abs(c.variacion_pesos) + ")</span>";
+      } else if (c.tendencia === "BAJANDO") {
+        tendBadge = "<span class='chip-tendencia bajando'>▼ " + c.variacion_pct + "% (-$" + Math.abs(c.variacion_pesos) + ")</span>";
+      } else {
+        tendBadge = "<span class='chip-tendencia estable'>▬ 0.0% ($0)</span>";
+      }
+
+      var diffGranadaHtml = "";
+      if (!esGranada && c.diff_granada !== undefined && c.diff_granada !== null) {
+        if (c.diff_granada > 0) {
+          diffGranadaHtml = "<span style='color:#16a34a; font-weight:700;'>+" + fmtMoneda(c.diff_granada) + "/kg vs Granada</span>";
+        } else if (c.diff_granada < 0) {
+          diffGranadaHtml = "<span style='color:var(--texto-suave);'>" + fmtMoneda(c.diff_granada) + "/kg vs Granada</span>";
+        } else {
+          diffGranadaHtml = "<span style='color:var(--texto-suave);'>Igual a Granada</span>";
+        }
+      } else if (esGranada) {
+        diffGranadaHtml = "<span style='color:var(--verde-marca); font-weight:700;'>Base Local (68 km)</span>";
+      }
+
+      var distTxt = c.distancia_km > 0
+        ? (c.distancia_km + " km · ~" + c.horas_viaje + "h vía")
+        : "Consolidado País";
+
+      return "<div class='" + claseRow + "'>"
+        + "<div class='mercado-bar-meta'>"
+        + "<div><b>#" + (idx + 1) + " " + esc(c.nombre) + "</b>" + badgePlaza + "</div>"
+        + "<div style='display:flex; align-items:center; gap:8px;'>"
+        + "<b style='font-size:15px; color:var(--texto);'>" + fmtMoneda(p) + " <span style='font-size:11px; font-weight:normal;'>/kg</span></b>"
+        + tendBadge
+        + "</div>"
+        + "</div>"
+        + "<div class='mercado-bar-track'><div class='mercado-bar-fill' style='width:" + pctAncho + "%; background:" + colFill + ";'></div></div>"
+        + "<div class='mercado-bar-sub'>"
+        + "<span>" + icon("pin", 12) + " " + esc(distTxt) + " · Merma est: <b>" + c.desbaste_pct + "%</b></span>"
+        + "<div>" + diffGranadaHtml + "</div>"
+        + "</div>"
+        + "</div>";
+    }).join("");
+
+    return "<div class='mercado-chart-box'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<div>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("chartBar", 18) + "Comparativa de Cotizaciones · " + esc(etiquetaMercado(cat)) + "</h4>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Precios en pie ordenados de mayor a menor con variación vs semana anterior y diferencial con Granada.</div>"
+      + "</div>"
+      + "<div class='chip verde' style='font-size:11px;'>8 Plazas Ganaderas</div>"
+      + "</div>"
+      + filasHtml
+      + "</div>";
+  }
+
+  function renderSvgTendenciaSemanalHtml(d, cat) {
+    var comp = (d.comparativa_por_categoria && d.comparativa_por_categoria[cat]) || [];
+    if (!comp.length) return "";
+
+    var plazasClave = [
+      { key: "GRANADA", nombre: "Granada (Local)", color: "#2F5233", dash: "" },
+      { key: "CATAMA", nombre: "Catama (Villavicencio)", color: "#16a34a", dash: "" },
+      { key: "BOGOTA", nombre: "Bogotá (Guadalupe)", color: "#2563eb", dash: "" },
+      { key: "PROMEDIO_NACIONAL", nombre: "Promedio Nacional", color: "#64748b", dash: "5,4" }
+    ];
+
+    var series = [];
+    var todasFechasSet = {};
+
+    plazasClave.forEach(function (pc) {
+      var c = comp.filter(function (x) { return x.plaza_key === pc.key; })[0];
+      if (c && c.historico_semanal && c.historico_semanal.length) {
+        c.historico_semanal.forEach(function (h) { todasFechasSet[h.fecha] = true; });
+        series.push({
+          key: pc.key,
+          nombre: pc.nombre,
+          color: pc.color,
+          dash: pc.dash,
+          historico: c.historico_semanal
+        });
+      }
+    });
+
+    var fechas = Object.keys(todasFechasSet).sort();
+    if (fechas.length < 2) {
+      return "<div class='aviso'>Datos históricos en recopilación para graficar tendencia temporal.</div>";
+    }
+
+    var W = 620, H = 270;
+    var padTop = 25, padRight = 65, padBottom = 35, padLeft = 55;
+    var plotW = W - padLeft - padRight;
+    var plotH = H - padTop - padBottom;
+
+    var allPrecios = [];
+    series.forEach(function (s) {
+      s.historico.forEach(function (h) { allPrecios.push(h.precio); });
+    });
+    var minP = Math.min.apply(null, allPrecios);
+    var maxP = Math.max.apply(null, allPrecios);
+    var spanP = maxP - minP;
+    if (spanP <= 0) spanP = 500;
+    var yMin = Math.floor((minP - spanP * 0.15) / 100) * 100;
+    var yMax = Math.ceil((maxP + spanP * 0.15) / 100) * 100;
+    var ySpan = yMax - yMin;
+
+    function getX(idx) {
+      return padLeft + Math.round((idx / (fechas.length - 1)) * plotW);
+    }
+    function getY(p) {
+      return padTop + plotH - Math.round(((p - yMin) / ySpan) * plotH);
+    }
+
+    var gridLinesHtml = "";
+    var pasosY = 4;
+    for (var step = 0; step <= pasosY; step++) {
+      var valY = yMin + (ySpan / pasosY) * step;
+      var yCoord = getY(valY);
+      gridLinesHtml += "<line x1='" + padLeft + "' y1='" + yCoord + "' x2='" + (W - padRight) + "' y2='" + yCoord + "' stroke='var(--borde)' stroke-dasharray='3,3' stroke-width='1'/>"
+        + "<text x='" + (padLeft - 6) + "' y='" + (yCoord + 4) + "' fill='var(--texto-suave)' font-size='10' text-anchor='end'>$" + Math.round(valY).toLocaleString('es-CO') + "</text>";
+    }
+
+    var xLabelsHtml = "";
+    fechas.forEach(function (f, idx) {
+      var xC = getX(idx);
+      var dObj = toDate(f);
+      var txtF = dObj ? (dObj.getDate() + " " + ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][dObj.getMonth()]) : f;
+      xLabelsHtml += "<text x='" + xC + "' y='" + (H - 12) + "' fill='var(--texto-suave)' font-size='10' text-anchor='middle'>" + esc(txtF) + "</text>";
+    });
+
+    var pathsHtml = "";
+    series.forEach(function (s) {
+      var pts = [];
+      var circlesHtml = "";
+      var mapaFec = {};
+      s.historico.forEach(function (h) { mapaFec[h.fecha] = h.precio; });
+
+      fechas.forEach(function (f, idx) {
+        if (mapaFec[f] !== undefined) {
+          var xC = getX(idx);
+          var yC = getY(mapaFec[f]);
+          pts.push(xC + "," + yC);
+          circlesHtml += "<circle cx='" + xC + "' cy='" + yC + "' r='4.5' fill='" + s.color + "' stroke='var(--superficie)' stroke-width='1.5'>"
+            + "<title>" + esc(s.nombre) + ": $" + mapaFec[f].toLocaleString('es-CO') + " (" + f + ")</title></circle>";
+        }
+      });
+
+      if (pts.length > 1) {
+        var dashAttr = s.dash ? " stroke-dasharray='" + s.dash + "'" : "";
+        pathsHtml += "<polyline fill='none' stroke='" + s.color + "' stroke-width='2.5' points='" + pts.join(" ") + "'" + dashAttr + "/>"
+          + circlesHtml;
+
+        var ultFec = fechas[fechas.length - 1];
+        if (mapaFec[ultFec] !== undefined) {
+          var ultX = getX(fechas.length - 1);
+          var ultY = getY(mapaFec[ultFec]);
+          pathsHtml += "<text x='" + (ultX + 7) + "' y='" + (ultY + 4) + "' fill='" + s.color + "' font-size='10.5' font-weight='bold'>$" + mapaFec[ultFec].toLocaleString('es-CO') + "</text>";
+        }
+      }
+    });
+
+    var leyendaHtml = "<div style='display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; font-size:12px; justify-content:center;'>"
+      + series.map(function (s) {
+        var dashStyle = s.dash ? "border-top:2px dashed " + s.color : "background:" + s.color;
+        return "<div style='display:flex; align-items:center; gap:6px;'>"
+          + "<span style='display:inline-block; width:16px; height:4px; " + dashStyle + "; border-radius:2px;'></span>"
+          + "<span><b>" + esc(s.nombre) + "</b></span>"
+          + "</div>";
+      }).join("")
+      + "</div>";
+
+    var resTend = d.resumen_tendencias && d.resumen_tendencias[cat];
+    var insightHtml = "";
+    if (resTend) {
+      var flechaTend = resTend.tendencia === "SUBIENDO" ? "📈" : (resTend.tendencia === "BAJANDO" ? "📉" : "📊");
+      var dirTxt = resTend.tendencia === "SUBIENDO" ? "ALCISTA" : (resTend.tendencia === "BAJANDO" ? "BAJISTA" : "ESTABLE");
+      insightHtml = "<div class='mercado-insight-box'>"
+        + "<div><b>" + flechaTend + " Interpretación de Mercado (" + esc(etiquetaMercado(cat)) + "):</b></div>"
+        + "<div style='margin-top:4px;'>Tendencia semanal <b>" + dirTxt + "</b> con variación promedio del <b>" + (resTend.variacion_pct > 0 ? "+" : "") + resTend.variacion_pct + "%</b> (" + fmtMoneda(resTend.variacion_pesos) + "/kg). En <b>Granada</b> cotiza a <b>" + fmtMoneda(resTend.precio_granada) + "/kg</b> (" + (resTend.variacion_granada_pct > 0 ? "+" : "") + resTend.variacion_granada_pct + "%). La plaza más alta es <b>" + esc(resTend.plaza_top) + "</b> (" + fmtMoneda(resTend.precio_top) + "/kg).</div>"
+        + "</div>";
+    }
+
+    return "<div class='mercado-chart-box'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<div>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("chartLine", 18) + "Tendencia Histórica Semanal · " + esc(etiquetaMercado(cat)) + "</h4>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Evolución de cotizaciones semanales ($/kg en pie) en las últimas 7 semanas.</div>"
+      + "</div>"
+      + "<div class='chip azul' style='font-size:11px;'>Evolución 7 Semanas</div>"
+      + "</div>"
+      + "<div class='mercado-svg-wrap'>"
+      + "<svg viewBox='0 0 " + W + " " + H + "' width='100%' height='auto'>"
+      + gridLinesHtml
+      + xLabelsHtml
+      + pathsHtml
+      + "</svg>"
+      + "</div>"
+      + leyendaHtml
+      + insightHtml
+      + "</div>";
+  }
+
+  function renderGraficaOficialJaHtml(d, cat) {
+    var tNow = Date.now();
+    return "<div class='mercado-chart-box'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<div>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("sparkles", 18) + "Gráfica Oficial Ganadería JA</h4>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Renderizada con tipografía de alta resolución y marca de agua institucional.</div>"
+      + "</div>"
+      + "<div class='chip verde' style='font-size:11px;'>Alta Definición</div>"
+      + "</div>"
+      + "<div style='display:flex; flex-direction:column; gap:16px;'>"
+      + "<div class='grafico-wrap'><img src='/api/grafico/subastas_comparativa?t=" + tNow + "' alt='Comparativa de Subastas Ganadería JA' loading='lazy'></div>"
+      + "<div class='grafico-wrap'><img src='/api/grafico/subastas_tendencia?t=" + tNow + "' alt='Tendencia Semanal Subastas Ganadería JA' loading='lazy'></div>"
+      + "</div>"
+      + "</div>";
+  }
+
+  function renderSubastasTabHtml(d) {
+    var viewBtns = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<div style='display:flex; gap:6px; align-items:center;'>"
+      + "<button type='button' class='tema-btn" + (_mercadoVistaSubastas === "graficas" ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700;'" : "'") + " data-subastas-view='graficas'>" + icon("chartBar", 13) + " Gráficas &amp; Comparativas</button>"
+      + "<button type='button' class='tema-btn" + (_mercadoVistaSubastas === "fichas" ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700;'" : "'") + " data-subastas-view='fichas'>" + icon("clipboard", 13) + " Fichas por Plaza (8)</button>"
+      + "</div>"
+      + "</div>";
+
+    if (_mercadoVistaSubastas === "fichas") {
+      var cardsPlazas = (d.subastas || []).map(renderCardPlazaMercado).join("");
+      return viewBtns + "<div class='grid-plazas'>" + cardsPlazas + "</div>";
+    }
+
+    // Modo Gráficas
+    var kpisHtml = renderKpisMercado(d);
+    var pillsHtml = renderPillsCategoriasMercado();
+
+    var chartModeBtns = "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px;'>"
+      + "<span style='font-size:12px; font-weight:700; color:var(--texto-suave);'>Vista:</span>"
+      + "<button type='button' class='tema-btn" + (_mercadoTipoGrafico === "barras" ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700;'" : "'") + " data-chart-mode='barras'>" + icon("chartBar", 13) + " Barras Comparativas</button>"
+      + "<button type='button' class='tema-btn" + (_mercadoTipoGrafico === "tendencia_tiempo" ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700;'" : "'") + " data-chart-mode='tendencia_tiempo'>" + icon("chartLine", 13) + " Evolución Semanal</button>"
+      + "<button type='button' class='tema-btn" + (_mercadoTipoGrafico === "oficial_ja" ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700;'" : "'") + " data-chart-mode='oficial_ja'>" + icon("sparkles", 13) + " Gráfica Oficial JA</button>"
+      + "</div>";
+
+    var chartContent = "";
+    if (_mercadoTipoGrafico === "barras") {
+      chartContent = renderBarrasComparativasHtml(d, _mercadoCatGrafico);
+    } else if (_mercadoTipoGrafico === "tendencia_tiempo") {
+      chartContent = renderSvgTendenciaSemanalHtml(d, _mercadoCatGrafico);
+    } else {
+      chartContent = renderGraficaOficialJaHtml(d, _mercadoCatGrafico);
+    }
+
+    return viewBtns + kpisHtml + pillsHtml + chartModeBtns + "<div id='mercado-grafico-contenedor'>" + chartContent + "</div>";
+  }
+
+  function renderMercado(d) {
+    _mercadoDatos = d;
+    var rol = (d.rol || (window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase();
+    var puedeEditar = (rol === "OWNER" || rol === "ADMIN" || rol === "ADMINISTRADOR");
+
+    var btnActPrecios = puedeEditar
+      ? "<button type='button' class='tema-btn' id='btn-actualizar-precios-mercado' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("pencil", 13) + "Actualizar Precios</button>"
+      : "";
+
+    var btnSincronizar = puedeEditar
+      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Sincronizar Ahora</button>"
+      : "";
+
+    var badgeSync = "<div style='display:inline-flex; align-items:center; gap:6px; font-size:11.5px; background:rgba(30,126,52,0.12); color:#155724; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid rgba(30,126,52,0.25);'>"
+      + "<span style='display:inline-block; width:7px; height:7px; border-radius:50%; background:#28a745;'></span>"
+      + "Auto-sincronizado: <b>" + esc(fechaCorta(d.ultima_actualizacion || d.fecha_consulta)) + "</b>"
+      + (d.trm_actual ? " · TRM: <b>" + fmtMoneda(d.trm_actual) + " COP</b>" : "")
+      + "</div>";
+
+    var headerHtml = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<div>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("chartLine", 22) + "Indicadores Económicos &amp; Subastas Ganaderas</h3>"
+      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;'>"
+      + "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("pin", 12) + "Finca: <b>" + esc(d.ubicacion_finca || "Mesetas, Meta") + "</b></span>"
+      + badgeSync
+      + "</div>"
+      + "</div>"
+      + "<div style='display:flex; gap:8px; align-items:center; flex-wrap:wrap;'>"
+      + "<button type='button' class='tema-btn' id='btn-fuentes-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("clipboard", 13) + "Fuentes Oficiales</button>"
+      + btnSincronizar
       + btnActPrecios
       + "</div>"
       + "</div>";
@@ -1534,7 +1929,7 @@
 
     var cuerpoHtml = "";
     if (_mercadoTabActual === "subastas") {
-      var cardsPlazas = (d.subastas || []).map(renderCardPlazaMercado).join("");
+      var subastasHtml = renderSubastasTabHtml(d);
       var noticiasHtml = "";
       if (d.noticias_recientes && d.noticias_recientes.length > 0) {
         var itemsNoticias = d.noticias_recientes.map(function (n) {
@@ -1552,7 +1947,7 @@
           + "<ul style='margin:0; padding-left:18px; line-height:1.45;'>" + itemsNoticias + "</ul>"
           + "</div>";
       }
-      cuerpoHtml = "<div class='grid-plazas'>" + cardsPlazas + "</div>" + noticiasHtml;
+      cuerpoHtml = subastasHtml + noticiasHtml;
     } else if (_mercadoTabActual === "calculadora") {
       cuerpoHtml = renderCalculadoraFleteHtml(d);
     } else if (_mercadoTabActual === "leche_insumos") {
@@ -1571,6 +1966,42 @@
         var tab = btn.getAttribute("data-mercado-tab");
         if (tab && tab !== _mercadoTabActual) {
           _mercadoTabActual = tab;
+          montarVista(vista, renderMercado(_mercadoDatos), false);
+          bindMercado(_mercadoDatos);
+        }
+      });
+    });
+
+    // Sub-vistas en Subastas (Gráficas vs Fichas)
+    qa("[data-subastas-view]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var v = btn.getAttribute("data-subastas-view");
+        if (v && v !== _mercadoVistaSubastas) {
+          _mercadoVistaSubastas = v;
+          montarVista(vista, renderMercado(_mercadoDatos), false);
+          bindMercado(_mercadoDatos);
+        }
+      });
+    });
+
+    // Modos de gráfico (Barras vs Tendencia en el Tiempo vs Gráfica Oficial JA)
+    qa("[data-chart-mode]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var m = btn.getAttribute("data-chart-mode");
+        if (m && m !== _mercadoTipoGrafico) {
+          _mercadoTipoGrafico = m;
+          montarVista(vista, renderMercado(_mercadoDatos), false);
+          bindMercado(_mercadoDatos);
+        }
+      });
+    });
+
+    // Pills de selección de categoría zootécnica
+    qa("[data-cat-pill]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var c = btn.getAttribute("data-cat-pill");
+        if (c && c !== _mercadoCatGrafico) {
+          _mercadoCatGrafico = c;
           montarVista(vista, renderMercado(_mercadoDatos), false);
           bindMercado(_mercadoDatos);
         }
@@ -2325,7 +2756,7 @@
   function renderCaptura() {
     var tipos = [
       { id: "parto", nom: "Parto", ico: "cowCalf" },
-      { id: "aborto", nom: "Aborto", ico: "alert" },
+      { id: "aborto", nom: "Aborto / Pérdida", ico: "alert" },
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
@@ -2363,8 +2794,9 @@
     var h = "<label>Fecha del evento: <input type='date' id='cap-fecha' value='" + hoy + "' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
 
     if (tipo === "parto") {
-      h += "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      h += "<label>Tipo de parto: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option></select></label>"
+        + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label id='cap-cria1-label'>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Sexo de la Cría: <select id='cap-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
         + "<div style='flex:1;'><label>Estado Cría: <select id='cap-estado-cria' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
@@ -2372,13 +2804,29 @@
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
+        + "<div id='cap-gemelo2-wrap' style='display:none; padding:10px; border:1px dashed var(--borde-fuerte); border-radius:8px;'>"
+        + "<p class='aviso' style='margin:2px 0 8px;'>Segunda cría (gemelo/a):</p>"
+        + "<label>Arete de la Cría 2: <input id='cap-cria2-tag' placeholder='ej. 103' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;'>"
+        + "<div style='flex:1;'><label>Sexo Cría 2: <select id='cap-sexo2' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
+        + "<div style='flex:1;'><label>Estado Cría 2: <select id='cap-estado-cria2' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
+        + "</div>"
+        + "<div style='margin-top:8px;'><label>Peso al nacer Cría 2 (kg): <input type='number' step='0.5' id='cap-peso-nacer2' placeholder='ej. 28' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<label>Observaciones / Notas: <input id='cap-notas' placeholder='Parto distócico, ternero vigoroso, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "aborto") {
-      h += "<label>Arete / Tag de la Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      h += "<label>Tipo de evento: <select id='cap-tipo-perdida' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+        + "<option value='ABORTO'>Aborto</option>"
+        + "<option value='REABSORCION'>Reabsorción embrionaria</option>"
+        + "<option value='MOMIFICACION'>Momificación fetal</option>"
+        + "<option value='MACERACION'>Maceración fetal</option>"
+        + "<option value='MUERTE_FETAL'>Muerte fetal</option>"
+        + "</select></label>"
+        + "<label>Arete / Tag de la Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Causa / Observaciones: <input id='cap-notas' placeholder='ej. Sospecha de brucelosis, trauma, sin causa aparente' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<p class='aviso' style='margin:2px 0;'>Se registra como un evento reproductivo de la vaca (sin cría), separado de un Parto normal.</p>";
     } else if (tipo === "destete") {
@@ -3092,6 +3540,22 @@
       });
     }
 
+    // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
+    // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
+    function bindTipoEventoParto() {
+      var sel = document.getElementById("cap-tipo-evento");
+      var wrap2 = document.getElementById("cap-gemelo2-wrap");
+      var labelCria1 = document.getElementById("cap-cria1-label");
+      if (!sel || !wrap2) return;
+      function toggle() {
+        var esGemelar = sel.value === "GEMELAR";
+        wrap2.style.display = esGemelar ? "block" : "none";
+        if (labelCria1) labelCria1.firstChild.textContent = esGemelar ? "Arete de la Cría 1: " : "Arete de la Cría (Nuevo): ";
+      }
+      sel.addEventListener("change", toggle);
+      toggle();
+    }
+
     function ejecutarTrasladoMasivo(fecha) {
       var origen = (q("#cap-pot-orig") && q("#cap-pot-orig").value || "").trim();
       var destino = (q("#cap-pot-dest") && q("#cap-pot-dest").value || "").trim();
@@ -3122,6 +3586,7 @@
               bindCamposFinanza();
               bindTrasladoMasivo();
               bindDesteteBusquedaCria();
+              bindTipoEventoParto();
             }
             actualizarBadges();
           } else if (feed) {
@@ -3138,6 +3603,7 @@
       bindCamposFinanza();
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
+      bindTipoEventoParto();
     }
 
     qa("button[data-cap-tipo]").forEach(function (b) {
@@ -3152,6 +3618,7 @@
           bindCamposFinanza();
           bindTrasladoMasivo();
           bindDesteteBusquedaCria();
+          bindTipoEventoParto();
         }
         var fTag = document.getElementById("cap-tag");
         if (fTag) fTag.focus();
@@ -3171,17 +3638,19 @@
         }
 
         var payload = {};
-        // Aborto se registra con el mismo mecanismo que Parto (vaca sin
-        // cría, estado_cria=MUERTO) -- son formularios distintos en la UI
-        // para que sea claro dónde registrar cada cosa, pero un solo tipo
-        // de evento/tabla en el backend.
+        // Aborto/Pérdida se registra con el mismo mecanismo que Parto (vaca
+        // sin cría) -- son formularios distintos en la UI para que sea claro
+        // dónde registrar cada cosa, pero un solo tipo de evento/tabla en el
+        // backend, distinguido por payload.tipo_evento.
         var tipoEnvio = (_tipoCapturaActual === "aborto") ? "parto" : _tipoCapturaActual;
 
         if (_tipoCapturaActual === "aborto") {
           payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.tipo_evento = (q("#cap-tipo-perdida") && q("#cap-tipo-perdida").value) || "ABORTO";
           payload.estado_cria = "MUERTO";
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
         } else if (_tipoCapturaActual === "parto") {
+          payload.tipo_evento = (q("#cap-tipo-evento") && q("#cap-tipo-evento").value) || "PARTO";
           payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.id_cria_tag = (q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim() || null;
           payload.sexo_cria = (q("#cap-sexo") && q("#cap-sexo").value) || "HEMBRA";
@@ -3190,6 +3659,14 @@
           payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          if (payload.tipo_evento === "GEMELAR") {
+            payload.gemelo = {
+              id_cria_tag: (q("#cap-cria2-tag") && q("#cap-cria2-tag").value || "").trim() || null,
+              sexo_cria: (q("#cap-sexo2") && q("#cap-sexo2").value) || "HEMBRA",
+              estado_cria: (q("#cap-estado-cria2") && q("#cap-estado-cria2").value) || "VIVO",
+              peso_nacimiento: parseFloat(q("#cap-peso-nacer2") && q("#cap-peso-nacer2").value) || null,
+            };
+          }
         } else if (_tipoCapturaActual === "destete") {
           payload.cria_tag = (q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim();
           payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
@@ -3274,6 +3751,7 @@
             bindCamposFinanza();
             bindTrasladoMasivo();
             bindDesteteBusquedaCria();
+            bindTipoEventoParto();
           }
           actualizarBadges();
         }

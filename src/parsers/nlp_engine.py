@@ -27,6 +27,10 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\bpari[oó]\b", r"\bdio a luz\b", r"\bparto\b", r"\bparir\b",
         r"\bternero\b", r"\bternera\b", r"\bbecerro\b", r"\bbecerra\b",
         r"\bcri[oó]\b", r"\bnaci[oó]\b", r"\balumbramiento\b",
+        # Pérdida gestacional (mismo evento reproductivo que el parto, sin
+        # cría -- ver TIPOS_EVENTO_SIN_CRIA) y parto múltiple.
+        r"\babort", r"\breabsor", r"\bmomific", r"\bmacer",
+        r"\bmuerte\s+fetal\b", r"\bgemel", r"\bmelliz",
     ]),
     ("muerte", [
         r"\bse muri[oó]\b", r"\bmuri[oó]\b", r"\bmuert[oa]\b",

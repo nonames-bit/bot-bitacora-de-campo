@@ -11,12 +11,14 @@ from __future__ import annotations
 import io
 import logging
 import os
+import re
 import struct
 import zipfile
 from datetime import date
 from typing import Iterator, Optional
 
 from ..db.database import Database
+from ..db.models import TIPOS_EVENTO_PARTO
 from ..engine.growth_engine import gmd
 from ..engine.reproductive_engine import fecha_estimada_parto
 from ..utils import hoy, iso, to_date
@@ -484,6 +486,21 @@ def import_partos(db: Database, records) -> dict:
             sexo_cria = None
 
         estado = "MUERTO" if (r.get("ABORTO") or "").strip() else "VIVO"
+        detalle = (r.get("DETALLE") or "").strip()
+        # Software Ganadero solo trae el booleano ABORTO; el catálogo fino
+        # (Gemelar/Reabsorción/Momificación/Maceración/Muerte fetal) viaja
+        # codificado como prefijo "[TIPO] " en DETALLE cuando el backup viene
+        # de nuestro propio exportador (ver dbf_exporter.export_partos_dbf).
+        m_tipo = re.match(r"^\[([A-Z_]+)\]\s*(.*)$", detalle)
+        if m_tipo and m_tipo.group(1) in TIPOS_EVENTO_PARTO:
+            tipo_evento = m_tipo.group(1)
+            detalle = m_tipo.group(2)
+        elif estado == "MUERTO":
+            tipo_evento = "ABORTO"
+        elif re.search(r"gemel|melliz", detalle, re.IGNORECASE):
+            tipo_evento = "GEMELAR"
+        else:
+            tipo_evento = "PARTO"
         peso = r.get("PESNAC")
         if peso is not None and float(peso) <= 0:
             peso = None
@@ -556,7 +573,8 @@ def import_partos(db: Database, records) -> dict:
             vaca_tag=vaca, fecha=r.get("FECHA"), sexo_cria=sexo_cria,
             estado_cria=estado, peso_nacimiento=peso,
             id_cria_tag=id_cria_tag,
-            notas=(r.get("DETALLE") or "").strip() or None,
+            notas=detalle or None,
+            tipo_evento=tipo_evento,
         )
         if res:
             nuevos += 1

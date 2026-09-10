@@ -143,3 +143,43 @@ def test_sincronizar_precios_mercado_completo(tmp_path):
         assert res3["actualizado"] is True
 
     db.close()
+
+
+def test_datos_mercado_tendencias_y_comparativa(tmp_path):
+    db_file = tmp_path / "test_tendencias.db"
+    db = Database(str(db_file)).create_tables()
+
+    datos = db.obtener_datos_mercado_completos()
+    assert "comparativa_por_categoria" in datos
+    assert "resumen_tendencias" in datos
+
+    # Verificar comparativa de categorías
+    comp = datos["comparativa_por_categoria"]
+    assert "MACHO_GORDO" in comp
+    macho_gordo = comp["MACHO_GORDO"]
+    assert len(macho_gordo) >= 6
+    # Primer elemento es el precio más alto
+    assert macho_gordo[0]["precio"] >= macho_gordo[-1]["precio"]
+    # Debe haber una fila para Granada
+    granada_row = next((r for r in macho_gordo if r["plaza_key"] == "GRANADA"), None)
+    assert granada_row is not None
+    assert granada_row["diff_granada"] == 0
+
+    # Verificar resumen de tendencias
+    resumen = datos["resumen_tendencias"]
+    assert "MACHO_GORDO" in resumen
+    assert "promedio_mercado" in resumen["MACHO_GORDO"]
+    assert resumen.get("mensaje_interpretativo")
+
+    # Verificar que los productos de las subastas tienen cálculo de tendencia
+    subasta_granada = next((s for s in datos["subastas"] if s["plaza_key"] == "GRANADA"), None)
+    assert subasta_granada is not None
+    assert "MACHO_GORDO" in subasta_granada["productos"]
+    mg = subasta_granada["productos"]["MACHO_GORDO"]
+    assert mg["tendencia"] in ("SUBIENDO", "BAJANDO", "ESTABLE")
+    assert "variacion_pct" in mg
+    assert "variacion_pesos" in mg
+    assert len(mg["historico_semanal"]) >= 4
+
+    db.close()
+

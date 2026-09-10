@@ -33,6 +33,13 @@ class Bot:
         resultado = self.parser.parse(texto)
         eventos = resultado if isinstance(resultado, list) else [resultado]
 
+        # Agrupa partos GEMELAR de la misma vaca/fecha dentro de un mismo
+        # mensaje (ej. "pario mellizos, la 47 tuvo cria macho y cria hembra"
+        # -> el LLM puede emitir dos eventos 'parto' separados con
+        # tipo_evento=GEMELAR): el primero fija el grupo, el segundo lo
+        # referencia. Vive solo durante esta llamada (no cruza mensajes).
+        grupo_gemelar: dict[tuple, int] = {}
+
         respuestas: list[str] = []
         for ev in eventos:
             if ev.tipo == "consulta":
@@ -42,7 +49,7 @@ class Bot:
                     return "No pude interpretar ese mensaje. Intente una nota como " \
                            "'pario la 47, ternero macho' o una pregunta."
             else:
-                self._registrar(ev, user_id)
+                self._registrar(ev, user_id, grupo_gemelar)
                 self._generar_alertas(ev)
                 respuestas.append(self._confirmacion(ev))
 
@@ -100,15 +107,22 @@ class Bot:
     # ------------------------------------------------------------------ #
     # Registro de eventos en SQLite
     # ------------------------------------------------------------------ #
-    def _registrar(self, ev: ParsedEvent, user_id: Optional[int] = None) -> None:
+    def _registrar(self, ev: ParsedEvent, user_id: Optional[int] = None,
+                   grupo_gemelar: Optional[dict] = None) -> None:
         d = ev.datos
         if ev.tipo == "parto":
-            self.db.registrar_parto(
+            tipo_evento = d.get("tipo_evento", "PARTO")
+            clave_grupo = (ev.animal_tag, ev.fecha)
+            grupo_parto_id = grupo_gemelar.get(clave_grupo) if (grupo_gemelar and tipo_evento == "GEMELAR") else None
+            nuevo_id = self.db.registrar_parto(
                 vaca_tag=ev.animal_tag, fecha=ev.fecha,
                 sexo_cria=d.get("sexo_cria"), estado_cria=d.get("estado_cria", "VIVO"),
                 peso_nacimiento=d.get("peso_nacimiento"), id_cria_tag=d.get("id_cria"),
-                registrado_por=user_id,
+                registrado_por=user_id, tipo_evento=tipo_evento,
+                grupo_parto_id=grupo_parto_id,
             )
+            if grupo_gemelar is not None and tipo_evento == "GEMELAR" and clave_grupo not in grupo_gemelar and nuevo_id:
+                grupo_gemelar[clave_grupo] = nuevo_id
         elif ev.tipo == "muerte":
             self.db.registrar_muerte(
                 animal_tag=ev.animal_tag, fecha=ev.fecha,
@@ -259,6 +273,14 @@ class Bot:
         d = ev.datos
         tag = ev.animal_tag or "lote"
         if ev.tipo == "parto":
+            tipo_evento = d.get("tipo_evento", "PARTO")
+            etiquetas = {
+                "GEMELAR": "parto gemelar", "ABORTO": "aborto",
+                "REABSORCION": "reabsorción embrionaria", "MOMIFICACION": "momificación fetal",
+                "MACERACION": "maceración fetal", "MUERTE_FETAL": "muerte fetal",
+            }
+            if tipo_evento in etiquetas:
+                return f"Registrado {etiquetas[tipo_evento]} de la {tag}."
             sexo = d.get("sexo_cria") or "?"
             return f"Registrado parto de la {tag} (cría {sexo.lower()})."
         if ev.tipo == "muerte":

@@ -42,6 +42,9 @@ CREATE TABLE IF NOT EXISTS animales (
     color TEXT
 );
 
+-- tipo_evento: PARTO | GEMELAR | ABORTO | REABSORCION | MOMIFICACION |
+-- MACERACION | MUERTE_FETAL (ver src/db/models.py TIPOS_EVENTO_PARTO).
+-- grupo_parto_id agrupa las 2+ filas de un mismo parto GEMELAR.
 CREATE TABLE IF NOT EXISTS partos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     vaca_id INTEGER,
@@ -50,7 +53,9 @@ CREATE TABLE IF NOT EXISTS partos (
     estado_cria TEXT,
     peso_nacimiento REAL,
     id_cria INTEGER,
-    notas TEXT
+    notas TEXT,
+    tipo_evento TEXT DEFAULT 'PARTO',
+    grupo_parto_id INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS muertes (
@@ -276,6 +281,8 @@ CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
 CREATE INDEX IF NOT EXISTS idx_partos_vaca_fecha ON partos(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_partos_cria ON partos(id_cria);
+CREATE INDEX IF NOT EXISTS idx_partos_tipo_evento ON partos(tipo_evento);
+CREATE INDEX IF NOT EXISTS idx_partos_grupo ON partos(grupo_parto_id);
 CREATE INDEX IF NOT EXISTS idx_servicios_vaca_fecha ON servicios(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_celos_vaca_fecha ON celos(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_tratamientos_animal_fecha ON tratamientos(animal_id, fecha);
@@ -456,6 +463,20 @@ TABLAS = [
 ]
 
 
+# Catálogo de tipos de evento reproductivo para `partos.tipo_evento`
+# (equivalente al combo "Tipo" de Software Ganadero: Parto/Gemelar/Aborto/
+# Reabsorción/Momificación/Maceración/Muerte fetal). Todos salvo PARTO y
+# GEMELAR implican id_cria=NULL (no se crea animal nuevo).
+TIPOS_EVENTO_PARTO = (
+    "PARTO", "GEMELAR", "ABORTO", "REABSORCION", "MOMIFICACION",
+    "MACERACION", "MUERTE_FETAL",
+)
+
+# Tipos que nunca generan una cría viva (id_cria debe quedar NULL).
+TIPOS_EVENTO_SIN_CRIA = (
+    "ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL",
+)
+
 # ---------------------------------------------------------------------------
 # Modelos (dataclasses) — espejo de las tablas para transferencia de datos
 # ---------------------------------------------------------------------------
@@ -484,6 +505,8 @@ class Parto:
     peso_nacimiento: Optional[float] = None
     id_cria: Optional[int] = None
     notas: Optional[str] = None
+    tipo_evento: Optional[str] = "PARTO"
+    grupo_parto_id: Optional[int] = None
 
 
 @dataclass
