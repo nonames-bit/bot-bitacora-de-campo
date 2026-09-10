@@ -993,7 +993,7 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     assert r_adm.status_code == 200
     us = r_adm.get_json()["usuarios"]
     owner_entry = next(u for u in us if u["user_id"] == 100)
-    assert owner_entry["pin"] == "****"
+    assert owner_entry["pin"] == "····"
 
     # Admin no puede crear OWNER
     r_adm_owner = c_adm.post("/api/usuarios", json={"nombre": "Nuevo Dueño", "rol": "OWNER", "pin": "7777"})
@@ -1020,7 +1020,9 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     assert r_owner_list.status_code == 200
     us_owner = r_owner_list.get_json()["usuarios"]
     owner_u = next(u for u in us_owner if u["user_id"] == 100)
-    assert owner_u["pin"] == "1234"  # Owner sí ve los PINs
+    # El PIN se guarda hasheado (no recuperable): ni el propio Owner ve el
+    # valor crudo en el listado, solo si tiene uno asignado o no.
+    assert owner_u["pin"] == "····"
 
     # Cambiar PIN de un usuario
     pepe_uid = r_adm_create.get_json()["usuario"]["user_id"]
@@ -1264,7 +1266,7 @@ def test_api_leche_analizar_recibo_guarda_la_foto_de_inmediato(client, db_file):
     from src.db.database import Database
 
     fake_img_b64 = base64.b64encode(
-        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
     ).decode("utf-8")
     sample_parse = {
         "ok": True, "es_recibo_leche": True, "periodo": "16 al 31 de Agosto",
@@ -1317,7 +1319,7 @@ def test_api_finanzas_analizar_factura(client):
     import base64
     from unittest.mock import patch
     fake_img_b64 = base64.b64encode(
-        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
     ).decode("utf-8")
     sample_parse = {
         "ok": True, "es_factura": True, "tipo": "EGRESO", "fecha": "2026-09-07",
@@ -1586,7 +1588,7 @@ def test_api_sync_gasto_con_foto_queda_enlazada_en_finanzas(client, db_file):
     import base64
 
     fake_img = base64.b64encode(
-        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xd9"
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a\x1f\x1e\x1d\x1a\x1c\x1c $.' \",#\x1c\x1c(7),01444\x1f'9=82<.342\xff\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xbf\x00\xff\xd9"
     ).decode("utf-8")
     b64_data = f"data:image/jpeg;base64,{fake_img}"
 
@@ -1822,6 +1824,72 @@ def test_api_mapa_datos_permitido_a_admin(client):
     d = r.get_json()
     assert "potreros_geojson" in d
     assert "rutas" in d
+
+
+def test_api_mercado_precios_retorna_subastas_leche_e_insumos(client):
+    r = client.get("/api/mercado/precios")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert "subastas" in d
+    assert "leche" in d
+    assert "insumos" in d
+    assert "fuentes_oficiales" in d
+    assert d["ubicacion_finca"] == "Mesetas, Meta (Región Ariari)"
+
+    plazas = [s["plaza_key"] for s in d["subastas"]]
+    for esperada in ("GRANADA", "GUAMAL", "SAN_MARTIN", "CATAMA", "BOGOTA", "PROMEDIO_NACIONAL"):
+        assert esperada in plazas
+
+    # Alias /api/mercado también debe responder exactamente igual
+    r_alias = client.get("/api/mercado")
+    assert r_alias.status_code == 200
+    assert len(r_alias.get_json()["subastas"]) == len(d["subastas"])
+
+
+def test_api_mercado_actualizar_permisos_y_guardado(client):
+    # TRABAJADOR no puede actualizar precios de mercado
+    with client.session_transaction() as sess:
+        sess["rol"] = "TRABAJADOR"
+    r_no_auth = client.post("/api/mercado/actualizar", json={
+        "plaza": "GRANADA",
+        "producto": "MACHO_GORDO",
+        "precio_promedio": 8700
+    })
+    assert r_no_auth.status_code == 403
+    assert r_no_auth.get_json()["ok"] is False
+
+    # ADMIN u OWNER sí pueden
+    with client.session_transaction() as sess:
+        sess["rol"] = "ADMIN"
+    
+    # Error 400 por campos faltantes
+    r_bad = client.post("/api/mercado/actualizar", json={"plaza": "GRANADA"})
+    assert r_bad.status_code == 400
+
+    # Registro exitoso
+    r_ok = client.post("/api/mercado/actualizar", json={
+        "plaza": "GRANADA",
+        "producto": "MACHO_GORDO",
+        "precio_promedio": 8950,
+        "precio_maximo": 9300,
+        "precio_minimo": 8600,
+        "unidad": "$/kg",
+        "fuente": "Sugameta Martes Remate Especial",
+        "notas": "Lote cebú comercial extraordinario"
+    })
+    assert r_ok.status_code == 200
+    res = r_ok.get_json()
+    assert res["ok"] is True
+    assert res["id"] > 0
+
+    # Verificar que el precio actualizado aparece en la consulta
+    r_get = client.get("/api/mercado/precios")
+    d = r_get.get_json()
+    granada = next(s for s in d["subastas"] if s["plaza_key"] == "GRANADA")
+    macho_gordo = granada["productos"]["MACHO_GORDO"]
+    assert macho_gordo["precio_promedio"] == 8950
+    assert macho_gordo["precio_maximo"] == 9300
+
 
 
 

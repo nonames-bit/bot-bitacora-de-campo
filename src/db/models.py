@@ -422,6 +422,25 @@ CREATE TABLE IF NOT EXISTS push_suscripciones (
 );
 
 CREATE INDEX IF NOT EXISTS idx_push_user ON push_suscripciones(user_id);
+
+-- Indicadores económicos y precios de subastas ganaderas de la región
+CREATE TABLE IF NOT EXISTS precios_mercado (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    plaza TEXT NOT NULL,
+    producto TEXT NOT NULL,
+    precio_promedio REAL NOT NULL,
+    precio_maximo REAL,
+    precio_minimo REAL,
+    unidad TEXT NOT NULL DEFAULT '$/kg',
+    fuente TEXT,
+    notas TEXT,
+    creado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_precios_mercado_fecha ON precios_mercado(fecha);
+CREATE INDEX IF NOT EXISTS idx_precios_mercado_plaza ON precios_mercado(plaza);
+CREATE INDEX IF NOT EXISTS idx_precios_mercado_producto ON precios_mercado(producto);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -433,6 +452,7 @@ TABLAS = [
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
+    "precios_mercado",
 ]
 
 

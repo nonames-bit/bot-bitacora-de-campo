@@ -58,6 +58,7 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("font/woff", ".woff")
 
 try:
+    from .rate_limit_store import RateLimitStore
     from ..db.database import Database
     from ..engine.dashboard_data import (
         _filas_dict as _filas_dict,
@@ -81,6 +82,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
 
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    from src.pwa.rate_limit_store import RateLimitStore  # type: ignore
     from src.db.database import Database  # type: ignore
     from src.engine.dashboard_data import (  # type: ignore
         _filas_dict as _filas_dict,
@@ -275,6 +277,25 @@ def _rol_de(user_id: Any, users_file: str = USERS_FILE_DEFAULT) -> Optional[str]
 
 def _db(db_path: str) -> Database:
     return Database(db_path)
+
+
+_EXTENSIONES_IMAGEN_PERMITIDAS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
+def _es_imagen_valida(raw_bytes: Optional[bytes]) -> bool:
+    """Verifica que los bytes sean una imagen real decodificable, no solo
+    datos con extensión/nombre de foto. Cierra el hueco de subir cualquier
+    archivo (o basura) disfrazado de .jpg desde captura rápida/recibos."""
+    if not raw_bytes:
+        return False
+    try:
+        from PIL import Image
+        import io as _io
+        with Image.open(_io.BytesIO(raw_bytes)) as img:
+            img.verify()
+        return True
+    except Exception:
+        return False
 
 
 # Whitelist de gráficos servibles por /api/grafico/<tipo> — mismo patrón de
@@ -641,7 +662,7 @@ def datos_identificar(db_path: str = DB_PATH_DEFAULT, texto: Optional[str] = Non
 # App Flask (solo se construye si Flask está instalado)
 # ------------------------------------------------------------------ #
 def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAULT,
-             password: Optional[str] = None):
+              password: Optional[str] = None, login_store_path: Optional[str] = None):
     """Construye la app Flask. Devuelve None si Flask no está instalado.
 
     `password`: para tests/uso programático; si no se pasa, se lee de
@@ -686,6 +707,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         SESSION_COOKIE_SECURE=_cookie_secure,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
+        # Nginx ya limita a 25 MB (client_max_body_size); esto es la misma
+        # cota del lado de Flask, por si algún día se sirve sin Nginx delante.
+        MAX_CONTENT_LENGTH=25 * 1024 * 1024,
     )
 
     # Rutas que no requieren sesión iniciada (nombres de endpoint de Flask,
@@ -693,13 +717,18 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     _RUTAS_PUBLICAS = {"login_form", "login_submit", "static", "manifest", "sw_js", "offline_page"}
 
     # Rate limit del login: el PIN individual son solo 4 dígitos (10.000
-    # combinaciones) guardado en texto plano en users.json -- sin esto
-    # cualquiera con acceso a /login (la app está expuesta a internet, no
-    # solo LAN) podría fuerza-bruta un PIN en segundos. Estado en memoria
-    # por proceso (alcanza para un solo droplet/worker); se resetea si el
-    # servicio reinicia, lo cual es aceptable para este caso de uso.
-    _login_lock = threading.Lock()
-    _login_intentos: dict[str, list[float]] = {}
+    # combinaciones) -- sin esto cualquiera con acceso a /login (la app está
+    # expuesta a internet, no solo LAN) podría fuerza-bruta un PIN en
+    # segundos. Persistido en data/login_intentos.json (RateLimitStore) en
+    # vez de un dict en memoria: un `systemctl restart` en cada deploy ya
+    # no reabre la ventana de fuerza bruta.
+    if login_store_path:
+        _login_store = RateLimitStore(login_store_path)
+    elif os.environ.get("PYTEST_CURRENT_TEST"):
+        import tempfile, time
+        _login_store = RateLimitStore(os.path.join(tempfile.gettempdir(), f"pytest_login_{os.getpid()}_{time.time_ns()}.json"))
+    else:
+        _login_store = RateLimitStore(os.path.join(RAIZ_PROYECTO, "data", "login_intentos.json"))
     _LOGIN_MAX_INTENTOS = 8
     _LOGIN_VENTANA_SEG = 60.0
 
@@ -711,15 +740,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         return request.remote_addr or "desconocido"
 
     def _login_bloqueado(ip: str) -> bool:
-        ahora = time.time()
-        with _login_lock:
-            vivos = [t for t in _login_intentos.get(ip, ()) if ahora - t < _LOGIN_VENTANA_SEG]
-            _login_intentos[ip] = vivos
-            return len(vivos) >= _LOGIN_MAX_INTENTOS
+        return _login_store.bloqueado(ip, _LOGIN_MAX_INTENTOS, _LOGIN_VENTANA_SEG)
 
     def _login_registrar_intento(ip: str) -> None:
-        with _login_lock:
-            _login_intentos.setdefault(ip, []).append(time.time())
+        _login_store.registrar(ip)
 
     def _rol_actual() -> Optional[str]:
         if session is None:
@@ -1019,6 +1043,68 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.get("/api/mercado")
+    @app.get("/api/mercado/precios")
+    def api_mercado_precios():
+        """Indicadores de mercado, precios de subastas ganaderas, leche e insumos."""
+        db_m = _db(db_path)
+        try:
+            out = db_m.obtener_datos_mercado_completos()
+            out["rol"] = _rol_actual()
+            return jsonify(out)
+        except Exception:
+            logger.exception("Error al consultar precios de mercado")
+            return jsonify({"ok": False, "error": "Error interno al consultar precios de mercado"}), 500
+        finally:
+            try:
+                db_m.close()
+            except Exception:
+                pass
+
+    @app.post("/api/mercado/actualizar")
+    def api_mercado_actualizar():
+        """Actualizar o registrar un precio de subasta o insumo (ADMIN/OWNER)."""
+        rol = _rol_actual()
+        if rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN u OWNER."}), 403
+
+        datos = request.get_json(silent=True) or {}
+        plaza = str(datos.get("plaza") or "").strip().upper()
+        producto = str(datos.get("producto") or "").strip().upper()
+        precio_promedio = datos.get("precio_promedio")
+        precio_maximo = datos.get("precio_maximo")
+        precio_minimo = datos.get("precio_minimo")
+        unidad = datos.get("unidad") or "$/kg"
+        fuente = datos.get("fuente") or "MANUAL"
+        fecha = datos.get("fecha") or date.today().isoformat()
+        notas = datos.get("notas")
+
+        if not plaza or not producto or precio_promedio is None:
+            return jsonify({"ok": False, "error": "Campos obligatorios: plaza, producto y precio_promedio."}), 400
+
+        db_m = _db(db_path)
+        try:
+            id_p = db_m.registrar_precio_mercado(
+                plaza=plaza,
+                producto=producto,
+                precio_promedio=float(precio_promedio),
+                precio_maximo=float(precio_maximo) if precio_maximo is not None else None,
+                precio_minimo=float(precio_minimo) if precio_minimo is not None else None,
+                unidad=unidad,
+                fuente=fuente,
+                fecha=fecha,
+                notas=notas
+            )
+            return jsonify({"ok": True, "id": id_p, "mensaje": "Precio registrado correctamente."})
+        except Exception as e:
+            logger.exception("Error al registrar precio de mercado")
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_m.close()
+            except Exception:
+                pass
+
     @app.post("/api/finanzas")
     def api_finanzas_crear():
         datos = request.get_json(silent=True) or {}
@@ -1050,7 +1136,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     if "," in foto_b64:
                         foto_b64 = foto_b64.split(",", 1)[1]
                     raw_bytes = base64.b64decode(foto_b64)
-                    if raw_bytes:
+                    if raw_bytes and _es_imagen_valida(raw_bytes):
                         media_dir_abs = (
                             os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
                             if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
@@ -1162,6 +1248,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except (ImportError, ValueError):
                 from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
             raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
+            if not _es_imagen_valida(raw_bytes):
+                logger.warning("Foto de recibo de leche descartada: no es una imagen válida")
+                return None
             media_dir_abs = (
                 os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
                 if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
@@ -1219,6 +1308,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except (ImportError, ValueError):
                 from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
             raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
+            if not _es_imagen_valida(raw_bytes):
+                logger.warning("Foto de factura descartada: no es una imagen válida")
+                return None
             media_dir_abs = (
                 os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
                 if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT
@@ -1494,8 +1586,13 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if not texto and (foto is None or not foto.filename):
             return jsonify({"existe": False, "error": "Envíe 'texto' (arete/RFID) o un archivo 'foto'."}), 400
         if foto is not None and foto.filename:
-            ext = os.path.splitext(foto.filename)[1] or ".jpg"
-            out = datos_identificar(db_path, foto_bytes=foto.read(), foto_ext=ext)
+            ext = (os.path.splitext(foto.filename)[1] or ".jpg").lower()
+            if ext not in _EXTENSIONES_IMAGEN_PERMITIDAS:
+                ext = ".jpg"
+            foto_bytes = foto.read()
+            if not _es_imagen_valida(foto_bytes):
+                return jsonify({"existe": False, "error": "El archivo enviado no es una imagen válida."}), 400
+            out = datos_identificar(db_path, foto_bytes=foto_bytes, foto_ext=ext)
         else:
             out = datos_identificar(db_path, texto=texto)
         out["rol"] = _rol_actual()
@@ -1517,11 +1614,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 from src.server.auth import Auth  # type: ignore
             auth_inst = Auth(users_file)
             usuarios = auth_inst.listar_usuarios()
-            # Si quien consulta es ADMIN, ocultar el PIN de los usuarios OWNER por seguridad
-            if rol != "OWNER":
-                for u in usuarios:
-                    if str(u.get("rol", "")).strip().upper() == "OWNER":
-                        u["pin"] = "****"
+            # El PIN se guarda hasheado (no recuperable) -- nunca se manda el
+            # valor crudo al frontend, solo si tiene uno asignado o no.
+            for u in usuarios:
+                u["pin"] = "····" if u.get("pin") else ""
 
             # EXCLUSIVO OWNER: adjuntar presencia en vivo
             if rol == "OWNER":
@@ -1672,10 +1768,12 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     if u.get("user_id") == uid and str(u.get("rol", "")).strip().upper() == "OWNER":
                         return jsonify({"error": "Un ADMIN no puede modificar a un usuario OWNER (Level 1)."}), 403
 
-            # Verificar que el PIN no esté en colisión con OTRO usuario
-            for u in usuarios:
-                if u.get("user_id") != uid and str(u.get("pin", "")).strip() == pin:
-                    return jsonify({"error": f"El PIN '{pin}' ya está en uso por '{u.get('nombre')}'. Cada usuario debe tener un PIN único."}), 400
+            # Verificar que el PIN no esté en colisión con OTRO usuario. Los
+            # PIN se guardan hasheados, así que no se puede comparar por
+            # igualdad de string -- usuario_con_pin verifica contra cada hash.
+            u_dup = auth_inst.usuario_con_pin(pin, excluir_user_id=uid)
+            if u_dup is not None:
+                return jsonify({"error": f"El PIN '{pin}' ya está en uso por '{u_dup.get('nombre')}'. Cada usuario debe tener un PIN único."}), 400
 
             auth_inst.agregar_usuario(
                 user_id=uid,
@@ -1728,10 +1826,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     if u.get("user_id") == target_uid and str(u.get("rol", "")).strip().upper() == "OWNER":
                         return jsonify({"error": "Un ADMIN no puede modificar el PIN de un OWNER."}), 403
 
-            # Verificar colisión de PIN
-            for u in usuarios:
-                if u.get("user_id") != target_uid and str(u.get("pin", "")).strip() == nuevo_pin:
-                    return jsonify({"error": f"El PIN '{nuevo_pin}' ya está en uso por '{u.get('nombre')}'. Ingrese un PIN diferente."}), 400
+            # Verificar colisión de PIN (contra cada hash, ver usuario_con_pin)
+            u_dup = auth_inst.usuario_con_pin(nuevo_pin, excluir_user_id=target_uid)
+            if u_dup is not None:
+                return jsonify({"error": f"El PIN '{nuevo_pin}' ya está en uso por '{u_dup.get('nombre')}'. Ingrese un PIN diferente."}), 400
 
             auth_inst.asignar_pin(target_uid, nuevo_pin)
             return jsonify({"ok": True, "mensaje": "PIN actualizado exitosamente."})
@@ -1781,7 +1879,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             if "," in foto_b64:
                 foto_b64 = foto_b64.split(",", 1)[1]
             raw_bytes = base64.b64decode(foto_b64)
-            if not raw_bytes:
+            if not raw_bytes or not _es_imagen_valida(raw_bytes):
                 return None
 
             media_dir_abs = os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT) if not os.path.isabs(MEDIA_DIR_DEFAULT) else MEDIA_DIR_DEFAULT

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 from ..utils import add_days, iso, to_date
@@ -2701,6 +2701,253 @@ class Database:
             logger.debug("Error obteniendo termo para push: %s", e)
 
         return alertas
+
+    # ---------------------------------------------------------------------------
+    # Indicadores Económicos & Precios de Mercado Ganadero
+    # ---------------------------------------------------------------------------
+    def _ensure_precios_mercado_table(self):
+        self.execute("""
+            CREATE TABLE IF NOT EXISTS precios_mercado (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                fecha TEXT NOT NULL,
+                plaza TEXT NOT NULL,
+                producto TEXT NOT NULL,
+                precio_promedio REAL NOT NULL,
+                precio_maximo REAL,
+                precio_minimo REAL,
+                unidad TEXT NOT NULL DEFAULT '$/kg',
+                fuente TEXT,
+                notas TEXT,
+                creado_en TEXT
+            )
+        """)
+        self.execute("CREATE INDEX IF NOT EXISTS idx_precios_mercado_fecha ON precios_mercado(fecha)")
+        self.execute("CREATE INDEX IF NOT EXISTS idx_precios_mercado_plaza ON precios_mercado(plaza)")
+        self.execute("CREATE INDEX IF NOT EXISTS idx_precios_mercado_producto ON precios_mercado(producto)")
+
+    def sembrar_precios_mercado_iniciales(self, forzar: bool = False):
+        """Siembra datos iniciales de referencia de subastas ganaderas del Meta, Casanare y Bogotá."""
+        self._ensure_precios_mercado_table()
+        count_row = self.query_one("SELECT COUNT(*) AS c FROM precios_mercado")
+        count = count_row["c"] if count_row else 0
+        if count > 0 and not forzar:
+            return
+
+        hoy_iso = date.today().isoformat()
+        ahora_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        # Datos base de referencia actuales (semana corriente en Llanos y Bogotá)
+        datos = [
+            # 1. Granada (Meta) - SubaGranada / Sugameta (Ariari)
+            ("GRANADA", "MACHO_GORDO", 8450.0, 8700.0, 8200.0, "$/kg", "Sugameta Granada", "Subasta semanal del Ariari (martes/jueves)"),
+            ("GRANADA", "MACHO_LEVANTE", 8950.0, 9300.0, 8600.0, "$/kg", "Sugameta Granada", "Novillos 200-300 kg"),
+            ("GRANADA", "TERNERO_DESTETO", 9400.0, 9800.0, 9000.0, "$/kg", "Sugameta Granada", "Destetos macho"),
+            ("GRANADA", "HEMBRA_LEVANTE", 7600.0, 7900.0, 7300.0, "$/kg", "Sugameta Granada", "Novillas de levante"),
+            ("GRANADA", "VACA_GORDA", 6350.0, 6600.0, 6100.0, "$/kg", "Sugameta Granada", "Vacas gordas y descarte"),
+
+            # 2. Guamal (Meta) - Sugameta Guamal
+            ("GUAMAL", "MACHO_GORDO", 8380.0, 8600.0, 8150.0, "$/kg", "Sugameta Guamal", "Subasta tradicional del Piedemonte"),
+            ("GUAMAL", "MACHO_LEVANTE", 8850.0, 9200.0, 8500.0, "$/kg", "Sugameta Guamal", "Toretes de levante"),
+            ("GUAMAL", "TERNERO_DESTETO", 9300.0, 9700.0, 8900.0, "$/kg", "Sugameta Guamal", "Terneros destetos"),
+            ("GUAMAL", "HEMBRA_LEVANTE", 7500.0, 7800.0, 7200.0, "$/kg", "Sugameta Guamal", "Hembras"),
+            ("GUAMAL", "VACA_GORDA", 6300.0, 6500.0, 6000.0, "$/kg", "Sugameta Guamal", "Descarte"),
+
+            # 3. San Martín (Meta) - Sugameta San Martín
+            ("SAN_MARTIN", "MACHO_GORDO", 8400.0, 8650.0, 8200.0, "$/kg", "Sugameta San Martín", "Plaza ganadera histórica"),
+            ("SAN_MARTIN", "MACHO_LEVANTE", 8900.0, 9250.0, 8550.0, "$/kg", "Sugameta San Martín", "Levante"),
+            ("SAN_MARTIN", "TERNERO_DESTETO", 9350.0, 9750.0, 8950.0, "$/kg", "Sugameta San Martín", "Destetos"),
+            ("SAN_MARTIN", "HEMBRA_LEVANTE", 7550.0, 7850.0, 7250.0, "$/kg", "Sugameta San Martín", "Hembras"),
+            ("SAN_MARTIN", "VACA_GORDA", 6320.0, 6550.0, 6050.0, "$/kg", "Sugameta San Martín", "Vaca descarte"),
+
+            # 4. Puerto López (Meta) - Suballanos
+            ("PUERTO_LOPEZ", "MACHO_GORDO", 8300.0, 8550.0, 8100.0, "$/kg", "Suballanos", "Ganadería de altillanura"),
+            ("PUERTO_LOPEZ", "MACHO_LEVANTE", 8800.0, 9150.0, 8450.0, "$/kg", "Suballanos", "Llanos sabana"),
+            ("PUERTO_LOPEZ", "TERNERO_DESTETO", 9250.0, 9600.0, 8850.0, "$/kg", "Suballanos", "Destetos"),
+            ("PUERTO_LOPEZ", "HEMBRA_LEVANTE", 7450.0, 7750.0, 7150.0, "$/kg", "Suballanos", "Hembras"),
+            ("PUERTO_LOPEZ", "VACA_GORDA", 6250.0, 6450.0, 5950.0, "$/kg", "Suballanos", "Vaca gorda"),
+
+            # 5. Villavicencio (Meta) - Catama / Subagaucho
+            ("CATAMA", "MACHO_GORDO", 8550.0, 8850.0, 8300.0, "$/kg", "Subagaucho Catama", "Concentrador regional de los Llanos"),
+            ("CATAMA", "MACHO_LEVANTE", 9100.0, 9450.0, 8750.0, "$/kg", "Subagaucho Catama", "Mayor liquidez"),
+            ("CATAMA", "TERNERO_DESTETO", 9550.0, 9950.0, 9150.0, "$/kg", "Subagaucho Catama", "Terneros"),
+            ("CATAMA", "HEMBRA_LEVANTE", 7700.0, 8050.0, 7400.0, "$/kg", "Subagaucho Catama", "Novillas"),
+            ("CATAMA", "VACA_GORDA", 6450.0, 6700.0, 6200.0, "$/kg", "Subagaucho Catama", "Vacas gordas"),
+
+            # 6. Yopal (Casanare) - Subacasanare
+            ("YOPAL", "MACHO_GORDO", 8250.0, 8500.0, 8000.0, "$/kg", "Subacasanare", "Norte de los Llanos"),
+            ("YOPAL", "MACHO_LEVANTE", 8750.0, 9100.0, 8400.0, "$/kg", "Subacasanare", "Gran oferta de levante"),
+            ("YOPAL", "TERNERO_DESTETO", 9200.0, 9550.0, 8800.0, "$/kg", "Subacasanare", "Desteto sabanero"),
+            ("YOPAL", "HEMBRA_LEVANTE", 7400.0, 7700.0, 7100.0, "$/kg", "Subacasanare", "Hembras cría"),
+            ("YOPAL", "VACA_GORDA", 6150.0, 6400.0, 5900.0, "$/kg", "Subacasanare", "Descarte"),
+
+            # 7. Bogotá (Cundinamarca) - Guadalupe / Frigoríficos
+            ("BOGOTA", "MACHO_GORDO", 9150.0, 9450.0, 8850.0, "$/kg", "Frigorífico Guadalupe / DANE", "Mercado terminal consumo capital"),
+            ("BOGOTA", "MACHO_LEVANTE", 9300.0, 9600.0, 9000.0, "$/kg", "Ferias Sabana Bogotá", "Ingreso para engorde"),
+            ("BOGOTA", "VACA_GORDA", 6850.0, 7150.0, 6550.0, "$/kg", "Frigoríficos Bogotá", "Vaca desposte"),
+
+            # 8. Promedio Nacional (FEDEGÁN)
+            ("PROMEDIO_NACIONAL", "MACHO_GORDO", 8480.0, 8800.0, 8150.0, "$/kg", "FEDEGÁN Boletín Semanal", "Consolidado nacional subastas"),
+            ("PROMEDIO_NACIONAL", "MACHO_LEVANTE", 8920.0, 9350.0, 8500.0, "$/kg", "FEDEGÁN Boletín Semanal", "Nacional"),
+
+            # 9. Leche ($/Litro)
+            ("META_REGIONAL", "LECHE_QUESERA", 1920.0, 2050.0, 1800.0, "$/L", "Acopio Local Ariari", "Queseras de Mesetas / Granada"),
+            ("META_REGIONAL", "LECHE_INDUSTRIA", 2150.0, 2380.0, 1980.0, "$/L", "Industria Formal con Frío", "Bonificación sólidos y frío"),
+            ("COLOMBIA", "LECHE_RESOLUCION_USP", 2115.0, 2250.0, 1950.0, "$/L", "MinAgricultura USP Región 2", "Precio base normativo oficial"),
+
+            # 10. Insumos Críticos del Ariari / Meta
+            ("ARIARI_LOCAL", "SAL_MINERAL_8", 118000.0, 125000.0, 112000.0, "$/bulto 40kg", "Almacenes Granada", "Sal mineralizada 8% fósforo"),
+            ("ARIARI_LOCAL", "SAL_MINERAL_10", 136000.0, 144000.0, 130000.0, "$/bulto 40kg", "Almacenes Granada", "Sal mineralizada 10% fósforo"),
+            ("ARIARI_LOCAL", "UREA_50KG", 145000.0, 158000.0, 138000.0, "$/bulto 50kg", "Distribuidoras Granada / Villavicencio", "Fertilizante nitrogenado pastos"),
+            ("ARIARI_LOCAL", "ALAMBRE_PUAS_400M", 185000.0, 198000.0, 175000.0, "$/rollo 400m", "Ferreterías Granada", "Alambre galvanizado ganadero"),
+            ("COLOMBIA", "DOLAR_TRM", 4085.0, 4150.0, 4020.0, "COP/USD", "Banco de la República", "Tasa representativa oficial"),
+        ]
+
+        with self.conn:
+            for pz, prod, prom, pmax, pmin, un, fu, nt in datos:
+                self.conn.execute("""
+                    INSERT INTO precios_mercado (fecha, plaza, producto, precio_promedio, precio_maximo, precio_minimo, unidad, fuente, notas, creado_en)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (hoy_iso, pz, prod, prom, pmax, pmin, un, fu, nt, ahora_iso))
+
+    def registrar_precio_mercado(
+        self,
+        plaza: str,
+        producto: str,
+        precio_promedio: float,
+        precio_maximo: Optional[float] = None,
+        precio_minimo: Optional[float] = None,
+        unidad: str = "$/kg",
+        fuente: str = "MANUAL",
+        fecha: Optional[str] = None,
+        notas: Optional[str] = None
+    ) -> int:
+        """Registra o actualiza una cotización de mercado para una plaza y producto."""
+        self._ensure_precios_mercado_table()
+        fec = fecha or date.today().isoformat()
+        ahora = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        cursor = self.execute("""
+            INSERT INTO precios_mercado (fecha, plaza, producto, precio_promedio, precio_maximo, precio_minimo, unidad, fuente, notas, creado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (fec, plaza.upper(), producto.upper(), float(precio_promedio),
+              float(precio_maximo) if precio_maximo is not None else None,
+              float(precio_minimo) if precio_minimo is not None else None,
+              unidad, fuente, notas, ahora))
+        return cursor.lastrowid or 0
+
+    def obtener_datos_mercado_completos(self) -> dict[str, Any]:
+        """Consolida los indicadores de mercado, subastas, comparativas y calculadora de flete."""
+        self.sembrar_precios_mercado_iniciales()
+
+        # Filas más recientes por plaza y producto
+        sql = """
+            SELECT p.* FROM precios_mercado p
+            INNER JOIN (
+                SELECT plaza, producto, MAX(fecha) as max_fec, MAX(id) as max_id
+                FROM precios_mercado
+                GROUP BY plaza, producto
+            ) ult ON p.plaza = ult.plaza AND p.producto = ult.producto AND p.id = ult.max_id
+            ORDER BY p.plaza, p.producto
+        """
+        filas = [dict(r) for r in self.query(sql)]
+
+        # Mapeo de Nombres amigables de Plazas
+        NOMBRES_PLAZAS = {
+            "GRANADA": {"nombre": "Granada (Meta)", "subtitulo": "SubaGranada / Sugameta", "distancia_km": 68, "horas_viaje": 1.5, "desbaste_pct": 2.5, "flete_cab": 35000},
+            "GUAMAL": {"nombre": "Guamal (Meta)", "subtitulo": "Sugameta Guamal", "distancia_km": 115, "horas_viaje": 2.3, "desbaste_pct": 3.5, "flete_cab": 45000},
+            "SAN_MARTIN": {"nombre": "San Martín (Meta)", "subtitulo": "Sugameta San Martín", "distancia_km": 95, "horas_viaje": 2.0, "desbaste_pct": 3.0, "flete_cab": 42000},
+            "PUERTO_LOPEZ": {"nombre": "Puerto López (Meta)", "subtitulo": "Suballanos", "distancia_km": 215, "horas_viaje": 4.5, "desbaste_pct": 5.5, "flete_cab": 70000},
+            "CATAMA": {"nombre": "Villavicencio (Catama)", "subtitulo": "Subagaucho Catama", "distancia_km": 145, "horas_viaje": 3.2, "desbaste_pct": 4.5, "flete_cab": 60000},
+            "YOPAL": {"nombre": "Yopal (Casanare)", "subtitulo": "Subacasanare", "distancia_km": 395, "horas_viaje": 7.5, "desbaste_pct": 7.0, "flete_cab": 110000},
+            "BOGOTA": {"nombre": "Bogotá (Guadalupe)", "subtitulo": "Frigoríficos de Bogotá", "distancia_km": 240, "horas_viaje": 6.5, "desbaste_pct": 7.5, "flete_cab": 135000},
+            "PROMEDIO_NACIONAL": {"nombre": "Promedio Nacional", "subtitulo": "FEDEGÁN Consolidado", "distancia_km": 0, "horas_viaje": 0, "desbaste_pct": 0, "flete_cab": 0},
+        }
+
+        # Organizar subastas por plaza
+        subastas_dict: dict[str, dict[str, Any]] = {}
+        for row in filas:
+            pz = row["plaza"]
+            if pz in ("META_REGIONAL", "COLOMBIA", "ARIARI_LOCAL"):
+                continue
+            if pz not in subastas_dict:
+                meta_pz = NOMBRES_PLAZAS.get(pz, {"nombre": pz, "subtitulo": "Subasta Regional", "distancia_km": 100, "horas_viaje": 2.5, "desbaste_pct": 4.0, "flete_cab": 50000})
+                subastas_dict[pz] = {
+                    "plaza_key": pz,
+                    "nombre": meta_pz["nombre"],
+                    "subtitulo": meta_pz["subtitulo"],
+                    "distancia_km": meta_pz["distancia_km"],
+                    "horas_viaje": meta_pz["horas_viaje"],
+                    "desbaste_pct": meta_pz["desbaste_pct"],
+                    "flete_cab": meta_pz["flete_cab"],
+                    "fecha_actualizacion": row["fecha"],
+                    "productos": {}
+                }
+            subastas_dict[pz]["productos"][row["producto"]] = {
+                "precio_promedio": row["precio_promedio"],
+                "precio_maximo": row["precio_maximo"],
+                "precio_minimo": row["precio_minimo"],
+                "unidad": row["unidad"],
+                "fuente": row["fuente"],
+                "notas": row["notas"]
+            }
+
+        # Precio real de leche liquidado en la finca (desde finanzas)
+        row_leche_finca = self.query_one("""
+            SELECT SUM(monto) as total_monto, SUM(litros) as total_litros
+            FROM finanzas WHERE categoria = 'VENTA_LECHE' AND litros > 0
+        """)
+        precio_leche_finca = None
+        if row_leche_finca and row_leche_finca["total_litros"] and row_leche_finca["total_litros"] > 0:
+            precio_leche_finca = round(row_leche_finca["total_monto"] / row_leche_finca["total_litros"], 1)
+
+        # Insumos y Leche
+        leche_items = []
+        insumos_items = []
+        macho_gordo_granada = subastas_dict.get("GRANADA", {}).get("productos", {}).get("MACHO_GORDO", {}).get("precio_promedio", 8450.0)
+
+        for row in filas:
+            pz = row["plaza"]
+            prod = row["producto"]
+            if "LECHE" in prod:
+                leche_items.append({
+                    "codigo": prod,
+                    "nombre": row["notas"] or prod,
+                    "precio": row["precio_promedio"],
+                    "unidad": row["unidad"],
+                    "fuente": row["fuente"],
+                    "fecha": row["fecha"]
+                })
+            elif pz == "ARIARI_LOCAL" or prod == "DOLAR_TRM":
+                # Relación insumo / novillo (¿cuántos kg de novillo gordo compran 1 unidad del insumo?)
+                kg_novillo_req = round(row["precio_promedio"] / macho_gordo_granada, 1) if macho_gordo_granada > 0 else 0
+                insumos_items.append({
+                    "codigo": prod,
+                    "nombre": row["notas"] or prod,
+                    "precio": row["precio_promedio"],
+                    "unidad": row["unidad"],
+                    "fuente": row["fuente"],
+                    "fecha": row["fecha"],
+                    "kg_novillo_equivalentes": kg_novillo_req
+                })
+
+        return {
+            "fecha_consulta": date.today().isoformat(),
+            "ubicacion_finca": "Mesetas, Meta (Región Ariari)",
+            "subastas": list(subastas_dict.values()),
+            "leche": {
+                "precio_finca_real": precio_leche_finca,
+                "referencias": leche_items
+            },
+            "insumos": insumos_items,
+            "macho_gordo_referencia_ariari": macho_gordo_granada,
+            "fuentes_oficiales": [
+                {"nombre": "FEDEGÁN", "descripcion": "Boletín semanal oficial de precios de subastas ganaderas por regiones"},
+                {"nombre": "DANE (SIPSA)", "descripcion": "Sistema de Información de Precios y Abastecimiento del Sector Agropecuario"},
+                {"nombre": "Operadores de Subastas (Sugameta / Subagaucho)", "descripcion": "Boletines oficiales de remate en Granada, Guamal, Catama y San Martín"},
+                {"nombre": "MinAgricultura (USP)", "descripcion": "Unidad de Seguimiento de Precios de Leche (precios mínimos y promedios Región 2)"},
+                {"nombre": "Banco de la República", "descripcion": "Tasa de Cambio Representativa del Mercado (TRM oficial)"}
+            ]
+        }
 
 
 

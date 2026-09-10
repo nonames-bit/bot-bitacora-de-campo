@@ -2531,4 +2531,147 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   }
 }
 
+/* ==========================================================================
+   Módulo de Indicadores Económicos y Subastas Ganaderas
+   ========================================================================== */
+.mercado-subnav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px 0;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--borde);
+  scrollbar-width: thin;
+}
+.mercado-tab-btn {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--texto-suave);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.mercado-tab-btn.act {
+  background: var(--verde-marca);
+  color: #ffffff;
+  border-color: var(--verde-marca);
+  box-shadow: 0 2px 6px rgba(47, 82, 51, 0.25);
+}
+
+.grid-plazas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 14px;
+  margin-top: 10px;
+}
+.card-plaza {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 2px 6px var(--sombra);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.card-plaza:hover {
+  border-color: var(--verde-marca);
+}
+.card-plaza-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--borde);
+  padding-bottom: 8px;
+}
+.card-plaza-titulo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--texto);
+}
+.card-plaza-dist {
+  font-size: 11.5px;
+  color: var(--texto-suave);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+.card-plaza-precios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fila-precio {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.02);
+}
+[data-theme="dark"] .fila-precio {
+  background: rgba(255, 255, 255, 0.04);
+}
+.fila-precio-etiq {
+  color: var(--texto);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fila-precio-val {
+  font-weight: 700;
+  color: var(--verde-marca);
+  letter-spacing: -0.01em;
+}
+
+/* Calculadora de Venta y Fletes */
+.calc-flete-box {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 2px 6px var(--sombra);
+}
+.calc-flete-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+  background: var(--fondo);
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--borde);
+}
+.calc-resultado-ganador {
+  border: 2px solid #16a34a !important;
+  background: rgba(22, 163, 74, 0.04) !important;
+}
+
+/* Insumos */
+.grid-insumos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+.card-insumo {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 4px var(--sombra);
+}
+
 

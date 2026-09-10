@@ -624,6 +624,7 @@ Para traer los últimos cambios y reiniciar el servicio, ejecute en el VPS:
 cd /root/bitacora
 git pull origin main
 systemctl restart bitacora-bot
+systemctl restart bitacora-pwa   # PWA (aplica templates/style.css/sw.js v78 vaquita)
 ```
 
 Para verificar que el bot arrancó correctamente:

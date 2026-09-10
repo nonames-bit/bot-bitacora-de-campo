@@ -1,17 +1,36 @@
 """Módulo de autenticación y control de acceso basado en roles (RBAC)."""
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
+import re
 import tempfile
 import threading
 from typing import Any, Optional
 
+from werkzeug.security import check_password_hash, generate_password_hash
+
 logger = logging.getLogger("bitacora.auth")
 
 ROLES_VALIDOS = {"OWNER", "ADMIN", "TRABAJADOR"}
+
+_PIN_PLANO_RE = re.compile(r"^\d{4}$")
+
+
+def _es_pin_plano(valor: str) -> bool:
+    """True si `valor` todavía es un PIN de 4 dígitos sin hashear (formato legado)."""
+    return bool(_PIN_PLANO_RE.match(valor or ""))
+
+
+def _hash_pin(pin: str) -> str:
+    # 200k iteraciones (no el default de werkzeug, ~1M): un PIN de 4 dígitos
+    # solo tiene 10.000 combinaciones posibles, así que subir el costo por
+    # intento no endurece mucho la fuerza bruta offline -- en cambio sí
+    # cuesta real en cada login, en usuario_con_pin (recorre TODOS los
+    # usuarios por cada verificación) y en la migración de PINs legados al
+    # cargar users.json. 200k sigue siendo un costo serio por intento.
+    return generate_password_hash(pin, method="pbkdf2:sha256:200000")
 
 # Candado de módulo que serializa toda mutación + persistencia de users.json.
 # python-telegram-bot atiende los handlers en hilos (dos /agregar_usuario a la
@@ -62,6 +81,21 @@ class Auth:
                 raise ValueError(f"Usuario inválido en {self.users_file}: {u}")
 
         self.usuarios = datos
+
+        # Migración automática de PINs legados en texto plano (formato de
+        # antes de esta versión): se hashean en el primer load y se
+        # reescribe el archivo. Idempotente -- un PIN ya hasheado nunca
+        # matchea el patrón de 4 dígitos, así que no se vuelve a tocar.
+        migrados = 0
+        for u in self.usuarios:
+            pin_actual = u.get("pin")
+            if pin_actual and _es_pin_plano(str(pin_actual)):
+                u["pin"] = _hash_pin(str(pin_actual))
+                migrados += 1
+        if migrados:
+            logger.warning("Migrados %d PIN(es) en texto plano a hash en %s", migrados, self.users_file)
+            self._guardar_sin_lock()
+
         try:
             self._ultimo_mtime = os.path.getmtime(self.users_file)
         except Exception:
@@ -199,12 +233,19 @@ class Auth:
         pin_limpio = str(pin).strip()
         for u in self.usuarios:
             pin_u = str(u.get("pin", "")).strip()
-            # compare_digest en vez de == : una comparación normal corta en
-            # cuanto encuentra el primer carácter distinto, así que el tiempo
-            # de respuesta revela cuántos dígitos del PIN acertó un atacante
-            # (ataque de temporización). Con 4 dígitos y el sitio expuesto a
-            # internet, vale la pena la comparación en tiempo constante.
-            if pin_u and hmac.compare_digest(pin_u, pin_limpio):
+            if not pin_u:
+                continue
+            # check_password_hash ya compara en tiempo constante (usa
+            # hmac.compare_digest internamente) -- con 4 dígitos y el sitio
+            # expuesto a internet, un timing attack sobre la comparación
+            # importaría tanto como el hash en sí.
+            try:
+                coincide = check_password_hash(pin_u, pin_limpio)
+            except (ValueError, TypeError):
+                # PIN legado sin migrar aún (no debería pasar tras _cargar_sin_lock,
+                # pero por robustez no se cae si el hash está malformado).
+                coincide = False
+            if coincide:
                 rol_u = str(u.get("rol", "")).strip().upper()
                 avatar_u = u.get("avatar") or ("patron" if rol_u == "OWNER" else "admin" if rol_u == "ADMIN" else "vaquero")
                 return {
@@ -227,11 +268,34 @@ class Auth:
             pin_limpio = str(pin).strip()
             for u in self.usuarios:
                 if u.get("user_id") == uid or u.get("telegram_id") == uid:
-                    u["pin"] = pin_limpio
+                    u["pin"] = _hash_pin(pin_limpio)
                     self._guardar_sin_lock()
                     logger.info("PIN actualizado para user_id=%s", uid)
                     return
             raise ValueError(f"El usuario con ID {uid} no existe.")
+
+    def usuario_con_pin(self, pin: str, excluir_user_id: Optional[int] = None) -> Optional[dict[str, Any]]:
+        """Devuelve el usuario (distinto de `excluir_user_id`) que ya tiene
+        este PIN, o None si no hay colisión. Reemplaza la comparación
+        directa de string que se usaba cuando el PIN se guardaba en texto
+        plano -- con hash no se puede comparar por igualdad, hay que
+        verificar contra cada hash individualmente."""
+        self._recargar_si_cambio()
+        pin_limpio = str(pin).strip()
+        if not pin_limpio:
+            return None
+        for u in self.usuarios:
+            if excluir_user_id is not None and u.get("user_id") == excluir_user_id:
+                continue
+            pin_u = str(u.get("pin", "")).strip()
+            if not pin_u:
+                continue
+            try:
+                if check_password_hash(pin_u, pin_limpio):
+                    return dict(u)
+            except (ValueError, TypeError):
+                continue
+        return None
 
     def agregar_usuario(
         self,
@@ -259,7 +323,7 @@ class Auth:
                 )
 
             nombre_norm = str(nombre).strip() if nombre else f"Usuario_{uid}"
-            pin_norm = str(pin).strip() if pin else None
+            pin_norm = _hash_pin(str(pin).strip()) if pin else None
             tg_id_norm = int(telegram_id) if telegram_id else None
             avatar_norm = avatar or ("patron" if rol_norm == "OWNER" else "admin" if rol_norm == "ADMIN" else "vaquero")
 
