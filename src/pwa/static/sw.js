@@ -68,7 +68,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v75: Unificación de Mapa Satelital y Rutas GPS en un solo módulo para ADMIN y OWNER (bloqueado para TRABAJADOR); dock de chat flotante/expandible con dictado de voz estilo WhatsApp; depuración de terminología zootécnica.
 // v77: Unificación definitiva de Mapa Satelital y Rutas GPS (ADMIN y OWNER), dock de chat WhatsApp con notas de voz y depuración integral de terminología.
 // v78: "Distribución por potrero" del Tablero sube justo después de "Evolución del rebaño" (antes quedaba al final, después del feed de eventos); se quita el gráfico de torta duplicado con Inventario.
-var CACHE = "pwa-ja-v78"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v79: Dock de chat colapsado ahora es una burbuja circular (antes pastilla ancha que estorbaba); se quitan los botones de Chat y Micrófono del header (ya cubiertos por la burbuja); vaquita del header ahora es de cuerpo completo y se mueve visiblemente por el espacio.
+var CACHE = "pwa-ja-v79"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

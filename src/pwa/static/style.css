@@ -2191,8 +2191,9 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 }
 
 /* --- Vaquita pastando en el header (decorativa, 100% CSS/SVG inline, sin requests) ---
-   Reutiliza la iconografía canónica COW_HEAD (cabeza de ternero) + brizna de pasto.
-   Sutil y profesional: deambula ±14px en 12s y cabecea a pastar en 4s. */
+   Silueta de cuerpo completo (no solo la cabeza) + brizna de pasto.
+   Camina de un lado a otro del espacio disponible (±50px en 12s, ±20px en
+   pantallas chicas) y agacha la cabeza a pastar cada tanto (4s). */
 .header-pasto {
   flex: 1 1 120px;
   display: flex;
@@ -2208,18 +2209,18 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 }
 .vaca-pista { display: inline-flex; align-items: flex-end; }
 .vaca-ambula { display: inline-flex; animation: vacaAmbla 12s ease-in-out infinite; }
-.vaca-pasta { display: inline-flex; align-items: flex-end; gap: 1px; animation: vacaPasta 4s ease-in-out infinite; transform-origin: 50% 90%; }
+.vaca-pasta { display: inline-flex; align-items: flex-end; gap: 1px; animation: vacaPasta 4s ease-in-out infinite; transform-origin: 50% 85%; }
 .vaca-svg { display: block; width: 32px; height: 32px; }
 .header-pasto-ficha .vaca-svg { width: 28px; height: 28px; }
 .pasto-svg { display: block; width: 14px; height: 14px; opacity: .75; margin-bottom: 1px; }
 .header-pasto-ficha .pasto-svg { width: 12px; height: 12px; }
 @keyframes vacaAmbla {
-  0%, 100% { transform: translateX(-14px); }
-  50% { transform: translateX(14px); }
+  0%, 100% { transform: translateX(-50px); }
+  50% { transform: translateX(50px); }
 }
 @keyframes vacaPasta {
   0%, 55%, 100% { transform: rotate(0deg) translateY(0); }
-  65%, 85% { transform: rotate(9deg) translateY(2px); }
+  65%, 85% { transform: rotate(4deg) translateY(1.5px); }
 }
 /* Tema claro: el header es blanco, el currentColor ya es oscuro; se baja un poco la opacidad. */
 :root[data-theme="light"] .header-pasto { opacity: .65; }
@@ -2228,15 +2229,16 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 :root[data-theme="sun"] .vaca-ambula, :root[data-theme="sun"] .vaca-pasta { animation: none; }
 :root[data-theme="sun"] .header-pasto { opacity: 1; }
 @media (max-width: 640px) {
-  .header-pasto { min-width: 56px; max-width: 140px; }
+  .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .9; }
   .vaca-svg { width: 28px; height: 28px; }
   @keyframes vacaAmbla {
-    0%, 100% { transform: translateX(-8px); }
-    50% { transform: translateX(8px); }
+    0%, 100% { transform: translateX(-20px); }
+    50% { transform: translateX(20px); }
   }
 }
-@media (max-width: 360px) {
-  .header-pasto { display: none; }
+@media (max-width: 319px) {
+  /* Solo pantallas muy angostas (<320px): compactar, nunca ocultar con display:none. */
+  .header-pasto { min-width: 40px; max-width: 90px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vaca-ambula, .vaca-pasta { animation: none; }
@@ -2257,16 +2259,17 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   overflow: hidden;
 }
 
-/* Estado Colapsado (Barra / Pill disponible siempre) */
+/* Estado Colapsado: burbuja circular (logo), no estorba el contenido de la
+   página -- antes era una barra ancha (hasta 460px) siempre visible tapando
+   la parte de abajo de la pantalla. Toca la burbuja para expandir el chat. */
 .chat-dock.colapsado {
   bottom: 20px;
   right: 24px;
-  width: min(460px, calc(100vw - 32px));
-  height: 48px;
-  border-radius: 28px;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
   background: var(--superficie);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
 }
 .chat-dock.colapsado .chat-dock-header {
   display: none !important;
@@ -2275,11 +2278,36 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   display: none !important;
 }
 .chat-dock.colapsado .chat-dock-footer {
-  border-top: none;
-  padding: 4px 6px;
+  display: none !important;
+}
+.chat-dock-burbuja {
+  display: none;
+  width: 100%;
   height: 100%;
-  display: flex;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  background: var(--verde-marca);
   align-items: center;
+  justify-content: center;
+  transition: transform 0.15s ease;
+}
+.chat-dock-burbuja:active {
+  transform: scale(0.93);
+}
+.chat-dock-burbuja img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.chat-dock.colapsado .chat-dock-burbuja {
+  display: flex;
+}
+.chat-dock.expandido .chat-dock-burbuja {
+  display: none !important;
 }
 
 /* Estado Expandido */
@@ -2473,13 +2501,13 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 /* En Móvil: Anclar sobre la barra de navegación inferior */
 @media (max-width: 768px) {
   .chat-dock.colapsado {
-    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
-    left: 8px;
-    right: 8px;
-    width: auto;
-    height: 46px;
-    border-radius: 24px;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+    bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+    right: 14px;
+    left: auto;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
   }
   .chat-dock.expandido {
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
@@ -2491,7 +2519,10 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
     border-radius: 16px;
   }
   main {
-    padding-bottom: 125px !important;
+    /* La burbuja del chat ahora es un círculo flotante en la esquina (no una
+       barra de ancho completo), así que ya no necesita tanto espacio reservado
+       abajo -- solo lo justo para la barra de navegación inferior. */
+    padding-bottom: 75px !important;
   }
 }
 @media (min-width: 769px) {

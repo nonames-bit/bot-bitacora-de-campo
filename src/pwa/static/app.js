@@ -4460,6 +4460,7 @@
   function setupChatDock() {
     var dock = document.getElementById("chat-dock") || document.getElementById("modal-chat");
     var btnChat = document.getElementById("btn-chat");
+    var btnBurbuja = document.getElementById("chat-dock-burbuja");
     var btnExpandir = document.getElementById("btn-expandir-chat");
     var btnColapsar = document.getElementById("btn-colapsar-chat");
     var btnCerrar = document.getElementById("btn-cerrar-chat");
@@ -4496,6 +4497,7 @@
     }
 
     if (btnChat) btnChat.addEventListener("click", function () { expandirChat(true); });
+    if (btnBurbuja) btnBurbuja.addEventListener("click", function () { expandirChat(true); });
     if (btnExpandir) btnExpandir.addEventListener("click", function (e) { e.preventDefault(); toggleChat(); });
     if (btnColapsar) btnColapsar.addEventListener("click", function (e) { e.preventDefault(); colapsarChat(); });
     if (btnCerrar) btnCerrar.addEventListener("click", function (e) { e.preventDefault(); colapsarChat(); });
