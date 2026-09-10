@@ -6,8 +6,8 @@ import pytest
 
 from src.importers.dbf_importer import (
     DBFReader, import_animales, import_causas, import_celos, import_dbfs,
-    import_fotos, import_leche, import_partos, import_pesajes, import_potreros,
-    import_servicios, import_tactos, import_traslados, import_zip,
+    import_destetes, import_fotos, import_leche, import_partos, import_pesajes,
+    import_potreros, import_servicios, import_tactos, import_traslados, import_zip,
 )
 
 
@@ -378,6 +378,47 @@ def test_import_traslados(db):
     assert res == {"nuevos": 1, "duplicados": 0}
     tr = db.query_one("SELECT * FROM traslados")
     assert tr["lote"] == "2"
+
+
+def test_import_destetes_resuelve_cria_activa_de_la_vaca(db):
+    """destete.dbf de SG trae CODANI = la VACA (no la cría, no hay campo de
+    arete de cría) -- el importador debe resolver la cría activa sin
+    destetar de esa vaca vía cria_activa_de_madre()."""
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("47", fecha="2026-01-01", sexo_cria="Hembra", id_cria_tag="47-1")
+
+    res = import_destetes(db, [
+        {"CODANI": "47", "FECHA": "2026-07-01", "MOTIVO": "Secado programado",
+         "DETALLE": "", "CODPOT": "VS"},
+    ])
+    assert res == {"nuevos": 1, "duplicados": 0, "sin_cria": 0}
+
+    fila = db.query_one(
+        "SELECT d.*, a.tag FROM destetes d JOIN animales a ON a.id_animal = d.animal_id"
+    )
+    assert fila["tag"] == "47-1"
+    assert fila["notas"] == "Secado programado"
+
+
+def test_import_destetes_sin_cria_activa_se_cuenta_aparte(db):
+    """Vaca sin ningún parto/cría activa importada: no se pierde en
+    silencio, se cuenta en 'sin_cria' para revisión manual."""
+    db.registrar_animal("99", sexo="Hembra", estado="ACTIVO")
+    res = import_destetes(db, [
+        {"CODANI": "99", "FECHA": "2026-07-01", "MOTIVO": "", "DETALLE": "", "CODPOT": ""},
+    ])
+    assert res == {"nuevos": 0, "duplicados": 0, "sin_cria": 1}
+    assert db.count("destetes") == 0
+
+
+def test_import_destetes_es_idempotente(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto("47", fecha="2026-01-01", sexo_cria="Hembra", id_cria_tag="47-1")
+    r = [{"CODANI": "47", "FECHA": "2026-07-01", "MOTIVO": "", "DETALLE": "", "CODPOT": ""}]
+    import_destetes(db, r)
+    res2 = import_destetes(db, r)
+    assert res2 == {"nuevos": 0, "duplicados": 1, "sin_cria": 0}
+    assert db.count("destetes") == 1
 
 
 def test_import_tactos_prenada_calcula_dias_gestacion(db):

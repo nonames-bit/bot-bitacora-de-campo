@@ -1874,6 +1874,14 @@ def formatear_reporte_importacion(conteos: dict) -> str:
         detalle_aprox = f" ({ventas_aprox} sin fecha exacta en SG, aproximadas a hoy)" if ventas_aprox else ""
         lineas.append(f"💰 <b>{ventas_registradas} venta(s)</b> nueva(s) detectada(s) en este backup{detalle_aprox}.")
 
+    destetes_sin_cria = (conteos.get("destetes") or {}).get("sin_cria")
+    if destetes_sin_cria:
+        lineas.append("")
+        lineas.append(
+            f"⚠️ <b>{destetes_sin_cria} secado(s)</b> de SG no se pudieron enlazar a una cría activa "
+            "(el parto correspondiente no se importó, o la cría ya no está activa). Revise manualmente."
+        )
+
     return "\n".join(lineas)
 
 

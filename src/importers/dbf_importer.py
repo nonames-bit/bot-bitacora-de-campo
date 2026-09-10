@@ -1,9 +1,10 @@
 """Parser nativo de tablas DBF (dBASE/FoxPro) e importador a SQLite.
 
 Lee las tablas ``hoja.dbf``, ``partos.dbf``, ``celos.dbf``, ``iamn.dbf``,
-``pesos.dbf``, ``potrero.dbf``, ``traslado.dbf`` y ``causas.dbf`` exportadas
-por Software Ganadero TP/SG (dentro de ``docs/Datos20260823.Zip``) y siembra
-la base de datos SQLite del bot. No requiere bibliotecas externas.
+``pesos.dbf``, ``potrero.dbf``, ``traslado.dbf``, ``causas.dbf``,
+``tactos.dbf``, ``leche.dbf`` y ``destete.dbf`` exportadas por Software
+Ganadero TP/SG (dentro de ``docs/Datos20260823.Zip``) y siembra la base de
+datos SQLite del bot. No requiere bibliotecas externas.
 """
 from __future__ import annotations
 
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 DBF_REQUERIDOS = [
     "hoja.dbf", "partos.dbf", "celos.dbf", "iamn.dbf",
     "pesos.dbf", "potrero.dbf", "traslado.dbf", "causas.dbf",
-    "tactos.dbf", "leche.dbf",
+    "tactos.dbf", "leche.dbf", "destete.dbf",
 ]
 
 # Marcas de campo de Visual FoxPro.
@@ -855,6 +856,70 @@ def import_traslados(db: Database, records) -> dict:
     return {"nuevos": nuevos, "duplicados": duplicados}
 
 
+def import_destetes(db: Database, records) -> dict:
+    """Siembra secados/destetos deduplicando por cría_id + fecha.
+
+    A diferencia de partos.dbf (donde CODANI es la vaca y HIJO es la cría
+    aparte), destete.dbf de SG -- pantalla "Secados/Destetos" -- registra
+    el evento sobre la VACA: CODANI es la madre que se seca, y no trae
+    ningún campo de arete de cría. La tabla `destetes` de este bot está
+    indexada por la cría (igual que la pantalla de Captura de la PWA), así
+    que acá se resuelve la cría activa sin destetar de esa vaca con
+    `cria_activa_de_madre()`. Si SG trae un secado de una vaca cuya cría no
+    se puede resolver (ej. el parto correspondiente no se importó, o la
+    cría ya fue vendida/no quedó activa), el registro se cuenta como
+    "sin_cria" en vez de perderse en silencio, para poder revisarlo a mano.
+    """
+    nuevos = 0
+    duplicados = 0
+    sin_cria = 0
+    for r in records:
+        vaca = (r.get("CODANI") or "").strip()
+        if not vaca:
+            continue
+        vaca_id = db.animal_id(vaca)
+        if vaca_id is None:
+            continue
+
+        # El chequeo de duplicado va ANTES de resolver la cría activa: una
+        # vez que el destete ya quedó registrado, esa cría deja de estar
+        # "activa sin destetar" (por diseño de cria_activa_de_madre) -- si
+        # se resolviera primero, reimportar el mismo backup nunca
+        # encontraría la cría de nuevo y el secado se contaría como
+        # "sin_cria" en vez de como duplicado.
+        fec = iso(r.get("FECHA"))
+        if fec is not None:
+            existe = db.query_one(
+                "SELECT 1 FROM destetes WHERE madre_id = ? AND fecha = ? LIMIT 1",
+                (vaca_id, fec),
+            )
+        else:
+            existe = db.query_one(
+                "SELECT 1 FROM destetes WHERE madre_id = ? AND fecha IS NULL LIMIT 1",
+                (vaca_id,),
+            )
+        if existe:
+            duplicados += 1
+            continue
+
+        cria = db.cria_activa_de_madre(vaca)
+        if not cria:
+            sin_cria += 1
+            continue
+
+        motivo = (r.get("MOTIVO") or "").strip()
+        detalle = (r.get("DETALLE") or "").strip()
+        notas = " -- ".join(p for p in (motivo, detalle) if p) or None
+
+        db.registrar_destete(
+            cria_tag=cria["tag"], fecha=r.get("FECHA"),
+            potrero_madre=(r.get("CODPOT") or "").strip() or None,
+            notas=notas,
+        )
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados, "sin_cria": sin_cria}
+
+
 # ---------------------------------------------------------------------------
 # Orquestación
 # ---------------------------------------------------------------------------
@@ -991,6 +1056,8 @@ def import_dbfs(
         conteos["produccion_leche"] = import_leche(db, lectores["leche.dbf"].records())
     if "traslado.dbf" in lectores:
         conteos["traslados"] = import_traslados(db, lectores["traslado.dbf"].records())
+    if "destete.dbf" in lectores:
+        conteos["destetes"] = import_destetes(db, lectores["destete.dbf"].records())
 
     # Fotos si vienen en fotos_data o en dbf_data ("Fotos.Zip" o "fotos.zip")
     fotos_source = fotos_data

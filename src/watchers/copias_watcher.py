@@ -106,6 +106,7 @@ def formatear_reporte_copias(
 
     dur_str = f" ({duracion_s:.1f}s)" if duracion_s > 0 else ""
     detalle_error = _conteos_tienen_error(conteos)
+    destetes_sin_cria = (conteos.get("destetes") or {}).get("sin_cria") if isinstance(conteos.get("destetes"), dict) else None
 
     if modo_html:
         titulo = "📦 <b>Auto-Import Exitoso de Respaldo</b>"
@@ -118,6 +119,11 @@ def formatear_reporte_copias(
             "",
             "📋 <b>Detalle por tabla:</b>",
         ] + lineas_tablas
+        if destetes_sin_cria:
+            lineas.append("")
+            lineas.append(
+                f"⚠️ <b>{destetes_sin_cria} secado(s)</b> de SG sin cría activa para enlazar -- revisar manualmente."
+            )
         if detalle_error:
             lineas.append("")
             lineas.append(f"❌ <b>Error:</b> <code>{detalle_error}</code>")
@@ -129,6 +135,8 @@ def formatear_reporte_copias(
         f"Total consolidado: {total_nuevos} nuevos, {total_duplicados} duplicados",
         "Detalle por tabla:",
     ] + lineas_tablas
+    if destetes_sin_cria:
+        lineas.append(f"AVISO: {destetes_sin_cria} secado(s) de SG sin cría activa para enlazar -- revisar manualmente.")
     if detalle_error:
         lineas.append(f"ERROR: {detalle_error}")
     lineas.append("-" * 60)
