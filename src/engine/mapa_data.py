@@ -5,7 +5,6 @@ ocupación de ganado en vivo y posiciones satelitales GPS recientes de operarios
 """
 
 from datetime import date, datetime, timedelta
-import json
 import logging
 from typing import Any, Optional
 
@@ -174,7 +173,6 @@ def datos_mapa_finca(db: Database) -> dict[str, Any]:
                ORDER BY t.fecha DESC, t.hora DESC"""
         )
 
-    presencias = {str(r["user_id"]): dict(r) for r in db.query("SELECT * FROM usuarios_presencia")}
     try:
         from ..server.auth import Auth
         usuarios_meta = {str(u.get("user_id")): u for u in Auth().usuarios}
@@ -187,7 +185,6 @@ def datos_mapa_finca(db: Database) -> dict[str, Any]:
     for pt in filas_usuarios_pts:
         uid_str = str(pt["user_id"])
         meta = usuarios_meta.get(uid_str) or {}
-        pres = presencias.get(uid_str) or {}
 
         # Determinar si está en línea (presencia en últimos 30 min)
         en_linea = False

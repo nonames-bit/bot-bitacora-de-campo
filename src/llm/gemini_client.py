@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.error
 import urllib.request
 from typing import Optional, Union
@@ -190,6 +191,7 @@ class GeminiClient:
                 if not parts:
                     return None
                 text = parts[0].get("text", "").strip()
+                return text or None
         except Exception as e:
             logger.warning("Error en transcripción Gemini Audio: %s", e)
             return None

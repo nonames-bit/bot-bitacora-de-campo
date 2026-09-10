@@ -15,38 +15,26 @@ from datetime import date, timedelta
 from typing import Any, Optional
 
 from .estilo_ja import (
-    COLOR_ALERTA_BG,
-    COLOR_ALERTA_TXT,
     COLOR_BORDE_SUAVE,
     COLOR_GRIS,
     COLOR_LINEA,
     COLOR_MARCA,
-    COLOR_MARCA_CLARA,
-    COLOR_MARCA_HEADER,
     COLOR_MARCA_ZEBRA,
-    COLOR_NEGRO,
-    COLOR_PIE,
     COLOR_ROJO_ALERTA,
     COLOR_TOTALES_BG,
     COLOR_VERDE_OK,
-    COLOR_VERDE_OK_BG,
     buscar_logo_path,
     crear_bloque_kpis,
     dibujar_fondo_pagina,
     dibujar_running_footer,
     dibujar_running_header,
     estilo_normal,
-    estilo_pie,
     estilo_subseccion_grafico,
-    estilo_subtitulo,
-    estilo_titulo,
     banda_seccion,
     SeccionFlowable,
     tabla_encabezado_franja,
     tabla_pie,
     tabla_style_alertas,
-    tabla_style_base,
-    tabla_style_header_verde,
     tabla_style_moderna,
     tabla_style_potreros,
 )
@@ -302,7 +290,6 @@ def generar_pdf(
     Usa tipografías base (Helvetica) y texto plano sin emojis. Crea el
     directorio padre de ``ruta_salida`` si no existe.
     """
-    import re
     import shutil
     import tempfile
     import time
@@ -389,11 +376,8 @@ def generar_pdf(
         title="Reporte de campo — Ganadería JA",
     )
 
-    est_titulo = estilo_titulo()
-    est_subtitulo = estilo_subtitulo()
     est_seccion_graf = estilo_subseccion_grafico()
     est_normal = estilo_normal()
-    est_pie = estilo_pie()
 
     logo_path = buscar_logo_path()
 

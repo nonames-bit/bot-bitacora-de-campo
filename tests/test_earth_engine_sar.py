@@ -11,7 +11,6 @@ import sys
 import types
 from datetime import date
 
-import pytest
 
 from src.gis import earth_engine_ndvi as gee_ndvi
 from src.gis import earth_engine_sar as gee_sar

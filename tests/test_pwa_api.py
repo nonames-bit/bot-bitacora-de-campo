@@ -222,7 +222,7 @@ def test_pasturas_incluye_pronostico_del_clima(db_file, tmp_path, monkeypatch):
     mismas coordenadas (centroide de Guayabal, ya georreferenciado en el
     fixture) y el mismo cache en disco, sin pegarle a la red en el test."""
     import json as _json
-    from datetime import date, datetime
+    from datetime import datetime
 
     cache = str(tmp_path / "pron_cache.json")
     monkeypatch.setenv("PRONOSTICO_CACHE", cache)

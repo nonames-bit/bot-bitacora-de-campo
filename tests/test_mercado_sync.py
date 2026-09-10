@@ -7,13 +7,11 @@ Valida:
 """
 from __future__ import annotations
 
-import io
 import json
 import urllib.request
 from datetime import date
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.db.database import Database
 from src.integrations.mercado_sync import (

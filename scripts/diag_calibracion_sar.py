@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import date
 from src.db.database import Database
 from src.gis.earth_engine_ndvi import inicializar_ee, _ndvi_region_sentinel2
-from src.gis.earth_engine_sar import _sar_region_sentinel1, calcular_sar_ndvi
+from src.gis.earth_engine_sar import _sar_region_sentinel1
 
 DIR_RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 db = Database(os.path.join(DIR_RAIZ, "data", "bitacora.db"))
@@ -71,7 +71,7 @@ if len(pares) >= 3:
         b = cov / varx
         a = my - b * mx
         print(f"Ajuste lineal real (mínimos cuadrados): NDVI_real ≈ {a:.4f} + {b:.4f} * RVI")
-        print(f"(fórmula actual en el código: NDVI_proxy = 0.20 + 0.65 * RVI)")
+        print("(fórmula actual en el código: NDVI_proxy = 0.20 + 0.65 * RVI)")
 elif pares:
     for x, y in pares:
         print(f"  RVI={x:.3f} -> NDVI_real={y:.3f}")

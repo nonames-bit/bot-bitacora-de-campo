@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Chequeo rápido local antes de pushear a cualquier rama.
+# No reemplaza al CI (que corre pytest completo) -- esto es la red de
+# seguridad barata que hubiera atajado en segundos el incidente del
+# 2026-09-10 (una funcion renderMercado() pegada dos veces en app.js dejo
+# sin sintaxis valida TODO el archivo, y se pusheo/desplego sin que nadie
+# lo notara hasta que el Tablero de produccion quedo en blanco).
+set -e
+
+echo "[pre-push] Validando sintaxis JS de la PWA..."
+for f in src/pwa/static/*.js; do
+  if ! node --check "$f" 2>&1; then
+    echo "[pre-push] ABORTADO: sintaxis invalida en $f"
+    echo "[pre-push] Revisa el archivo antes de pushear. Para saltarte esto (no recomendado): git push --no-verify"
+    exit 1
+  fi
+done
+
+echo "[pre-push] Validando sintaxis Python..."
+if ! python -m compileall -q src/; then
+  echo "[pre-push] ABORTADO: sintaxis invalida en Python (ver arriba)."
+  exit 1
+fi
+
+echo "[pre-push] OK -- sintaxis valida. (El CI en GitHub correra pytest completo)."

@@ -666,7 +666,7 @@ def datos_leche(db: Database) -> dict:
                WHERE caption LIKE 'Recibo Quincenal%'
                ORDER BY fecha DESC, id DESC LIMIT 12"""
         ))
-    except Exception as e:
+    except Exception:
         logger.error("seccion fotos_recibos fallo", exc_info=True)
         fotos_recibos = []
     out: dict[str, Any] = {"serie_tanque": serie, "controles": controles,

@@ -18,8 +18,6 @@ import re
 import shutil
 import socket
 import sys
-import threading
-import time
 import uuid
 
 # Fix Windows cp1252: consola sin UTF-8 rompía los print() del banner

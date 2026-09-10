@@ -10,7 +10,7 @@ Usado por ``pdf_report.py`` (reporte general) y ``qr_fichas.py``
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import Optional, Sequence
 
 from reportlab.lib import colors
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet

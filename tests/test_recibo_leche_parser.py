@@ -1,7 +1,6 @@
 """Pruebas unitarias para el parser de recibos y planillas de leche con IA."""
 import base64
 from unittest.mock import MagicMock, patch
-import pytest
 
 from src.vision.recibo_leche_parser import (
     _extraer_bytes_e_imagen,

@@ -13,8 +13,8 @@ import json
 import logging
 import re
 import urllib.request
-from datetime import date, datetime, timezone
-from typing import Any, Optional
+from datetime import date
+from typing import Any
 
 logger = logging.getLogger(__name__)
 

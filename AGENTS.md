@@ -18,6 +18,7 @@ Este archivo define las reglas de comportamiento, estándares y herramientas par
 - **Control de Versiones**:
   - Commits descriptivos en presente indicativo (ej: `add sensor calibration routine`, `fix tag binding`).
   - Cada cambio significativo debe documentarse en la sección de progreso de [README.md](./README.md).
+  - **Hooks de git**: este repo trae `.githooks/pre-push` (valida sintaxis de `src/pwa/static/*.js` y de todo `src/` en Python antes de dejar pushear). Actívalo una vez por clon con `git config core.hooksPath .githooks`. Se agregó tras un incidente real (2026-09-10) donde un `app.js` con sintaxis inválida se pusheó y tumbó toda la PWA en producción sin que nada lo detectara — CI (`.github/workflows/tests.yml`) también corre este mismo chequeo de JS además de `ruff` + `pytest`, pero el hook local da el aviso segundos antes de pushear.
 - **Estructura Limpia**:
   - `src/`: Código fuente principal.
   - `docs/`: Documentación técnica, diagramas y especificaciones.
