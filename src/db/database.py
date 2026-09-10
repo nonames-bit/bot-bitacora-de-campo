@@ -517,6 +517,25 @@ class Database:
                                         motivo="Destete de cría", registrado_por=registrado_por)
         return did
 
+    def cria_activa_de_madre(self, madre_tag) -> Optional[dict]:
+        """Busca la cría ACTIVA más reciente de una vaca que aún no fue
+        destetada (sin fila en `destetes`). La usa Captura > Destete para
+        que el operario busque por el arete de la VACA -- que suele
+        recordar de memoria mejor que el de una cría reciente -- y el
+        sistema resuelva la cría automáticamente en vez de forzarlo a
+        buscar/escribir el arete de la cría primero."""
+        madre_id = self.resolve_animal(madre_tag)
+        if madre_id is None:
+            return None
+        fila = self.query_one(
+            "SELECT a.tag, a.fecha_nacimiento FROM animales a "
+            "WHERE a.madre_id = ? AND a.estado = 'ACTIVO' "
+            "AND a.id_animal NOT IN (SELECT animal_id FROM destetes) "
+            "ORDER BY a.fecha_nacimiento DESC, a.id_animal DESC LIMIT 1",
+            (madre_id,),
+        )
+        return dict(fila) if fila else None
+
     def animales_activos_en_potrero(self, potrero_id: int) -> list[str]:
         """Tags de los animales ACTIVOS cuyo potrero actual es `potrero_id`."""
         filas = self.query(

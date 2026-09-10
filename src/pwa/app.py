@@ -1564,6 +1564,28 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.get("/api/cria-activa")
+    def api_cria_activa():
+        """Resuelve la cría ACTIVA sin destetar de una vaca, para Captura >
+        Destete (el operario busca por el arete de la VACA, no de la cría)."""
+        vaca = (request.args.get("vaca") or "").strip()
+        if not vaca:
+            return jsonify({"encontrada": False, "error": "Falta el parámetro 'vaca'."}), 400
+        db_c = _db(db_path)
+        try:
+            cria = db_c.cria_activa_de_madre(vaca)
+            if cria:
+                return jsonify({"encontrada": True, "cria_tag": cria["tag"], "fecha_nacimiento": cria.get("fecha_nacimiento")})
+            return jsonify({"encontrada": False})
+        except Exception:
+            logger.exception("Error al resolver cría activa de la vaca %s", vaca)
+            return jsonify({"encontrada": False, "error": "Error interno."}), 500
+        finally:
+            try:
+                db_c.close()
+            except Exception:
+                pass
+
     @app.get("/api/inventario")
     def api_inventario():
         out = datos_inventario(db_path)

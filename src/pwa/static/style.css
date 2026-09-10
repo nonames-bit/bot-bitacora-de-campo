@@ -2219,10 +2219,10 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   transition: width .3s ease;
 }
 
-/* --- Vaquita pastando en el header (decorativa, 100% CSS/SVG inline, sin requests) ---
-   Silueta de cuerpo completo (no solo la cabeza) + brizna de pasto.
-   Camina de un lado a otro del espacio disponible (±50px en 12s, ±20px en
-   pantallas chicas) y agacha la cabeza a pastar cada tanto (4s). */
+/* --- Vaquita pastando en el header (decorativa, silueta realista comiendo pasto) ---
+   Basada en la ilustración de vaca holstein comiendo en el pasto.
+   Camina y se desplaza de un lado a otro (vacaAmbla) y agacha la trompa
+   a pastar y masticar rítmicamente el forraje (vacaCome). */
 .header-pasto {
   flex: 1 1 120px;
   display: flex;
@@ -2232,42 +2232,58 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   max-width: 320px;
   overflow: hidden;
   pointer-events: none;
-  color: var(--header-txt);
-  opacity: .8;
   user-select: none;
 }
 .vaca-pista { display: inline-flex; align-items: flex-end; }
-.vaca-ambula { display: inline-flex; animation: vacaAmbla 12s ease-in-out infinite; }
-.vaca-pasta { display: inline-flex; align-items: flex-end; gap: 1px; animation: vacaPasta 4s ease-in-out infinite; transform-origin: 50% 85%; }
-.vaca-svg { display: block; width: 32px; height: 32px; }
-.header-pasto-ficha .vaca-svg { width: 28px; height: 28px; }
-.pasto-svg { display: block; width: 14px; height: 14px; opacity: .75; margin-bottom: 1px; }
-.header-pasto-ficha .pasto-svg { width: 12px; height: 12px; }
+.vaca-ambula { display: inline-flex; animation: vacaAmbla 14s ease-in-out infinite; }
+.vaca-pasta { display: inline-flex; align-items: flex-end; animation: vacaCome 2.4s ease-in-out infinite; transform-origin: 75% 85%; }
+.vaca-img {
+  display: block;
+  width: 48px;
+  height: auto;
+  aspect-ratio: 814 / 517;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.22));
+}
+.header-pasto-ficha .vaca-img {
+  width: 42px;
+}
 @keyframes vacaAmbla {
-  0%, 100% { transform: translateX(-50px); }
-  50% { transform: translateX(50px); }
+  0% { transform: translateX(-40px) scaleX(1); }
+  45% { transform: translateX(40px) scaleX(1); }
+  48% { transform: translateX(40px) scaleX(-1); }
+  95% { transform: translateX(-40px) scaleX(-1); }
+  100% { transform: translateX(-40px) scaleX(1); }
 }
-@keyframes vacaPasta {
-  0%, 55%, 100% { transform: rotate(0deg) translateY(0); }
-  65%, 85% { transform: rotate(4deg) translateY(1.5px); }
+@keyframes vacaCome {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  25% { transform: rotate(2.5deg) translateY(1.5px); }
+  35% { transform: rotate(-1deg) translateY(-0.8px); }
+  50% { transform: rotate(1deg) translateY(0.8px); }
+  70% { transform: rotate(3deg) translateY(2px); }
+  85% { transform: rotate(-0.5deg) translateY(-0.5px); }
 }
-/* Tema claro: el header es blanco, el currentColor ya es oscuro; se baja un poco la opacidad. */
-:root[data-theme="light"] .header-pasto { opacity: .65; }
-:root[data-theme="dark"] .header-pasto { opacity: .85; }
+/* Tema claro y oscuro */
+:root[data-theme="light"] .header-pasto { opacity: .9; }
+:root[data-theme="dark"] .header-pasto { opacity: .95; }
 /* Sol de Campo (alto contraste B/N): se muestra estática, sin movimiento. */
 :root[data-theme="sun"] .vaca-ambula, :root[data-theme="sun"] .vaca-pasta { animation: none; }
 :root[data-theme="sun"] .header-pasto { opacity: 1; }
 @media (max-width: 640px) {
-  .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .9; }
-  .vaca-svg { width: 28px; height: 28px; }
+  .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .95; }
+  .vaca-img { width: 40px; }
   @keyframes vacaAmbla {
-    0%, 100% { transform: translateX(-20px); }
-    50% { transform: translateX(20px); }
+    0% { transform: translateX(-18px) scaleX(1); }
+    45% { transform: translateX(18px) scaleX(1); }
+    48% { transform: translateX(18px) scaleX(-1); }
+    95% { transform: translateX(-18px) scaleX(-1); }
+    100% { transform: translateX(-18px) scaleX(1); }
   }
 }
 @media (max-width: 319px) {
   /* Solo pantallas muy angostas (<320px): compactar, nunca ocultar con display:none. */
-  .header-pasto { min-width: 40px; max-width: 90px; }
+  .header-pasto { min-width: 36px; max-width: 80px; }
+  .vaca-img { width: 34px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vaca-ambula, .vaca-pasta { animation: none; }

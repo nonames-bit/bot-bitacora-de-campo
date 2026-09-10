@@ -68,8 +68,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v75: Unificación de Mapa Satelital y Rutas GPS en un solo módulo para ADMIN y OWNER (bloqueado para TRABAJADOR); dock de chat flotante/expandible con dictado de voz estilo WhatsApp; depuración de terminología zootécnica.
 // v77: Unificación definitiva de Mapa Satelital y Rutas GPS (ADMIN y OWNER), dock de chat WhatsApp con notas de voz y depuración integral de terminología.
 // v78: "Distribución por potrero" del Tablero sube justo después de "Evolución del rebaño" (antes quedaba al final, después del feed de eventos); se quita el gráfico de torta duplicado con Inventario.
-// v80: Módulo de Mercado, Subastas Ganaderas (8 plazas) & TRM 100% automatizado ("nada manual") con sincronización oficial.
-var CACHE = "pwa-ja-v80"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v81: Vaquita realista comiendo pasto en el header (vaca_comiendo.png con animación de pastar y caminar).
+var CACHE = "pwa-ja-v81"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -77,6 +77,7 @@ var PRECACHE = [
   "/manifest.json",
   "/static/style.css",
   "/static/app.js",
+  "/static/vaca_comiendo.png",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",
   "/static/favicon.svg",

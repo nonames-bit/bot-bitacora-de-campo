@@ -13,13 +13,13 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="/static/style.css?v=80">
+<link rel="stylesheet" href="/static/style.css?v=81">
 </head>
 <body>
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
   <span class="marca-titulo"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="28" height="28"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
-  <span class="header-pasto" aria-hidden="true"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><svg class="vaca-svg" viewBox="0 0 256 256" width="32" height="32" fill="currentColor"><path d="M104 192a8 8 0 0 1-8 8H80a8 8 0 0 1 0-16h16a8 8 0 0 1 8 8m72-8h-16a8 8 0 0 0 0 16h16a8 8 0 0 0 0-16m-76-48a12 12 0 1 0-12-12a12 12 0 0 0 12 12m56 0a12 12 0 1 0-12-12a12 12 0 0 0 12 12m88.39-13.88A16 16 0 0 1 232 128h-32v32a40 40 0 0 1-24 72H80a40 40 0 0 1-24-72v-32H24a16 16 0 0 1-15.69-19a56.13 56.13 0 0 1 54.91-45h1.64A55.83 55.83 0 0 1 48 24a8 8 0 0 1 16 0a40 40 0 0 0 40 40h48a40 40 0 0 0 40-40a8 8 0 0 1 16 0a55.83 55.83 0 0 1-16.86 40h1.64a56.13 56.13 0 0 1 54.91 45a15.82 15.82 0 0 1-3.3 13.12M72 152.8a40.6 40.6 0 0 1 8-.8h96a40.6 40.6 0 0 1 8 .8V104a24 24 0 0 0-24-24H96a24 24 0 0 0-24 24ZM56 112v-8a39.8 39.8 0 0 1 8-24h-.8A40.09 40.09 0 0 0 24 112Zm144 80a24 24 0 0 0-24-24H80a24 24 0 0 0 0 48h96a24 24 0 0 0 24-24m32-80a40.08 40.08 0 0 0-39.2-32h-.8a39.8 39.8 0 0 1 8 24v8Z"/></svg><svg class="pasto-svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span></span></span></span>
+  <span class="header-pasto" aria-hidden="true"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><img src="/static/vaca_comiendo.png" class="vaca-img" alt="Vaca pastando" width="48" height="31"></span></span></span></span>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
     <button id="btn-instalar-app" class="tema-btn btn-instalar" title="Instalar Bitácora JA como App en tu celular o PC" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="txt-instalar">Instalar App</span></button>
@@ -306,7 +306,7 @@
   </div>
 </div>
 </main>
-<script src="/static/app.js?v=80"></script>
+<script src="/static/app.js?v=81"></script>
 <script>
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", function () {
