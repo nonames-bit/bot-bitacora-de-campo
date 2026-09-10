@@ -2470,7 +2470,7 @@ class Database:
         """Registra o actualiza el latido/actividad de un usuario (para presencia en vivo)."""
         if not user_id:
             return
-        now_iso = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+        now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         self._ensure_presencia_table()
         sql = """
             INSERT INTO usuarios_presencia (user_id, nombre, rol, canal, ip, ultima_actividad, detalles)
@@ -2584,7 +2584,7 @@ class Database:
                                  p256dh: Optional[str] = None, auth: Optional[str] = None) -> int:
         """Registra o actualiza una suscripción de navegador para notificaciones Web Push."""
         self._ensure_push_table()
-        ahora = datetime.utcnow().isoformat()
+        ahora = datetime.now(timezone.utc).isoformat()
         sql = """
             INSERT INTO push_suscripciones (user_id, endpoint, p256dh, auth, creado_en, ultimo_uso)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -2892,10 +2892,14 @@ class Database:
             }
 
         # Precio real de leche liquidado en la finca (desde finanzas)
-        row_leche_finca = self.query_one("""
-            SELECT SUM(monto) as total_monto, SUM(litros) as total_litros
-            FROM finanzas WHERE categoria = 'VENTA_LECHE' AND litros > 0
-        """)
+        row_leche_finca = None
+        try:
+            row_leche_finca = self.query_one("""
+                SELECT SUM(monto) as total_monto, SUM(litros) as total_litros
+                FROM finanzas WHERE categoria = 'VENTA_LECHE' AND litros > 0
+            """)
+        except Exception:
+            pass
         precio_leche_finca = None
         if row_leche_finca and row_leche_finca["total_litros"] and row_leche_finca["total_litros"] > 0:
             precio_leche_finca = round(row_leche_finca["total_monto"] / row_leche_finca["total_litros"], 1)
@@ -2930,8 +2934,16 @@ class Database:
                     "kg_novillo_equivalentes": kg_novillo_req
                 })
 
+        max_fecha = max((r["fecha"] for r in filas), default=date.today().isoformat())
+        es_auto = any(r.get("fuente", "").startswith("AUTOMATICO") for r in filas)
+        trm_row = next((r for r in filas if r["producto"] == "DOLAR_TRM"), None)
+        trm_actual = trm_row["precio_promedio"] if trm_row else None
+
         return {
             "fecha_consulta": date.today().isoformat(),
+            "ultima_actualizacion": max_fecha,
+            "actualizacion_automatica": es_auto,
+            "trm_actual": trm_actual,
             "ubicacion_finca": "Mesetas, Meta (Región Ariari)",
             "subastas": list(subastas_dict.values()),
             "leche": {

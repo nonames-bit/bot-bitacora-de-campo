@@ -1891,6 +1891,43 @@ def test_api_mercado_actualizar_permisos_y_guardado(client):
     assert macho_gordo["precio_maximo"] == 9300
 
 
+def test_api_mercado_sincronizar_permisos_y_ejecucion(client):
+    from datetime import date
+    from unittest.mock import patch
+
+    # TRABAJADOR no puede forzar sincronización
+    with client.session_transaction() as sess:
+        sess["rol"] = "TRABAJADOR"
+    r_no_auth = client.post("/api/mercado/sincronizar")
+    assert r_no_auth.status_code == 403
+    assert r_no_auth.get_json()["ok"] is False
+
+    # ADMIN sí puede
+    with client.session_transaction() as sess:
+        sess["rol"] = "ADMIN"
+    with patch("src.integrations.mercado_sync.consultar_trm_oficial", return_value={
+        "valor": 4125.0,
+        "fecha": date.today().isoformat(),
+        "fuente": "AUTOMATICO: Datos Abiertos (Test)",
+        "ok": True
+    }), patch("src.integrations.mercado_sync.consultar_titulares_mercado", return_value=[]):
+        r_ok = client.post("/api/mercado/sincronizar")
+        assert r_ok.status_code == 200
+        res = r_ok.get_json()
+        assert res["ok"] is True
+        assert res["actualizado"] is True
+        assert res["trm"] == 4125.0
+
+    # GET /api/mercado/precios ahora incluye metadatos de sincronización
+    r_get = client.get("/api/mercado/precios")
+    assert r_get.status_code == 200
+    d = r_get.get_json()
+    assert "ultima_actualizacion" in d
+    assert "actualizacion_automatica" in d
+    assert d["trm_actual"] == 4125.0
+
+
+
 
 
 

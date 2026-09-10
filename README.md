@@ -540,7 +540,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Depuración Integral de Terminología**:
     - Erradicación de términos no deseados ("zootécnico", "zootecnia") en interfaces de usuario, paneles de control, comandos de Telegram y manuales de ayuda, sustituyéndolos por un lenguaje ganadero natural, directo y ejecutivo.
   - **Vaquita pastando en header PWA (2026-09-09, validada en VPS)**: SVG inline COW_HEAD + pasto en `index.html`/`ficha.html`, animada (`vacaAmbla 12s` + `vacaPasta 4s`), visible 360-640px (oculta solo <320px), estática en Sol de Campo y `reduced-motion`; SW `pwa-ja-v78`.
-- [x] Suite de pruebas con pytest: **739 pruebas en verde** (100% pasando).
+  - **Módulo de Mercado, Subastas Ganaderas & TRM 100% Automatizado ("Nada Manual", PWA v79)**:
+    - **Sincronización Automática Diaria**: Robot en background (`src/integrations/mercado_sync.py`) y script cron (`scripts/actualizar_precios_mercado.py`, programado diario a las 06:00 AM COT) que actualiza cotizaciones oficiales sin requerir digitación ni intervención manual.
+    - **Dólar TRM Oficial en Tiempo Real**: Consumo directo de la API de Datos Abiertos de Colombia (Superintendencia Financiera / Banco de la República con fallback automático a DolarAPI).
+    - **8 Plazas Ganaderas Estratégicas para Mesetas, Meta**: Cotizaciones por categoría (macho gordo, levante, ternero desteto, hembra levante, vaca descarte) en Granada (Sugameta/SubaGranada), Guamal, San Martín, Puerto López, Catama (Villavicencio), Yopal (Casanare), Bogotá (Frigorífico Guadalupe) y Promedio Nacional FEDEGÁN.
+    - **Calculadora Interactiva de Flete, Merma & Utilidad Neta**: Simulación instantánea para lotes de venta desde Mesetas calculando merma por desbaste de viaje, flete por camión y comisión de subasta (2.5%).
+    - **Poder Adquisitivo de Insumos del Ariari**: Relación de intercambio kg de novillo vs. insumos críticos (urea 46%, sal mineralizada 8% y 10%, alambre de púas) indexados a TRM, y precio real liquidado de leche finca desde el módulo de Finanzas.
+    - **Monitoreo de Titulares y Boletines**: Ticker informativo de boletines semanales de FEDEGÁN y CONtexto Ganadero vía RSS oficial.
+- [x] Suite de pruebas con pytest: **745+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

@@ -41,5 +41,10 @@ chmod +x "$BACKUP_SCRIPT" "$PROYECTO_DIR/scripts/iniciar_bot.sh" "$PROYECTO_DIR/
 CRON_CMD="0 3 * * * $BACKUP_SCRIPT >> $PROYECTO_DIR/bot.log 2>&1"
 (crontab -l 2>/dev/null | grep -Fv "$BACKUP_SCRIPT" ; echo "$CRON_CMD") | crontab -
 
+MERCADO_SCRIPT="$PROYECTO_DIR/scripts/actualizar_precios_mercado.py"
+chmod +x "$MERCADO_SCRIPT" || true
+CRON_MERCADO="0 6 * * * $PROYECTO_DIR/.venv/bin/python $MERCADO_SCRIPT >> $PROYECTO_DIR/mercado.log 2>&1"
+(crontab -l 2>/dev/null | grep -Fv "$MERCADO_SCRIPT" ; echo "$CRON_MERCADO") | crontab -
+
 echo "✅ Configuración del VPS completada con éxito."
 echo "   Para iniciar el bot ejecuta: ./scripts/iniciar_bot.sh"

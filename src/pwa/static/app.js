@@ -176,7 +176,8 @@
       sparkles: '<path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/><path d="M19 3v4"/><path d="M21 5h-4"/>',
       plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
       table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
-      pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>'
+      pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+      newspaper: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>'
     };
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
   }
@@ -1498,13 +1499,27 @@
       ? "<button type='button' class='tema-btn' id='btn-actualizar-precios-mercado' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("pencil", 13) + "Actualizar Precios</button>"
       : "";
 
+    var btnSincronizar = puedeEditar
+      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Sincronizar Ahora</button>"
+      : "";
+
+    var badgeSync = "<div style='display:inline-flex; align-items:center; gap:6px; font-size:11.5px; background:rgba(30,126,52,0.12); color:#155724; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid rgba(30,126,52,0.25);'>"
+      + "<span style='display:inline-block; width:7px; height:7px; border-radius:50%; background:#28a745;'></span>"
+      + "Auto-sincronizado: <b>" + esc(fechaCorta(d.ultima_actualizacion || d.fecha_consulta)) + "</b>"
+      + (d.trm_actual ? " · TRM: <b>" + fmtMoneda(d.trm_actual) + " COP</b>" : "")
+      + "</div>";
+
     var headerHtml = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<div>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("chartLine", 22) + "Indicadores Económicos &amp; Subastas Ganaderas</h3>"
-      + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>" + icon("pin", 12) + "Finca: <b>" + esc(d.ubicacion_finca || "Mesetas, Meta") + "</b> · Cotizaciones Sugameta, Catama, Bogotá y mercado nacional</div>"
+      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;'>"
+      + "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("pin", 12) + "Finca: <b>" + esc(d.ubicacion_finca || "Mesetas, Meta") + "</b></span>"
+      + badgeSync
+      + "</div>"
       + "</div>"
       + "<div style='display:flex; gap:8px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='tema-btn' id='btn-fuentes-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("clipboard", 13) + "Fuentes Oficiales</button>"
+      + btnSincronizar
       + btnActPrecios
       + "</div>"
       + "</div>";
@@ -1518,7 +1533,24 @@
     var cuerpoHtml = "";
     if (_mercadoTabActual === "subastas") {
       var cardsPlazas = (d.subastas || []).map(renderCardPlazaMercado).join("");
-      cuerpoHtml = "<div class='grid-plazas'>" + cardsPlazas + "</div>";
+      var noticiasHtml = "";
+      if (d.noticias_recientes && d.noticias_recientes.length > 0) {
+        var itemsNoticias = d.noticias_recientes.map(function (n) {
+          return "<li style='margin-bottom:6px; font-size:12px;'>"
+            + "<a href='" + esc(n.enlace) + "' target='_blank' rel='noopener noreferrer' style='color:var(--verde-marca); font-weight:600; text-decoration:none; display:inline-flex; align-items:center; gap:4px;'>"
+            + icon("newspaper", 13) + esc(n.titulo)
+            + "</a>"
+            + (n.fecha ? " <span style='color:var(--texto-suave); font-size:11px;'>(" + esc(fechaCorta(n.fecha)) + ")</span>" : "")
+            + "</li>";
+        }).join("");
+        noticiasHtml = "<div class='card' style='margin-top:14px; padding:14px 16px; background:var(--tarjeta-bg); border:1px solid var(--borde); border-radius:8px;'>"
+          + "<div style='font-weight:700; font-size:13px; margin-bottom:8px; display:flex; align-items:center; gap:6px;'>"
+          + icon("newspaper", 16) + "Últimos Boletines y Noticias Ganaderas (FEDEGÁN / CONtexto Ganadero)"
+          + "</div>"
+          + "<ul style='margin:0; padding-left:18px; line-height:1.45;'>" + itemsNoticias + "</ul>"
+          + "</div>";
+      }
+      cuerpoHtml = "<div class='grid-plazas'>" + cardsPlazas + "</div>" + noticiasHtml;
     } else if (_mercadoTabActual === "calculadora") {
       cuerpoHtml = renderCalculadoraFleteHtml(d);
     } else if (_mercadoTabActual === "leche_insumos") {
@@ -1548,6 +1580,34 @@
     if (btnFuentes) {
       btnFuentes.addEventListener("click", function () {
         mostrarModalFuentesMercado(d.fuentes_oficiales);
+      });
+    }
+
+    // Botón Sincronizar Ahora (Fuerza actualización automática)
+    var btnSync = document.getElementById("btn-sincronizar-mercado");
+    if (btnSync) {
+      btnSync.addEventListener("click", function () {
+        btnSync.disabled = true;
+        btnSync.innerHTML = icon("refresh", 13) + " Sincronizando...";
+        fetch("/api/mercado/sincronizar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+          btnSync.disabled = false;
+          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          if (res && res.ok) {
+            cargar(true);
+          } else {
+            alert("No se pudo sincronizar: " + ((res && res.error) || "Error desconocido"));
+          }
+        })
+        .catch(function (err) {
+          btnSync.disabled = false;
+          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          alert("Error de conexión al sincronizar: " + (err && err.message || err));
+        });
       });
     }
 

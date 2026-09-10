@@ -1049,12 +1049,44 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         """Indicadores de mercado, precios de subastas ganaderas, leche e insumos."""
         db_m = _db(db_path)
         try:
+            # Auto-sincronización transparente si no se ha ejecutado hoy (cero intervención manual)
+            from src.integrations.mercado_sync import consultar_titulares_mercado, sincronizar_precios_mercado
+            try:
+                sincronizar_precios_mercado(db_m, forzar=False)
+            except Exception as se:
+                logger.warning("Auto-sincronización de mercado omitida por excepción transitoria: %s", se)
+
             out = db_m.obtener_datos_mercado_completos()
             out["rol"] = _rol_actual()
+            try:
+                out["noticias_recientes"] = consultar_titulares_mercado()
+            except Exception:
+                out["noticias_recientes"] = []
             return jsonify(out)
         except Exception:
             logger.exception("Error al consultar precios de mercado")
             return jsonify({"ok": False, "error": "Error interno al consultar precios de mercado"}), 500
+        finally:
+            try:
+                db_m.close()
+            except Exception:
+                pass
+
+    @app.post("/api/mercado/sincronizar")
+    def api_mercado_sincronizar():
+        """Fuerza la sincronización automática con fuentes oficiales (ADMIN/OWNER)."""
+        rol = _rol_actual()
+        if rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN u OWNER."}), 403
+
+        db_m = _db(db_path)
+        try:
+            from src.integrations.mercado_sync import sincronizar_precios_mercado
+            res = sincronizar_precios_mercado(db_m, forzar=True)
+            return jsonify(res)
+        except Exception as e:
+            logger.exception("Error al forzar sincronización de mercado")
+            return jsonify({"ok": False, "error": str(e)}), 500
         finally:
             try:
                 db_m.close()
