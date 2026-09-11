@@ -1101,7 +1101,12 @@ def test_telemetria_gps_ping_y_rutas(tmp_path):
     )
     d.close()
 
-    app = crear_app(db_path=db_path, users_file=str(uf))
+    # password explícito: sin esto, crear_app() cae a PWA_PASSWORD del
+    # entorno (.env real vía load_dotenv) -- vacío en un checkout limpio
+    # (CI), lo que bloquea /login con 503 ANTES de intentar el PIN y hace
+    # este test flaky según qué máquina lo corra. Ver los demás tests con
+    # users_file= en este archivo, que ya pasan password= por la misma razón.
+    app = crear_app(db_path=db_path, users_file=str(uf), password="master-password")
     app.config.update({"TESTING": True})
 
     # 1. Trabajador envía ping de telemetría en segundo plano
