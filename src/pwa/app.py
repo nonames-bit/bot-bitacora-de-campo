@@ -665,7 +665,8 @@ def datos_identificar(db_path: str = DB_PATH_DEFAULT, texto: Optional[str] = Non
 # Versión automática de la PWA (BLOQUE 3): SHA1 (8 hex) de los bytes
 # concatenados de los estáticos principales, en este orden fijo. Se calcula
 # una sola vez al crear la app (barato y determinista) para no subir `?v=`
-# ni `CACHE` a mano nunca más. Si un fichero falta en disco aporta b"".
+# ni `CACHE` a mano nunca más. Falla rápido si falta un estático crítico
+# (un hash silencioso con b"" serviría una versión fantasma inconsistente).
 PWA_VERSION = "dev"
 
 
@@ -673,11 +674,11 @@ def _calcular_pwa_version() -> str:
     """Calcula el hash de versión PWA desde el contenido de los estáticos."""
     h = hashlib.sha1()
     for _nombre in ("app.js", "ja-core.js", "style.css", "sw-register.js", "login.js"):
-        try:
-            with open(os.path.join(BASE_DIR, "static", _nombre), "rb") as _f:
-                h.update(_f.read())
-        except OSError:
-            h.update(b"")
+        _ruta = os.path.join(BASE_DIR, "static", _nombre)
+        if not os.path.isfile(_ruta):
+            raise RuntimeError(f"PWA_VERSION: falta estático crítico '{_nombre}' en {_ruta}")
+        with open(_ruta, "rb") as _f:
+            h.update(_f.read())
     return h.hexdigest()[:8]
 
 
@@ -940,7 +941,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             cuerpo_sw = _f.read().replace("__PWA_VERSION__", pwa_version)
         resp = app.response_class(cuerpo_sw, content_type="application/javascript; charset=utf-8")
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-        resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
         return resp
 
     @app.get("/offline.html")
@@ -950,7 +950,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         # reescribe al hash calculado al arrancar (cubre también el token
         # __PWA_VERSION__ que trae offline.html en disco).
         with open(os.path.join(app.static_folder, "offline.html"), encoding="utf-8") as _f:
-            cuerpo_off = re.sub(r"\?v=[A-Za-z0-9._-]+", "?v=" + pwa_version, _f.read())
+            cuerpo_off = _f.read().replace("__PWA_VERSION__", pwa_version)
+            cuerpo_off = re.sub(r"\?v=[A-Za-z0-9._-]+", "?v=" + pwa_version, cuerpo_off)
         resp = app.response_class(cuerpo_off, content_type="text/html; charset=utf-8")
         resp.headers["Cache-Control"] = "no-cache"
         return resp
