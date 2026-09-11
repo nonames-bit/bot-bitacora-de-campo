@@ -13,7 +13,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="stylesheet" href="/static/style.css?v=84">
+<link rel="stylesheet" href="/static/style.css?v=85">
 <style>
 body{display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px;background:var(--fondo, #f5f6f8)}
 .card{width:100%;max-width:340px;padding:32px 24px;border-radius:14px;box-shadow:0 4px 18px rgba(0,0,0,0.08);background:var(--card-bg, #fff);text-align:center}
@@ -51,45 +51,6 @@ label{display:block;font-size:13px;margin:12px 0 4px;color:#444;text-align:left}
     </button>
   </div>
 </div>
-<script>
-(function() {
-  var deferredPromptLogin = null;
-  var esStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-  var esIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-  var boxInst = document.getElementById('box-instalar-login');
-  var btnInst = document.getElementById('btn-instalar-login');
-
-  if (!esStandalone) {
-    if (boxInst) boxInst.style.display = 'block';
-    window.addEventListener('beforeinstallprompt', function(e) {
-      e.preventDefault();
-      deferredPromptLogin = e;
-      if (boxInst) boxInst.style.display = 'block';
-    });
-  }
-
-  if (btnInst) {
-    btnInst.addEventListener('click', function() {
-      if (deferredPromptLogin) {
-        deferredPromptLogin.prompt();
-        deferredPromptLogin.userChoice.then(function(choice) {
-          if (choice.outcome === 'accepted') {
-            if (boxInst) boxInst.style.display = 'none';
-          }
-          deferredPromptLogin = null;
-        });
-      } else if (esIos) {
-        alert("📲 Para instalar en iPhone / iPad:\n1. Toca el botón Compartir ⎋ (abajo en Safari).\n2. Desliza y elige 'Agregar a pantalla de inicio' ➕.\n3. Toca 'Agregar' arriba a la derecha.");
-      } else {
-        alert("📲 Para instalar en tu teléfono:\n1. Toca los tres puntos (⋮) arriba a la derecha en Chrome/Edge.\n2. Toca 'Instalar aplicación' o 'Agregar a la pantalla principal'.");
-      }
-    });
-  }
-
-  window.addEventListener('appinstalled', function() {
-    if (boxInst) boxInst.style.display = 'none';
-  });
-})();
-</script>
+<script src="/static/login.js?v=85" defer></script>
 </body>
 </html>

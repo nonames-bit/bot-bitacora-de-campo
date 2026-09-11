@@ -17,6 +17,9 @@
     if (!cont) {
       cont = document.createElement("div");
       cont.id = "toast-contenedor";
+      cont.setAttribute("role", "status");
+      cont.setAttribute("aria-live", "polite");
+      cont.setAttribute("aria-atomic", "true");
       document.body.appendChild(cont);
     }
     var t = document.createElement("div");
@@ -44,7 +47,7 @@
     if (/^⚪/.test(t)) return "<span class='chip gris'>" + t + "</span>";
     return "<span class='chip gris'>" + esc(t) + "</span>";
   }
-  function vacio(msg) { return "<p class='aviso'>🌾 " + esc(msg || "Sin datos.") + "</p>"; }
+  function vacio(msg) { return "<p class='aviso'><span aria-hidden='true'>🌾</span> " + esc(msg || "Sin datos.") + "</p>"; }
   // cols: [clave, etiqueta, 'num'?, render?(valor,fila)]
   function tabla(filas, cols, vacioMsg) {
     if (!filas || !filas.length) return vacio(vacioMsg || "Sin datos.");
@@ -92,7 +95,7 @@
     // "cow" usa un dibujo de cuerpo completo con relleno (viewBox/estilo propio);
     // el resto de íconos de vaca (cría, combinado de parto) sigue con trazo Lucide.
     if (name === "cow") {
-      return '<svg class="svg-icon" viewBox="0 0 256 256" width="' + s + '" height="' + s + '" fill="currentColor" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + COW_BODY_FILL + '</svg>';
+      return '<svg class="svg-icon" viewBox="0 0 256 256" width="' + s + '" height="' + s + '" fill="currentColor" aria-hidden="true" focusable="false" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + COW_BODY_FILL + '</svg>';
     }
     var paths = {
       calf: CALF_HEAD,
@@ -179,7 +182,7 @@
       pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
       newspaper: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>'
     };
-    return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
+    return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true" focusable="false" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
   }
 
   /* ---------- Vistas principales ---------- */
@@ -2753,7 +2756,7 @@
       + "<div id='captura-campos'></div>"
       + "<button type='submit' id='btn-guardar-captura' class='btn-guardar-manga' style='margin-top:12px;'>" + icon("save", 15) + "Guardar Registro</button>"
       + "</form>"
-      + "<div id='captura-feedback' style='margin-top:12px;'></div>"
+      + "<div id='captura-feedback' role='status' aria-live='polite' style='margin-top:12px;'></div>"
       + "</div>";
 
     return h;
@@ -5239,7 +5242,7 @@
       + "<button type='button' id='btn-cancelar-edit-usr' class='tema-btn' style='display:none; padding:10px 16px;'>Cancelar Edición</button>"
       + "</div>"
       + "</form>"
-      + "<div id='usr-feedback' style='margin-top:12px;'></div>"
+      + "<div id='usr-feedback' role='status' aria-live='polite' style='margin-top:12px;'></div>"
       + "</div>";
 
     // Tarjeta 2: Tabla de Usuarios Existentes
@@ -6354,8 +6357,8 @@
     head += "</div>";
 
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
-    html += "<div id='ficha-tabs'><div class='mini'>"
-      + TABS.map(function (t, i) { return "<button data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
+    html += "<div id='ficha-tabs' role='tablist'><div class='mini'>"
+      + TABS.map(function (t, i) { return "<button role='tab' aria-selected='" + (i === 0 ? "true" : "false") + "' data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
       + "</div></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
     return html;
   }
@@ -6814,8 +6817,9 @@
     // abre otra ficha mientras se navega por las pestañas de la anterior.
     qa(".mini button", nav).forEach(function (b) {
       b.addEventListener("click", function () {
-        qa(".mini button", nav).forEach(function (x) { x.classList.remove("act"); });
+        qa(".mini button", nav).forEach(function (x) { x.classList.remove("act"); x.setAttribute("aria-selected", "false"); });
         b.classList.add("act");
+        b.setAttribute("aria-selected", "true");
         var panel = document.getElementById("ficha-panel");
         if (panel) panel.innerHTML = fichaTab(b.getAttribute("data-tab"), ficha || window.__ultimaFicha || {});
       });
@@ -7704,8 +7708,9 @@
     }
     actual = v;
     qa("#nav-principal > button").forEach(function (x) { x.classList.remove("act"); });
+    qa("#nav-principal button[data-v]").forEach(function (b) { b.removeAttribute("aria-current"); });
     var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
-    if (destino) destino.classList.add("act");
+    if (destino) { destino.classList.add("act"); if (destino.hasAttribute("data-v")) destino.setAttribute("aria-current", "page"); }
 
     // Sincronizar botón Más en barra móvil
     var btnMas = document.getElementById("btn-nav-mas");
@@ -7722,8 +7727,8 @@
 
     // Sincronizar ítem activo en modal de módulos
     qa("#modal-mas-modulos .modulo-item").forEach(function (it) {
-      if (it.getAttribute("data-v") === v) it.classList.add("act");
-      else it.classList.remove("act");
+      if (it.getAttribute("data-v") === v) { it.classList.add("act"); it.setAttribute("aria-current", "page"); }
+      else { it.classList.remove("act"); it.removeAttribute("aria-current"); }
     });
   }
   // Cargar manual (botón o Enter): el tag manda a Ficha y el potrero manda a

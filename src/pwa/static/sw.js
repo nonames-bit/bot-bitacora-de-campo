@@ -71,8 +71,10 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v81: Vaquita realista comiendo pasto en el header (vaca_comiendo.png con animación de pastar y caminar).
 // v82: Tablero visual interactivo de subastas ganaderas con comparativa de plazas, barras de precios relativos a Granada y curvas de tendencia semanal.
 // v83: Vaquita animada en GIF convertida de vaca.mp4 con ciclos naturales de pastoreo, masticado y cola en el header.
-// v84: Quick wins visuales PWA (chip ambar, clases btn-satelite-sar/card-banner sin inline, objetivos tactiles 44px y feed de eventos como cards en movil).
-var CACHE = "pwa-ja-v84"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v85: Bloque 2 Accesibilidad y CSP — registro de SW y script de login
+// extraídos a /static/sw-register.js y /static/login.js (sin <script>
+// inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
+var CACHE = "pwa-ja-v85"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -80,6 +82,7 @@ var PRECACHE = [
   "/manifest.json",
   "/static/style.css",
   "/static/app.js",
+  "/static/sw-register.js",
   "/static/vaca_comiendo.gif",
   "/static/vaca_comiendo.png",
   "/static/leaflet/leaflet.css",
