@@ -28,8 +28,12 @@ Un **droplet** es el nombre que DigitalOcean le da a cada servidor virtual.
 
 1. Entre a DigitalOcean y haga clic en **Create → Droplets** (Crear Droplets).
 2. En **Image** (imagen) elija **Ubuntu 22.04 (LTS) x64**.
-3. En **Plan**, elija el **Basic** de **$6/mes** (1 GB de RAM es suficiente para
-   este bot).
+3. En **Plan**, elija el **Basic** de **$12-14/mes (2 GB de RAM)**. El de
+   $6/mes (1 GB) alcanza para arrancar, pero con PWA + bot + gráficos
+   (seaborn/matplotlib) + sincronización de mercado corriendo a la vez se
+   queda muy justo de memoria (quedaba con ~130 MB libres en producción) —
+   confirmado real el 2026-09-10 al subir de 1 GB a 2 GB vía **Resize** desde
+   el panel del droplet (1-2 min de caída, sin pérdida de datos en el disco).
 4. En **Datacenter region**, elija la región **más cercana a usted** (por
    ejemplo "New York" para América o la que le quede más cerca), para que
    responda rápido.
