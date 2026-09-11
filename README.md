@@ -217,7 +217,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **575 pruebas en verde** (100% pasando)
+- **Pruebas:** Pytest — **761 pruebas en verde** (100% pasando)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -368,7 +368,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
   - [x] **Seguimiento auditoría 2026-08-30 (H-10..H-12 y recomendaciones)**: file-lock atómico (`threading.Lock` + `tempfile` + `os.replace`) en `auth.py`; backoff adaptativo por longitud de nota en la cascada LLM (`try_multiagent_parse` con `timeout=None`); validación Zip Slip + zip-bomb (`_validar_zip_seguro`, límite 1 GB total / 512 MB por entrada) en `dbf_importer.py`; `watchdog` documentado como extra opcional; test de concurrencia WAL (`tests/test_concurrencia_wal.py`); y lista blanca canónica de `tipo_evento` para la salida de la Capa 2 LLM con log de rechazos (`TIPOS_EVENTO_LLM_VALIDOS`).
   - [x] **Hardening WS-1 — 4 bugs críticos corregidos** (`tests/test_bugs_criticos.py`): `registrar_servicio` en `src/db/database.py` ya no traga fallo de `descontar_pajuela` (warning con detalle); `create_tables` con try/except individual + traceback (`vincular_fotos_huerfanas`, `marcar_historicos_sg`, autorreferencias); `import_fotos` en `src/importers/dbf_importer.py` retorna `{"error": ...}` en Zip corrupto/inseguro y no inserta fila fantasma; `copias_watcher.py` solo persiste estado sin errores y distingue "con errores" de "Exitoso"; `formatear_reporte_importacion` en `src/server/formatters.py` muestra errores por tabla.
-- [x] Suite de pruebas con pytest: **580 pruebas en verde** (100% pasando)
+- [x] Suite de pruebas con pytest: **761 pruebas en verde** (100% pasando)
 - [x] **Árbol Genealógico & Trazabilidad 3G Completo en PWA y Bot (2026-09-06)**:
   - **PWA Ficha Técnica**: Incorporada la pestaña interactiva `[ 🌳 Genealogía (3G) ]` en la ficha de cada animal con diagrama de pedigree estructurado (padres, abuelos paternos y maternos, bisabuelos), semáforo zootécnico de consanguinidad parental en 3G, lista interactiva de crías/descendientes con navegación táctil fluida entre fichas y bloque de texto compartible para WhatsApp/Telegram. En la pestaña `General`, se integraron abuelos y crías directas con botón de salto al pedigree.
   - **Bot de Telegram**: Nuevos comandos `/arbol <tag>`, `/genealogia <tag>`, `/pedigree` y `/trazabilidad` con vista zootécnica completa (G1, G2, G3 bisabuelos, verificación de consanguinidad y crías registradas tanto para hembras como machos) y menú interactivo de selección rápida cuando no se indica tag.
@@ -538,11 +538,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Sustitución del modal emergente centrado por una barra/dock acoplada en la parte inferior, siempre disponible para escribir o expandirse suavemente hacia arriba.
     - Grabación de notas de voz estilo WhatsApp con cronómetro en vivo, indicador rojo pulsante, descarte (`✕`) y envío inmediato (`✓`) hacia el motor Whisper con inclusión automática de la transcripción y respuesta en el hilo.
   - **Depuración Integral de Terminología**:
-    - Erradicación de términos no deseados ("zootécnico", "zootecnia") en interfaces de usuario, paneles de control, comandos de Telegram y manuales de ayuda, sustituyéndolos por un lenguaje ganadero natural, directo y ejecutivo.
-  - **Vaquita Pastando y Moviéndose en Header PWA (`vaca.jpg`, PWA v81)**:
-    - Extracción y recorte de alta precisión desde imagen personalizada (`vaca.jpg`) con remoción de fondo y recorte de bolsas de aire translúcidas bajo el vientre y cuello con anti-aliasing, manteniendo pelaje blanco opaco, manchas negras y franja de pasto verde.
-    - Animación dual CSS fluida: patrullaje horizontal continuo con cambio de dirección (`vacaAmbla 14s ease-in-out infinite`) sincronizado con cabeceo realista de pastoreo comiendo bocado en el pasto (`vacaCome 2.4s infinite`).
-    - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v81`), adaptada a pantallas móviles y desktop.
+  - **Vaquita Animada en GIF desde Video Real (`vaca.mp4`, PWA v83)**:
+    - Conversión cuadro a cuadro desde video MP4 (`vaca.mp4`) a GIF animado transparente (`src/pwa/static/vaca_comiendo.gif`, 120 fotogramas, 10s de ciclo continuo de 83 ms/cuadro) con remoción de fondo blanco y aislamiento inteligente de bolsas de aire (bajo vientre, entre patas y base de pasto).
+    - Técnica anti-halo de sangrado negro en bordes para garantizar integración limpia sin rebordes blancos sobre temas oscuro, campestre, claro y sol de campo.
+    - Animación 100% natural y orgánica: la vaca come pasto en el suelo, levanta la cabeza, mastica rumiando, mueve las orejas y colea, para luego volver a bajar la cabeza a pastar.
+    - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v83`), con fallback PNG estático optimizado.
   - **Módulo de Mercado, Subastas Ganaderas & TRM 100% Automatizado ("Nada Manual", PWA v79)**:
     - **Sincronización Automática Diaria**: Robot en background (`src/integrations/mercado_sync.py`) y script cron (`scripts/actualizar_precios_mercado.py`, programado diario a las 06:00 AM COT) que actualiza cotizaciones oficiales sin requerir digitación ni intervención manual.
     - **Dólar TRM Oficial en Tiempo Real**: Consumo directo de la API de Datos Abiertos de Colombia (Superintendencia Financiera / Banco de la República con fallback automático a DolarAPI).
@@ -556,7 +556,8 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Badges y Chips de Tendencia Zootécnica**: Indicadores visuales en cada plaza y producto (`▲ +X.X%`, `▼ -X.X%`, `▬ 0.0%`) calculados con funciones de ventana SQL (`LAG` / `ROW_NUMBER`).
     - **KPIs y Diagnóstico Ejecutivo de Comercialización**: Resumen con semáforo alcista/bajista, cotización de Granada, líder regional, líder terminal y recomendación estratégica para venta de lotes desde Mesetas.
     - **Endpoints de Gráficos de Servidor**: `/api/grafico/subastas_comparativa` y `/api/grafico/subastas_tendencia` para reportes PNG y visualización de alta resolución.
-- [x] Suite de pruebas con pytest: **755 pruebas en verde** (100% pasando).
+  - [x] **Hardening idempotencia de partos y mercado (2026-09-10)**: `registrar_parto` idempotente en `src/db/database.py` — deduplica por `(vaca_id, fecha, id_cria)` y por `(vaca_id, fecha, tipo_evento, id_cria)` cuando `id_cria` es NULL (evita duplicar partos/gemelos en reintentos de `/api/sync`); propaga `grupo_parto_id` al gemelo existente si estaba NULL; `sembrar_precios_mercado_iniciales(forzar=True)` preserva precios manuales (`DELETE ... WHERE COALESCE(fuente,'') NOT LIKE 'MANUAL%'`); doble capa documentada en `src/importers/dbf_importer.py`; 3 tests nuevos en `tests/test_db.py` (gemelo conserva `grupo_parto_id`, misma cría con distinto `tipo_evento` no duplica, ABORTO vs REABSORCIÓN sin cría no colisionan).
+- [x] Suite de pruebas con pytest: **761 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

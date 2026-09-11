@@ -2235,55 +2235,32 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   user-select: none;
 }
 .vaca-pista { display: inline-flex; align-items: flex-end; }
-.vaca-ambula { display: inline-flex; animation: vacaAmbla 14s ease-in-out infinite; }
-.vaca-pasta { display: inline-flex; align-items: flex-end; animation: vacaCome 2.4s ease-in-out infinite; transform-origin: 75% 85%; }
+.vaca-ambula { display: inline-flex; align-items: flex-end; }
+.vaca-pasta { display: inline-flex; align-items: flex-end; }
 .vaca-img {
   display: block;
-  width: 48px;
+  width: 54px;
   height: auto;
-  aspect-ratio: 814 / 517;
+  aspect-ratio: 150 / 80;
   object-fit: contain;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.22));
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 .header-pasto-ficha .vaca-img {
-  width: 42px;
-}
-@keyframes vacaAmbla {
-  0% { transform: translateX(-40px) scaleX(1); }
-  45% { transform: translateX(40px) scaleX(1); }
-  48% { transform: translateX(40px) scaleX(-1); }
-  95% { transform: translateX(-40px) scaleX(-1); }
-  100% { transform: translateX(-40px) scaleX(1); }
-}
-@keyframes vacaCome {
-  0%, 100% { transform: rotate(0deg) translateY(0); }
-  25% { transform: rotate(2.5deg) translateY(1.5px); }
-  35% { transform: rotate(-1deg) translateY(-0.8px); }
-  50% { transform: rotate(1deg) translateY(0.8px); }
-  70% { transform: rotate(3deg) translateY(2px); }
-  85% { transform: rotate(-0.5deg) translateY(-0.5px); }
+  width: 48px;
 }
 /* Tema claro y oscuro */
 :root[data-theme="light"] .header-pasto { opacity: .9; }
 :root[data-theme="dark"] .header-pasto { opacity: .95; }
 /* Sol de Campo (alto contraste B/N): se muestra estática, sin movimiento. */
-:root[data-theme="sun"] .vaca-ambula, :root[data-theme="sun"] .vaca-pasta { animation: none; }
 :root[data-theme="sun"] .header-pasto { opacity: 1; }
 @media (max-width: 640px) {
   .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .95; }
-  .vaca-img { width: 40px; }
-  @keyframes vacaAmbla {
-    0% { transform: translateX(-18px) scaleX(1); }
-    45% { transform: translateX(18px) scaleX(1); }
-    48% { transform: translateX(18px) scaleX(-1); }
-    95% { transform: translateX(-18px) scaleX(-1); }
-    100% { transform: translateX(-18px) scaleX(1); }
-  }
+  .vaca-img { width: 44px; }
 }
 @media (max-width: 319px) {
   /* Solo pantallas muy angostas (<320px): compactar, nunca ocultar con display:none. */
   .header-pasto { min-width: 36px; max-width: 80px; }
-  .vaca-img { width: 34px; }
+  .vaca-img { width: 36px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vaca-ambula, .vaca-pasta { animation: none; }

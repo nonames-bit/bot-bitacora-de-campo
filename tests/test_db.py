@@ -173,7 +173,7 @@ def test_historial_incluye_destetes_propios_y_de_crias(db):
 def test_registrar_parto_autorreferenciado_proteccion(db):
     # Intentar registrar parto donde vaca_tag == id_cria_tag
     res = db.registrar_parto(vaca_tag="V009", fecha="2026-03-02", sexo_cria="Macho", id_cria_tag="V009")
-    assert res == 0
+    assert res is None
     assert db.count("partos") == 0
     cria = db.get_animal("V009")
     assert cria is not None
@@ -974,6 +974,78 @@ def test_kpis_financieros_margenes_unitarios_dinamicos(db):
     assert k["costo_por_kg_carne"] == 250.0  # 100000 / 400
     assert k["margen_por_kg_carne"] == 7750.0  # 8000 - 250
     assert k["margen_carne_pct"] == 96.9
+
+
+def test_registrar_parto_idempotente_no_duplica(db):
+    id1 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    id2 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    assert id1 == id2
+    assert db.count("partos") == 1
+
+
+def test_registrar_parto_gemelos_distinta_cria_crea_dos_filas(db):
+    primer_id = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho",
+                                   id_cria_tag="47-1", tipo_evento="GEMELAR")
+    segundo_id = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Hembra",
+                                    id_cria_tag="47-2", tipo_evento="GEMELAR",
+                                    grupo_parto_id=primer_id)
+    assert segundo_id != primer_id
+    filas = db.query("SELECT * FROM partos ORDER BY id")
+    assert len(filas) == 2
+    assert filas[1]["grupo_parto_id"] == primer_id
+    # Reintento offline del mismo batch no duplica ninguno de los dos.
+    otra_vez_1 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho",
+                                    id_cria_tag="47-1", tipo_evento="GEMELAR")
+    otra_vez_2 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Hembra",
+                                    id_cria_tag="47-2", tipo_evento="GEMELAR",
+                                    grupo_parto_id=primer_id)
+    assert otra_vez_1 == primer_id
+    assert otra_vez_2 == segundo_id
+    assert db.count("partos") == 2
+
+
+def test_resiembra_forzada_preserva_precio_manual(db):
+    db.sembrar_precios_mercado_iniciales()
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO", precio_promedio=9999.0,
+                                fuente="MANUAL", fecha="2026-09-09", notas="precio del productor")
+    db.sembrar_precios_mercado_iniciales(forzar=True)
+    fila = db.query_one("SELECT * FROM precios_mercado WHERE fuente = 'MANUAL' AND precio_promedio = 9999.0")
+    assert fila is not None
+
+
+def test_registrar_parto_gemelos_reintento_preserva_grupo_parto_id(db):
+    primer_id = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho",
+                                   id_cria_tag="47-1", tipo_evento="GEMELAR")
+    segundo_id = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Hembra",
+                                    id_cria_tag="47-2", tipo_evento="GEMELAR",
+                                    grupo_parto_id=primer_id)
+    # Reintento offline del 2º gemelo con el mismo grupo: no duplica y el
+    # grupo se conserva (antes quedaba en NULL por el retorno temprano).
+    reintento_id = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Hembra",
+                                      id_cria_tag="47-2", tipo_evento="GEMELAR",
+                                      grupo_parto_id=primer_id)
+    assert reintento_id == segundo_id
+    assert db.count("partos") == 2
+    fila = db.query_one("SELECT * FROM partos WHERE id = ?", (segundo_id,))
+    assert fila["grupo_parto_id"] == primer_id
+
+
+def test_registrar_parto_misma_cria_distinto_tipo_no_duplica(db):
+    id1 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho",
+                             id_cria_tag="47-1", tipo_evento="PARTO")
+    id2 = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho",
+                             id_cria_tag="47-1", tipo_evento="GEMELAR",
+                             grupo_parto_id=id1)
+    assert id2 == id1
+    assert db.count("partos") == 1
+
+
+def test_registrar_parto_sin_cria_distinto_tipo_no_colisiona(db):
+    id_aborto = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", tipo_evento="ABORTO")
+    id_reabs = db.registrar_parto(vaca_tag="47", fecha="2026-06-01", tipo_evento="REABSORCION")
+    assert id_aborto != id_reabs
+    assert db.count("partos") == 2
+
 
 
 

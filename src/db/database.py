@@ -336,7 +336,10 @@ class Database:
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
                         notas=None, potrero_cria=None, potrero_madre=None,
                         registrado_por=None, tipo_evento="PARTO",
-                        grupo_parto_id=None) -> int:
+                        grupo_parto_id=None) -> Optional[int]:
+        """Registra un parto/evento reproductivo. Retorna el id (int) de la
+        fila creada o ya existente (reintento idempotente); retorna None si
+        el registro fue rechazado por autorreferencia (vaca == cría)."""
         tipo_evento = (tipo_evento or "PARTO").strip().upper()
         if tipo_evento not in TIPOS_EVENTO_PARTO:
             tipo_evento = "PARTO"
@@ -360,13 +363,13 @@ class Database:
                     self.execute("UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria))
                 if fecha:
                     self.execute("UPDATE animales SET fecha_nacimiento = COALESCE(fecha_nacimiento, ?) WHERE id_animal = ?", (iso(fecha), id_cria))
-            return 0
+            return None
 
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
 
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
-            return 0
+            return None
 
         if id_cria is not None:
             if vaca_id is not None and id_cria != vaca_id:
@@ -409,6 +412,27 @@ class Database:
             pid_madre = self.resolve_potrero(potrero_madre)
             if pid_madre:
                 self.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (pid_madre, vaca_id))
+        # Idempotente por clave natural: la identidad de una cría nacida es
+        # (vaca, fecha, cría) -- un PARTO registrado y luego reenviado como
+        # GEMELAR (o viceversa) es el mismo evento, no dos filas. Solo cuando
+        # no hay cría (ABORTO/REABSORCIÓN/etc., id_cria NULL) el tipo_evento
+        # sí distingue eventos distintos el mismo día. IS compara bien NULL.
+        # (Ver import_partos en dbf_importer.py, que aplica la misma clave
+        # antes de llamar aquí: primera capa de deduplicación.)
+        if id_cria is not None:
+            condiciones = {"vaca_id": vaca_id, "fecha": iso(fecha), "id_cria": id_cria}
+        else:
+            condiciones = {"vaca_id": vaca_id, "fecha": iso(fecha), "tipo_evento": tipo_evento, "id_cria": id_cria}
+        existente = self._id_si_ya_existe("partos", condiciones)
+        if existente:
+            # Reintento del 2º gemelo con grupo_parto_id explícito: propaga
+            # el grupo si la fila aún no tiene ninguno (NULL); nunca pisa
+            # una agrupación ya existente con otro valor.
+            if tipo_evento == "GEMELAR" and grupo_parto_id is not None:
+                fila = self.query_one("SELECT grupo_parto_id FROM partos WHERE id = ?", (existente,))
+                if fila is not None and fila["grupo_parto_id"] is None:
+                    self.execute("UPDATE partos SET grupo_parto_id = ? WHERE id = ?", (grupo_parto_id, existente))
+            return existente
         nuevo_id = self.insert("partos", dict(
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,
@@ -2851,7 +2875,11 @@ class Database:
             return
 
         if forzar:
-            self.execute("DELETE FROM precios_mercado")
+            # Resiembra forzada: nunca borrar precios MANUAL del usuario.
+            # Solo se eliminan filas semilla/automáticas (fuente distinta de
+            # MANUAL); las filas semilla se reinsertan abajo con upsert
+            # (si ya existe fecha/plaza/producto se conserva).
+            self.execute("DELETE FROM precios_mercado WHERE COALESCE(fuente, '') NOT LIKE 'MANUAL%'")
 
         ahora_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 

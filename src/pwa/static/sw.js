@@ -70,7 +70,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v78: "Distribución por potrero" del Tablero sube justo después de "Evolución del rebaño" (antes quedaba al final, después del feed de eventos); se quita el gráfico de torta duplicado con Inventario.
 // v81: Vaquita realista comiendo pasto en el header (vaca_comiendo.png con animación de pastar y caminar).
 // v82: Tablero visual interactivo de subastas ganaderas con comparativa de plazas, barras de precios relativos a Granada y curvas de tendencia semanal.
-var CACHE = "pwa-ja-v82"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v83: Vaquita animada en GIF convertida de vaca.mp4 con ciclos naturales de pastoreo, masticado y cola en el header.
+var CACHE = "pwa-ja-v83"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",
@@ -78,6 +79,7 @@ var PRECACHE = [
   "/manifest.json",
   "/static/style.css",
   "/static/app.js",
+  "/static/vaca_comiendo.gif",
   "/static/vaca_comiendo.png",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",

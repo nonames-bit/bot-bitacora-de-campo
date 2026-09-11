@@ -514,6 +514,10 @@ def import_partos(db: Database, records) -> dict:
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
             continue
 
+        # Primera capa de deduplicación (la segunda está en
+        # Database.registrar_parto, con la misma clave cuando hay cría:
+        # (vaca_id, fecha, id_cria); sin cría ambas capas distinguen por
+        # tipo_evento para no colapsar ABORTO vs REABSORCIÓN el mismo día).
         if id_cria is not None:
             if fec is not None:
                 existe = db.query_one(
@@ -576,6 +580,10 @@ def import_partos(db: Database, records) -> dict:
             notas=detalle or None,
             tipo_evento=tipo_evento,
         )
+        # TODO: registrar_parto retorna None ante rechazo por autorreferencia
+        # (vaca == cría), que no es un duplicado real; hoy se cuenta como
+        # duplicado para no cambiar la forma del dict {"nuevos", "duplicados"}
+        # que los tests y llamadores comparan por igualdad exacta.
         if res:
             nuevos += 1
         else:

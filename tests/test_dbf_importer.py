@@ -307,8 +307,14 @@ def test_import_partos_no_completa_si_hay_ambiguedad_de_huerfanos(db):
     día -- caso raro pero posible con datos sucios -- no arriesga a
     completar el equivocado: crea el parto nuevo con cría."""
     db.registrar_animal(tag="A090", sexo="Hembra")
-    db.registrar_parto(vaca_tag="A090", fecha="2026-08-01", notas="huerfano 1")
-    db.registrar_parto(vaca_tag="A090", fecha="2026-08-01", notas="huerfano 2")
+    # Estado sucio preexistente (anterior a la idempotencia de
+    # registrar_parto): se inserta directo para simular dos huérfanos del
+    # mismo día, ya que la API hoy no duplicaría el segundo.
+    vaca_id = db.animal_id("A090")
+    db.insert("partos", dict(vaca_id=vaca_id, fecha="2026-08-01", tipo_evento="PARTO",
+                             notas="huerfano 1", creado_en="2026-08-01T00:00:00"))
+    db.insert("partos", dict(vaca_id=vaca_id, fecha="2026-08-01", tipo_evento="PARTO",
+                             notas="huerfano 2", creado_en="2026-08-01T00:00:00"))
     assert db.count("partos") == 2
 
     res = import_partos(db, [
