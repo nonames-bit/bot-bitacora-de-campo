@@ -508,6 +508,50 @@ header {
 .chip.gris  { background: var(--color-gris-bg); color: var(--color-gris-txt); }
 .chip.azul  { background: var(--color-azul-bg); color: var(--color-azul-txt); }
 
+/* Botón satelital SAR (antes gradiente inline en app.js): gradiente fijo
+   azul corporativo con texto blanco; override en sun para alto contraste. */
+.btn-satelite-sar {
+  font-size: 12px;
+  padding: 6px 12px;
+  background: linear-gradient(135deg, #1e3c72, #2a5298);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+:root[data-theme="sun"] .btn-satelite-sar {
+  background: #000;
+  color: #fff;
+  border: 2px solid #000;
+  box-shadow: none;
+}
+
+/* Tarjeta banner con gradiente suave (antes inline en app.js: Monitor en Vivo).
+   Acento lateral azul corporativo para distinguirla de una .card normal.
+   En sun se aplana con borde negro grueso para no romperse en alto contraste. */
+.card-banner {
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(22,163,74,0.08), rgba(37,99,235,0.06));
+  border: 1px solid var(--borde-fuerte);
+  border-left: 4px solid #2a5298;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+:root[data-theme="sun"] .card-banner {
+  background: var(--superficie);
+  border: 2px solid #000;
+  border-left: 4px solid #000;
+}
+
 /* Banners destacados de bajas e historial de salidas (Ventas / Muertes / Descartes) */
 .banner-baja {
   padding: 14px 16px;
@@ -834,10 +878,15 @@ button:active {
   header .reloj { display: none; }
   header .acciones { gap: 4px; flex-wrap: wrap; }
   header .tema-btn {
-    min-height: 28px;
-    height: 28px;
-    padding: 0 6px;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 8px;
     font-size: 11px;
+  }
+  /* Objetivos táctiles >=44px en header (sin tocar escritorio) */
+  header .acciones button {
+    min-height: 44px;
+    min-width: 44px;
   }
   header #select-tema {
     max-width: 95px;
@@ -845,8 +894,10 @@ button:active {
     padding: 0 4px;
   }
   header a.salir {
-    height: 28px;
-    padding: 0 8px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 10px;
     font-size: 10.5px;
   }
   .logo-ja {
@@ -934,10 +985,64 @@ button:active {
     font-size: 12px;
     padding: 6px 8px;
   }
+  /* Objetivos táctiles >=44px en formularios de Captura/Manga (acotado,
+     sin tocar escritorio ni inputs globales fuera de estos contenedores) */
+  #form-captura input, #form-captura select, #form-captura textarea,
+  #captura-campos input, #captura-campos select,
+  .manga-pesaje-box input, .manga-pesaje-box select,
+  .gps-box input, .gps-box select,
+  .btn-punto {
+    min-height: 44px;
+  }
   .ficha-head img.avatar {
     width: 60px;
     height: 60px;
   }
+}
+
+/* Feed "Últimos Eventos" como cards en móvil (solo .tabla-eventos) */
+@media (max-width: 640px) {
+  .tabla-eventos.tabla-scroll {
+    border: none;
+    background: transparent;
+  }
+  .tabla-eventos table, .tabla-eventos tbody {
+    display: block;
+    width: 100%;
+  }
+  .tabla-eventos tr { display: block; }
+  .tabla-eventos tr:first-child, .tabla-eventos tr:has(th) {
+    display: none;
+  }
+  .tabla-eventos tr:not(:first-child) {
+    background: var(--superficie);
+    border: 1px solid var(--borde-fuerte);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    padding: 6px 12px;
+  }
+  .tabla-eventos td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    border: none;
+    border-bottom: 1px solid var(--borde);
+    padding: 8px 0;
+    font-size: 12.5px;
+    text-align: right;
+  }
+  .tabla-eventos td:last-child { border-bottom: none; }
+  .tabla-eventos td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--texto-suave);
+    text-align: left;
+    flex-shrink: 0;
+    max-width: 40%;
+  }
+  .tabla-eventos a.ficha-link { min-height: 44px; display: inline-flex; align-items: center; }
 }
 
 /* Pirámide de edades (Población) */

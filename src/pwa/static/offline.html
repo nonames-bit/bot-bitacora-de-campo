@@ -5,13 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Sin conexión · Bitácora JA</title>
 <meta name="theme-color" content="#2F5233">
-<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/style.css?v=84">
 <style>
 body { display: flex; min-height: 100vh; align-items: center; justify-content: center; padding-bottom: 0; }
 .card { width: 100%; max-width: 360px; padding: 28px 24px; text-align: center; }
 .card h1 { font-size: 20px; color: var(--verde-marca); margin: 10px 0 6px; }
 .card p { color: var(--texto-suave); font-size: 14px; }
 .card button { margin-top: 16px; width: 100%; }
+/* Botón "Reintentar" como enlace (CSP script-src 'self' bloquea onclick/JS inline) */
+.btn-reintentar { display: block; text-align: center; padding: 12px 14px; min-height: 44px; box-sizing: border-box; background: var(--verde-marca); color: #fff; border-radius: 8px; text-decoration: none; margin-top: 16px; font-weight: 600; }
 .ico { font-size: 44px; }
 </style>
 </head>
@@ -22,7 +24,7 @@ body { display: flex; min-height: 100vh; align-items: center; justify-content: c
   <p>Estás viendo el tablero <b>Bitácora JA</b> sin conexión a la red.<br>
      Las secciones ya cargadas siguen disponibles. Los datos nuevos se
      actualizarán al reconectar.</p>
-  <button onclick="location.reload()">Reintentar</button>
+  <a href="" class="btn-reintentar">Reintentar</a>
   <p><a href="/" style="color:var(--verde-marca)">← Volver al inicio</a></p>
 </div>
 </body>

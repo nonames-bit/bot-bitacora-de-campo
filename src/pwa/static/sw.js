@@ -71,7 +71,8 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v81: Vaquita realista comiendo pasto en el header (vaca_comiendo.png con animación de pastar y caminar).
 // v82: Tablero visual interactivo de subastas ganaderas con comparativa de plazas, barras de precios relativos a Granada y curvas de tendencia semanal.
 // v83: Vaquita animada en GIF convertida de vaca.mp4 con ciclos naturales de pastoreo, masticado y cola en el header.
-var CACHE = "pwa-ja-v83"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// v84: Quick wins visuales PWA (chip ambar, clases btn-satelite-sar/card-banner sin inline, objetivos tactiles 44px y feed de eventos como cards en movil).
+var CACHE = "pwa-ja-v84"; // subir versión al cambiar app.js/style.css/templates (cache-first)
 var PRECACHE = [
   "/",
   "/login",

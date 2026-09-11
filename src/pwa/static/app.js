@@ -210,7 +210,7 @@
     if (!eventos.length) {
       h += vacio("No hay eventos recientes registrados.");
     } else {
-      h += "<div class='tabla-scroll'><table>"
+      h += "<div class='tabla-scroll tabla-eventos'><table class='tabla-eventos'>"
         + "<tr>"
         + "<th>Tipo Evento</th>"
         + "<th>Fecha</th>"
@@ -265,10 +265,10 @@
         }
 
         h += "<tr>"
-          + "<td>" + chipHtml + "</td>"
-          + "<td><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
-          + "<td>" + linkAnimal + detalleExtra + "</td>"
-          + "<td>" + descHtml + "</td>"
+          + "<td data-label='Tipo Evento'>" + chipHtml + "</td>"
+          + "<td data-label='Fecha'><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
+          + "<td data-label='Animal / Arete'>" + linkAnimal + detalleExtra + "</td>"
+          + "<td data-label='Detalle de la Actividad'>" + descHtml + "</td>"
           + "</tr>";
       });
 
@@ -414,7 +414,7 @@
     var sat = d.satelite_resumen || {};
     var tieneSat = sat.total_potreros > 0;
 
-    var btnSyncSar = "<button type='button' class='tema-btn' id='btn-sync-satelite-sar' style='font-size:12px; padding:6px 12px; background:linear-gradient(135deg, #1e3c72, #2a5298); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
+    var btnSyncSar = "<button type='button' class='tema-btn btn-satelite-sar' id='btn-sync-satelite-sar'>"
       + icon("sparkles", 13) + (simple ? "🔄 Actualizar (con nubes)" : "📡 Radar SAR (Todo Clima)") + "</button>";
     var btnSyncAuto = "<button type='button' class='tema-btn' id='btn-sync-satelite-auto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
       + icon("sparkles", 13) + (simple ? "🔄 Actualizar (rápido)" : "⚡ Auto (S2 + S1)") + "</button>";
@@ -4903,7 +4903,7 @@
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>";
     h += "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("refresh", 16) + "Sincronización con Software Ganadero (SG)</h4>";
     if (syncUlt) {
-      var badgeCls = syncUlt.al_dia ? "chip verde" : "chip amarillo";
+      var badgeCls = syncUlt.al_dia ? "chip verde" : "chip ambar";
       var badgeTxt = syncUlt.al_dia ? "✅ Al día (" + esc(syncUlt.tiempo_relativo) + ")" : "⚠️ Requiere actualización (" + esc(syncUlt.tiempo_relativo) + ")";
       h += "<span class='" + badgeCls + "'>" + badgeTxt + "</span>";
     } else {
@@ -4969,7 +4969,7 @@
         if (rolCat === "OWNER" || rolCat === "ADMIN") fGrupo = "admin";
         else if (rolCat === "SISTEMA") fGrupo = "sg";
 
-        var badgeRol = rolCat === "OWNER" ? "<span class='chip amarillo' style='font-size:9.5px; padding:1px 5px;'>OWNER</span>"
+        var badgeRol = rolCat === "OWNER" ? "<span class='chip ambar' style='font-size:9.5px; padding:1px 5px;'>OWNER</span>"
                      : rolCat === "ADMIN" ? "<span class='chip azul' style='font-size:9.5px; padding:1px 5px;'>ADMIN</span>"
                      : rolCat === "SISTEMA" ? "<span class='chip gris' style='font-size:9.5px; padding:1px 5px;'>SISTEMA</span>"
                      : "<span class='chip verde' style='font-size:9.5px; padding:1px 5px;'>CAMPO</span>";
@@ -5121,7 +5121,7 @@
 
   function rolToNivel(rol) {
     var r = (rol || "").toUpperCase();
-    if (r === "OWNER") return { lvl: 1, txt: "Level 1 (OWNER)", badge: "L1", color: "#d97706", chip: "amarillo" };
+    if (r === "OWNER") return { lvl: 1, txt: "Level 1 (OWNER)", badge: "L1", color: "#d97706", chip: "ambar" };
     if (r === "ADMIN" || r === "ADMINISTRADOR") return { lvl: 2, txt: "Level 2 (ADMIN)", badge: "L2", color: "#2563eb", chip: "azul" };
     return { lvl: 3, txt: "Level 3 (TRABAJADOR)", badge: "L3", color: "#16a34a", chip: "verde" };
   }
@@ -5153,7 +5153,7 @@
       var enLineaCount = usuarios.filter(function (u) {
         return u.online_info && u.online_info.en_linea;
       }).length;
-      h += "<div class='card' style='padding:14px 18px; margin-bottom:16px; background:linear-gradient(135deg, rgba(22,163,74,0.08), rgba(37,99,235,0.06)); border:1px solid var(--borde-fuerte); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;'>"
+      h += "<div class='card card-banner'>"
         + "<div>"
         + "<div style='display:flex; align-items:center; gap:8px;'>"
         + "<span style='display:inline-block; width:10px; height:10px; border-radius:50%; background:" + (enLineaCount > 0 ? "#16a34a" : "#9ca3af") + "; box-shadow:" + (enLineaCount > 0 ? "0 0 8px #16a34a" : "none") + ";'></span>"
@@ -5286,7 +5286,7 @@
             dotColor = "#16a34a";
             estadoLabel = "En línea";
           } else if (oi.estado === "reciente") {
-            chipClase = "amarillo";
+            chipClase = "ambar";
             dotColor = "#d97706";
             estadoLabel = "Reciente";
           }

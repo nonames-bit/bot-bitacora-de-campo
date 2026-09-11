@@ -564,6 +564,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **KPIs y Diagnóstico Ejecutivo de Comercialización**: Resumen con semáforo alcista/bajista, cotización de Granada, líder regional, líder terminal y recomendación estratégica para venta de lotes desde Mesetas.
     - **Endpoints de Gráficos de Servidor**: `/api/grafico/subastas_comparativa` y `/api/grafico/subastas_tendencia` para reportes PNG y visualización de alta resolución.
   - [x] **Hardening idempotencia de partos y mercado (2026-09-10)**: `registrar_parto` idempotente en `src/db/database.py` — deduplica por `(vaca_id, fecha, id_cria)` y por `(vaca_id, fecha, tipo_evento, id_cria)` cuando `id_cria` es NULL (evita duplicar partos/gemelos en reintentos de `/api/sync`); propaga `grupo_parto_id` al gemelo existente si estaba NULL; `sembrar_precios_mercado_iniciales(forzar=True)` preserva precios manuales (`DELETE ... WHERE COALESCE(fuente,'') NOT LIKE 'MANUAL%'`); doble capa documentada en `src/importers/dbf_importer.py`; 3 tests nuevos en `tests/test_db.py` (gemelo conserva `grupo_parto_id`, misma cría con distinto `tipo_evento` no duplica, ABORTO vs REABSORCIÓN sin cría no colisionan).
+- [x] **Bloque 1 Quick Wins Visuales PWA (2026-09-10)** (`src/pwa/`, SW `pwa-ja-v83` → `v84`):
+    - Chips `chip amarillo` → `chip ambar` (4 sitios `app.js`); 2 gradientes inline → `.btn-satelite-sar` / `.card-banner` con override tema Sol.
+    - Táctil `min-height:44px` en móvil (header, captura/manga, reintento offline); feed Tablero como cards en `≤640px` (`data-label`), tabla en escritorio.
+    - CSP `offline.html` sin `onclick` inline (enlace sin JS); bump caché `?v=84` en `index/ficha/login/offline.html`.
 - [x] Suite de pruebas con pytest: **761 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
