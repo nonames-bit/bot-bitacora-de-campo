@@ -307,6 +307,8 @@ def import_animales(db: Database, records, causas: dict) -> dict:
     tags = []  # para segunda pasada de madre/padre
     nuevos_animales = 0
     duplicados_animales = 0
+    traslados_detectados = 0
+    fecha_import_hoy = iso(hoy())
     for r in records:
         tag = (r.get("CODANI") or "").strip()
         if not tag:
@@ -323,12 +325,15 @@ def import_animales(db: Database, records, causas: dict) -> dict:
 
         existente = db.animal_id(tag)
         estado_previo = None
+        potrero_id_previo = None
         if existente is None:
             nuevos_animales += 1
         else:
             duplicados_animales += 1
             fila_previa = db.get_animal(existente)
-            estado_previo = fila_previa["estado"] if fila_previa else None
+            if fila_previa:
+                estado_previo = fila_previa["estado"]
+                potrero_id_previo = fila_previa["potrero_id"]
 
         codpot = (r.get("CODPOT") or "").strip() or None
         estado_nuevo = _estado_desde_tipo(r.get("TIPO"), codpot=codpot)
@@ -344,13 +349,29 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             notas=(r.get("OBS") or "").strip() or None,
             hierro=hierro,
         )
+        # hoja.dbf (este archivo) solo trae el potrero ACTUAL del animal, sin
+        # fecha ni historial -- si el mayordomo lo mueve en SG sin pasar por
+        # la pantalla de Traslados (traslado.dbf, importado aparte en
+        # import_traslados), el cambio queda invisible en "Últimos Eventos"
+        # del Tablero aunque Inventario/Mapa ya lo muestren bien (ambos leen
+        # animales.potrero_id directo). Se deja constancia igual con fecha
+        # aproximada = fecha de esta importación, solo para animales activos
+        # que ya tenían un potrero antes (evita ruido en altas nuevas).
+        if estado_nuevo == "ACTIVO" and potrero_id_previo is not None and codpot:
+            potrero_id_nuevo = db.resolve_potrero(codpot)
+            if potrero_id_nuevo is not None and potrero_id_nuevo != potrero_id_previo:
+                db.registrar_traslado(
+                    animal_tag=tag, fecha=fecha_import_hoy,
+                    potrero_origen=potrero_id_previo, potrero_destino=potrero_id_nuevo,
+                    motivo="Detectado en import SG (cambio de potrero en hoja.dbf)",
+                )
+                traslados_detectados += 1
         tags.append((tag, r, estado_previo, estado_nuevo))
 
     nuevas_muertes = 0
     duplicadas_muertes = 0
     nuevas_ventas = 0
     ventas_fecha_aproximada = 0
-    fecha_import_hoy = iso(hoy())
     nota_fecha_aprox = (
         "Fecha aproximada: SG (Software Ganadero) marcó este animal como {estado} en el "
         "respaldo importado, pero ese registro no trae la fecha exacta -- se usó la fecha "
@@ -456,6 +477,7 @@ def import_animales(db: Database, records, causas: dict) -> dict:
             "nuevos": nuevos_animales, "duplicados": duplicados_animales,
             "ventas_registradas": nuevas_ventas,
             "ventas_fecha_aproximada": ventas_fecha_aproximada,
+            "traslados_detectados": traslados_detectados,
         },
         "muertes": {"nuevos": nuevas_muertes, "duplicados": duplicadas_muertes},
     }

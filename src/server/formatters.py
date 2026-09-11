@@ -1874,6 +1874,11 @@ def formatear_reporte_importacion(conteos: dict) -> str:
         detalle_aprox = f" ({ventas_aprox} sin fecha exacta en SG, aproximadas a hoy)" if ventas_aprox else ""
         lineas.append(f"💰 <b>{ventas_registradas} venta(s)</b> nueva(s) detectada(s) en este backup{detalle_aprox}.")
 
+    traslados_detectados = info_animales.get("traslados_detectados")
+    if traslados_detectados:
+        lineas.append("")
+        lineas.append(f"🚚 <b>{traslados_detectados} cambio(s) de potrero</b> detectado(s) en SG (sin pasar por la pantalla de Traslados) — quedaron registrados con fecha aproximada de hoy.")
+
     destetes_sin_cria = (conteos.get("destetes") or {}).get("sin_cria")
     if destetes_sin_cria:
         lineas.append("")

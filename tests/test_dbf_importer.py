@@ -110,12 +110,55 @@ def test_import_animales_y_muertes(db):
          "MADRE": "", "PADRE": "", "TIPO": "M", "FECMUERTE": "20260507",
          "CAU": "19", "MOTIVO": "se rodo"},
     ], causas)
-    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0, "ventas_registradas": 0, "ventas_fecha_aproximada": 0}
+    assert conteos["animales"] == {"nuevos": 1, "duplicados": 0, "ventas_registradas": 0, "ventas_fecha_aproximada": 0, "traslados_detectados": 0}
     assert conteos["muertes"] == {"nuevos": 1, "duplicados": 0}
     animal = db.get_animal("47")
     assert animal["sexo"] == "Hembra"
     muerte = db.query_one("SELECT * FROM muertes")
     assert muerte["causa_presunta"] == "ACCIDENTE"
+
+
+def test_import_animales_detecta_cambio_potrero_sin_traslado_dbf(db):
+    """hoja.dbf trae solo el potrero ACTUAL del animal (sin historial): si
+    cambió respecto a la importación previa y no vino explicado por un
+    traslado.dbf (import_traslados, probado aparte), igual debe quedar un
+    registro en `traslados` para que aparezca en "Últimos Eventos" del
+    Tablero -- sin esto, Inventario/Mapa (que leen animales.potrero_id
+    directo) muestran el cambio pero el feed de eventos queda mudo."""
+    causas = {}
+    # registrar_animal() no crea el potrero al vuelo (resolve_potrero sin
+    # crear=True) -- en producción potrero.dbf siempre se importa antes que
+    # hoja.dbf (ver DBF_REQUERIDOS / import_dbfs), así que el potrero ya
+    # existe cuando llega este cambio.
+    db.registrar_potrero(nombre="A01", codigo="A01")
+    db.registrar_potrero(nombre="B02", codigo="B02")
+    base = {"NOMANI": "Mariposa", "SEXO": "H", "TIPORAZA": "T", "FECNACE": "20200101",
+            "ESTADO": "1", "OBS": "", "MADRE": "", "PADRE": "", "TIPO": "",
+            "FECMUERTE": "", "CAU": "", "MOTIVO": ""}
+    # Primera importación: potrero A01 (nomenclatura activa, no legacy numérico).
+    conteos1 = import_animales(db, [{**base, "CODANI": "47", "CODPOT": "A01"}], causas)
+    assert conteos1["animales"]["traslados_detectados"] == 0
+    assert db.query(("SELECT * FROM traslados")) == []
+
+    # Segunda importación (otro backup): SG ya muestra a la 47 en B02, sin
+    # que nadie haya usado la pantalla de Traslados en SG.
+    conteos2 = import_animales(db, [{**base, "CODANI": "47", "CODPOT": "B02"}], causas)
+    assert conteos2["animales"]["traslados_detectados"] == 1
+    traslado = db.query_one("SELECT * FROM traslados WHERE animal_id = (SELECT id_animal FROM animales WHERE tag = '47')")
+    assert traslado is not None
+    assert traslado["motivo"] == "Detectado en import SG (cambio de potrero en hoja.dbf)"
+    pot_origen = db.get_potrero(traslado["potrero_origen"])
+    pot_destino = db.get_potrero(traslado["potrero_destino"])
+    assert pot_origen["codigo"] == "A01"
+    assert pot_destino["codigo"] == "B02"
+    # animales.potrero_id (lo que leen Inventario/Mapa) también queda al día.
+    assert db.get_animal("47")["potrero_id"] == traslado["potrero_destino"]
+
+    # Tercera importación con el MISMO potrero: no debe generar un traslado
+    # duplicado por cada backup diario mientras el animal no se mueva.
+    conteos3 = import_animales(db, [{**base, "CODANI": "47", "CODPOT": "B02"}], causas)
+    assert conteos3["animales"]["traslados_detectados"] == 0
+    assert db.count("traslados") == 1
 
 
 def test_import_animales_estado_desde_tipo(db):

@@ -74,17 +74,22 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v85: Bloque 2 Accesibilidad y CSP — registro de SW y script de login
 // extraídos a /static/sw-register.js y /static/login.js (sin <script>
 // inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
-var CACHE = "pwa-ja-v85"; // subir versión al cambiar app.js/style.css/templates (cache-first)
+// BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
+// __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
+var CACHE = "pwa-ja-__PWA_VERSION__"; // token → hash SHA1(estáticos) al servir
 var PRECACHE = [
   "/",
   "/login",
   "/offline.html",
   "/manifest.json",
-  "/static/style.css",
-  "/static/app.js",
-  "/static/sw-register.js",
+  "/static/style.css?v=__PWA_VERSION__",
+  "/static/app.js?v=__PWA_VERSION__",
+  "/static/ja-core.js?v=__PWA_VERSION__",
+  "/static/sw-register.js?v=__PWA_VERSION__",
   "/static/vaca_comiendo.gif",
+  "/static/vaca_comiendo.gif?v=__PWA_VERSION__",
   "/static/vaca_comiendo.png",
+  "/static/vaca_comiendo.png?v=__PWA_VERSION__",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",
   "/static/favicon.svg",

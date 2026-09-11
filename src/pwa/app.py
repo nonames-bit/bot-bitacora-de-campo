@@ -11,6 +11,7 @@ Si Flask no está instalado el módulo se importa sin romper el bot
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
@@ -661,6 +662,25 @@ def datos_identificar(db_path: str = DB_PATH_DEFAULT, texto: Optional[str] = Non
 # ------------------------------------------------------------------ #
 # App Flask (solo se construye si Flask está instalado)
 # ------------------------------------------------------------------ #
+# Versión automática de la PWA (BLOQUE 3): SHA1 (8 hex) de los bytes
+# concatenados de los estáticos principales, en este orden fijo. Se calcula
+# una sola vez al crear la app (barato y determinista) para no subir `?v=`
+# ni `CACHE` a mano nunca más. Si un fichero falta en disco aporta b"".
+PWA_VERSION = "dev"
+
+
+def _calcular_pwa_version() -> str:
+    """Calcula el hash de versión PWA desde el contenido de los estáticos."""
+    h = hashlib.sha1()
+    for _nombre in ("app.js", "ja-core.js", "style.css", "sw-register.js", "login.js"):
+        try:
+            with open(os.path.join(BASE_DIR, "static", _nombre), "rb") as _f:
+                h.update(_f.read())
+        except OSError:
+            h.update(b"")
+    return h.hexdigest()[:8]
+
+
 def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAULT,
               password: Optional[str] = None, login_store_path: Optional[str] = None):
     """Construye la app Flask. Devuelve None si Flask no está instalado.
@@ -686,6 +706,12 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 static_folder=os.path.join(BASE_DIR, "static"))
     app.secret_key = _obtener_secret_key()
     clave_esperada = password if password is not None else PWA_PASSWORD
+    # BLOQUE 3: versión automática de la PWA (hash SHA1 de los estáticos,
+    # calculada una sola vez al arrancar; barata y determinista).
+    global PWA_VERSION
+    PWA_VERSION = _calcular_pwa_version()
+    app.config["PWA_VERSION"] = PWA_VERSION
+    pwa_version = PWA_VERSION
 
     # Waitress solo escucha en loopback; Nginx es el único que le habla
     # directo (1 salto). Sin esto, request.remote_addr y el X-Forwarded-For
@@ -828,7 +854,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 "contraseña — no se sirve sin autenticación.",
                 503,
             )
-        return render_template("login.html", error=request.args.get("error"))
+        return render_template("login.html", error=request.args.get("error"), pwa_v=pwa_version)
 
     @app.post("/login")
     def login_submit():
@@ -894,11 +920,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", pwa_v=pwa_version)
 
     @app.get("/ficha/<tag>")
     def ficha(tag):
-        return render_template("ficha.html", tag=tag)
+        return render_template("ficha.html", tag=tag, pwa_v=pwa_version)
 
     @app.get("/manifest.json")
     def manifest():
@@ -908,7 +934,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def sw_js():
         # El service worker debe servirse en la raíz de su scope ("/") y sin
         # caché HTTP (los navegadores lo revalidan agresivamente). Público.
-        resp = app.send_static_file("sw.js")
+        # BLOQUE 3: se sirve con el token __PWA_VERSION__ sustituido por el
+        # hash calculado al arrancar (versionado automático, sin bump manual).
+        with open(os.path.join(app.static_folder, "sw.js"), encoding="utf-8") as _f:
+            cuerpo_sw = _f.read().replace("__PWA_VERSION__", pwa_version)
+        resp = app.response_class(cuerpo_sw, content_type="application/javascript; charset=utf-8")
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
         resp.headers["Content-Type"] = "application/javascript; charset=utf-8"
         return resp
@@ -916,7 +946,12 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/offline.html")
     def offline_page():
         # Página de respaldo para el SW (navegación offline). Público.
-        resp = app.send_static_file("offline.html")
+        # BLOQUE 3: versionado automático — cualquier ?v=... del fichero se
+        # reescribe al hash calculado al arrancar (cubre también el token
+        # __PWA_VERSION__ que trae offline.html en disco).
+        with open(os.path.join(app.static_folder, "offline.html"), encoding="utf-8") as _f:
+            cuerpo_off = re.sub(r"\?v=[A-Za-z0-9._-]+", "?v=" + pwa_version, _f.read())
+        resp = app.response_class(cuerpo_off, content_type="text/html; charset=utf-8")
         resp.headers["Cache-Control"] = "no-cache"
         return resp
 

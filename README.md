@@ -545,11 +545,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Sustitución del modal emergente centrado por una barra/dock acoplada en la parte inferior, siempre disponible para escribir o expandirse suavemente hacia arriba.
     - Grabación de notas de voz estilo WhatsApp con cronómetro en vivo, indicador rojo pulsante, descarte (`✕`) y envío inmediato (`✓`) hacia el motor Whisper con inclusión automática de la transcripción y respuesta en el hilo.
   - **Depuración Integral de Terminología**:
-  - **Vaquita Animada en GIF desde Video Real (`vaca.mp4`, PWA v83)**:
+  - **Vaquita Animada en GIF desde Video Real (`vaca.mp4`, PWA v86)**:
     - Conversión cuadro a cuadro desde video MP4 (`vaca.mp4`) a GIF animado transparente (`src/pwa/static/vaca_comiendo.gif`, 120 fotogramas, 10s de ciclo continuo de 83 ms/cuadro) con remoción de fondo blanco y aislamiento inteligente de bolsas de aire (bajo vientre, entre patas y base de pasto).
+    - **Depuración visual completa**: Remoción del destello blanco atrapado entre cola y pata trasera al colear, eliminación de la mancha blanca oclusa bajo el hocico/cuello al agacharse a pastar, y corrección de la oreja derecha para mantener orejas caídas naturales de vaca mocha/descornada sin falsos cuernos al levantar la cabeza a rumiar.
     - Técnica anti-halo de sangrado negro en bordes para garantizar integración limpia sin rebordes blancos sobre temas oscuro, campestre, claro y sol de campo.
     - Animación 100% natural y orgánica: la vaca come pasto en el suelo, levanta la cabeza, mastica rumiando, mueve las orejas y colea, para luego volver a bajar la cabeza a pastar.
-    - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v83`), con fallback PNG estático optimizado.
+    - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v86`), con fallback PNG estático optimizado.
   - **Módulo de Mercado, Subastas Ganaderas & TRM 100% Automatizado ("Nada Manual", PWA v79)**:
     - **Sincronización Automática Diaria**: Robot en background (`src/integrations/mercado_sync.py`) y script cron (`scripts/actualizar_precios_mercado.py`, programado diario a las 06:00 AM COT) que actualiza cotizaciones oficiales sin requerir digitación ni intervención manual.
     - **Dólar TRM Oficial en Tiempo Real**: Consumo directo de la API de Datos Abiertos de Colombia (Superintendencia Financiera / Banco de la República con fallback automático a DolarAPI).
