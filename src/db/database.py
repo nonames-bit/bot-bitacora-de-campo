@@ -2853,7 +2853,6 @@ class Database:
         if forzar:
             self.execute("DELETE FROM precios_mercado")
 
-        hoy_iso = date.today().isoformat()
         ahora_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
         # Semanas históricas para análisis de tendencia (7 semanas consecutivas)
