@@ -146,11 +146,22 @@
 
     bubble.innerHTML = txt;
     bubble.style.display = "block";
+    try {
+      bubble.style.transform = "translateX(-50%)";
+      var rect = bubble.getBoundingClientRect();
+      if (rect.left < 10) {
+        var diffL = 10 - rect.left;
+        bubble.style.transform = "translateX(calc(-50% + " + Math.ceil(diffL) + "px))";
+      } else if (rect.right > window.innerWidth - 10) {
+        var diffR = rect.right - (window.innerWidth - 10);
+        bubble.style.transform = "translateX(calc(-50% - " + Math.ceil(diffR) + "px))";
+      }
+    } catch (e) { /* noop */ }
 
     if (_vacaBubbleTimer) clearTimeout(_vacaBubbleTimer);
     _vacaBubbleTimer = setTimeout(function () {
       if (bubble) bubble.style.display = "none";
-    }, 4200);
+    }, 4500);
   }
 
   function setupVacaHeaderInteractivo() {
