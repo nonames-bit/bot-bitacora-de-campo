@@ -106,6 +106,7 @@ var PRECACHE = [
   "/static/logo.jpg",
   "/static/icon-192.png",
   "/static/icon-512.png",
+  "/static/badge-96.png",
   "/static/fonts/geist-sans-latin-400-normal.woff2",
   "/static/fonts/geist-sans-latin-500-normal.woff2",
   "/static/fonts/geist-sans-latin-600-normal.woff2",
@@ -205,7 +206,12 @@ self.addEventListener("push", function (event) {
   var options = {
     body: data.cuerpo || data.body || "",
     icon: data.icono || data.icon || "/static/icon-192.png",
-    badge: "/static/icon-192.png",
+    // badge (no icon): Android lo pinta como silueta a partir del canal
+    // alfa -- icon-192.png es una imagen opaca (medalla plateada), así que
+    // la "silueta" salía como un cuadrado blanco sólido en la barra de
+    // estado. badge-96.png es blanco puro sobre fondo transparente, hecho
+    // a propósito para esto.
+    badge: "/static/badge-96.png",
     tag: data.tag || "bitacora-push",
     renotify: true,
     data: { url: data.url || "/" }
