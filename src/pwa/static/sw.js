@@ -74,6 +74,9 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v85: Bloque 2 Accesibilidad y CSP — registro de SW y script de login
 // extraídos a /static/sw-register.js y /static/login.js (sin <script>
 // inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
+// v86: Chat interno del equipo en la PWA — canal general + mensajes directos
+// entre usuarios (users.json), presencia en vivo, no-leídos con badge en la
+// navegación y notificación nativa al recibir mensajes con la app oculta.
 // BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
 // __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
 var CACHE = "pwa-ja-__PWA_VERSION__"; // token → hash SHA1(estáticos) al servir
@@ -142,6 +145,21 @@ self.addEventListener("fetch", function (e) {
             return hit || caches.match("/offline.html");
           });
         })
+    );
+    return;
+  }
+
+  // Chat interno: siempre red, sin copia en caché (cada poll incremental
+  // lleva un desde_id distinto en la URL: cachearlos acumularía entradas
+  // y podría revivir conversaciones viejas al quedarse sin señal).
+  if (url.pathname.indexOf("/api/chat/") === 0) {
+    e.respondWith(
+      fetch(req).catch(function () {
+        return new Response(JSON.stringify({
+          errores: { red: "Sin conexión: el chat requiere señal." },
+          _offline: true
+        }), { status: 503, headers: { "Content-Type": "application/json" } });
+      })
     );
     return;
   }

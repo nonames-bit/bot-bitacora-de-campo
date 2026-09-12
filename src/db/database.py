@@ -2677,7 +2677,7 @@ class Database:
         """Devuelve un mapa {str(user_id): info_presencia} con cálculo de estado en línea."""
         self._ensure_presencia_table()
         try:
-            filas = self.query_all("SELECT * FROM usuarios_presencia")
+            filas = self.query("SELECT * FROM usuarios_presencia")
         except Exception as e:
             logger.debug("Error al consultar usuarios_presencia: %s", e)
             return {}
@@ -2727,6 +2727,150 @@ class Database:
                 "detalles": r["detalles"] or "",
             }
         return res
+
+    # ------------------------------------------------------------------ #
+    # Chat interno del equipo (PWA)
+    # ------------------------------------------------------------------ #
+    def _ensure_chat_tables(self) -> None:
+        try:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS chat_mensajes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    remitente_id TEXT NOT NULL,
+                    remitente_nombre TEXT,
+                    remitente_avatar TEXT,
+                    destinatario_id TEXT,
+                    texto TEXT NOT NULL,
+                    fecha TEXT NOT NULL
+                )
+            """)
+            # destinatario_id NULL = canal general de la finca (todos lo ven).
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_dest ON chat_mensajes(destinatario_id, id)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_rem ON chat_mensajes(remitente_id, id)")
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS chat_lecturas (
+                    user_id TEXT NOT NULL,
+                    conversacion TEXT NOT NULL,
+                    ultimo_id INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (user_id, conversacion)
+                )
+            """)
+        except Exception:
+            pass
+
+    @staticmethod
+    def _chat_fila_dict(r) -> dict:
+        return {
+            "id": r["id"],
+            "de": r["remitente_id"],
+            "de_nombre": r["remitente_nombre"] or "",
+            "de_avatar": r["remitente_avatar"] or "",
+            "para": r["destinatario_id"],
+            "texto": r["texto"],
+            "fecha": r["fecha"],
+        }
+
+    def enviar_mensaje_chat(self, remitente_id, texto, destinatario_id=None,
+                            remitente_nombre: str = "", remitente_avatar: str = "") -> dict:
+        """Guarda un mensaje del chat interno y lo devuelve como dict.
+
+        ``destinatario_id=None`` publica en el canal general; con un user_id
+        es un mensaje directo entre dos usuarios de la PWA.
+        """
+        self._ensure_chat_tables()
+        texto = (texto or "").strip()
+        if not remitente_id or not texto:
+            raise ValueError("Mensaje de chat sin remitente o sin texto")
+        ahora = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cursor = self.execute(
+            "INSERT INTO chat_mensajes (remitente_id, remitente_nombre, remitente_avatar, "
+            "destinatario_id, texto, fecha) VALUES (?, ?, ?, ?, ?, ?)",
+            (str(remitente_id), remitente_nombre or "", remitente_avatar or "",
+             str(destinatario_id) if destinatario_id else None, texto, ahora),
+        )
+        mid = cursor.lastrowid
+        # Lo enviado por mí queda leído por mí: el propio envío avanza mi marcador.
+        conv = str(destinatario_id) if destinatario_id else "general"
+        self.marcar_chat_leido(remitente_id, conv, mid)
+        fila = self.query_one("SELECT * FROM chat_mensajes WHERE id = ?", (mid,))
+        return self._chat_fila_dict(fila)
+
+    def obtener_mensajes_chat(self, user_id, conversacion: str = "general",
+                              desde_id: int = 0, limite: int = 50) -> list[dict]:
+        """Mensajes de una conversación visibles para ``user_id``, en orden cronológico.
+
+        ``conversacion`` es ``"general"`` (canal común) o el user_id del otro
+        usuario (mensajes directos en ambos sentidos). Con ``desde_id`` se
+        traen solo los mensajes nuevos (polling incremental de la PWA).
+        """
+        self._ensure_chat_tables()
+        uid = str(user_id)
+        limite = max(1, min(int(limite or 50), 200))
+        if conversacion == "general":
+            filas = self.query(
+                "SELECT * FROM chat_mensajes WHERE destinatario_id IS NULL AND id > ? "
+                "ORDER BY id DESC LIMIT ?",
+                (int(desde_id or 0), limite),
+            )
+        else:
+            otro = str(conversacion)
+            filas = self.query(
+                "SELECT * FROM chat_mensajes WHERE id > ? AND ("
+                "(remitente_id = ? AND destinatario_id = ?) OR "
+                "(remitente_id = ? AND destinatario_id = ?)) "
+                "ORDER BY id DESC LIMIT ?",
+                (int(desde_id or 0), uid, otro, otro, uid, limite),
+            )
+        return [self._chat_fila_dict(r) for r in reversed(filas)]
+
+    def marcar_chat_leido(self, user_id, conversacion: str, ultimo_id: int) -> None:
+        """Avanza el marcador de lectura de un usuario en una conversación."""
+        self._ensure_chat_tables()
+        if not user_id or not conversacion:
+            return
+        self.execute(
+            "INSERT INTO chat_lecturas (user_id, conversacion, ultimo_id) VALUES (?, ?, ?) "
+            "ON CONFLICT(user_id, conversacion) DO UPDATE SET "
+            "ultimo_id = MAX(chat_lecturas.ultimo_id, excluded.ultimo_id)",
+            (str(user_id), str(conversacion), int(ultimo_id or 0)),
+        )
+
+    def chat_no_leidos(self, user_id) -> dict:
+        """Conteo de mensajes sin leer para ``user_id``.
+
+        Devuelve ``{"total": n, "por_conversacion": {"general": n, "<uid>": n}}``
+        contando el canal general (mensajes ajenos) y los directos recibidos.
+        """
+        self._ensure_chat_tables()
+        uid = str(user_id)
+        lecturas = {
+            r["conversacion"]: r["ultimo_id"]
+            for r in self.query("SELECT conversacion, ultimo_id FROM chat_lecturas WHERE user_id = ?", (uid,))
+        }
+        por_conv: dict[str, int] = {}
+        fila_gen = self.query_one(
+            "SELECT COUNT(*) AS n FROM chat_mensajes WHERE destinatario_id IS NULL "
+            "AND remitente_id != ? AND id > ?",
+            (uid, lecturas.get("general", 0)),
+        )
+        n_gen = fila_gen["n"] if fila_gen else 0
+        if n_gen:
+            por_conv["general"] = n_gen
+        for r in self.query(
+            "SELECT remitente_id, COUNT(*) AS n, MAX(id) AS max_id FROM chat_mensajes "
+            "WHERE destinatario_id = ? GROUP BY remitente_id",
+            (uid,),
+        ):
+            otro = str(r["remitente_id"])
+            pendientes = self.query_one(
+                "SELECT COUNT(*) AS n FROM chat_mensajes WHERE destinatario_id = ? "
+                "AND remitente_id = ? AND id > ?",
+                (uid, otro, lecturas.get(otro, 0)),
+            )
+            n = pendientes["n"] if pendientes else 0
+            if n:
+                por_conv[otro] = n
+        return {"total": sum(por_conv.values()), "por_conversacion": por_conv}
 
     # ------------------------------------------------------------------ #
     # Web Push Notifications (PWA)

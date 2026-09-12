@@ -804,6 +804,20 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             "avatar": session.get("avatar") or default_av,
         }
 
+    def _chat_uid() -> str:
+        """Identidad estable del usuario para el chat interno.
+
+        Mismo criterio que la presencia (heartbeat): user_id de users.json
+        y, para el acceso por contraseña maestra sin usuario, el nombre de
+        sesión ("Propietario") como identificador de respaldo.
+        """
+        if session is None:
+            return ""
+        uid = session.get("user_id")
+        if uid is not None and str(uid).strip() != "":
+            return str(uid)
+        return str(session.get("nombre") or "").strip()
+
     @app.before_request
     def _requerir_login():
         if request is None or request.endpoint in _RUTAS_PUBLICAS:
@@ -1665,6 +1679,15 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         except (TypeError, ValueError):
             dias = 7
         out = datos_badges(db_path, dias=max(1, min(dias, 60)))
+        # Mensajes del chat interno sin leer (badge de la pestaña Chat).
+        uid_chat = _chat_uid()
+        if uid_chat:
+            try:
+                db_b = _db(db_path)
+                out["chat"] = db_b.chat_no_leidos(uid_chat)["total"]
+                db_b.close()
+            except Exception:
+                out["chat"] = 0
         return jsonify(out)
 
     @app.post("/api/identificar")
@@ -1796,6 +1819,124 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         except Exception:
             pass
         return jsonify({"ok": True})
+
+    # ------------------------------------------------------------------ #
+    # Chat interno del equipo (solo PWA): canal general + mensajes directos
+    # ------------------------------------------------------------------ #
+
+    @app.get("/api/chat/contactos")
+    def api_chat_contactos():
+        """Usuarios de la finca con presencia en vivo y no-leídos, para el chat."""
+        uid = _chat_uid()
+        if not uid:
+            return jsonify({"error": "Sesión sin identidad de usuario."}), 400
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            usuarios = Auth(users_file).listar_usuarios()
+        except Exception:
+            usuarios = []
+        db_c = _db(db_path)
+        try:
+            presencias = db_c.obtener_usuarios_presencia()
+            no_leidos = db_c.chat_no_leidos(uid)
+        finally:
+            db_c.close()
+        contactos = []
+        for u in usuarios:
+            cid = str(u.get("user_id"))
+            if cid == uid:
+                continue
+            p = presencias.get(cid, {})
+            # Solo datos de perfil + presencia: nunca el PIN ni la IP (la IP
+            # es información exclusiva del OWNER en /api/usuarios).
+            contactos.append({
+                "user_id": cid,
+                "nombre": u.get("nombre") or "Usuario",
+                "rol": u.get("rol") or "TRABAJADOR",
+                "avatar": u.get("avatar") or "vaquero",
+                "en_linea": p.get("en_linea", False),
+                "estado": p.get("estado", "offline"),
+                "hace_texto": p.get("hace_texto", "Nunca"),
+            })
+        return jsonify({
+            "ok": True,
+            "yo": {
+                "user_id": uid,
+                "nombre": session.get("nombre") or "Usuario",
+                "avatar": session.get("avatar") or "",
+            },
+            "contactos": contactos,
+            "no_leidos": no_leidos,
+        })
+
+    @app.get("/api/chat/mensajes")
+    def api_chat_mensajes():
+        """Mensajes de una conversación (polling incremental con ``desde_id``)."""
+        uid = _chat_uid()
+        if not uid:
+            return jsonify({"error": "Sesión sin identidad de usuario."}), 400
+        con = (request.args.get("con") or "general").strip() or "general"
+        try:
+            desde_id = int(request.args.get("desde_id") or 0)
+        except (TypeError, ValueError):
+            desde_id = 0
+        # marcar=0 permite consultar sin avanzar el marcador de lectura
+        # (ej. previsualizaciones); al ver la conversación se marca leída.
+        marcar = (request.args.get("marcar") or "1") != "0"
+        db_c = _db(db_path)
+        try:
+            mensajes = db_c.obtener_mensajes_chat(uid, con, desde_id=desde_id)
+            ultimo = mensajes[-1]["id"] if mensajes else desde_id
+            if marcar and mensajes:
+                db_c.marcar_chat_leido(uid, con, ultimo)
+            no_leidos = db_c.chat_no_leidos(uid)
+        finally:
+            db_c.close()
+        for m in mensajes:
+            m["mio"] = str(m["de"]) == uid
+        return jsonify({"ok": True, "con": con, "mensajes": mensajes,
+                        "ultimo_id": ultimo, "no_leidos": no_leidos})
+
+    @app.post("/api/chat/enviar")
+    def api_chat_enviar():
+        """Publica un mensaje en el canal general o directo a otro usuario."""
+        uid = _chat_uid()
+        if not uid:
+            return jsonify({"error": "Sesión sin identidad de usuario."}), 400
+        datos = request.get_json(silent=True) or request.form
+        con = str(datos.get("con") or "general").strip() or "general"
+        texto = str(datos.get("texto") or "").strip()
+        if not texto:
+            return jsonify({"error": "El mensaje está vacío."}), 400
+        if len(texto) > 2000:
+            return jsonify({"error": "El mensaje es demasiado largo (máx. 2000 caracteres)."}), 400
+        destinatario = None
+        if con != "general":
+            try:
+                try:
+                    from ..server.auth import Auth
+                except (ImportError, ValueError):
+                    from src.server.auth import Auth  # type: ignore
+                existe = Auth(users_file).obtener_usuario(con)
+            except Exception:
+                existe = None
+            if not existe:
+                return jsonify({"error": "Destinatario no válido."}), 400
+            destinatario = con
+        db_c = _db(db_path)
+        try:
+            msg = db_c.enviar_mensaje_chat(
+                uid, texto, destinatario_id=destinatario,
+                remitente_nombre=session.get("nombre") or "Usuario",
+                remitente_avatar=session.get("avatar") or "",
+            )
+        finally:
+            db_c.close()
+        msg["mio"] = True
+        return jsonify({"ok": True, "mensaje": msg})
 
     @app.post("/api/usuarios")
     def api_guardar_usuario():

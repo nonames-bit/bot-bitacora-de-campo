@@ -3042,3 +3042,45 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 .fab-registrar { position:fixed; bottom:76px; right:16px; z-index:50; background:var(--verde-marca); color:#fff; border:none; border-radius:50%; width:56px; height:56px; box-shadow:0 4px 12px rgba(0,0,0,0.25); cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .fab-registrar:hover { opacity:0.92; }
 .cap-potrero-hint { font-size:11px; color:var(--verde-marca); font-weight:600; cursor:pointer; border:1px solid var(--verde-marca); border-radius:999px; padding:2px 8px; margin-left:6px; }
+
+/* ==========================================================================
+   Chat interno del equipo (vista "Chat Finca")
+   ========================================================================== */
+.chatf-wrap { display:flex; border:1px solid var(--borde); border-radius:12px; overflow:hidden; height:min(64vh, 560px); background:var(--superficie); }
+.chatf-lista { width:250px; min-width:210px; border-right:1px solid var(--borde); overflow-y:auto; background:var(--fondo); }
+.chatf-cargando { padding:16px; font-size:13px; color:var(--texto-suave); }
+.chatf-contacto { display:flex; align-items:center; gap:10px; width:100%; padding:10px 12px; border:0; border-bottom:1px solid var(--borde); background:transparent; cursor:pointer; text-align:left; color:var(--texto); font-family:var(--font-base); }
+.chatf-contacto:hover { background:var(--superficie); }
+.chatf-contacto.act { background:var(--superficie); box-shadow:inset 3px 0 0 var(--verde-marca); }
+.chatf-cont-avatar { position:relative; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; }
+.chatf-av-general { width:34px; height:34px; border-radius:50%; background:var(--verde-marca-pastel); font-size:17px; }
+.chatf-dot { position:absolute; bottom:0; right:0; width:10px; height:10px; border-radius:50%; background:#22c55e; border:2px solid var(--superficie); }
+.chatf-cont-info { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+.chatf-cont-info b { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chatf-cont-info small { font-size:11px; color:var(--texto-suave); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.chatf-unread { flex:0 0 auto; min-width:20px; height:20px; padding:0 5px; border-radius:999px; background:#e65100; color:#fff; font-size:11px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
+.chatf-conv { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; }
+.chatf-conv-head { display:flex; align-items:center; gap:8px; padding:10px 14px; border-bottom:1px solid var(--borde); background:var(--superficie); }
+.chatf-conv-tit b { font-size:14px; display:block; }
+.chatf-conv-tit small { font-size:11px; color:var(--texto-suave); display:block; }
+.chatf-volver { display:none; border:0; background:transparent; color:var(--texto); font-size:20px; line-height:1; cursor:pointer; padding:4px 8px; }
+.chatf-mensajes { flex:1 1 auto; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; background:var(--fondo); }
+.chatf-msg { max-width:78%; align-self:flex-start; background:var(--superficie); border:1px solid var(--borde); border-radius:12px 12px 12px 4px; padding:7px 11px; display:flex; flex-direction:column; }
+.chatf-msg.mio { align-self:flex-end; background:var(--verde-marca-pastel); border-radius:12px 12px 4px 12px; }
+.chatf-quien { font-size:11px; font-weight:700; color:var(--verde-marca); margin-bottom:2px; }
+.chatf-texto { font-size:13.5px; white-space:pre-wrap; word-break:break-word; }
+.chatf-hora { font-size:10px; color:var(--texto-suave); align-self:flex-end; margin-top:2px; }
+.chatf-form { display:flex; gap:8px; padding:10px 12px; border-top:1px solid var(--borde); background:var(--superficie); }
+.chatf-form input { flex:1 1 auto; min-width:0; border:1px solid var(--borde-fuerte); border-radius:999px; padding:9px 14px; font-size:14px; background:var(--fondo); color:var(--texto); font-family:var(--font-base); }
+.chatf-form input:focus { outline:2px solid var(--verde-marca); outline-offset:-1px; }
+.chatf-enviar { flex:0 0 auto; width:40px; height:40px; border:0; border-radius:50%; background:var(--verde-marca); color:#fff; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; }
+.chatf-enviar:hover { background:var(--verde-marca-hover); }
+/* Móvil: lista y conversación alternan en una sola columna */
+@media (max-width: 720px) {
+  .chatf-wrap { height:calc(100vh - 260px); min-height:340px; }
+  .chatf-lista { width:100%; min-width:0; border-right:0; }
+  .chatf-conv { display:none; }
+  .chatf-wrap.en-conv .chatf-lista { display:none; }
+  .chatf-wrap.en-conv .chatf-conv { display:flex; }
+  .chatf-volver { display:inline-block; }
+}
