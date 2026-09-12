@@ -1251,6 +1251,16 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   cursor: pointer;
   padding: 0 6px;
 }
+/* D2 — campos del modal de Ronda Voisin (reusan variables del tema activo). */
+.ronda-campo {
+  padding: 8px 10px;
+  border: 1px solid var(--borde-suave);
+  border-radius: 6px;
+  background: var(--fondo, #fff);
+  color: var(--texto);
+  font-size: 14px;
+}
+textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .chat-cuerpo {
   padding: 14px;
   overflow-y: auto;
@@ -2350,10 +2360,9 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   transition: width .3s ease;
 }
 
-/* --- Vaquita pastando en el header (decorativa, silueta realista comiendo pasto) ---
-   Basada en la ilustración de vaca holstein comiendo en el pasto.
-   Camina y se desplaza de un lado a otro (vacaAmbla) y agacha la trompa
-   a pastar y masticar rítmicamente el forraje (vacaCome). */
+/* --- Vaquita pastando en el header (decorativa, interactiva, silueta realista comiendo pasto) ---
+   Soporta modos de día (pastando), noche (descansando/rumiando), y maternidad (vaca con cría).
+   Tocar la vaquita muestra un globo de diálogo con estadísticas y frases de la finca. */
 .header-pasto {
   flex: 1 1 120px;
   display: flex;
@@ -2361,11 +2370,13 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   align-items: center;
   min-width: 80px;
   max-width: 320px;
-  overflow: hidden;
-  pointer-events: none;
+  overflow: visible;
+  position: relative;
+  pointer-events: auto;
   user-select: none;
+  cursor: pointer;
 }
-.vaca-pista { display: inline-flex; align-items: flex-end; }
+.vaca-pista { display: inline-flex; align-items: flex-end; position: relative; }
 .vaca-ambula { display: inline-flex; align-items: flex-end; }
 .vaca-pasta { display: inline-flex; align-items: flex-end; }
 .vaca-img {
@@ -2375,18 +2386,97 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   aspect-ratio: 150 / 80;
   object-fit: contain;
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+.vaca-img:active,
+.vaca-img.vaca-anim-tap {
+  transform: scale(1.18) translateY(-3px);
 }
 .header-pasto-ficha .vaca-img {
   width: 48px;
 }
+/* Globo de diálogo interactivo (Easter Egg al tocar la vaca) */
+.vaca-speech-bubble {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--superficie);
+  color: var(--texto-color);
+  border: 1px solid var(--borde-fuerte);
+  padding: 6px 11px;
+  border-radius: 9px;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: normal;
+  min-width: 140px;
+  max-width: 250px;
+  text-align: center;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+  z-index: 1050;
+  pointer-events: none;
+  animation: vaca-bubble-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.vaca-speech-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: var(--superficie) transparent transparent transparent;
+}
+.vaca-speech-bubble::before {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -6px;
+  border-width: 6px;
+  border-style: solid;
+  border-color: var(--borde-fuerte) transparent transparent transparent;
+}
+@keyframes vaca-bubble-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.85); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+
+/* Lluvia animada en el header (cuando llueve en la finca) */
+.header-lluvia {
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  border-radius: 6px;
+  overflow: hidden;
+  background: repeating-linear-gradient(
+    108deg,
+    transparent 0%,
+    transparent 10%,
+    rgba(120, 185, 255, 0.4) 10.5%,
+    transparent 11%,
+    transparent 22%
+  );
+  background-size: 32px 32px;
+  animation: header-lluvia-cae 0.38s linear infinite;
+  opacity: 0.85;
+}
+@keyframes header-lluvia-cae {
+  0% { background-position: 0 0; }
+  100% { background-position: -10px 32px; }
+}
+
 /* Tema claro y oscuro */
-:root[data-theme="light"] .header-pasto { opacity: .9; }
+:root[data-theme="light"] .header-pasto { opacity: .92; }
 :root[data-theme="dark"] .header-pasto { opacity: .95; }
 /* Sol de Campo (alto contraste B/N): se muestra estática, sin movimiento. */
 :root[data-theme="sun"] .header-pasto { opacity: 1; }
 @media (max-width: 640px) {
   .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .95; }
   .vaca-img { width: 44px; }
+  .vaca-speech-bubble { max-width: 200px; font-size: 11px; }
 }
 @media (max-width: 319px) {
   /* Solo pantallas muy angostas (<320px): compactar, nunca ocultar con display:none. */
@@ -2394,7 +2484,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   .vaca-img { width: 36px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .vaca-ambula, .vaca-pasta { animation: none; }
+  .vaca-ambula, .vaca-pasta, .header-lluvia { animation: none; }
 }
 
 /* ========================================================================== */

@@ -15,6 +15,12 @@ CONSUMO_MS_UGG = 12.0  # valor histórico para compatibilidad (tests usan 12)
 CONSUMO_MS_UGG_28 = 12.6  # 450 kg * 2.8% = 12.6 kg MS / UGG / día (para cálculo dinámico)
 PCT_MS_TROPICAL = 22.0  # pasto tropical ~22% de materia seca (%MS)
 FACTOR_APROVECHAMIENTO_DEFAULT = 0.75  # 75% aprovechamiento real (25% pérdidas pisoteo/bostas)
+# Constantes de la ronda Voisin D2 (chequeo rápido de campo): %MS fijo 30%
+# y consumo 12.6 kg MS/UGG/día (2.8% PV). Difieren a propósito del cálculo
+# dinámico con clima de arriba (22% y factor de aprovechamiento).
+PCT_MS_RONDA_VOISIN = 0.30  # 30% MS del MV en la ronda rápida
+CONSUMO_MS_RONDA_VOISIN = 12.6  # kg MS/UGG/día (450 kg * 2.8% PV)
+DIAS_REPOSO_OPTIMO_VOISIN = 30  # punto óptimo de reposo Voisin (días)
 
 
 def kg_mv_ha(aforo_kg_m2: float) -> float:
@@ -93,6 +99,39 @@ def consumo_diario_ms(peso_vivo_kg: float, pct_pv: float = PCT_CONSUMO_PV) -> fl
     """Consumo diario de Materia Seca estimado a partir del Peso Vivo (2.8% PV)."""
     return float(peso_vivo_kg) * (float(pct_pv) / 100.0)
 
+
+def evaluar_ronda_voisin(mediciones: list[float], area_has: float,
+                         num_animales: int = 1) -> dict | None:
+    """Evalúa una ronda Voisin de aforo (D2): promedia los puntos (kg MV/m²),
+    estima MS/ha con 30% MS tropical y calcula días de forraje disponible.
+
+    Semáforo: VERDE si días > 7, AMARILLO si 4-7, ROJO si < 4.
+    Nunca lanza excepciones: retorna None si los datos son inválidos o el
+    potrero no tiene área registrada.
+    """
+    try:
+        if area_has is None or float(area_has) <= 0:
+            return None
+        if not mediciones:
+            return None
+        vals = [float(m) for m in mediciones]
+        if any(v < 0 for v in vals):
+            return None
+        if num_animales is None or int(num_animales) <= 0:
+            return None
+        kg_mv_prom = sum(vals) / len(vals)
+        kg_ms_ha_val = kg_mv_prom * M2_POR_HA * PCT_MS_RONDA_VOISIN
+        dias = (kg_ms_ha_val * float(area_has)) / (int(num_animales) * CONSUMO_MS_RONDA_VOISIN)
+        semaforo = "VERDE" if dias > 7 else ("AMARILLO" if dias >= 4 else "ROJO")
+        return {
+            "kg_mv_promedio": round(kg_mv_prom, 2),
+            "kg_ms_ha": round(kg_ms_ha_val, 1),
+            "dias_disponibles": round(dias, 1),
+            "semaforo": semaforo,
+            "num_puntos": len(vals),
+        }
+    except (TypeError, ValueError):
+        return None
 
 
 def ugg_de_peso(peso_vivo_kg: float) -> float:
@@ -191,4 +230,8 @@ class PastureEngine:
     @staticmethod
     def balance_forrajero(oferta_neta_ms_total, demanda_ms_diaria, dias_rotacion=33):
         return balance_forrajero_calculo(oferta_neta_ms_total, demanda_ms_diaria, dias_rotacion)
+
+    @staticmethod
+    def evaluar_ronda_voisin(mediciones, area_has, num_animales=1):
+        return evaluar_ronda_voisin(mediciones, area_has, num_animales)
 

@@ -2833,4 +2833,32 @@ def formatear_deteccion_potrero_gps(
     return "\n".join(lineas)
 
 
+def formatear_ronda_voisin(ronda: dict | None) -> str | None:
+    """Formatea una ronda Voisin de aforo (D2) como mensaje legible con semáforo."""
+    if not ronda:
+        return None
+    nombre = _esc(ronda.get("potrero_nom") or ronda.get("potrero") or "Potrero")
+    fecha = _esc(ronda.get("fecha") or "")
+    n_pts = ronda.get("num_puntos") or 0
+    dias = ronda.get("dias_disponibles")
+    ms_ha = ronda.get("kg_ms_ha")
+    sem = str(ronda.get("semaforo") or "").strip().upper()
+    try:
+        dias_txt = f"{float(dias):.1f}"
+    except (TypeError, ValueError):
+        dias_txt = "—"
+    try:
+        ms_txt = f"{float(ms_ha):,.1f}".replace(",", ".")
+    except (TypeError, ValueError):
+        ms_txt = "—"
+    linea = f"🌱 <b>Ronda Voisin — {nombre}</b> — {fecha} ({n_pts} pts)"
+    if sem == "VERDE":
+        detalle = f"✅ <b>{dias_txt} días de forraje disponible</b> (≈{ms_txt} kg MS/ha)"
+    elif sem == "AMARILLO":
+        detalle = f"⚠️ Solo <b>{dias_txt} días</b> — considerar rotación pronto ({ms_txt} kg MS/ha)"
+    else:
+        detalle = f"🔴 <b>CRÍTICO: {dias_txt} días</b> — rotar INMEDIATAMENTE ({ms_txt} kg MS/ha)"
+    return f"{linea}\n{detalle}"
+
+
 

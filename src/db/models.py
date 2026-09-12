@@ -317,6 +317,23 @@ CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro)
 CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
 CREATE INDEX IF NOT EXISTS idx_pluviometria_fecha ON pluviometria(fecha);
 CREATE INDEX IF NOT EXISTS idx_aforos_potrero_fecha ON aforos_historico(potrero_id, fecha);
+-- Ronda Voisin de campo (D2): 10-15 puntos de aforo (g/kg MV por m²) por
+-- potrero con su evaluación calculada (promedio, MS/ha, días, semáforo).
+CREATE TABLE IF NOT EXISTS aforos_ronda (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    potrero_id INTEGER NOT NULL,
+    fecha TEXT NOT NULL,
+    mediciones_json TEXT NOT NULL,
+    num_puntos INTEGER,
+    kg_mv_promedio REAL,
+    kg_ms_ha REAL,
+    dias_disponibles REAL,
+    semaforo TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_aforos_ronda_potrero_fecha ON aforos_ronda(potrero_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_ndvi_potrero_fecha ON monitoreo_satelital_ndvi(potrero_id, fecha);
 
 CREATE TABLE IF NOT EXISTS monitoreo_satelital_lluvia (
@@ -491,7 +508,7 @@ TABLAS = [
     "tratamientos", "traslados", "destetes", "secados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
-    "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
+    "termo_nitrogeno", "pluviometria", "aforos_historico", "aforos_ronda", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
     "precios_mercado", "mensajes_equipo",

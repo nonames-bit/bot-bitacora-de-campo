@@ -981,6 +981,82 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.post("/api/pasturas/ronda")
+    def api_pasturas_ronda():
+        """Evalúa y registra una ronda Voisin de aforo (D2). Cualquier rol
+        autenticado puede grabar (incluido TRABAJADOR, vía _requerir_login)."""
+        datos = request.get_json(silent=True) or {}
+        potrero = str(datos.get("potrero") or "").strip()
+        mediciones = datos.get("mediciones") or []
+        try:
+            num_animales = int(datos.get("num_animales") or 1)
+        except (TypeError, ValueError):
+            num_animales = 1
+        fecha = str(datos.get("fecha") or "").strip() or date.today().isoformat()
+        if not potrero or not isinstance(mediciones, list) or not mediciones:
+            return jsonify({"error": "Se requieren 'potrero' y 'mediciones' (lista no vacía)."}), 400
+        try:
+            from ..engine.pasture_engine import PastureEngine
+        except (ImportError, ValueError):
+            from src.engine.pasture_engine import PastureEngine  # type: ignore
+        try:
+            from ..server.formatters import formatear_ronda_voisin
+        except (ImportError, ValueError):
+            from src.server.formatters import formatear_ronda_voisin  # type: ignore
+        db_r = _db(db_path)
+        try:
+            pid = db_r.potrero_id(potrero)
+            if pid is None:
+                fila_ci = db_r.query_one(
+                    "SELECT id FROM potreros WHERE UPPER(nombre) = UPPER(?) OR UPPER(codigo) = UPPER(?) LIMIT 1",
+                    (potrero, potrero),
+                )
+                pid = int(fila_ci["id"]) if fila_ci else None
+            if pid is None:
+                return jsonify({"error": f"No se encontró el potrero '{potrero}'."}), 404
+            prow = db_r.get_potrero(pid)
+            area = (prow["area_has"] if prow and prow["area_has"] else None)
+            res = PastureEngine.evaluar_ronda_voisin(mediciones, area, num_animales)
+            if res is None:
+                return jsonify({"error": "Datos invalidos o potrero sin area"}), 400
+            uid = session.get("user_id")
+            db_r.registrar_ronda_voisin(
+                pid, mediciones, res["num_puntos"], res["kg_mv_promedio"],
+                res["dias_disponibles"], res["semaforo"],
+                kg_ms_ha_val=res["kg_ms_ha"], fecha=fecha, registrado_por=uid,
+            )
+            ronda = {"potrero_nom": (prow["nombre"] if prow and prow["nombre"] else potrero),
+                     "fecha": fecha, **res}
+            return jsonify({"ok": True, "ronda": ronda,
+                            "mensaje": formatear_ronda_voisin(ronda)})
+        except Exception:
+            logger.exception("Error en ronda Voisin")
+            return jsonify({"error": "No se pudo registrar la ronda."}), 500
+        finally:
+            db_r.close()
+
+    @app.get("/api/pasturas/rondas")
+    def api_pasturas_rondas():
+        """Últimas 10 rondas Voisin, opcionalmente filtradas por potrero."""
+        potrero = (request.args.get("potrero") or "").strip() or None
+        db_r = _db(db_path)
+        try:
+            pid = None
+            if potrero:
+                pid = db_r.potrero_id(potrero)
+                if pid is None:
+                    fila_ci = db_r.query_one(
+                        "SELECT id FROM potreros WHERE UPPER(nombre) = UPPER(?) OR UPPER(codigo) = UPPER(?) LIMIT 1",
+                        (potrero, potrero),
+                    )
+                    pid = int(fila_ci["id"]) if fila_ci else None
+                if pid is None:
+                    return jsonify({"ok": True, "rondas": []})
+            filas = db_r.listar_rondas_voisin(pid, limite=10)
+            return jsonify({"ok": True, "rondas": [dict(f) for f in filas]})
+        finally:
+            db_r.close()
+
     @app.post("/api/satelite/actualizar")
     def api_satelite_actualizar():
         """Sincroniza lecturas satelitales (Sentinel-1 SAR Radar o Sentinel-2 Óptico)

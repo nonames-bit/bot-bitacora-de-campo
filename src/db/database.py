@@ -1239,6 +1239,76 @@ class Database:
             (limite,),
         )
 
+    def _ensure_aforos_ronda_table(self) -> None:
+        """Migración idempotente de la tabla de rondas Voisin (D2)."""
+        self.conn.execute(
+            "CREATE TABLE IF NOT EXISTS aforos_ronda ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "potrero_id INTEGER NOT NULL, "
+            "fecha TEXT NOT NULL, "
+            "mediciones_json TEXT NOT NULL, "
+            "num_puntos INTEGER, "
+            "kg_mv_promedio REAL, "
+            "kg_ms_ha REAL, "
+            "dias_disponibles REAL, "
+            "semaforo TEXT, "
+            "creado_en TEXT, "
+            "registrado_por INTEGER)"
+        )
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_aforos_ronda_potrero_fecha "
+            "ON aforos_ronda(potrero_id, fecha)"
+        )
+        self.conn.commit()
+
+    def registrar_ronda_voisin(self, potrero_id_o_nom, mediciones_json, num_puntos,
+                               kg_mv_promedio, dias_disponibles, semaforo,
+                               kg_ms_ha_val: Optional[float] = None,
+                               fecha=None, registrado_por: Optional[int] = None) -> int:
+        """Registra una ronda Voisin de aforo (10-15 puntos) ya evaluada."""
+        import json
+        self._ensure_aforos_ronda_table()
+        pot_id = None
+        if isinstance(potrero_id_o_nom, int) and not isinstance(potrero_id_o_nom, bool):
+            pot_id = potrero_id_o_nom
+        else:
+            pot_row = self.query_one(
+                "SELECT id FROM potreros WHERE nombre = ? OR UPPER(nombre) = UPPER(?) OR codigo = ? LIMIT 1",
+                (str(potrero_id_o_nom), str(potrero_id_o_nom), str(potrero_id_o_nom)),
+            )
+            pot_id = pot_row["id"] if pot_row else self.registrar_potrero(nombre=str(potrero_id_o_nom))
+        f = iso(fecha) or date.today().isoformat()
+        meds = mediciones_json if isinstance(mediciones_json, (list, tuple)) else [mediciones_json]
+        return self.insert("aforos_ronda", dict(
+            potrero_id=pot_id,
+            fecha=f,
+            mediciones_json=json.dumps(list(meds)),
+            num_puntos=int(num_puntos),
+            kg_mv_promedio=float(kg_mv_promedio),
+            kg_ms_ha=float(kg_ms_ha_val) if kg_ms_ha_val is not None else None,
+            dias_disponibles=float(dias_disponibles),
+            semaforo=str(semaforo).strip().upper() if semaforo else None,
+            creado_en=self._ahora(),
+            registrado_por=registrado_por,
+        ))
+
+    def listar_rondas_voisin(self, potrero_id: Optional[int] = None, limite: int = 20) -> list[sqlite3.Row]:
+        """Últimas rondas Voisin con el nombre del potrero (JOIN con potreros)."""
+        self._ensure_aforos_ronda_table()
+        if potrero_id:
+            return self.query(
+                "SELECT a.*, p.nombre AS potrero_nom FROM aforos_ronda a "
+                "LEFT JOIN potreros p ON p.id = a.potrero_id "
+                "WHERE a.potrero_id = ? ORDER BY a.fecha DESC, a.id DESC LIMIT ?",
+                (potrero_id, limite),
+            )
+        return self.query(
+            "SELECT a.*, p.nombre AS potrero_nom FROM aforos_ronda a "
+            "LEFT JOIN potreros p ON p.id = a.potrero_id "
+            "ORDER BY a.fecha DESC, a.id DESC LIMIT ?",
+            (limite,),
+        )
+
     def registrar_lectura_lluvia_satelital(
         self,
         mm_estimado: float,
@@ -3331,5 +3401,38 @@ class Database:
             ]
         }
 
+    def precio_referencia_hoy(self, plaza: str = "GRANADA", producto: str = "MACHO_GORDO") -> Optional[dict[str, Any]]:
+        """Última cotización + variación vs. la anterior para UNA plaza/producto
+        puntual -- widget "Precio del día" del Tablero. Reusa el mismo patrón
+        LAG (ROW_NUMBER + self-join) de obtener_datos_mercado_completos, pero
+        filtrado a una sola serie para no pagar el costo de consolidar las 8
+        plazas y todas las categorías solo para mostrar un número en el Tablero.
+        """
+        self.sembrar_precios_mercado_iniciales()
+        fila = self.query_one(
+            """
+            WITH ranked AS (
+                SELECT fecha, precio_promedio,
+                       ROW_NUMBER() OVER (ORDER BY fecha DESC, id DESC) AS rn
+                FROM precios_mercado WHERE plaza = ? AND producto = ?
+            )
+            SELECT curr.fecha, curr.precio_promedio AS precio, prev.precio_promedio AS precio_anterior
+            FROM ranked curr LEFT JOIN ranked prev ON prev.rn = 2
+            WHERE curr.rn = 1
+            """,
+            (plaza, producto),
+        )
+        if not fila:
+            return None
+        precio = float(fila["precio"])
+        precio_ant = float(fila["precio_anterior"]) if fila["precio_anterior"] is not None else None
+        variacion_pct = round((precio - precio_ant) / precio_ant * 100, 2) if precio_ant else 0.0
+        return {
+            "plaza": plaza,
+            "producto": producto,
+            "precio": precio,
+            "variacion_pct": variacion_pct,
+            "fecha": fila["fecha"],
+        }
 
 
