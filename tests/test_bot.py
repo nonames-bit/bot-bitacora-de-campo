@@ -14,6 +14,15 @@ def test_procesar_texto_parto(db):
     assert db.get_animal("47") is not None
 
 
+def test_procesar_texto_secado(db):
+    bot = Bot(db)
+    resp = bot.procesar_texto("se seco la 47 por mastitis")
+    assert "secado" in resp.lower()
+    assert db.count("secados") == 1
+    fila = db.query_one("SELECT * FROM secados")
+    assert fila["motivo"] == "Mastitis"
+
+
 def test_procesar_servicio_genera_alertas(db):
     bot = Bot(db)
     bot.procesar_texto("insemine la 47 con toro brahman 502")

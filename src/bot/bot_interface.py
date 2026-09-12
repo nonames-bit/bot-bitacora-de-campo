@@ -123,6 +123,12 @@ class Bot:
             )
             if grupo_gemelar is not None and tipo_evento == "GEMELAR" and clave_grupo not in grupo_gemelar and nuevo_id:
                 grupo_gemelar[clave_grupo] = nuevo_id
+        elif ev.tipo == "secado":
+            self.db.registrar_secado(
+                vaca_tag=ev.animal_tag, fecha=ev.fecha,
+                motivo=d.get("motivo"),
+                registrado_por=user_id,
+            )
         elif ev.tipo == "muerte":
             self.db.registrar_muerte(
                 animal_tag=ev.animal_tag, fecha=ev.fecha,
@@ -283,6 +289,9 @@ class Bot:
                 return f"Registrado {etiquetas[tipo_evento]} de la {tag}."
             sexo = d.get("sexo_cria") or "?"
             return f"Registrado parto de la {tag} (cría {sexo.lower()})."
+        if ev.tipo == "secado":
+            motivo_str = f" ({d['motivo']})" if d.get("motivo") else ""
+            return f"Registrado secado de la {tag}{motivo_str}."
         if ev.tipo == "muerte":
             return f"Registrada muerte del animal {tag}."
         if ev.tipo == "diagnostico_gestacion":

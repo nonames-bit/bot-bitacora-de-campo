@@ -82,6 +82,8 @@
           chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("grass", 13) + " Traslado</span>";
         } else if (tipo === "DESTETE") {
           chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("destete", 13) + " Destete</span>";
+        } else if (tipo === "SECADO") {
+          chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("milk", 13) + " Secado</span>";
         } else if (tipo === "PESAJE") {
           chipHtml = "<span class='chip gris' style='font-weight:700;'>" + icon("scale", 13) + " Pesaje</span>";
         } else if (tipo === "TRATAMIENTO") {
@@ -2284,7 +2286,7 @@
       + "<label style='font-size:13px; font-weight:600;'>Arete / Tag:</label>"
       + "<input id='manga-tag' class='manga-input-grande' placeholder='ej. 47' autocomplete='off' list='dl-tags' autofocus style='margin-bottom:12px;'>"
       + "<label style='font-size:13px; font-weight:600;'>Peso Actual (kg):</label>"
-      + "<input id='manga-peso' type='number' step='0.5' class='manga-input-grande' placeholder='0.0' style='color:var(--verde-marca); font-size:38px; margin-bottom:12px;'>"
+      + "<input id='manga-peso' type='number' step='0.5' inputmode='decimal' class='manga-input-grande' placeholder='0.0' style='color:var(--verde-marca); font-size:38px; margin-bottom:12px;'>"
       + "<div style='display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;'>"
       + "<div style='flex:1; min-width:130px;'><label style='font-size:12px;'>Condición Corporal:</label>"
       + "<select id='manga-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
@@ -2405,14 +2407,22 @@
         }
         var peso = parseFloat(pesoStr);
         if (isNaN(peso) || peso <= 0) {
+          // BLOQUE 4 (ráfaga): vibración corta de error + campo en rojo.
+          if (navigator.vibrate) { try { navigator.vibrate([40, 40, 40]); } catch (eVibManga) { /* noop */ } }
+          if (inpPeso) inpPeso.style.borderColor = "var(--color-rojo-txt)";
           alert("El peso debe ser un número válido mayor a 0.");
           return;
         }
+        if (inpPeso) inpPeso.style.borderColor = "";
 
         var resBox = document.getElementById("manga-resultado-kpi");
 
         function procesarResultadoLocal(data) {
           enviarTelemetriaSilenciosa("pesaje_manga");
+          // BLOQUE 4 (ráfaga): vibración larga de éxito. Solo se limpian tag
+          // y peso (el resto del formulario se mantiene) y el cursor vuelve
+          // al tag para pesar el siguiente animal sin tocar la pantalla.
+          if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOk) { /* noop */ } }
           var gmd = data.gmd_g_dia;
           var chipGmd = gmd != null && !isNaN(gmd)
             ? "<span class='chip " + (gmd >= 600 ? "verde" : gmd > 0 ? "ambar" : "rojo") + "'>" + (gmd > 0 ? "+" : "") + Number(gmd).toFixed(0) + " g/d</span>"
@@ -2442,6 +2452,7 @@
 
         if (navigator.onLine === false) {
           encolarOffline("pesaje", { animal_tag: tag, peso_kg: peso, evento: evento, condicion_corporal: cc }).then(function () {
+            if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
               resBox.innerHTML = "<b>💾 Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
@@ -2473,6 +2484,7 @@
           else alert("Error: " + (data.error || "No se pudo registrar"));
         }).catch(function (err) {
           encolarOffline("pesaje", { animal_tag: tag, peso_kg: peso, evento: evento, condicion_corporal: cc }).then(function () {
+            if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff2) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
               resBox.innerHTML = "<b>💾 Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
@@ -2576,6 +2588,7 @@
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
       { id: "destete", nom: "Destete", ico: "destete" },
+      { id: "secado", nom: "Secado", ico: "milk" },
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
@@ -2586,17 +2599,41 @@
     var h = "<h3>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>";
     h += "<p class='aviso'>Registra eventos directamente en el potrero. Si estás sin señal, se guardarán en la cola local de tu celular y se sincronizarán al volver a la casa.</p>";
 
-    h += "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px;'>";
-    tipos.forEach(function (t) {
-      var act = t.id === _tipoCapturaActual ? "act" : "";
-      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:13px;'>" + icon(t.ico, 14) + t.nom + "</button>";
-    });
-    h += "</div>";
+    // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
+    // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
+    h += "<div class='cap-pasos' aria-hidden='true'>"
+      + "<span class='chip verde' id='cap-ind-1'>1 · Tipo</span>"
+      + "<span class='chip gris' id='cap-ind-2'>2 · Datos</span>"
+      + "<span class='chip gris' id='cap-ind-3'>3 · Guardar</span>"
+      + "</div>";
 
     h += "<div class='card' style='padding:16px;'>"
       + "<form id='form-captura' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<div class='cap-paso cap-paso-1 act'>"
+      + "<div class='cap-paso-num'>1/3: ¿Qué evento desea registrar?</div>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;'>";
+    tipos.forEach(function (t) {
+      var act = t.id === _tipoCapturaActual ? "act" : "";
+      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:15px; padding:12px 16px;'>" + icon(t.ico, 16) + t.nom + "</button>";
+    });
+    h += "</div>"
+      + "<button type='button' id='btn-cap-sig1' class='btn-guardar-manga'>Siguiente →</button>"
+      + "</div>"
+      + "<div class='cap-paso cap-paso-2'>"
+      + "<div class='cap-paso-num'>2/3: Datos del evento</div>"
+      + "<div id='cap-tag-chip' style='margin-bottom:8px;'></div>"
       + "<div id='captura-campos'></div>"
-      + "<button type='submit' id='btn-guardar-captura' class='btn-guardar-manga' style='margin-top:12px;'>" + icon("save", 15) + "Guardar Registro</button>"
+      + "<div style='display:flex; gap:8px; margin-top:12px;'>"
+      + "<button type='button' id='btn-cap-atras2' class='tema-btn' style='flex:1; padding:12px; cursor:pointer;'>← Atrás</button>"
+      + "<button type='button' id='btn-cap-sig2' class='btn-guardar-manga' style='flex:2;'>Siguiente →</button>"
+      + "</div>"
+      + "</div>"
+      + "<div class='cap-paso cap-paso-3'>"
+      + "<div class='cap-paso-num'>3/3: Revise y guarde</div>"
+      + "<div id='cap-preview-resumen' class='aviso' style='font-size:13px; line-height:1.6;'></div>"
+      + "<div style='margin-top:12px;'><button type='button' id='btn-cap-atras3' class='tema-btn' style='width:100%; padding:12px; cursor:pointer;'>← Atrás</button></div>"
+      + "<div class='cap-guardar-sticky'><button type='submit' id='btn-guardar-captura' class='btn-guardar-manga'>" + icon("save", 15) + "Guardar Registro</button></div>"
+      + "</div>"
       + "</form>"
       + "<div id='captura-feedback' role='status' aria-live='polite' style='margin-top:12px;'></div>"
       + "</div>";
@@ -2652,13 +2689,22 @@
         + "<div style='flex:1;'><label>Peso al destete (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 120' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero nuevo de la Cría: <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
-        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional -- útil si también se seca):</p>"
+        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional, solo informativo -- el destete NO seca a la vaca; si dejó de ordeñarse use el botón <b>Secado</b> aparte):</p>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso de la Madre (kg): <input type='number' step='0.5' id='cap-peso-madre' placeholder='ej. 410' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Cond. Corporal Madre (1-5): <select id='cap-cc-madre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
         + "</div>"
         + "<label>Potrero nuevo de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Vacas Secas' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Observaciones / Motivo: <input id='cap-notas' placeholder='Destete normal, adelantado por sequía, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "secado") {
+      h += "<label>Arete / Tag de la Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Cond. Corporal (1-5): <select id='cap-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
+        + "<div style='flex:1;'><label>Potrero nuevo (opcional): <input id='cap-pot-secado' placeholder='ej. Vacas Secas' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Motivo: <select id='cap-motivo-secado' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Fin de lactancia'>Fin de lactancia (programado)</option><option value='Baja producción'>Baja producción</option><option value='Mastitis'>Mastitis / problema de ubre</option><option value='Preparación para el parto'>Preparación para el próximo parto</option><option value='Otro'>Otro</option></select></label>"
+        + "<label>Observaciones: <input id='cap-notas' placeholder='ej. Se secó sola, sin problema' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<p class='aviso' style='margin:2px 0;'>Evento independiente del destete de la cría: registra que esta vaca dejó de ordeñarse de verdad.</p>";
     } else if (tipo === "pesaje") {
       h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -2818,6 +2864,148 @@
     var cCampos = document.getElementById("captura-campos");
     var _fotoActual = null;
     var _facturaIaFotoRuta = null;
+
+    // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview)
+    // + defaults inteligentes (último potrero / tag desde ficha).
+    var _capPaso = 1;
+    var _capTipo = _tipoCapturaActual;
+    var _capDatos = {};
+
+    function mostrarPasoCap(n) {
+      _capPaso = n;
+      [1, 2, 3].forEach(function (i) {
+        var paso = q(".cap-paso-" + i);
+        if (paso) {
+          if (i === n) paso.classList.add("act");
+          else paso.classList.remove("act");
+        }
+        var ind = document.getElementById("cap-ind-" + i);
+        if (ind) ind.className = "chip " + (i === n ? "verde" : (i < n ? "azul" : "gris"));
+      });
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eScrollCap) { window.scrollTo(0, 0); }
+    }
+
+    // Defaults inteligentes: último potrero (localStorage), tag desde ficha
+    // (?tag= en URL, /ficha/TAG en la ruta, o pendiente dejado por el FAB) y
+    // fecha de hoy si quedó vacía (camposHtmlCaptura ya la prellena).
+    function aplicarDefaultsCaptura() {
+      var tagIni = window.__capTagPendiente || null;
+      if (!tagIni) {
+        try { tagIni = new URLSearchParams(window.location.search).get("tag"); } catch (eTag1) { tagIni = null; }
+      }
+      if (!tagIni) {
+        try {
+          var mFicha = window.location.pathname.match(/\/ficha\/([A-Za-z0-9_-]+)/i);
+          if (mFicha) tagIni = mFicha[1];
+        } catch (eTag2) { /* noop */ }
+      }
+      if (tagIni) {
+        var fTagDef = document.getElementById("cap-tag");
+        if (fTagDef && !fTagDef.value) fTagDef.value = tagIni;
+        var chipTag = document.getElementById("cap-tag-chip");
+        if (chipTag) chipTag.innerHTML = "<span class='chip azul'>📋 Animal: " + esc(tagIni) + "</span>";
+        window.__capTagPendiente = null;
+      }
+      var ultPot = null;
+      try { ultPot = localStorage.getItem("bitacora_ultimo_potrero"); } catch (ePot0) { ultPot = null; }
+      if (ultPot) {
+        var idsPot = ["cap-pot-dest", "cap-fin-potrero", "cap-pot-cria", "cap-pot-madre", "cap-pot-orig"];
+        for (var ip = 0; ip < idsPot.length; ip++) {
+          var inpPotDef = document.getElementById(idsPot[ip]);
+          if (inpPotDef && !inpPotDef.value) {
+            inpPotDef.value = ultPot;
+            // Chip "último usado": un toque lo reaplica si el operario lo borró.
+            (function (inpC, idC) {
+              if (document.getElementById("cap-pot-hint-" + idC)) return;
+              var hint = document.createElement("button");
+              hint.type = "button";
+              hint.id = "cap-pot-hint-" + idC;
+              hint.className = "cap-potrero-hint";
+              hint.textContent = "último usado: " + ultPot;
+              hint.addEventListener("click", function () { inpC.value = ultPot; try { inpC.focus(); } catch (eHint) { /* noop */ } });
+              if (inpC.parentNode) inpC.parentNode.appendChild(hint);
+            })(inpPotDef, idsPot[ip]);
+            break;
+          }
+        }
+      }
+      var fFechaDef = document.getElementById("cap-fecha");
+      if (fFechaDef && !fFechaDef.value) fFechaDef.value = new Date().toISOString().slice(0, 10);
+    }
+
+    function recolectarCapDatos() {
+      var d = {};
+      qa("#captura-campos input, #captura-campos select").forEach(function (el) {
+        if (!el.id || el.type === "file" || el.type === "checkbox") return;
+        var v = (el.value || "").trim();
+        if (v) d[el.id] = v;
+      });
+      _capDatos = d;
+      return d;
+    }
+
+    function nombreTipoCap(id) {
+      var noms = { parto: "Parto", aborto: "Aborto / Pérdida", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto" };
+      return noms[id] || id;
+    }
+
+    // Paso 3: resumen legible en texto plano antes de guardar.
+    function resumenCapHtml() {
+      var d = recolectarCapDatos();
+      var tagR = d["cap-tag"] || d["cap-cria-tag"] || "—";
+      var fechaR = d["cap-fecha"] || new Date().toISOString().slice(0, 10);
+      var h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Vaca/Animal: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaR) + "</b>";
+      Object.keys(d).forEach(function (k) {
+        if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag") return;
+        h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
+      });
+      return h;
+    }
+
+    // El avance 2→3 valida los requeridos del paso 2 (respeta el modo
+    // masivo de traslado, que quita el required del tag).
+    function validarPaso2Cap() {
+      var falt = null;
+      qa("#captura-campos [required]").forEach(function (el) {
+        if (!falt && !(el.value || "").trim() && el.offsetParent !== null) falt = el;
+      });
+      if (falt) {
+        mostrarToast("Falta un campo requerido", "rojo");
+        try { falt.focus(); } catch (eFoco) { /* noop */ }
+        return false;
+      }
+      return true;
+    }
+
+    // Regenera los campos del paso 2 con TODA la lógica de binding
+    // existente (foto, IA recibo, traslado masivo, destete, gemelar) más
+    // los defaults inteligentes. No toca ninguna de esas funciones.
+    function refrescarCamposCap() {
+      if (!cCampos) return;
+      cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
+      bindFotoCaptura();
+      bindCamposFinanza();
+      bindTrasladoMasivo();
+      bindDesteteBusquedaCria();
+      bindTipoEventoParto();
+      aplicarDefaultsCaptura();
+    }
+
+    function wireStepperCap() {
+      var bSig1 = document.getElementById("btn-cap-sig1");
+      if (bSig1) bSig1.addEventListener("click", function () { mostrarPasoCap(2); });
+      var bAtr2 = document.getElementById("btn-cap-atras2");
+      if (bAtr2) bAtr2.addEventListener("click", function () { mostrarPasoCap(1); });
+      var bSig2 = document.getElementById("btn-cap-sig2");
+      if (bSig2) bSig2.addEventListener("click", function () {
+        if (!validarPaso2Cap()) return;
+        var prev = document.getElementById("cap-preview-resumen");
+        if (prev) prev.innerHTML = resumenCapHtml();
+        mostrarPasoCap(3);
+      });
+      var bAtr3 = document.getElementById("btn-cap-atras3");
+      if (bAtr3) bAtr3.addEventListener("click", function () { mostrarPasoCap(2); });
+    }
 
     function bindFotoCaptura() {
       var btnElegir = document.getElementById("btn-elegir-foto");
@@ -3395,14 +3583,7 @@
             }
             var formEl = document.getElementById("form-captura");
             if (formEl) formEl.reset();
-            if (cCampos) {
-              cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
-              bindFotoCaptura();
-              bindCamposFinanza();
-              bindTrasladoMasivo();
-              bindDesteteBusquedaCria();
-              bindTipoEventoParto();
-            }
+            refrescarCamposCap();
             actualizarBadges();
           } else if (feed) {
             feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
@@ -3412,31 +3593,20 @@
         });
     }
 
-    if (cCampos) {
-      cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
-      bindFotoCaptura();
-      bindCamposFinanza();
-      bindTrasladoMasivo();
-      bindDesteteBusquedaCria();
-      bindTipoEventoParto();
-    }
+    refrescarCamposCap();
+    wireStepperCap();
+    mostrarPasoCap(1);
 
     qa("button[data-cap-tipo]").forEach(function (b) {
       b.addEventListener("click", function () {
         qa("button[data-cap-tipo]").forEach(function (x) { x.classList.remove("act"); });
         b.classList.add("act");
         _tipoCapturaActual = b.getAttribute("data-cap-tipo");
+        _capTipo = _tipoCapturaActual;
         _fotoActual = null;
-        if (cCampos) {
-          cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
-          bindFotoCaptura();
-          bindCamposFinanza();
-          bindTrasladoMasivo();
-          bindDesteteBusquedaCria();
-          bindTipoEventoParto();
-        }
-        var fTag = document.getElementById("cap-tag");
-        if (fTag) fTag.focus();
+        // Al cambiar el tipo en el paso 1 se regeneran los campos del paso
+        // 2 en segundo plano (el operario sigue en el paso 1).
+        refrescarCamposCap();
       });
     });
 
@@ -3489,6 +3659,12 @@
           payload.peso_madre_kg = parseFloat(q("#cap-peso-madre") && q("#cap-peso-madre").value) || null;
           payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+        } else if (_tipoCapturaActual === "secado") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.cond_corporal = parseFloat(q("#cap-cc") && q("#cap-cc").value) || null;
+          payload.potrero_destino = (q("#cap-pot-secado") && q("#cap-pot-secado").value || "").trim() || null;
+          payload.motivo = (q("#cap-motivo-secado") && q("#cap-motivo-secado").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
@@ -3558,17 +3734,22 @@
           }
           mostrarToast(online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal", online ? "verde" : "ambar");
           vibrarConfirmacion();
+          // BLOQUE 4: persistir defaults inteligentes (potrero + tag).
+          try {
+            var potsG = ["cap-pot-dest", "cap-fin-potrero", "cap-pot-cria", "cap-pot-madre", "cap-pot-orig"];
+            for (var ig = 0; ig < potsG.length; ig++) {
+              var inpG = q("#" + potsG[ig]);
+              if (inpG && (inpG.value || "").trim()) { localStorage.setItem("bitacora_ultimo_potrero", inpG.value.trim()); break; }
+            }
+            var tagG = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+            if (tagG) localStorage.setItem("bitacora_ultimo_tag", tagG);
+          } catch (eGuard) { /* almacenamiento no disponible */ }
           _fotoActual = null;
           form.reset();
-          if (cCampos) {
-            cCampos.innerHTML = camposHtmlCaptura(_tipoCapturaActual);
-            bindFotoCaptura();
-            bindCamposFinanza();
-            bindTrasladoMasivo();
-            bindDesteteBusquedaCria();
-            bindTipoEventoParto();
-          }
+          refrescarCamposCap();
           actualizarBadges();
+          // Tras guardar se vuelve al paso 1 para el siguiente registro.
+          mostrarPasoCap(1);
         }
 
         if (navigator.onLine === false) {
@@ -6198,6 +6379,12 @@
 
     head += "</div>";
 
+    // BLOQUE 4: FAB "Registrar evento" — salta a Captura con el tag actual.
+    head += "<button id='btn-ficha-registrar' class='fab-registrar' title='Registrar evento' aria-label='Registrar evento'>"
+      + icon("plus", 20)
+      + "<span style='position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;'>Registrar evento</span>"
+      + "</button>";
+
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
     html += "<div id='ficha-tabs' role='tablist'><div class='mini'>"
       + TABS.map(function (t, i) { return "<button role='tab' aria-selected='" + (i === 0 ? "true" : "false") + "' data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
@@ -6364,7 +6551,10 @@
       var lac = f.lactancia || {};
       var h3 = "<h4>Estado de lactancia</h4>";
       if (lac && lac.fecha_parto) {
-        h3 += "<p class='aviso'>" + icon("milk", 14) + esc(lac.estado) + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
+        var txtEstado = lac.estado_confirmado && lac.fecha_secado
+          ? esc(lac.estado) + " (secada el " + esc(lac.fecha_secado) + ")"
+          : esc(lac.estado) + (lac.estado === "Seca" ? " (estimado por días, sin secado registrado)" : "");
+        h3 += "<p class='aviso'>" + icon("milk", 14) + txtEstado + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
       } else {
         h3 += vacio("Sin lactancia activa (sin parto registrado o es macho).");
       }
@@ -6666,6 +6856,21 @@
         if (panel) panel.innerHTML = fichaTab(b.getAttribute("data-tab"), ficha || window.__ultimaFicha || {});
       });
     });
+    // BLOQUE 4: el FAB lleva a Captura prellenando el tag de esta ficha.
+    var btnFab = document.getElementById("btn-ficha-registrar");
+    if (btnFab) {
+      btnFab.addEventListener("click", function () {
+        var tagFab = (ficha && ficha.tag) || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+        tagFab = String(tagFab || "").trim();
+        if (tagFab) {
+          try { localStorage.setItem("bitacora_ultimo_tag", tagFab); } catch (eFabTag) { /* noop */ }
+          window.__capTagPendiente = tagFab;
+        }
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eFabScroll) { window.scrollTo(0, 0); }
+      });
+    }
   }
 
   /* ---------- Carga de datos ---------- */

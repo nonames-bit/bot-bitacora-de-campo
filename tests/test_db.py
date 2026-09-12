@@ -170,6 +170,52 @@ def test_historial_incluye_destetes_propios_y_de_crias(db):
     assert len(h_madre["destetes_crias"]) == 1
 
 
+def test_registrar_destete_no_afecta_estado_de_leche_de_la_madre(db):
+    """El destete solo separa a la cría -- NO seca a la vaca. Sin un
+    registro explícito en `secados`, la madre no debe quedar marcada como
+    seca ni generar ninguna fila en esa tabla."""
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-06-01", sexo_cria="Macho", id_cria_tag="47-1")
+    db.registrar_destete("47-1", fecha="2026-09-01", peso_kg=120.0,
+                         potrero_madre="Vacas Secas", peso_madre_kg=410.0, cond_corporal_madre=3.0)
+    assert db.count("secados") == 0
+
+
+def test_registrar_secado_actualiza_potrero_y_condicion_corporal(db):
+    pid_ordeno = db.registrar_potrero(nombre="Ordeño")
+    pid_secas = db.registrar_potrero(nombre="Vacas Secas")
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=pid_ordeno)
+
+    sid = db.registrar_secado("47", fecha="2026-09-12", potrero_destino="Vacas Secas",
+                              cond_corporal=3.0, motivo="Fin de lactancia")
+    assert isinstance(sid, int)
+
+    vaca = db.get_animal("47")
+    assert vaca["potrero_id"] == pid_secas
+    traslados = db.query("SELECT * FROM traslados WHERE animal_id = ?", (vaca["id_animal"],))
+    assert len(traslados) == 1
+    assert traslados[0]["motivo"] == "Secado"
+    cc = db.query("SELECT * FROM condicion_corporal WHERE animal_id = ?", (vaca["id_animal"],))
+    assert len(cc) == 1
+    assert cc[0]["valor"] == 3.0
+
+
+def test_registrar_secado_es_idempotente(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    id1 = db.registrar_secado("47", fecha="2026-09-12", motivo="Fin de lactancia")
+    id2 = db.registrar_secado("47", fecha="2026-09-12", motivo="Fin de lactancia")
+    assert id1 == id2
+    assert db.count("secados") == 1
+
+
+def test_registrar_secado_sin_potrero_ni_cc_no_falla(db):
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    sid = db.registrar_secado("47", fecha="2026-09-12", notas="Se secó sola")
+    assert isinstance(sid, int)
+    assert db.count("traslados") == 0
+    assert db.count("condicion_corporal") == 0
+
+
 def test_registrar_parto_autorreferenciado_proteccion(db):
     # Intentar registrar parto donde vaca_tag == id_cria_tag
     res = db.registrar_parto(vaca_tag="V009", fecha="2026-03-02", sexo_cria="Macho", id_cria_tag="V009")

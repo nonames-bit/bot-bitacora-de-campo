@@ -65,6 +65,15 @@ INTENTOS: list[tuple[str, list[str]]] = [
         r"\btraslad", r"\bpotrero\b.*\bpotrero\b", r"\bmov[ií] el lote\b",
         r"\bcambie el lote\b", r"\brot[óo] el\b",
     ]),
+    ("secado", [
+        # Secado real de una vaca lechera (deja de ordeñarse), evento
+        # independiente del destete de su cría -- ver Database.registrar_secado.
+        # Patrones específicos para no confundir con "potrero seco"/"época
+        # seca" (clima/pastura), que no mencionan a la vaca.
+        r"\bse sec[oó]\b", r"\bsec[oó]\s+(?:a\s+)?la\b", r"\bsecad[oa]\s+de\s+la\b",
+        r"\bdej[oó]\s+de\s+(?:dar|producir)\s+leche\b", r"\bfin\s+de\s+(?:la\s+)?lactancia\b",
+        r"\bya\s+no\s+da\s+leche\b",
+    ]),
     ("leche", [
         r"\blitros?\s+de\s+leche\b", r"\bleche\b.*\blitros?\b", r"\blitros?\b.*\bleche\b",
         r"\bordeñ[eoó]", r"\bproducci[oó]n\s+de\s+leche\b", r"\bcontrol\s+lechero\b",

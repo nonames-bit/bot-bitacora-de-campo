@@ -206,6 +206,33 @@ def test_ficha_qr_url(client, db_file):
     assert datos_tablero(db_file)["activos"] == 1
 
 
+def test_ficha_lactancia_sin_secado_usa_estimado_por_dias(db_file):
+    """Sin un registro real en `secados`, el estado de lactancia sigue
+    siendo el estimado por días desde el parto (comportamiento previo),
+    marcado explícitamente como no confirmado."""
+    f = datos_ficha("47", db_file)
+    lac = f["lactancia"]
+    assert lac is not None
+    assert lac["estado_confirmado"] is False
+    assert lac["estado"] == "En ordeño"
+    assert "fecha_secado" not in lac
+
+
+def test_ficha_lactancia_con_secado_confirmado(db_file):
+    """Un secado real registrado después del último parto debe primar sobre
+    el estimado por días -- la vaca queda 'Seca' con la fecha confirmada,
+    aunque el estimado por DEL todavía diría 'En ordeño'."""
+    db = Database(db_file)
+    db.registrar_secado("47", fecha="2026-09-01", motivo="Baja producción")
+    db.close()
+
+    f = datos_ficha("47", db_file)
+    lac = f["lactancia"]
+    assert lac["estado_confirmado"] is True
+    assert lac["estado"] == "Seca"
+    assert lac["fecha_secado"] == "2026-09-01"
+
+
 def test_pasturas_excluye_potreros_sin_geometria_real(db_file):
     """Los códigos legacy (sin geom_wkt_4326) no son potreros reales/actuales
     de la finca (confirmado por el usuario) — no deben aparecer en el

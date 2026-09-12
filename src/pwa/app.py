@@ -2006,6 +2006,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 caption_txt = f"Muerte: {payload.get('causa_presunta') or ''} ({tag_asoc or ''})".strip()
             elif tipo == "destete":
                 caption_txt = f"Destete: cría {tag_asoc or 'S/D'}".strip()
+            elif tipo == "secado":
+                caption_txt = f"Secado: {tag_asoc or 'S/D'}".strip()
             elif tipo == "leche":
                 litros_str = f"{payload.get('litros')} L" if payload.get("litros") is not None else ""
                 caption_txt = f"Recibo/Planilla de Leche: {litros_str} · {fecha}".strip()
@@ -2111,6 +2113,20 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             potrero_madre=payload.get("potrero_madre"),
                             peso_madre_kg=payload.get("peso_madre_kg"),
                             cond_corporal_madre=payload.get("cond_corporal_madre"),
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
+                        )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo == "secado":
+                        db_sync.registrar_secado(
+                            vaca_tag=payload.get("animal_tag") or payload.get("vaca_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            potrero_destino=payload.get("potrero_destino"),
+                            cond_corporal=payload.get("cond_corporal"),
+                            motivo=payload.get("motivo"),
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )

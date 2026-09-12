@@ -21,7 +21,7 @@ class Database:
     # son "eventos de campo" puntuales en el mismo sentido).
     TABLAS_EVENTOS = (
         "partos", "muertes", "servicios", "celos", "tratamientos",
-        "traslados", "destetes", "pesajes", "movimientos", "condicion_corporal",
+        "traslados", "destetes", "secados", "pesajes", "movimientos", "condicion_corporal",
         "produccion_leche", "diagnosticos_gestacion", "pluviometria",
         "aforos_historico", "monitoreo_satelital_ndvi", "monitoreo_satelital_lluvia",
         "rondas_campo",
@@ -612,6 +612,37 @@ class Database:
                 self.registrar_traslado(madre_fila["tag"], fecha=f, potrero_destino=potrero_madre,
                                         motivo="Destete de cría", registrado_por=registrado_por)
         return did
+
+    def registrar_secado(self, vaca_tag, fecha=None, potrero_destino=None,
+                         cond_corporal=None, motivo=None, notas=None,
+                         registrado_por=None) -> int:
+        """Registra el secado REAL de una vaca lechera (deja de ordeñarse),
+        como evento independiente del destete de su cría -- una vaca puede
+        destetar y seguir en ordeño con normalidad; el secado es una
+        decisión posterior y separada que antes solo se estimaba por días
+        desde el último parto (ver `dashboard_data.datos_ficha`, que
+        prioriza este registro cuando existe)."""
+        vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
+        f = iso(fecha)
+        existente = self._id_si_ya_existe("secados", {"animal_id": vaca_id, "fecha": f})
+        if existente:
+            return existente
+
+        pot_id = self.resolve_potrero(potrero_destino) if potrero_destino else None
+
+        sid = self.insert("secados", dict(
+            animal_id=vaca_id, fecha=f, potrero_destino=pot_id,
+            cond_corporal=cond_corporal, motivo=motivo, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+        if potrero_destino:
+            self.registrar_traslado(vaca_tag, fecha=f, potrero_destino=potrero_destino,
+                                    motivo="Secado", registrado_por=registrado_por)
+        if cond_corporal is not None:
+            self.registrar_condicion_corporal(vaca_tag, fecha=f, valor=cond_corporal,
+                                              notas="Al secado", registrado_por=registrado_por)
+        return sid
 
     def cria_activa_de_madre(self, madre_tag) -> Optional[dict]:
         """Busca la cría ACTIVA más reciente de una vaca que aún no fue

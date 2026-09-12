@@ -265,6 +265,19 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
                 UNION ALL
 
+                SELECT 'SECADO' AS tipo, se.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       '' AS detalle_label,
+                       COALESCE(se.motivo, 'Secado registrado') ||
+                       CASE WHEN pd_seca.nombre IS NOT NULL OR pd_seca.codigo IS NOT NULL
+                            THEN ' ➔ ' || COALESCE(pd_seca.nombre, pd_seca.codigo) ELSE '' END AS descripcion,
+                       COALESCE(se.notas, '') AS notas, se.id AS id
+                FROM secados se
+                JOIN animales a ON a.id_animal = se.animal_id
+                LEFT JOIN potreros pd_seca ON pd_seca.id = se.potrero_destino
+
+                UNION ALL
+
                 SELECT 'PESAJE' AS tipo, pe.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
                        '' AS detalle_label,
@@ -841,14 +854,34 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     lactancia: Optional[dict[str, Any]] = None
     try:
         if es_hembra and base.get("ultimo_parto") and base["ultimo_parto"].get("fecha"):
-            f_parto = to_date_safe(base["ultimo_parto"]["fecha"])
+            fecha_parto_iso = base["ultimo_parto"]["fecha"]
+            f_parto = to_date_safe(fecha_parto_iso)
             if f_parto:
                 del_dias = max(0, (date.today() - f_parto).days)
-                lactancia = {
-                    "del_dias": del_dias,
-                    "estado": "En ordeño" if del_dias < 300 else "Seca",
-                    "fecha_parto": base["ultimo_parto"]["fecha"],
-                }
+                # Secado real (tabla `secados`) posterior al último parto:
+                # reemplaza el estimado por días con la fecha confirmada --
+                # un destete de la cría NO seca a la vaca, solo un secado
+                # explícito lo hace (ver Database.registrar_secado).
+                secado_row = db.query_one(
+                    "SELECT fecha FROM secados WHERE animal_id = ? AND fecha >= ? "
+                    "ORDER BY fecha DESC, id DESC LIMIT 1",
+                    (aid, fecha_parto_iso),
+                )
+                if secado_row and secado_row["fecha"]:
+                    lactancia = {
+                        "del_dias": del_dias,
+                        "estado": "Seca",
+                        "estado_confirmado": True,
+                        "fecha_secado": secado_row["fecha"],
+                        "fecha_parto": fecha_parto_iso,
+                    }
+                else:
+                    lactancia = {
+                        "del_dias": del_dias,
+                        "estado": "En ordeño" if del_dias < 300 else "Seca",
+                        "estado_confirmado": False,
+                        "fecha_parto": fecha_parto_iso,
+                    }
     except Exception as e:
         logger.error("seccion lactancia fallo", exc_info=True)
         errores["lactancia"] = str(e)

@@ -271,6 +271,16 @@ class EventParser:
         ev.datos["peso_kg"] = peso
         ev.datos["evento"] = evento
 
+    def _parse_secado(self, ev: ParsedEvent, t: str) -> None:
+        motivo = None
+        if re.search(r"\bmastitis\b", t):
+            motivo = "Mastitis"
+        elif re.search(r"\bbaja producci[oó]n\b|\bpoca leche\b", t):
+            motivo = "Baja producción"
+        elif re.search(r"\bpr[oó]xim[oa]\s+parto\b|\bva\s+a\s+parir\b", t):
+            motivo = "Preparación para el parto"
+        ev.datos["motivo"] = motivo
+
     def _parse_leche(self, ev: ParsedEvent, t: str) -> None:
         ev.datos["litros"] = nlu.extraer_litros_leche(t)
 

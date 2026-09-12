@@ -79,6 +79,18 @@ def test_parse_celo(parser):
     assert ev.datos["am_pm"] == "PM"
 
 
+def test_parse_secado(parser):
+    ev = parser.parse("se seco la 47 por mastitis")
+    assert ev.tipo == "secado"
+    assert ev.animal_tag == "47"
+    assert ev.datos["motivo"] == "Mastitis"
+
+
+def test_parse_secado_no_confunde_potrero_seco_con_evento(parser):
+    ev = parser.parse("el potrero esta muy seco por la sequia")
+    assert ev.tipo != "secado"
+
+
 def test_parse_tratamiento(parser):
     ev = parser.parse("le puse oxitetraciclina 20ml a la 47 con 14 dias de retiro")
     assert ev.tipo == "tratamiento"

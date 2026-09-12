@@ -129,6 +129,25 @@ CREATE TABLE IF NOT EXISTS destetes (
     registrado_por INTEGER
 );
 
+-- Secado real de una vaca lechera (deja de ordeñarse), como evento
+-- independiente del destete de su cría -- una vaca puede destetar (separar
+-- la cría) y seguir en ordeño normalmente; el secado es una decisión
+-- posterior y separada. Sin esto, "En ordeño"/"Seca" en la ficha era solo
+-- un estimado (días desde el último parto vs umbral), nunca confirmado.
+-- No tiene equivalente de importación/exportación con Software Ganadero
+-- (SG solo modela "Secados/Destetos" como un único evento sobre la vaca).
+CREATE TABLE IF NOT EXISTS secados (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER NOT NULL,
+    fecha TEXT,
+    potrero_destino INTEGER,
+    cond_corporal REAL,
+    motivo TEXT,
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS pesajes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER,
@@ -288,6 +307,7 @@ CREATE INDEX IF NOT EXISTS idx_celos_vaca_fecha ON celos(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_tratamientos_animal_fecha ON tratamientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_traslados_animal_fecha ON traslados(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_destetes_animal_fecha ON destetes(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_secados_animal_fecha ON secados(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
@@ -453,7 +473,7 @@ CREATE INDEX IF NOT EXISTS idx_precios_mercado_producto ON precios_mercado(produ
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "destetes", "pesajes", "movimientos", "condicion_corporal",
+    "tratamientos", "traslados", "destetes", "secados", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
@@ -560,6 +580,16 @@ class Traslado:
     potrero_origen: Optional[int] = None
     potrero_destino: Optional[int] = None
     motivo: Optional[str] = None
+
+
+@dataclass
+class Secado:
+    animal_id: Optional[int] = None
+    fecha: Optional[str] = None
+    potrero_destino: Optional[int] = None
+    cond_corporal: Optional[float] = None
+    motivo: Optional[str] = None
+    notas: Optional[str] = None
 
 
 @dataclass
