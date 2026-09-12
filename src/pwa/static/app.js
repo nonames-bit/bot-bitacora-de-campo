@@ -2583,7 +2583,6 @@
   function renderCaptura() {
     var tipos = [
       { id: "parto", nom: "Parto", ico: "cowCalf" },
-      { id: "aborto", nom: "Aborto / Pérdida", ico: "alert" },
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
@@ -2646,8 +2645,9 @@
     var h = "<label>Fecha del evento: <input type='date' id='cap-fecha' value='" + hoy + "' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
 
     if (tipo === "parto") {
-      h += "<label>Tipo de parto: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option></select></label>"
+      h += "<label>Tipo de evento: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option><option value='ABORTO'>Aborto</option><option value='REABSORCION'>Reabsorción embrionaria</option><option value='MOMIFICACION'>Momificación fetal</option><option value='MACERACION'>Maceración fetal</option><option value='MUERTE_FETAL'>Muerte fetal</option></select></label>"
         + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div id='cap-parto-cria-wrap'>"
         + "<label id='cap-cria1-label'>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Sexo de la Cría: <select id='cap-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
@@ -2669,18 +2669,9 @@
         + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
+        + "</div>"
+        + "<p id='cap-perdida-aviso' class='aviso' style='display:none; margin:2px 0;'>Se registra como un evento reproductivo de la vaca (sin cría), separado de un Parto normal.</p>"
         + "<label>Observaciones / Notas: <input id='cap-notas' placeholder='Parto distócico, ternero vigoroso, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
-    } else if (tipo === "aborto") {
-      h += "<label>Tipo de evento: <select id='cap-tipo-perdida' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<option value='ABORTO'>Aborto</option>"
-        + "<option value='REABSORCION'>Reabsorción embrionaria</option>"
-        + "<option value='MOMIFICACION'>Momificación fetal</option>"
-        + "<option value='MACERACION'>Maceración fetal</option>"
-        + "<option value='MUERTE_FETAL'>Muerte fetal</option>"
-        + "</select></label>"
-        + "<label>Arete / Tag de la Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Causa / Observaciones: <input id='cap-notas' placeholder='ej. Sospecha de brucelosis, trauma, sin causa aparente' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0;'>Se registra como un evento reproductivo de la vaca (sin cría), separado de un Parto normal.</p>";
     } else if (tipo === "destete") {
       h += "<label>Arete de la Vaca (Madre): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-destete-cria-info' style='font-size:12.5px; color:var(--texto-suave); margin:-4px 0 2px 2px; min-height:16px;'></div>"
@@ -2945,7 +2936,7 @@
     }
 
     function nombreTipoCap(id) {
-      var noms = { parto: "Parto", aborto: "Aborto / Pérdida", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto" };
+      var noms = { parto: "Parto", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto" };
       return noms[id] || id;
     }
 
@@ -3545,14 +3536,20 @@
 
     // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
     // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
+    var TIPOS_EVENTO_SIN_CRIA = ["ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"];
     function bindTipoEventoParto() {
       var sel = document.getElementById("cap-tipo-evento");
+      var wrapCria = document.getElementById("cap-parto-cria-wrap");
       var wrap2 = document.getElementById("cap-gemelo2-wrap");
       var labelCria1 = document.getElementById("cap-cria1-label");
+      var avisoPerdida = document.getElementById("cap-perdida-aviso");
       if (!sel || !wrap2) return;
       function toggle() {
         var esGemelar = sel.value === "GEMELAR";
+        var esPerdida = TIPOS_EVENTO_SIN_CRIA.indexOf(sel.value) !== -1;
         wrap2.style.display = esGemelar ? "block" : "none";
+        if (wrapCria) wrapCria.style.display = esPerdida ? "none" : "block";
+        if (avisoPerdida) avisoPerdida.style.display = esPerdida ? "block" : "none";
         if (labelCria1) labelCria1.firstChild.textContent = esGemelar ? "Arete de la Cría 1: " : "Arete de la Cría (Nuevo): ";
       }
       sel.addEventListener("change", toggle);
@@ -3623,23 +3620,18 @@
         }
 
         var payload = {};
-        // Aborto/Pérdida se registra con el mismo mecanismo que Parto (vaca
-        // sin cría) -- son formularios distintos en la UI para que sea claro
-        // dónde registrar cada cosa, pero un solo tipo de evento/tabla en el
-        // backend, distinguido por payload.tipo_evento.
-        var tipoEnvio = (_tipoCapturaActual === "aborto") ? "parto" : _tipoCapturaActual;
+        // Aborto/Pérdida (y sus subtipos) usan el mismo formulario de Parto,
+        // con tipo_evento eligiendo el subtipo -- un solo tipo de evento/tabla
+        // en el backend, distinguido por payload.tipo_evento.
+        var tipoEnvio = _tipoCapturaActual;
 
-        if (_tipoCapturaActual === "aborto") {
-          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
-          payload.tipo_evento = (q("#cap-tipo-perdida") && q("#cap-tipo-perdida").value) || "ABORTO";
-          payload.estado_cria = "MUERTO";
-          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
-        } else if (_tipoCapturaActual === "parto") {
+        if (_tipoCapturaActual === "parto") {
           payload.tipo_evento = (q("#cap-tipo-evento") && q("#cap-tipo-evento").value) || "PARTO";
+          var esPerdidaEnvio = TIPOS_EVENTO_SIN_CRIA.indexOf(payload.tipo_evento) !== -1;
           payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
-          payload.id_cria_tag = (q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim() || null;
+          payload.id_cria_tag = esPerdidaEnvio ? null : ((q("#cap-cria-tag") && q("#cap-cria-tag").value || "").trim() || null);
           payload.sexo_cria = (q("#cap-sexo") && q("#cap-sexo").value) || "HEMBRA";
-          payload.estado_cria = (q("#cap-estado-cria") && q("#cap-estado-cria").value) || "VIVO";
+          payload.estado_cria = esPerdidaEnvio ? "MUERTO" : ((q("#cap-estado-cria") && q("#cap-estado-cria").value) || "VIVO");
           payload.peso_nacimiento = parseFloat(q("#cap-peso-nacer") && q("#cap-peso-nacer").value) || null;
           payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
