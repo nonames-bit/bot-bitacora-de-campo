@@ -66,6 +66,12 @@
   --color-gris-txt: #5F5E5B;
   --color-azul-bg: #E1F3FE;
   --color-azul-txt: #1F6C9F;
+  /* Aliases de compatibilidad (app.js usa estos nombres) */
+  --borde-suave: var(--borde);
+  --rojo-alerta: var(--color-rojo-txt);
+  --ambar-alerta: var(--color-ambar-txt);
+  --color-ambar: var(--color-ambar-txt);
+  --rojo: var(--color-rojo-txt);
 
   --piramide-hembra: #2e7d32;
   --piramide-macho: #1976d2;
@@ -107,6 +113,12 @@
   --color-gris-txt: #5F5E5B;
   --color-azul-bg: #E1F3FE;
   --color-azul-txt: #1F6C9F;
+  /* Aliases de compatibilidad (app.js usa estos nombres) */
+  --borde-suave: var(--borde);
+  --rojo-alerta: var(--color-rojo-txt);
+  --ambar-alerta: var(--color-ambar-txt);
+  --color-ambar: var(--color-ambar-txt);
+  --rojo: var(--color-rojo-txt);
 
   --piramide-hembra: #2e7d32;
   --piramide-macho: #1976d2;
@@ -148,6 +160,12 @@
   --color-gris-txt: #A0A0A0;
   --color-azul-bg: #16283D;
   --color-azul-txt: #8FBCFF;
+  /* Aliases de compatibilidad (app.js usa estos nombres) */
+  --borde-suave: var(--borde);
+  --rojo-alerta: var(--color-rojo-txt);
+  --ambar-alerta: var(--color-ambar-txt);
+  --color-ambar: var(--color-ambar-txt);
+  --rojo: var(--color-rojo-txt);
 
   --piramide-hembra: #4ade80;
   --piramide-macho: #60a5fa;
@@ -168,6 +186,7 @@ body {
   margin: 0;
   background: var(--fondo);
   color: var(--texto);
+  font-size: 14px;
   padding-bottom: 76px; /* espacio para navegación móvil fija */
   transition: background .2s ease, color .2s ease, border-color .2s ease;
   line-height: 1.5;
@@ -219,6 +238,7 @@ header a.salir {
   opacity: 0.9;
   padding: 0 10px;
   height: 30px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -244,7 +264,7 @@ header .tema-btn {
   border: 1px solid var(--header-txt);
   opacity: 0.85;
   border-radius: 6px;
-  min-height: 30px;
+  min-height: 40px;
   padding: 2px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -286,7 +306,7 @@ header .tema-btn:hover {
   color: var(--texto-suave);
   border-radius: 6px;
   padding: 8px 14px;
-  min-height: 38px;
+  min-height: 40px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
@@ -433,7 +453,7 @@ header {
   background: var(--color-rojo-bg);
   color: var(--color-rojo-txt);
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   line-height: 16px;
   text-align: center;
@@ -484,7 +504,7 @@ header {
 }
 .kpi .etiq {
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--texto-suave);
@@ -701,6 +721,9 @@ tbody tr:nth-child(even) {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.filtros button {
+  min-height: 40px;
 }
 input, select {
   font-family: var(--font-base);
@@ -966,10 +989,10 @@ button:active {
   #nav-principal button .nav-badge {
     top: 2px;
     right: 14%;
-    font-size: 8px;
-    min-width: 13px;
-    height: 13px;
-    line-height: 13px;
+    font-size: 11px;
+    min-width: 16px;
+    height: 16px;
+    line-height: 16px;
     border-radius: 99px;
   }
   #nav-principal button.act {
@@ -1129,6 +1152,12 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   --color-azul-txt: #000000;
   --color-gris-bg: #E0E0E0;
   --color-gris-txt: #000000;
+  /* Aliases de compatibilidad (app.js usa estos nombres) */
+  --borde-suave: var(--borde);
+  --rojo-alerta: var(--color-rojo-txt);
+  --ambar-alerta: var(--color-ambar-txt);
+  --color-ambar: var(--color-ambar-txt);
+  --rojo: var(--color-rojo-txt);
   --piramide-hembra: #15803d;
   --piramide-macho: #1d4ed8;
   --piramide-pista: #f1f5f9;
@@ -2032,7 +2061,7 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 }
 
 .modulo-info small {
-  font-size: 10.5px;
+  font-size: 11px;
   color: var(--texto-suave);
   line-height: 1.25;
   margin-top: 2px;
