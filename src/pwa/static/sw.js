@@ -74,6 +74,7 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v85: Bloque 2 Accesibilidad y CSP — registro de SW y script de login
 // extraídos a /static/sw-register.js y /static/login.js (sin <script>
 // inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
+// v86: Animaciones contextuales en el header (vaca_echada en descanso nocturno y vaca_con_cria para fichas de paridas), easter egg interactivo con métricas en vivo y lluvia animada en header.
 // BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
 // __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
 var CACHE = "pwa-ja-__PWA_VERSION__"; // token → hash SHA1(estáticos) al servir
@@ -90,6 +91,14 @@ var PRECACHE = [
   "/static/vaca_comiendo.gif?v=__PWA_VERSION__",
   "/static/vaca_comiendo.png",
   "/static/vaca_comiendo.png?v=__PWA_VERSION__",
+  "/static/vaca_echada.gif",
+  "/static/vaca_echada.gif?v=__PWA_VERSION__",
+  "/static/vaca_echada.png",
+  "/static/vaca_echada.png?v=__PWA_VERSION__",
+  "/static/vaca_con_cria.gif",
+  "/static/vaca_con_cria.gif?v=__PWA_VERSION__",
+  "/static/vaca_con_cria.png",
+  "/static/vaca_con_cria.png?v=__PWA_VERSION__",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",
   "/static/favicon.svg",

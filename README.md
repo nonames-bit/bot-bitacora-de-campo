@@ -551,6 +551,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Técnica anti-halo de sangrado negro en bordes para garantizar integración limpia sin rebordes blancos sobre temas oscuro, campestre, claro y sol de campo.
     - Animación 100% natural y orgánica: la vaca come pasto en el suelo, levanta la cabeza, mastica rumiando, mueve las orejas y colea, para luego volver a bajar la cabeza a pastar.
     - Integrada en cabecera de `index.html` y `ficha.html`, precargada en Service Worker (`pwa-ja-v86`), con fallback PNG estático optimizado.
+  - **Animaciones Contextuales en Cabecera & Easter Egg Interactivo (PWA v86)**:
+    - **Modo Nocturno / Descanso (`vaca_echada.gif`)**: Vaca rumiando plácidamente echada en el suelo; se activa automáticamente de noche (18:30 a 05:30 hora Colombia) o al encender el tema oscuro.
+    - **Modo Maternidad / Cría (`vaca_con_cria.gif`)**: Vaca mocha amamantando y cuidando a su ternero; se activa dinámicamente en la cabecera al consultar la ficha de un animal en estado `PARIDA` o con cría al pie. Descornado quirúrgico cuadro a cuadro para mantener pureza de hato mocho sin cuernos.
+    - **Easter Egg Táctil**: Al tocar la vaquita en la cabecera, reacciona con un brinco elástico, vibración háptica hábil en el dispositivo (`navigator.vibrate`) y un globo de diálogo flotante con estadísticas vivas (conteo de hato activo, potreros y potrero con mayor descanso Voisin) y frases zootécnicas de Ganadería JA.
+    - **Lluvia Dinámica en Cabecera**: Líneas diagonales translúcidas animadas sobre el pasto del header cuando el pronóstico del día detecta lluvia (≥1.5 mm o prob ≥65%).
+    - **Semáforo Biológico Voisin en Pasturas**: Íconos de estadio forrajero (`🌱` rebrote tierno, `🌿` en crecimiento, `🌾` punto óptimo Voisin, `🍂` pasado/lignificado) en la columna de Días de Reposo de la tabla de potreros.
   - **Módulo de Mercado, Subastas Ganaderas & TRM 100% Automatizado ("Nada Manual", PWA v79)**:
     - **Sincronización Automática Diaria**: Robot en background (`src/integrations/mercado_sync.py`) y script cron (`scripts/actualizar_precios_mercado.py`, programado diario a las 06:00 AM COT) que actualiza cotizaciones oficiales sin requerir digitación ni intervención manual.
     - **Dólar TRM Oficial en Tiempo Real**: Consumo directo de la API de Datos Abiertos de Colombia (Superintendencia Financiera / Banco de la República con fallback automático a DolarAPI).
@@ -570,7 +576,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Chips `chip amarillo` → `chip ambar` (4 sitios `app.js`); 2 gradientes inline → `.btn-satelite-sar` / `.card-banner` con override tema Sol.
     - Táctil `min-height:44px` en móvil (header, captura/manga, reintento offline); feed Tablero como cards en `≤640px` (`data-label`), tabla en escritorio.
     - CSP `offline.html` sin `onclick` inline (enlace sin JS); bump caché `?v=84` en `index/ficha/login/offline.html`.
-- [x] Suite de pruebas con pytest: **761 pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest: **790 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

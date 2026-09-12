@@ -8262,6 +8262,9 @@
       }
     }
     actual = v;
+    if (v !== "ficha") {
+      actualizarVacaHeader({ esFicha: false });
+    }
     qa("#nav-principal > button").forEach(function (x) { x.classList.remove("act"); });
     qa("#nav-principal button[data-v]").forEach(function (b) { b.removeAttribute("aria-current"); });
     var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
@@ -8337,6 +8340,7 @@
     if (reloj) {
       try { reloj.textContent = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { /* noop */ }
     }
+    actualizarVacaHeader();
   }
   tick();
   setInterval(function () {
@@ -8358,6 +8362,7 @@
     else document.documentElement.setAttribute("data-theme", "green");
     try { localStorage.setItem("pwa_tema", modo || "green"); } catch (e) { /* noop */ }
     if (selectTema) selectTema.value = modo || "green";
+    actualizarVacaHeader();
   }
   function temaInicial() {
     try { return localStorage.getItem("pwa_tema") || "green"; } catch (e) { return "green"; }
@@ -8824,6 +8829,7 @@
   // Inicializar visor lightbox para fichas y gráficos en toda la app
   setupLightboxVisor();
   setupInstalacionApp();
+  setupVacaHeaderInteractivo();
 
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";

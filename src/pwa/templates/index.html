@@ -19,7 +19,7 @@
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
   <span class="marca-titulo"><img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="28" height="28"><b>GANADERÍA JA</b><span id="user-badge" class="user-badge">...</span></span>
-  <span class="header-pasto" aria-hidden="true"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><img src="/static/vaca_comiendo.gif?v={{ pwa_v }}" class="vaca-img" alt="Vaca pastando" width="54" height="29"></span></span></span></span>
+  <span class="header-pasto" id="header-pasto" aria-label="Ganado en pastoreo"><span class="vaca-pista"><span class="vaca-ambula"><span class="vaca-pasta"><img id="header-vaca-img" src="/static/vaca_comiendo.gif?v={{ pwa_v }}" class="vaca-img" alt="Vaca en el potrero" width="54" height="29" title="Toca la vaquita para ver estado rápido"></span></span></span><span id="header-lluvia" class="header-lluvia" style="display:none;" aria-hidden="true"></span><div id="vaca-bubble" class="vaca-speech-bubble" style="display:none;" role="tooltip"></div></span>
   <span class="acciones">
     <span class="reloj" id="reloj-hora"></span>
     <button id="btn-instalar-app" class="tema-btn btn-instalar" title="Instalar Bitácora JA como App en tu celular o PC" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span class="txt-instalar">Instalar App</span></button>
