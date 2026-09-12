@@ -1771,7 +1771,11 @@
       cuerpoHtml = renderLecheInsumosHtml(d);
     }
 
-    return headerHtml + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";
+    var avisoReferencia = (d && d.es_datos_referencia)
+      ? "<div class='chip ambar' style='margin-bottom:10px;'>⚠️ Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
+      : "";
+
+    return headerHtml + avisoReferencia + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";
   }
 
   function bindMercado(d) {
@@ -5662,6 +5666,10 @@
     var timerAudio = document.getElementById("chat-audio-timer");
     var btnCancelarAudio = document.getElementById("btn-cancelar-audio");
     var btnEnviarAudio = document.getElementById("btn-enviar-audio");
+    var tabIA = document.getElementById("tab-chat-ia");
+    var tabEquipo = document.getElementById("tab-chat-equipo");
+    var histEquipo = document.getElementById("chat-historial-equipo");
+    var dotEquipo = document.getElementById("equipo-dot");
 
     if (!dock) return;
 
@@ -5669,7 +5677,12 @@
       dock.classList.remove("colapsado");
       dock.classList.add("expandido");
       if (dock.classList.contains("modal-overlay")) dock.style.display = "flex";
-      if (hist) hist.scrollTop = hist.scrollHeight;
+      if (equipoTabActiva) {
+        if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
+        equipoMarcarVisto(equipoUltimoId);
+      } else if (hist) {
+        hist.scrollTop = hist.scrollHeight;
+      }
       if (enfocar && inp) setTimeout(function () { inp.focus(); }, 120);
     }
 
@@ -5683,6 +5696,150 @@
       if (dock.classList.contains("expandido")) colapsarChat();
       else expandirChat(true);
     }
+
+    /* ---------- Chat de Equipo (canal de avisos entre usuarios conectados) ---------- */
+    var ROL_ICONO_EQUIPO = { OWNER: "👑", ADMIN: "🛡️", TRABAJADOR: "👷" };
+    var LS_EQUIPO_VISTO = "ja_chat_equipo_visto_id";
+    var equipoTabActiva = false;
+    var equipoUltimoId = 0;
+    var equipoUltimoVistoId = parseInt(localStorage.getItem(LS_EQUIPO_VISTO) || "0", 10) || 0;
+
+    function equipoHoraCorta(iso) {
+      if (!iso) return "";
+      var d = new Date(String(iso).replace(" ", "T"));
+      if (isNaN(d.getTime())) return "";
+      var hh = d.getHours(), mm = d.getMinutes();
+      return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+    }
+
+    function equipoMarcarVisto(id) {
+      equipoUltimoVistoId = id;
+      try { localStorage.setItem(LS_EQUIPO_VISTO, String(id)); } catch (e) {}
+      if (dotEquipo) dotEquipo.classList.remove("on");
+      var bd = btnBurbuja && btnBurbuja.querySelector(".nav-badge");
+      if (bd) bd.classList.remove("on");
+    }
+
+    function equipoEncenderNoLeido() {
+      if (dotEquipo) dotEquipo.classList.add("on");
+      if (btnBurbuja) {
+        var bd = btnBurbuja.querySelector(".nav-badge");
+        if (!bd) {
+          bd = document.createElement("span");
+          bd.className = "nav-badge";
+          btnBurbuja.appendChild(bd);
+        }
+        bd.classList.add("on");
+      }
+    }
+
+    function renderMensajeEquipo(m) {
+      if (!histEquipo) return;
+      var yo = window.__usuarioActual || {};
+      var esMio = yo.user_id != null && String(yo.user_id) === String(m.user_id);
+      var puedeBorrar = esMio || yo.rol === "OWNER" || yo.rol === "ADMIN";
+      var div = document.createElement("div");
+      div.className = "chat-msg equipo " + (esMio ? "mio" : "otro");
+      div.setAttribute("data-id", m.id);
+      var html = "";
+      if (!esMio) {
+        var ic = ROL_ICONO_EQUIPO[m.rol] || "👤";
+        html += "<div class='chat-msg-cabecera'>" + ic + " " + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
+      }
+      html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
+      html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
+      if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje'>🗑</span>";
+      html += "</div>";
+      div.innerHTML = html;
+      histEquipo.appendChild(div);
+    }
+
+    function cargarMensajesEquipo() {
+      fetch("/api/mensajes-equipo?despues_de=" + equipoUltimoId + "&limite=50")
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) return;
+          var nuevos = d.mensajes || [];
+          nuevos.forEach(renderMensajeEquipo);
+          if (typeof d.ultimo_id === "number") equipoUltimoId = d.ultimo_id;
+          if (nuevos.length) {
+            if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
+            if (equipoTabActiva && dock.classList.contains("expandido")) {
+              equipoMarcarVisto(equipoUltimoId);
+            } else if (equipoUltimoId > equipoUltimoVistoId) {
+              equipoEncenderNoLeido();
+            }
+          }
+        }).catch(function () {});
+    }
+
+    function enviarMensajeEquipo(txt) {
+      fetch("/api/mensajes-equipo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: txt })
+      }).then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok && d.mensaje) {
+            if (typeof d.mensaje.id === "number" && d.mensaje.id > equipoUltimoId) equipoUltimoId = d.mensaje.id;
+            renderMensajeEquipo(d.mensaje);
+            if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
+            equipoMarcarVisto(equipoUltimoId);
+          } else if (d && d.error) {
+            mostrarToast(d.error, "rojo");
+          }
+        }).catch(function (err) {
+          mostrarToast("Error de conexión: " + err.message, "rojo");
+        });
+    }
+
+    function activarPestanaChat(cual) {
+      equipoTabActiva = (cual === "equipo");
+      if (tabIA) tabIA.classList.toggle("activa", cual === "ia");
+      if (tabEquipo) tabEquipo.classList.toggle("activa", cual === "equipo");
+      if (hist) hist.style.display = cual === "ia" ? "" : "none";
+      if (histEquipo) histEquipo.style.display = cual === "equipo" ? "" : "none";
+      if (btnMic) btnMic.style.display = cual === "ia" ? "" : "none";
+      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa 🎙️..." : "Escribe un aviso para el equipo...";
+      if (cual === "equipo") {
+        equipoMarcarVisto(equipoUltimoId);
+        if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
+      }
+    }
+
+    if (tabIA) tabIA.addEventListener("click", function () { activarPestanaChat("ia"); });
+    if (tabEquipo) {
+      tabEquipo.addEventListener("click", function () {
+        activarPestanaChat("equipo");
+        expandirChat(false);
+      });
+    }
+
+    if (histEquipo) {
+      histEquipo.addEventListener("click", function (e) {
+        var btn = e.target && e.target.closest ? e.target.closest(".chat-msg-borrar") : null;
+        if (!btn) return;
+        var id = btn.getAttribute("data-id");
+        if (!id) return;
+        fetch("/api/mensajes-equipo/" + encodeURIComponent(id), { method: "DELETE" })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d && d.ok) {
+              var fila = histEquipo.querySelector(".chat-msg[data-id='" + id + "']");
+              if (fila) fila.remove();
+            } else if (d && d.error) {
+              mostrarToast(d.error, "rojo");
+            }
+          }).catch(function () {});
+      });
+    }
+
+    // Se expone en window: la carga inicial se dispara después de conocer
+    // al usuario actual (ver cargarUsuario().finally en el arranque de la
+    // app), para que "esMio" ya pueda distinguir bien desde el primer
+    // pintado; el setInterval de polling junto al heartbeat reutiliza la
+    // misma función.
+    window.__cargarMensajesEquipo = cargarMensajesEquipo;
 
     if (btnChat) btnChat.addEventListener("click", function () { expandirChat(true); });
     if (btnBurbuja) btnBurbuja.addEventListener("click", function () { expandirChat(true); });
@@ -5735,6 +5892,12 @@
         e.preventDefault();
         var txt = (inp && inp.value || "").trim();
         if (!txt) return;
+
+        if (equipoTabActiva) {
+          if (inp) inp.value = "";
+          enviarMensajeEquipo(txt);
+          return;
+        }
 
         expandirChat(false);
 
@@ -8334,9 +8497,19 @@
         fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
       }
     }, 60000);
+    // Refresco del chat de equipo (cada 20s con pestaña activa): más
+    // frecuente que el heartbeat porque un canal de avisos pierde utilidad
+    // si tarda un minuto en aparecer, sin bajar a segundos para no generar
+    // tráfico innecesario sobre SQLite en modo WAL.
+    setInterval(function () {
+      if (!document.hidden && navigator.onLine && window.__cargarMensajesEquipo) {
+        window.__cargarMensajesEquipo();
+      }
+    }, 20000);
     document.addEventListener("visibilitychange", function () {
       if (!document.hidden && navigator.onLine) {
         fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
+        if (window.__cargarMensajesEquipo) window.__cargarMensajesEquipo();
       }
     });
     // Primer refresco de badges y cola offline al reconectar tras estar sin señal.
@@ -8346,6 +8519,7 @@
     });
     cargarUsuario().finally(function () {
       arrancarDesdeUrl();
+      if (window.__cargarMensajesEquipo) window.__cargarMensajesEquipo();
     });
   }
 })();

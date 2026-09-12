@@ -3495,6 +3495,12 @@ def construir_application(
             logger.info("Tarea de Despacho Matutino programada diariamente a las %02d:%02d", h, m)
         except Exception as ejq:
             logger.warning("No se pudo programar despacho matutino en job_queue: %s", ejq)
+    else:
+        logger.warning(
+            "JobQueue no disponible: el Despacho Matutino (%s) NO se programara. "
+            "Instale el extra con: pip install 'python-telegram-bot[job-queue]'",
+            os.getenv("DESPACHO_HORA", "05:30"),
+        )
 
     return app
 

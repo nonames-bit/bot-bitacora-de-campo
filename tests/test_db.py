@@ -1093,5 +1093,57 @@ def test_registrar_parto_sin_cria_distinto_tipo_no_colisiona(db):
     assert db.count("partos") == 2
 
 
+# ---------------------------------------------------------------------------
+# Chat de equipo: canal único de avisos (broadcast) entre usuarios de la PWA.
+# ---------------------------------------------------------------------------
+def test_registrar_mensaje_equipo_y_obtenerlo(db):
+    mid = db.registrar_mensaje_equipo(user_id=1, nombre="Jaime", rol="owner", texto="  Revisar la cerca del potrero  ")
+    assert isinstance(mid, int)
+    fila = db.obtener_mensaje_equipo(mid)
+    assert fila["nombre"] == "Jaime"
+    assert fila["rol"] == "OWNER"  # normalizado a mayúsculas
+    assert fila["texto"] == "Revisar la cerca del potrero"  # trim aplicado
+    assert fila["creado_en"] is not None
+
+
+def test_obtener_mensaje_equipo_inexistente_devuelve_none(db):
+    assert db.obtener_mensaje_equipo(99999) is None
+
+
+def test_listar_mensajes_equipo_carga_inicial_orden_cronologico(db):
+    db.registrar_mensaje_equipo(user_id=1, nombre="Jaime", rol="OWNER", texto="Uno")
+    db.registrar_mensaje_equipo(user_id=2, nombre="Carlos", rol="TRABAJADOR", texto="Dos")
+    filas = db.listar_mensajes_equipo()
+    assert [f["texto"] for f in filas] == ["Uno", "Dos"]
+
+
+def test_listar_mensajes_equipo_polling_incremental(db):
+    id1 = db.registrar_mensaje_equipo(user_id=1, nombre="Jaime", rol="OWNER", texto="Uno")
+    db.registrar_mensaje_equipo(user_id=2, nombre="Carlos", rol="TRABAJADOR", texto="Dos")
+    filas = db.listar_mensajes_equipo(despues_de_id=id1)
+    assert len(filas) == 1
+    assert filas[0]["texto"] == "Dos"
+
+
+def test_listar_mensajes_equipo_respeta_limite_y_tope_maximo(db):
+    for i in range(5):
+        db.registrar_mensaje_equipo(user_id=1, nombre="Jaime", rol="OWNER", texto=f"Msg {i}")
+    filas = db.listar_mensajes_equipo(limite=2)
+    assert len(filas) == 2
+    assert [f["texto"] for f in filas] == ["Msg 3", "Msg 4"]  # los últimos 2, en orden ascendente
+
+
+def test_eliminar_mensaje_equipo_borra_solo_ese(db):
+    id1 = db.registrar_mensaje_equipo(user_id=1, nombre="Jaime", rol="OWNER", texto="Uno")
+    id2 = db.registrar_mensaje_equipo(user_id=2, nombre="Carlos", rol="TRABAJADOR", texto="Dos")
+    assert db.eliminar_mensaje_equipo(id1) is True
+    assert db.obtener_mensaje_equipo(id1) is None
+    assert db.obtener_mensaje_equipo(id2) is not None
+
+
+def test_eliminar_mensaje_equipo_inexistente_devuelve_false(db):
+    assert db.eliminar_mensaje_equipo(99999) is False
+
+
 
 

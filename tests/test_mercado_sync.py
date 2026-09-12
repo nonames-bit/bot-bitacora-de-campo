@@ -181,3 +181,54 @@ def test_datos_mercado_tendencias_y_comparativa(tmp_path):
 
     db.close()
 
+
+def test_tabla_vacia_siembra_y_marca_referencia(db):
+    # 1. Tabla vacía -> la siembra inserta filas y todo es referencia jul-sep 2026.
+    datos = db.obtener_datos_mercado_completos()
+    n = db.query_one("SELECT COUNT(*) AS c FROM precios_mercado")["c"]
+    assert n > 0
+    assert datos["es_datos_referencia"] is True
+    assert datos["fecha_ultimo_dato"] == "2026-09-09"
+
+
+def test_fechas_propias_no_reinyectan_semilla(db):
+    # 2. Con 1-3 fechas propias la lectura NO reinyecta las 7 semanas semilla.
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO",
+                                precio_promedio=9000.0, fuente="MANUAL",
+                                fecha="2026-10-01", notas="propio")
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO",
+                                precio_promedio=9100.0, fuente="MANUAL",
+                                fecha="2026-10-02", notas="propio")
+    datos = db.obtener_datos_mercado_completos()
+    fechas = {r["fecha"] for r in db.query("SELECT DISTINCT fecha AS fecha FROM precios_mercado")}
+    assert fechas == {"2026-10-01", "2026-10-02"}
+    n_semilla = db.query_one(
+        "SELECT COUNT(*) AS c FROM precios_mercado WHERE fuente LIKE 'Sugameta%'"
+    )["c"]
+    assert n_semilla == 0
+    assert datos["es_datos_referencia"] is False
+
+
+def test_precio_manual_desmarca_referencia(db):
+    # 3. Un registro MANUAL hace que es_datos_referencia pase a False.
+    datos_antes = db.obtener_datos_mercado_completos()
+    assert datos_antes["es_datos_referencia"] is True
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO",
+                                precio_promedio=9999.0, fuente="MANUAL",
+                                fecha="2026-10-03", notas="precio del productor")
+    datos_despues = db.obtener_datos_mercado_completos()
+    assert datos_despues["es_datos_referencia"] is False
+
+
+def test_resiembra_forzada_preserva_precio_manual_sync(db):
+    # 4. forzar=True repone la semilla pero conserva las filas MANUAL.
+    db.sembrar_precios_mercado_iniciales()
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO",
+                                precio_promedio=9999.0, fuente="MANUAL",
+                                fecha="2026-09-09", notas="precio del productor")
+    db.sembrar_precios_mercado_iniciales(forzar=True)
+    fila = db.query_one(
+        "SELECT * FROM precios_mercado WHERE fuente = 'MANUAL' AND precio_promedio = 9999.0"
+    )
+    assert fila is not None
+
