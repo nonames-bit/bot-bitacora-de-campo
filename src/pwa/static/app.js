@@ -7373,6 +7373,198 @@
         }
       }).catch(function () { /* best-effort */ });
   }
+  /* ---------- Chat interno del equipo (solo PWA) ---------- */
+  var _chatfTimer = null;
+  var _chatfCon = "general";       // conversación abierta: "general" o user_id
+  var _chatfUltimoId = 0;          // último mensaje recibido (polling incremental)
+  var _chatfContactos = [];
+  var _chatfNoLeidos = {};
+  var _chatfEnviando = false;
+  var _chatfTickContactos = 0;
+
+  function chatfHora(fecha) {
+    try {
+      var dt = new Date(fecha);
+      var hm = dt.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+      if (dt.toDateString() === new Date().toDateString()) return hm;
+      return dt.toLocaleDateString("es-CO", { day: "2-digit", month: "short" }) + " " + hm;
+    } catch (e) { return ""; }
+  }
+
+  function renderChatFinca() {
+    return "<h3>" + icon("chat", 18) + "Chat de la Finca</h3>"
+      + "<p class='aviso'>Mensajería interna entre los usuarios de la app: canal general del equipo y conversaciones directas. Requiere señal (no funciona en modo offline).</p>"
+      + "<div class='chatf-wrap' id='chatf-wrap'>"
+      + "<div class='chatf-lista' id='chatf-lista'><div class='chatf-cargando'>Cargando contactos…</div></div>"
+      + "<div class='chatf-conv'>"
+      + "<div class='chatf-conv-head'>"
+      + "<button type='button' id='chatf-volver' class='chatf-volver' title='Volver a contactos' aria-label='Volver a contactos'>←</button>"
+      + "<div class='chatf-conv-tit'><b id='chatf-titulo'>📢 Canal General</b><small id='chatf-sub'></small></div>"
+      + "</div>"
+      + "<div id='chatf-mensajes' class='chatf-mensajes'><div class='chatf-cargando'>Cargando mensajes…</div></div>"
+      + "<form id='chatf-form' class='chatf-form'>"
+      + "<input type='text' id='chatf-input' placeholder='Escribe un mensaje…' autocomplete='off' maxlength='2000'>"
+      + "<button type='submit' class='chatf-enviar' title='Enviar mensaje' aria-label='Enviar mensaje'>" + icon("send", 16) + "</button>"
+      + "</form>"
+      + "</div></div>";
+  }
+
+  function chatfPintarContactos() {
+    var cont = document.getElementById("chatf-lista");
+    if (!cont) return;
+    var por = (_chatfNoLeidos && _chatfNoLeidos.por_conversacion) || {};
+    function badge(con) {
+      var n = parseInt(por[con], 10) || 0;
+      return n > 0 ? "<span class='chatf-unread'>" + (n > 99 ? "99+" : n) + "</span>" : "";
+    }
+    var h = "<button type='button' class='chatf-contacto" + (_chatfCon === "general" ? " act" : "") + "' data-con='general'>"
+      + "<span class='chatf-cont-avatar chatf-av-general'>📢</span>"
+      + "<span class='chatf-cont-info'><b>Canal General</b><small>Todo el equipo</small></span>"
+      + badge("general") + "</button>";
+    _chatfContactos.forEach(function (c) {
+      var con = String(c.user_id);
+      h += "<button type='button' class='chatf-contacto" + (_chatfCon === con ? " act" : "") + "' data-con='" + esc(con) + "'>"
+        + "<span class='chatf-cont-avatar'>" + renderAvatarBadge(c.avatar, c.rol, 34, false)
+        + (c.en_linea ? "<span class='chatf-dot'></span>" : "") + "</span>"
+        + "<span class='chatf-cont-info'><b>" + esc(c.nombre) + "</b><small>" + esc(c.en_linea ? "En línea" : (c.hace_texto || "")) + "</small></span>"
+        + badge(con) + "</button>";
+    });
+    cont.innerHTML = h;
+    qa(".chatf-contacto", cont).forEach(function (b) {
+      b.addEventListener("click", function () { chatfAbrir(b.getAttribute("data-con")); });
+    });
+  }
+
+  function chatfAppend(mensajes) {
+    var box = document.getElementById("chatf-mensajes");
+    if (!box || !mensajes || !mensajes.length) return;
+    var placeholder = box.querySelector(".chatf-cargando");
+    if (placeholder) placeholder.remove();
+    mensajes.forEach(function (m) {
+      var div = document.createElement("div");
+      div.className = "chatf-msg" + (m.mio ? " mio" : "");
+      var quien = (!m.mio && _chatfCon === "general")
+        ? "<small class='chatf-quien'>" + esc(m.de_nombre || m.de) + "</small>" : "";
+      div.innerHTML = quien + "<span class='chatf-texto'>" + esc(m.texto) + "</span>"
+        + "<small class='chatf-hora'>" + esc(chatfHora(m.fecha)) + "</small>";
+      box.appendChild(div);
+      if (m.id > _chatfUltimoId) _chatfUltimoId = m.id;
+    });
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function chatfAbrir(con) {
+    _chatfCon = con || "general";
+    _chatfUltimoId = 0;
+    var box = document.getElementById("chatf-mensajes");
+    if (box) box.innerHTML = "<div class='chatf-cargando'>Cargando mensajes…</div>";
+    var tit = document.getElementById("chatf-titulo");
+    var sub = document.getElementById("chatf-sub");
+    if (_chatfCon === "general") {
+      if (tit) tit.textContent = "📢 Canal General";
+      if (sub) sub.textContent = "Mensajes para todo el equipo";
+    } else {
+      var c = _chatfContactos.filter(function (x) { return String(x.user_id) === _chatfCon; })[0];
+      if (tit) tit.textContent = c ? c.nombre : "Usuario " + _chatfCon;
+      if (sub) sub.textContent = c ? (c.en_linea ? "En línea" : (c.hace_texto || "")) : "";
+    }
+    // Móvil: al abrir una conversación se oculta la lista (botón ← regresa).
+    var wrap = document.getElementById("chatf-wrap");
+    if (wrap) wrap.classList.add("en-conv");
+    chatfPintarContactos();
+    chatfPoll(true);
+  }
+
+  function chatfPoll(inicial) {
+    if (actual !== "chat" || navigator.onLine === false) return;
+    var con = _chatfCon;
+    fetch("/api/chat/mensajes?con=" + encodeURIComponent(con) + "&desde_id=" + _chatfUltimoId)
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) {
+        if (actual !== "chat" || _chatfCon !== con) return; // cambió de vista/conversación
+        _chatfNoLeidos = d.no_leidos || {};
+        if (d.mensajes && d.mensajes.length) {
+          chatfAppend(d.mensajes);
+        } else if (inicial) {
+          var box = document.getElementById("chatf-mensajes");
+          if (box && box.querySelector(".chatf-cargando")) {
+            box.innerHTML = "<div class='chatf-cargando'>Sin mensajes todavía. ¡Escribe el primero! 👋</div>";
+          }
+        }
+        chatfPintarContactos();
+      }).catch(function () { /* sin red: reintenta en el próximo tick */ });
+  }
+
+  function chatfRefrescarContactos() {
+    if (actual !== "chat" || navigator.onLine === false) return;
+    fetch("/api/chat/contactos")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) {
+        if (actual !== "chat") return;
+        _chatfContactos = (d && d.contactos) || [];
+        _chatfNoLeidos = (d && d.no_leidos) || {};
+        chatfPintarContactos();
+      }).catch(function () { /* noop */ });
+  }
+
+  function chatfEnviar() {
+    var inp = document.getElementById("chatf-input");
+    var texto = (inp && inp.value || "").trim();
+    if (!texto || _chatfEnviando) return;
+    if (navigator.onLine === false) {
+      mostrarToast("⚠️ Sin señal: el chat necesita conexión para enviar.");
+      return;
+    }
+    _chatfEnviando = true;
+    var con = _chatfCon;
+    fetch("/api/chat/enviar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ con: con, texto: texto })
+    }).then(function (r) { return r.json().then(function (b) { return { status: r.status, body: b }; }); })
+      .then(function (res) {
+        _chatfEnviando = false;
+        if (res.status !== 200 || !res.body || !res.body.ok) {
+          mostrarToast("⚠️ " + ((res.body && res.body.error) || "No se pudo enviar el mensaje."));
+          return;
+        }
+        if (inp) { inp.value = ""; inp.focus(); }
+        if (_chatfCon === con) chatfAppend([res.body.mensaje]);
+      }).catch(function () {
+        _chatfEnviando = false;
+        mostrarToast("⚠️ No se pudo enviar: revisa la conexión.");
+      });
+  }
+
+  function bindChatFinca() {
+    fetch("/api/chat/contactos")
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) {
+        _chatfContactos = (d && d.contactos) || [];
+        _chatfNoLeidos = (d && d.no_leidos) || {};
+        chatfAbrir(_chatfCon);
+      }).catch(function () {
+        var cont = document.getElementById("chatf-lista");
+        if (cont) cont.innerHTML = "<div class='chatf-cargando'>⚠️ No se pudieron cargar los contactos.</div>";
+      });
+    var form = document.getElementById("chatf-form");
+    if (form) form.addEventListener("submit", function (e) { e.preventDefault(); chatfEnviar(); });
+    var volver = document.getElementById("chatf-volver");
+    if (volver) volver.addEventListener("click", function () {
+      var wrap = document.getElementById("chatf-wrap");
+      if (wrap) wrap.classList.remove("en-conv");
+    });
+    if (_chatfTimer) clearInterval(_chatfTimer);
+    _chatfTickContactos = 0;
+    _chatfTimer = setInterval(function () {
+      if (document.hidden) return;
+      chatfPoll(false);
+      // La presencia/no-leídos de la lista se refresca cada ~30 s.
+      _chatfTickContactos = (_chatfTickContactos + 1) % 6;
+      if (_chatfTickContactos === 0) chatfRefrescarContactos();
+    }, 5000);
+  }
+
   function cargar(animar) {
     if (animar === undefined) animar = true;
 
@@ -7426,6 +7618,15 @@
     if (actual === "gps") {
       irAVista("mapa");
       cargar(animar);
+      return;
+    }
+
+    if (actual === "chat") {
+      if (!animar) return; // el chat tiene su propio polling: no resetear al minuto
+      if (vista) {
+        montarVista(vista, renderChatFinca(), animar);
+        bindChatFinca();
+      }
       return;
     }
 
@@ -7508,7 +7709,7 @@
   }
 
   /* ---------- Badges de contadores en la navegación ---------- */
-  var VISTAS_BADGE = ["agenda", "repro", "sanidad"];
+  var VISTAS_BADGE = ["agenda", "repro", "sanidad", "chat"];
   var badgesCache = {};
   function crearBadgesNav() {
     VISTAS_BADGE.forEach(function (v) {
@@ -7591,6 +7792,18 @@
           } catch (e) { /* noop */ }
         }
         window.__agendaPrev = nA;
+
+        // Chat interno: notificación nativa al llegar mensajes nuevos
+        // mientras la pestaña está oculta o el usuario no está en el chat.
+        var nC = parseInt(d && d.chat, 10) || 0;
+        var prevC = (window.__chatPrev === undefined) ? -1 : window.__chatPrev;
+        if (prevC >= 0 && nC > prevC && nC > 0 && (document.hidden || actual !== "chat")) {
+          mostrarNotificacionNativa("💬 Chat de la Finca", {
+            body: nC + " mensaje(s) sin leer del equipo.",
+            tag: "bitacora-chat"
+          });
+        }
+        window.__chatPrev = nC;
         verificarAlertasPush();
       }).catch(function () { /* sin red: se ocultan */ });
   }
@@ -7631,6 +7844,7 @@
     finanzas: "Finanzas",
     mapa: "Mapa & GPS",
     manga: "Manga",
+    chat: "Chat",
     agenda: "Agenda",
     repro: "Repro",
     leche: "Leche",
@@ -7728,6 +7942,10 @@
 
   // Cambia de pestaña activa sin recargar
   function irAVista(v) {
+    if (actual === "chat" && v !== "chat" && _chatfTimer) {
+      clearInterval(_chatfTimer);
+      _chatfTimer = null;
+    }
     if (actual === "mapa" && v !== "mapa") {
       if (_mapaTimerRefresh) {
         clearInterval(_mapaTimerRefresh);
