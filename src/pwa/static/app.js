@@ -2280,7 +2280,7 @@
     if (!filas || !filas.length) return vacio("Ningún potrero con animales.");
     var max = 0;
     filas.forEach(function (f) { max = Math.max(max, Number(f.n) || 0); });
-    var h = "<div style='display:flex; flex-direction:column; gap:7px;'>";
+    var h = "<div style='display:flex; flex-direction:column; gap:10px;'>";
     filas.forEach(function (f) {
       var nom = String(f.potrero || "");
       var n = Number(f.n) || 0;
@@ -2289,12 +2289,18 @@
       var etiqueta = esReal
         ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "' style='font-weight:600; font-size:13px; text-decoration:none; color:var(--texto-color);'>" + esc(nom) + "</a>"
         : "<span style='font-weight:600; font-size:13px; color:var(--texto-suave);'>" + esc(nom) + "</span>";
-      h += "<div style='display:flex; align-items:center; gap:10px;'>"
-        + "<div style='min-width:130px; max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title=\"" + esc(nom) + "\">" + etiqueta + "</div>"
-        + "<div style='flex:1; background:var(--superficie); border-radius:6px; height:20px; overflow:hidden; border:1px solid var(--borde-suave);'>"
+      // Nombre en su propia línea (nunca se corta, sin importar largo) y la
+      // barra a todo el ancho debajo -- así todas arrancan en el mismo x y
+      // quedan alineadas, sin depender de una columna de etiqueta fija que
+      // truncaba nombres largos como "CASA ABAJO VERSALLES".
+      h += "<div>"
+        + "<div style='display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:3px;'>"
+        + "<span>" + etiqueta + "</span>"
+        + "<b style='font-size:13px; flex-shrink:0;'>" + esc(n) + "</b>"
+        + "</div>"
+        + "<div style='background:var(--superficie); border-radius:6px; height:16px; overflow:hidden; border:1px solid var(--borde-suave);'>"
         + "<div style='width:" + pct + "%; height:100%; background:var(--verde-marca); border-radius:6px;'></div>"
         + "</div>"
-        + "<b style='min-width:32px; text-align:right; font-size:13px;'>" + esc(n) + "</b>"
         + "</div>";
     });
     h += "</div>";
