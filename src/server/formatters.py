@@ -2190,7 +2190,57 @@ def formatear_despacho_matutino(db: Database, hoy: Optional[date] = None, finca_
     else:
         lineas.append("🧬 <b>Inseminaciones AM:</b> Sin servicios de regla AM-PM programados para hoy.\n")
 
-    # 3. 📌 Recordatorios Programados
+    # 3. ⚠️ Alertas de Peso — animales que perdieron peso desde el último control
+    try:
+        alertas_peso = db.query(
+            """
+            WITH ranked AS (
+                SELECT
+                    p.animal_id,
+                    a.tag,
+                    a.nombre,
+                    p.fecha AS fecha_pesaje,
+                    p.peso_kg,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY p.animal_id
+                        ORDER BY p.fecha DESC
+                    ) AS rn,
+                    LAG(p.peso_kg) OVER (
+                        PARTITION BY p.animal_id
+                        ORDER BY p.fecha DESC
+                    ) AS peso_anterior,
+                    LAG(p.fecha) OVER (
+                        PARTITION BY p.animal_id
+                        ORDER BY p.fecha DESC
+                    ) AS fecha_anterior
+                FROM pesajes p
+                JOIN animales a ON a.id_animal = p.animal_id
+                WHERE a.estado = 'ACTIVO'
+                  AND p.peso_kg IS NOT NULL
+            )
+            SELECT tag, nombre, peso_anterior, peso_kg
+            FROM ranked
+            WHERE rn = 1
+              AND peso_anterior IS NOT NULL
+              AND peso_kg < peso_anterior
+            ORDER BY (peso_kg - peso_anterior) ASC
+            LIMIT 10
+            """
+        )
+    except Exception:
+        alertas_peso = []
+
+    if alertas_peso:
+        lineas.append("⚠️ <b>ANIMALES CON PERDIDA DE PESO:</b>")
+        for p in alertas_peso:
+            nombre = f" ({p['nombre']})" if p.get("nombre") else ""
+            linea = f"• <b>{_esc(p['tag'])}{nombre}</b>"
+            dif = p['peso_anterior'] - p['peso_kg']
+            linea += f" — {p['peso_kg']} kg <i>(bajó {dif:.1f} kg)</i>"
+            lineas.append(linea)
+        lineas.append("")
+
+    # 4. 📌 Recordatorios Programados
     try:
         recordatorios = db.listar_recordatorios_pendientes(fecha=hoy_iso)
     except Exception:
@@ -2345,6 +2395,62 @@ def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> st
     lineas.append("• <code>/termo</code> — Ver nivel y recargas de nitrógeno")
     lineas.append("• <code>/recarga_n2</code> — Registrar recarga de nitrógeno")
     lineas.append("• <code>palpé la 47 confirmada preñada 60 días</code> — Registrar diagnóstico")
+
+    return "\n".join(lineas)
+
+
+def formatear_despacho_tarde(db: Database, hoy=None) -> str:
+    """Genera el aviso vespertino (14:00) para inseminaciones de celos AM.
+
+    Un celo observado en la mañana (AM) debe inseminarse la misma tarde.
+    Este mensaje recuerda a los trabajadores que tienen animals pendientes.
+    Solo se envía si hay celos AM del día actual registrados.
+    """
+    if hoy is None:
+        hoy = date.today()
+    hoy_iso = hoy.isoformat()
+
+    # Celos AM del día (no ayer, hoy)
+    celos_am = db.query(
+        """
+        SELECT c.*, a.tag, a.nombre, p.nombre AS potrero_nom
+        FROM celos c
+        JOIN animales a ON a.id_animal = c.vaca_id
+        LEFT JOIN potreros p ON p.id = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+          AND c.fecha = ?
+          AND (UPPER(c.am_pm) LIKE '%AM%' OR UPPER(c.am_pm) = 'MANANA' OR UPPER(c.am_pm) = 'MANIANA')
+        ORDER BY c.id DESC
+        """,
+        (hoy_iso,),
+    )
+
+    if not celos_am:
+        return None  # Nada que reportar
+
+    lineas = [
+        "🌅 <b>AVISO VESPERTINO — INSEMINACIONES PENDIENTES</b>",
+        f"<i>{hoy.strftime('%d/%b/%Y').lower()}</i> · <code>14:00</code>",
+        "────────────────────────────────────────",
+        "🔥 <b>Celos observados esta mañana — Inseminar HOY antes de las 17:00:</b>",
+        "",
+    ]
+
+    vistos = set()
+    for c in celos_am:
+        if c["vaca_id"] in vistos:
+            continue
+        vistos.add(c["vaca_id"])
+        tag = c["tag"] or f"#{c['vaca_id']}"
+        nom = f" ({c['nombre']})" if c.get("nombre") else ""
+        pot = f" en <b>{c['potrero_nom']}</b>" if c.get("potrero_nom") else ""
+        lineas.append(
+            f"• 💉 <b>{_esc(tag)}{nom}</b>{pot}"
+            f" — Celo <b>AM</b> <i>(Inseminar esta tarde)</i>"
+        )
+
+    lineas.append("")
+    lineas.append("⚠️ <i>Registre el servicio o IA con /servicio o por voz.</i>")
 
     return "\n".join(lineas)
 

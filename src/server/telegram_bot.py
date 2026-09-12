@@ -3502,6 +3502,43 @@ def construir_application(
             os.getenv("DESPACHO_HORA", "05:30"),
         )
 
+    # ------------------------------------------------------------------ #
+    # Tarea vespertina: recordatorio de inseminaciones pendientes (celos AM)
+    # ------------------------------------------------------------------ #
+    async def _tarea_despacho_tarde(context: ContextTypes.DEFAULT_TYPE) -> None:
+        try:
+            msg = formatear_despacho_tarde(db)
+            if msg is None:
+                return
+            teclado = crear_teclado_despacho_matutino()
+            for u in auth.listar_usuarios():
+                u_id = u.get("user_id")
+                u_rol = u.get("rol")
+                if u_id and u_rol in ("OWNER", "ADMIN", "TRABAJADOR"):
+                    try:
+                        await context.bot.send_message(
+                            chat_id=u_id,
+                            text=msg,
+                            parse_mode="HTML",
+                            reply_markup=teclado,
+                        )
+                    except Exception as eu:
+                        logger.warning("No se pudo enviar aviso vespertino a usuario %s: %s", u_id, eu)
+        except Exception as e:
+            logger.error("Error ejecutando _tarea_despacho_tarde: %s", e, exc_info=True)
+
+    if app.job_queue:
+        import datetime
+        hora_tarde_env = os.getenv("DESPACHO_HORA_TARDE", "14:00")
+        try:
+            ht, mt = map(int, hora_tarde_env.split(":"))
+            hora_tarde = datetime.time(hour=ht, minute=mt)
+            app.job_queue.run_daily(_tarea_despacho_tarde, time=hora_tarde)
+            logger.info("Tarea de Aviso Vespertino programada diariamente a las %02d:%02d", ht, mt)
+        except Exception as ejq2:
+            logger.warning("No se pudo programar aviso vespertino en job_queue: %s", ejq2)
+    # Si job_queue no está disponible, el aviso vespertino simplemente no se programa.
+
     return app
 
 
