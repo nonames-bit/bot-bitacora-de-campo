@@ -83,10 +83,68 @@
     }
   }
 
-  function actualizarLluviaHeader(hayLluvia) {
+  var _climaEstadoActual = "soleado";
+  function actualizarClimaHeader(climaDatos) {
+    if (climaDatos) {
+      window.__ultimoClimaPronostico = climaDatos;
+    }
+    var dClima = window.__ultimoClimaPronostico;
+    if (!dClima && window.__datosUltimoTablero && window.__datosUltimoTablero.clima_hoy) {
+      dClima = window.__datosUltimoTablero.clima_hoy;
+    }
+    if (!dClima && window.__datosUltimoPasturas && window.__datosUltimoPasturas.pronostico && window.__datosUltimoPasturas.pronostico.dias) {
+      dClima = window.__datosUltimoPasturas.pronostico.dias[0];
+    }
+
+    var col = obtenerHoraColombia();
+    var esNocheHora = (col.hora > 18 || (col.hora === 18 && col.min >= 30) || col.hora < 5 || (col.hora === 5 && col.min < 30));
+    var tema = document.documentElement.getAttribute("data-theme");
+    var esNoche = esNocheHora || (tema === "dark");
+
+    var lluviaMm = 0;
+    var probLluvia = 0;
+    if (dClima) {
+      lluviaMm = Number(dClima.lluvia_mm) || 0;
+      probLluvia = Number(dClima.prob_lluvia_pct) || 0;
+    }
+
+    var hayLluvia = (lluviaMm >= 1.5 || probLluvia >= 65);
+    var hayNubes = (lluviaMm >= 0.3 || probLluvia >= 30);
+
+    var solEl = document.getElementById("header-clima-sol");
+    var lunaEl = document.getElementById("header-clima-luna");
+    var nubesEl = document.getElementById("header-clima-nubes");
     var lluviaEl = document.getElementById("header-lluvia");
-    if (!lluviaEl) return;
-    lluviaEl.style.display = hayLluvia ? "block" : "none";
+
+    if (lluviaEl) {
+      lluviaEl.style.display = hayLluvia ? "block" : "none";
+    }
+
+    if (esNoche) {
+      if (solEl) solEl.style.display = "none";
+      if (lunaEl) lunaEl.style.display = "inline-flex";
+      if (nubesEl) nubesEl.style.display = hayNubes ? "block" : "none";
+      _climaEstadoActual = hayLluvia ? "lluvia-noche" : "noche";
+    } else {
+      if (lunaEl) lunaEl.style.display = "none";
+      if (hayLluvia) {
+        if (solEl) solEl.style.display = "none";
+        if (nubesEl) nubesEl.style.display = "block";
+        _climaEstadoActual = "lluvia";
+      } else if (hayNubes) {
+        if (solEl) solEl.style.display = "none";
+        if (nubesEl) nubesEl.style.display = "block";
+        _climaEstadoActual = "nublado";
+      } else {
+        if (solEl) solEl.style.display = "inline-flex";
+        if (nubesEl) nubesEl.style.display = "none";
+        _climaEstadoActual = "soleado";
+      }
+    }
+  }
+
+  function actualizarLluviaHeader(hayLluvia) {
+    actualizarClimaHeader(hayLluvia ? { lluvia_mm: 4.0, prob_lluvia_pct: 80 } : { lluvia_mm: 0, prob_lluvia_pct: 0 });
   }
 
   function tocarVaquitaHeader() {
@@ -128,6 +186,14 @@
     } else {
       frases.push("🌾 Pastando forraje fresco bajo rotación Voisin.");
       frases.push("¡Muuu! 🐮 Cero garrapatas y ganado al día.");
+    }
+
+    if (_climaEstadoActual === "lluvia" || _climaEstadoActual === "lluvia-noche") {
+      frases.push("🌧️ ¡Lluvia en la finca! Pastos verdes y buen aforo asegurado.");
+    } else if (_climaEstadoActual === "nublado") {
+      frases.push("⛅ Día fresco y nublado en Mesetas, ideal para el pastoreo.");
+    } else if (_climaEstadoActual === "soleado") {
+      frases.push("☀️ Día soleado en la sabana: ganado en pleno pastoreo.");
     }
 
     if (totalActivos > 0) {
@@ -174,6 +240,7 @@
       });
     }
     actualizarVacaHeader();
+    actualizarClimaHeader();
   }
 
   /* ---------- Vistas principales ---------- */
@@ -243,10 +310,12 @@
   }
   function renderTablero(d) {
     window.__datosUltimoTablero = d;
-    if (d && d.pronostico && d.pronostico.dias && d.pronostico.dias.length) {
-      var ll = Number(d.pronostico.dias[0].lluvia_mm) || 0;
-      var pr = Number(d.pronostico.dias[0].prob_lluvia_pct) || 0;
-      actualizarLluviaHeader(ll >= 1.5 || pr >= 65);
+    if (d && d.clima_hoy) {
+      actualizarClimaHeader(d.clima_hoy);
+    } else if (d && d.pronostico && d.pronostico.dias && d.pronostico.dias.length) {
+      actualizarClimaHeader(d.pronostico.dias[0]);
+    } else {
+      actualizarClimaHeader();
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:5px 12px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
@@ -423,9 +492,9 @@
   function renderPasturas(d) {
     window.__datosUltimoPasturas = d;
     if (d && d.pronostico && d.pronostico.dias && d.pronostico.dias.length) {
-      var llHoy = Number(d.pronostico.dias[0].lluvia_mm) || 0;
-      var prHoy = Number(d.pronostico.dias[0].prob_lluvia_pct) || 0;
-      actualizarLluviaHeader(llHoy >= 1.5 || prHoy >= 65);
+      actualizarClimaHeader(d.pronostico.dias[0]);
+    } else {
+      actualizarClimaHeader();
     }
     var simple = modoPasturasEsSimple();
     var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px;'>"
@@ -8358,6 +8427,7 @@
       try { reloj.textContent = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { /* noop */ }
     }
     actualizarVacaHeader();
+    actualizarClimaHeader();
   }
   tick();
   setInterval(function () {
@@ -8380,6 +8450,7 @@
     try { localStorage.setItem("pwa_tema", modo || "green"); } catch (e) { /* noop */ }
     if (selectTema) selectTema.value = modo || "green";
     actualizarVacaHeader();
+    actualizarClimaHeader();
   }
   function temaInicial() {
     try { return localStorage.getItem("pwa_tema") || "green"; } catch (e) { return "green"; }

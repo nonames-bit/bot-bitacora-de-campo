@@ -2474,28 +2474,155 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-/* Lluvia animada en el header (cuando llueve en la finca) */
+/* Cielo y elementos climáticos dinámicos sobre el pasto */
+.header-cielo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 6px;
+  z-index: 1;
+}
+
+/* Sol radiante */
+.clima-sol {
+  position: absolute;
+  top: 1px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 0 5px rgba(255, 193, 7, 0.75));
+  animation: sol-radiante 5s ease-in-out infinite;
+  z-index: 2;
+}
+@keyframes sol-radiante {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.95; }
+  50% { transform: scale(1.08) rotate(14deg); opacity: 1; filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.95)); }
+}
+
+/* Luna y estrellitas en reposo nocturno */
+.clima-luna {
+  position: absolute;
+  top: 1px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+.clima-luna .svg-luna {
+  filter: drop-shadow(0 0 4px rgba(255, 241, 184, 0.65));
+  animation: luna-flota 3.5s ease-in-out infinite;
+}
+@keyframes luna-flota {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.5px); }
+}
+.estrellita {
+  position: absolute;
+  color: #FFF9D2;
+  font-size: 8px;
+  line-height: 1;
+  pointer-events: none;
+  animation: estrella-titila 2.2s ease-in-out infinite;
+}
+.est-1 { top: -2px; left: -8px; font-size: 8px; animation-delay: 0s; }
+.est-2 { top: 10px; left: -11px; font-size: 6px; animation-delay: 0.7s; }
+.est-3 { top: 2px; right: -8px; font-size: 7px; animation-delay: 1.4s; }
+@keyframes estrella-titila {
+  0%, 100% { opacity: 0.2; transform: scale(0.65); }
+  50% { opacity: 1; transform: scale(1.2); filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95)); }
+}
+
+/* Nubes en cielo cubierto */
+.clima-nubes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 2;
+}
+.clima-nubes .svg-nube {
+  position: absolute;
+  top: 1px;
+}
+.clima-nubes .nube-1 {
+  left: 6px;
+  animation: nube-deriva-1 14s ease-in-out infinite alternate;
+}
+.clima-nubes .nube-2 {
+  right: 8px;
+  top: 3px;
+  animation: nube-deriva-2 18s ease-in-out infinite alternate;
+}
+.nube-forma {
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: rgba(200, 225, 245, 0.9);
+  stroke-width: 1px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.25));
+}
+:root[data-theme="light"] .nube-forma {
+  fill: rgba(220, 235, 245, 0.9);
+  stroke: #809bb0;
+}
+@keyframes nube-deriva-1 {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(18px); }
+}
+@keyframes nube-deriva-2 {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-16px); }
+}
+
+/* Lluvia animada en el header (cuando llueve en la finca) - Gotas densas y nítidas de alto contraste */
 .header-lluvia {
   position: absolute;
-  inset: -4px;
+  inset: -6px;
   pointer-events: none;
-  border-radius: 6px;
+  border-radius: 8px;
   overflow: hidden;
-  background: repeating-linear-gradient(
-    108deg,
-    transparent 0%,
-    transparent 10%,
-    rgba(120, 185, 255, 0.4) 10.5%,
-    transparent 11%,
-    transparent 22%
-  );
-  background-size: 32px 32px;
-  animation: header-lluvia-cae 0.38s linear infinite;
-  opacity: 0.85;
+  background-image:
+    repeating-linear-gradient(
+      110deg,
+      transparent 0px,
+      transparent 19px,
+      rgba(145, 215, 255, 0.95) 20px,
+      rgba(255, 255, 255, 1) 21px,
+      rgba(115, 195, 255, 0.95) 22px,
+      transparent 23.5px
+    ),
+    repeating-linear-gradient(
+      116deg,
+      transparent 0px,
+      transparent 14px,
+      rgba(165, 225, 255, 0.85) 15px,
+      rgba(255, 255, 255, 0.95) 15.8px,
+      rgba(110, 195, 255, 0.8) 16.6px,
+      transparent 18px
+    );
+  background-size: 48px 48px, 34px 34px;
+  animation: header-lluvia-cae 0.30s linear infinite;
+  opacity: 1;
+  z-index: 6;
+  filter: drop-shadow(0 0 2.5px rgba(120, 210, 255, 0.8));
+}
+.nube-lluvia {
+  position: absolute;
+  top: -1px;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0.9;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
+  animation: nube-lluvia-pulsa 4s ease-in-out infinite;
+}
+@keyframes nube-lluvia-pulsa {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.05); }
 }
 @keyframes header-lluvia-cae {
   0% { background-position: 0 0; }
-  100% { background-position: -10px 32px; }
+  100% { background-position: -12px 36px; }
 }
 
 /* Tema claro y oscuro */
@@ -2506,7 +2633,11 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 @media (max-width: 640px) {
   .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .95; }
   .vaca-img { width: 44px; }
-  .vaca-speech-bubble { max-width: 200px; font-size: 11px; }
+  .vaca-speech-bubble { max-width: min(240px, calc(100vw - 20px)); font-size: 11px; padding: 6px 10px; }
+  .clima-sol svg { width: 18px; height: 18px; }
+  .clima-luna svg { width: 16px; height: 16px; }
+  .clima-nubes .nube-1 { width: 17px; height: 10px; }
+  .clima-nubes .nube-2 { width: 13px; height: 8px; }
 }
 @media (max-width: 319px) {
   /* Solo pantallas muy angostas (<320px): compactar, nunca ocultar con display:none. */
@@ -2514,7 +2645,7 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   .vaca-img { width: 36px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .vaca-ambula, .vaca-pasta, .header-lluvia { animation: none; }
+  .vaca-ambula, .vaca-pasta, .header-lluvia, .clima-sol, .clima-luna .svg-luna, .estrellita, .clima-nubes .nube-1, .clima-nubes .nube-2, .nube-lluvia { animation: none; }
 }
 
 /* ========================================================================== */
