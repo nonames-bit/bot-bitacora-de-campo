@@ -59,7 +59,7 @@ def test_endpoints_sin_sesion_devuelven_401(db_file):
     app = crear_app(db_file, password="clave-de-prueba")
     c = app.test_client()
     for ep in ("/api/tablero", "/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche",
-               "/api/ficha/47", "/api/finanzas"):
+               "/api/ficha/47", "/api/finanzas", "/api/mensajes-equipo"):
         r = c.get(ep)
         assert r.status_code == 401, ep
 
@@ -650,6 +650,73 @@ def test_autenticacion_pin_roles_y_usuario(tmp_path, db_file):
     assert "sync_sg" in d_sis
     assert "actividad_reciente" in d_sis
     assert c.get("/api/logs").status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Chat de equipo: canal único de avisos (broadcast) entre usuarios de la PWA.
+# ---------------------------------------------------------------------------
+def test_mensajes_equipo_crear_y_listar_cronologico(client):
+    r1 = client.post("/api/mensajes-equipo", json={"texto": "Primero"})
+    assert r1.status_code == 200
+    assert r1.get_json()["ok"] is True
+    client.post("/api/mensajes-equipo", json={"texto": "Segundo"})
+
+    r = client.get("/api/mensajes-equipo")
+    d = r.get_json()
+    assert d["ok"] is True
+    assert [m["texto"] for m in d["mensajes"]] == ["Primero", "Segundo"]
+    assert d["ultimo_id"] == d["mensajes"][-1]["id"]
+
+
+def test_mensajes_equipo_poll_incremental(client):
+    r1 = client.post("/api/mensajes-equipo", json={"texto": "Uno"})
+    id1 = r1.get_json()["mensaje"]["id"]
+    client.post("/api/mensajes-equipo", json={"texto": "Dos"})
+
+    r = client.get(f"/api/mensajes-equipo?despues_de={id1}")
+    d = r.get_json()
+    assert [m["texto"] for m in d["mensajes"]] == ["Dos"]
+
+
+def test_mensajes_equipo_valida_vacio_y_longitud(client):
+    r_vacio = client.post("/api/mensajes-equipo", json={"texto": "   "})
+    assert r_vacio.status_code == 400
+    r_largo = client.post("/api/mensajes-equipo", json={"texto": "x" * 501})
+    assert r_largo.status_code == 400
+
+
+def test_mensajes_equipo_eliminar_inexistente_404(client):
+    r = client.delete("/api/mensajes-equipo/999999")
+    assert r.status_code == 404
+
+
+def test_mensajes_equipo_permisos_de_borrado_por_rol(tmp_path, db_file):
+    users_json = str(tmp_path / "users_test.json")
+    with open(users_json, "w", encoding="utf-8") as f:
+        json.dump([
+            {"user_id": 100, "nombre": "Don Juan", "rol": "OWNER", "pin": "9999"},
+            {"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"},
+            {"user_id": 301, "nombre": "Pedro Vaquero", "rol": "TRABAJADOR", "pin": "6666"},
+        ], f)
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+
+    c_carlos = app.test_client()
+    c_carlos.post("/login", data={"pin": "7777"})
+    mid = c_carlos.post("/api/mensajes-equipo", json={"texto": "Aviso de Carlos"}).get_json()["mensaje"]["id"]
+
+    # Otro TRABAJADOR no puede borrar un mensaje ajeno.
+    c_pedro = app.test_client()
+    c_pedro.post("/login", data={"pin": "6666"})
+    assert c_pedro.delete(f"/api/mensajes-equipo/{mid}").status_code == 403
+
+    # El propio autor sí puede borrar su mensaje.
+    assert c_carlos.delete(f"/api/mensajes-equipo/{mid}").status_code == 200
+
+    # OWNER puede moderar (borrar) cualquier mensaje ajeno.
+    mid2 = c_pedro.post("/api/mensajes-equipo", json={"texto": "Otro aviso"}).get_json()["mensaje"]["id"]
+    c_owner = app.test_client()
+    c_owner.post("/login", data={"pin": "9999"})
+    assert c_owner.delete(f"/api/mensajes-equipo/{mid2}").status_code == 200
 
 
 def test_api_sync_offline(client):

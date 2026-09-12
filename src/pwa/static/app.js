@@ -1574,7 +1574,8 @@
     var xLabelsHtml = "";
     fechas.forEach(function (f, idx) {
       var xC = getX(idx);
-      var dObj = toDate(f);
+      var partesF = String(f).split("-");
+      var dObj = partesF.length === 3 ? new Date(+partesF[0], +partesF[1] - 1, +partesF[2]) : null;
       var txtF = dObj ? (dObj.getDate() + " " + ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"][dObj.getMonth()]) : f;
       xLabelsHtml += "<text x='" + xC + "' y='" + (H - 12) + "' fill='var(--texto-suave)' font-size='10' text-anchor='middle'>" + esc(txtF) + "</text>";
     });

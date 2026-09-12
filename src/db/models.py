@@ -468,6 +468,21 @@ CREATE TABLE IF NOT EXISTS precios_mercado (
 CREATE INDEX IF NOT EXISTS idx_precios_mercado_fecha ON precios_mercado(fecha);
 CREATE INDEX IF NOT EXISTS idx_precios_mercado_plaza ON precios_mercado(plaza);
 CREATE INDEX IF NOT EXISTS idx_precios_mercado_producto ON precios_mercado(producto);
+
+-- Canal único de avisos del equipo (broadcast, no mensajes directos).
+-- Denormaliza nombre/rol del autor en el momento de publicar (mismo patrón
+-- que rondas_campo/telemetria_gps) para que el mensaje siga mostrando quién
+-- lo escribió aunque luego se edite o borre ese usuario en users.json.
+CREATE TABLE IF NOT EXISTS mensajes_equipo (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    nombre TEXT NOT NULL,
+    rol TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    creado_en TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_creado ON mensajes_equipo(creado_en);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -479,7 +494,7 @@ TABLAS = [
     "termo_nitrogeno", "pluviometria", "aforos_historico", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
-    "precios_mercado",
+    "precios_mercado", "mensajes_equipo",
 ]
 
 

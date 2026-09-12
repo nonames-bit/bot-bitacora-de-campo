@@ -1797,6 +1797,66 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             pass
         return jsonify({"ok": True})
 
+    @app.get("/api/mensajes-equipo")
+    def api_mensajes_equipo():
+        """Lista el canal único de avisos del equipo (broadcast, cualquier rol autenticado)."""
+        try:
+            despues_de = int(request.args.get("despues_de") or 0)
+        except (TypeError, ValueError):
+            despues_de = 0
+        try:
+            limite = int(request.args.get("limite") or 50)
+        except (TypeError, ValueError):
+            limite = 50
+        db_m = _db(db_path)
+        try:
+            filas = db_m.listar_mensajes_equipo(despues_de_id=despues_de, limite=limite)
+            mensajes = [dict(f) for f in filas]
+            ultimo_id = mensajes[-1]["id"] if mensajes else despues_de
+            return jsonify({"ok": True, "mensajes": mensajes, "ultimo_id": ultimo_id})
+        finally:
+            db_m.close()
+
+    @app.post("/api/mensajes-equipo")
+    def api_mensajes_equipo_crear():
+        """Publica un mensaje en el canal de equipo (cualquier rol autenticado)."""
+        datos = request.get_json(silent=True) or {}
+        texto = str(datos.get("texto") or "").strip()
+        if not texto:
+            return jsonify({"ok": False, "error": "El mensaje no puede estar vacío."}), 400
+        if len(texto) > 500:
+            return jsonify({"ok": False, "error": "El mensaje no puede superar 500 caracteres."}), 400
+
+        uid = session.get("user_id")
+        nombre = session.get("nombre") or "Usuario"
+        rol = session.get("rol") or _rol_actual() or "TRABAJADOR"
+        db_m = _db(db_path)
+        try:
+            mid = db_m.registrar_mensaje_equipo(user_id=uid, nombre=nombre, rol=rol, texto=texto)
+            fila = db_m.obtener_mensaje_equipo(mid)
+            return jsonify({"ok": True, "mensaje": dict(fila) if fila else None})
+        finally:
+            db_m.close()
+
+    @app.delete("/api/mensajes-equipo/<int:id_mensaje>")
+    def api_mensajes_equipo_eliminar(id_mensaje):
+        """Borra un mensaje del canal de equipo (autor propio, u OWNER/ADMIN para moderar)."""
+        mi_uid = session.get("user_id")
+        mi_rol = _rol_actual()
+        db_m = _db(db_path)
+        try:
+            fila = db_m.obtener_mensaje_equipo(id_mensaje)
+            if not fila:
+                return jsonify({"ok": False, "error": "El mensaje no existe."}), 404
+            es_autor = mi_uid is not None and str(fila["user_id"]) == str(mi_uid)
+            es_moderador = mi_rol in ("OWNER", "ADMIN", "ADMINISTRADOR")
+            if not (es_autor or es_moderador):
+                return jsonify({"ok": False, "error": "Solo el autor o un OWNER/ADMIN pueden borrar este mensaje."}), 403
+            db_m.eliminar_mensaje_equipo(id_mensaje)
+            return jsonify({"ok": True})
+        finally:
+            db_m.close()
+
     @app.post("/api/usuarios")
     def api_guardar_usuario():
         mi_rol = _rol_actual()

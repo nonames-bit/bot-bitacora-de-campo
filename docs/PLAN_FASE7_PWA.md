@@ -72,44 +72,41 @@ PWA Corral (móvil, offline) ─────┘  Service-Worker v20 + IndexedDB(
    `src/parsers/nlp_engine.py`) en vez de reinventar el parser. Sería un
    nuevo endpoint de solo lectura tipo `POST /api/preguntar` que delegue
    en ese mismo motor.
-2. **Chat/mensajes del equipo**: una sección de notas o avisos donde los
-   trabajadores de la finca puedan dejarse mensajes entre sí, visible en
-   el dashboard. A diferencia de todo lo demás en la PWA (que es de solo
-   lectura), esto **sí implica escritura** — habría que decidir el
-   almacenamiento (¿tabla nueva en SQLite? ¿reusar `notas`/`alertas`
-   existentes?) y quién puede ver/borrar qué (RBAC), ya que rompe el
-   principio "solo lectura" que ha guiado el diseño de seguridad de la
-   PWA hasta ahora.
+2. **Chat/mensajes del equipo ✅ IMPLEMENTADA (2026-09-12)**: canal único de
+   avisos (broadcast, no DM) integrado como segunda pestaña ("👥 Equipo")
+   dentro del Chat Dock existente, junto al Asistente IA. Tabla
+   `mensajes_equipo` (`src/db/models.py`), métodos en `Database`
+   (`registrar_mensaje_equipo`, `listar_mensajes_equipo`,
+   `eliminar_mensaje_equipo`, `src/db/database.py`) y endpoints
+   `GET/POST/DELETE /api/mensajes-equipo` (`src/pwa/app.py`). Cualquier rol
+   autenticado lee y escribe (máx. 500 caracteres); borrar: el autor borra
+   lo suyo, OWNER/ADMIN moderan cualquier mensaje. Refresco por polling
+   cada 20s (`src/pwa/static/app.js`), sin WebSockets. Sin adjuntos ni
+   mensajes directos en v1; sin integración con Telegram (no hay puente
+   Flask→Telegram en el código).
 
-Al retomar: decidir alcance y diseño concreto antes de implementar
-(especialmente la Etapa E.2, que necesita repensar el modelo de
-autenticación/escritura).
+### Etapa F — Usuarios y roles reales en la PWA ✅ IMPLEMENTADA (verificado 2026-09-12)
 
-### Etapa F — Usuarios y roles reales en la PWA (idea futura, sin empezar) 💡 ANOTADA 2026-09-05
+Anotada como idea futura el 2026-09-05; al retomarla se encontró que **ya
+está implementada** en el código (probablemente en un commit posterior a
+la nota, nunca reflejado aquí). Verificado en `src/server/auth.py`,
+`src/pwa/app.py` y `src/pwa/static/app.js`:
 
-Pedido del usuario tras preguntar cómo se crean los usuarios de la PWA —
-hoy **no se crean**: hay una sola `PWA_PASSWORD` compartida en el `.env`
-(quien la tenga, entra) y un campo opcional de "ID de Telegram" en el
-login que solo *identifica* la sesión contra `src/server/users.json` (el
-mismo archivo que usa el bot) — el rol que devuelve (`OWNER`/`TRABAJADOR`)
-se guarda y se puede leer en las respuestas de la API, pero **hoy no
-restringe nada**: cualquiera con la contraseña ve exactamente lo mismo,
-sin importar su rol.
+1. **PIN individual por persona** (4 dígitos, hasheado con
+   `pbkdf2:sha256:200000` vía `werkzeug.security`) en cada entrada de
+   `src/server/users.json` — login por PIN (`Auth.autenticar_pin`) además
+   de la `PWA_PASSWORD` maestra que sigue existiendo como respaldo.
+2. **Rol aplicado de verdad, no solo guardado**: decenas de endpoints en
+   `src/pwa/app.py` devuelven 403 según `_rol_actual()` (jerarquía
+   OWNER > ADMIN > TRABAJADOR) — ej. solo OWNER ve "usuarios conectados en
+   vivo", solo OWNER/ADMIN edita precios, un ADMIN no puede crear ni
+   modificar a un OWNER.
+3. **CRUD completo de usuarios** vía `/api/usuarios` (crear, editar,
+   cambiar PIN, eliminar) con las reglas de jerarquía aplicadas, y UI ya
+   integrada en el dashboard (`renderUsuarios` en `app.js`).
 
-Para que esto sea real haría falta:
-1. **Contraseña por persona** en vez de una compartida (ej. agregar un
-   campo `pwa_pin`/hash de contraseña a cada entrada de `users.json`, o
-   una tabla nueva) — así se sabe quién entró realmente, no solo "alguien
-   con la clave".
-2. **Aplicar el rol a lo que se muestra/permite**, no solo guardarlo —
-   ej. si algún día la Etapa E.2 (chat de equipo) o cualquier endpoint de
-   escritura se implementa, decidir explícitamente qué puede hacer
-   TRABAJADOR vs OWNER.
-
-Está directamente relacionado con la Etapa E de arriba: cualquier feature
-de escritura (chat de equipo, etc.) casi seguro necesita resolver esto
-primero. Nada de esto está diseñado en detalle ni implementado, es solo
-la nota para no perder la idea.
+No requiere trabajo adicional salvo lo que necesite puntualmente la
+Etapa E.2 (chat de equipo).
 
 ---
 
