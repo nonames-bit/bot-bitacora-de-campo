@@ -1160,7 +1160,12 @@ def import_zip(db: Database, zip_path: str, media_dir: str = "media") -> dict:
             fotos_zip_name = names_lower["fotos.zip"]
             fotos_raw = outer.read(fotos_zip_name)
 
-    conteos = import_dbfs(db, dbf_data, fotos_data=fotos_raw, media_dir=media_dir)
+    # Todo el import en una sola transacción SQLite: sin esto, cada uno de
+    # los ~1500+ registros se commitea por separado (ver Database.execute)
+    # y un lector concurrente (ej. el Tablero de la PWA) puede caer justo a
+    # mitad del import y ver un conteo de animales genuinamente parcial.
+    with db.transaccion():
+        conteos = import_dbfs(db, dbf_data, fotos_data=fotos_raw, media_dir=media_dir)
     # Registro de auditoría (una sola vez aquí cubre tanto /confirmar_importar
     # como el vigilante automático copias_watcher, ya que los dos llaman a
     # import_zip): permite responder "¿está usando el backup de hoy?" sin

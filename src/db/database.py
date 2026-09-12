@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import re
 import sqlite3
+from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from typing import Any, Optional
 
@@ -32,6 +33,10 @@ class Database:
         self.path = path
         self.conn = sqlite3.connect(path, check_same_thread=False, timeout=10.0)
         self.conn.row_factory = sqlite3.Row
+        # Ver transaccion() más abajo: cuando está en True, execute()/insert()
+        # no commitean por si solos -- se agrupan en un solo COMMIT al final
+        # del bloque `with`.
+        self._en_transaccion = False
         if path != ":memory:":
             try:
                 self.conn.execute("PRAGMA journal_mode = WAL;")
@@ -164,7 +169,8 @@ class Database:
 
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:
         cur = self.conn.execute(sql, params)
-        self.conn.commit()
+        if not self._en_transaccion:
+            self.conn.commit()
         return cur
 
     def query(self, sql: str, params: tuple = ()) -> list[sqlite3.Row]:
@@ -183,8 +189,36 @@ class Database:
         cur = self.conn.execute(
             f"INSERT INTO {tabla} ({cols}) VALUES ({marks})", tuple(datos.values())
         )
-        self.conn.commit()
+        if not self._en_transaccion:
+            self.conn.commit()
         return cur.lastrowid
+
+    @contextmanager
+    def transaccion(self):
+        """Agrupa varias escrituras (vía execute()/insert()) en una sola
+        transacción SQLite -- todo o nada, con un solo COMMIT al final en
+        vez de uno por cada llamada.
+
+        Pensado para procesos batch como el import de Software Ganadero
+        (~1500+ registros, cada uno con su propio registrar_animal()):
+        sin esto, cada registro se commitea por separado, y un lector
+        concurrente (ej. el Tablero de la PWA) que consulte justo a mitad
+        del import ve un conteo de animales genuinamente parcial -- no es
+        un glitch de la UI, es el estado real de la tabla en ese instante.
+        Anidable (si ya se está dentro de una transacción, no abre otra)."""
+        if self._en_transaccion:
+            yield self
+            return
+        self._en_transaccion = True
+        try:
+            self.conn.execute("BEGIN IMMEDIATE")
+            yield self
+            self.conn.commit()
+        except Exception:
+            self.conn.rollback()
+            raise
+        finally:
+            self._en_transaccion = False
 
     def count(self, tabla: str) -> int:
         row = self.query_one(f"SELECT COUNT(*) AS n FROM {tabla}")

@@ -1145,5 +1145,62 @@ def test_eliminar_mensaje_equipo_inexistente_devuelve_false(db):
     assert db.eliminar_mensaje_equipo(99999) is False
 
 
+# ---------------------------------------------------------------------------
+# transaccion(): agrupa varias escrituras en un solo COMMIT (usado por el
+# import de Software Ganadero para no exponer conteos parciales a lectores
+# concurrentes, ej. el Tablero de la PWA, mientras procesa ~1500+ registros).
+# ---------------------------------------------------------------------------
+def test_transaccion_agrupa_escrituras_invisibles_hasta_el_commit(tmp_path):
+    from src.db.database import Database
+
+    ruta = str(tmp_path / "transaccion.db")
+    d = Database(ruta)
+    d.create_tables()
+    lector = Database(ruta)
+    try:
+        with d.transaccion():
+            d.registrar_animal("A1", sexo="Hembra", estado="ACTIVO")
+            d.registrar_animal("A2", sexo="Macho", estado="ACTIVO")
+            # Un lector en otra conexión no debe ver nada mientras el
+            # bloque `with` sigue abierto (todavía no hubo COMMIT).
+            assert lector.count("animales") == 0
+        # Al salir del bloque ya se commiteó todo de una sola vez.
+        assert lector.count("animales") == 2
+        assert d.count("animales") == 2
+    finally:
+        d.close()
+        lector.close()
+
+
+def test_transaccion_hace_rollback_completo_si_algo_falla(tmp_path):
+    import pytest
+    from src.db.database import Database
+
+    ruta = str(tmp_path / "transaccion_rollback.db")
+    d = Database(ruta)
+    d.create_tables()
+    try:
+        with pytest.raises(ValueError):
+            with d.transaccion():
+                d.registrar_animal("B1", sexo="Hembra", estado="ACTIVO")
+                raise ValueError("fallo simulado a mitad del import")
+        # Ni B1 quedó a medias: el rollback deshizo todo el bloque.
+        assert d.count("animales") == 0
+    finally:
+        d.close()
+
+
+def test_transaccion_anidada_no_abre_una_segunda(db):
+    # Si el código que ya está dentro de una transaccion() llama a otra
+    # función que también usa `with db.transaccion():`, no debe intentar
+    # abrir un segundo BEGIN (SQLite no permite transacciones anidadas).
+    with db.transaccion():
+        with db.transaccion():
+            db.registrar_animal("C1", sexo="Hembra", estado="ACTIVO")
+        # La transacción interna no cerró la externa.
+        assert db._en_transaccion is True
+    assert db.count("animales") == 1
+
+
 
 
