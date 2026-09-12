@@ -27,6 +27,17 @@ def _sin_credenciales_llm_reales(monkeypatch):
             monkeypatch.delenv(f"{prefix}{suf}", raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _sin_vapid_real(monkeypatch):
+    """Mismo motivo que _sin_credenciales_llm_reales: si el .env real tiene
+    VAPID configurada y algún test crea una push_suscripcion con un endpoint
+    que parezca real, src/server/push_sender.enviar_push podría intentar un
+    envío de red real. Los tests que sí necesitan VAPID "configurada" la
+    agregan explícitamente con monkeypatch.setenv (ver tests/test_push_sender.py)."""
+    monkeypatch.delenv("VAPID_PRIVATE_KEY", raising=False)
+    monkeypatch.delenv("VAPID_CLAIMS_EMAIL", raising=False)
+
+
 @pytest.fixture
 def db():
     d = Database(":memory:")

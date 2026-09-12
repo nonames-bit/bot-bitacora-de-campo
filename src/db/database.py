@@ -2921,10 +2921,18 @@ class Database:
         cursor = self.execute("DELETE FROM push_suscripciones WHERE endpoint = ?", (endpoint,))
         return cursor.rowcount > 0
 
-    def listar_push_suscripciones(self) -> list[dict[str, Any]]:
-        """Retorna todas las suscripciones push activas."""
+    def listar_push_suscripciones(self, excluir_user_id: Optional[Any] = None) -> list[dict[str, Any]]:
+        """Retorna las suscripciones push activas, opcionalmente excluyendo
+        a un usuario (ej. el autor de un mensaje de chat no necesita
+        notificarse a sí mismo de su propio mensaje)."""
         self._ensure_push_table()
-        filas = self.query("SELECT * FROM push_suscripciones ORDER BY id DESC")
+        if excluir_user_id is not None:
+            filas = self.query(
+                "SELECT * FROM push_suscripciones WHERE user_id IS NULL OR user_id != ? ORDER BY id DESC",
+                (str(excluir_user_id),),
+            )
+        else:
+            filas = self.query("SELECT * FROM push_suscripciones ORDER BY id DESC")
         return [dict(f) for f in filas]
 
     def alertas_pendientes_push(self) -> list[dict[str, Any]]:

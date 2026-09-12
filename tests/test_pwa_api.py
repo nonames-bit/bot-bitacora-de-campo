@@ -719,6 +719,53 @@ def test_mensajes_equipo_permisos_de_borrado_por_rol(tmp_path, db_file):
     assert c_owner.delete(f"/api/mensajes-equipo/{mid2}").status_code == 200
 
 
+def test_api_push_vapid_key_devuelve_lo_que_haya_en_el_entorno(client, monkeypatch):
+    monkeypatch.setenv("VAPID_PUBLIC_KEY", "clave-publica-de-prueba")
+    r = client.get("/api/push/vapid-key")
+    assert r.status_code == 200
+    assert r.get_json()["publicKey"] == "clave-publica-de-prueba"
+
+
+def test_api_push_vapid_key_vacia_si_no_esta_configurada(client, monkeypatch):
+    monkeypatch.delenv("VAPID_PUBLIC_KEY", raising=False)
+    r = client.get("/api/push/vapid-key")
+    assert r.get_json()["publicKey"] == ""
+
+
+def test_mensajes_equipo_crear_dispara_push_a_otros_suscriptores(tmp_path, db_file, monkeypatch):
+    """Al publicar un mensaje en el chat de equipo, se les avisa por Web
+    Push a los demás suscritos -- pero no al propio autor. Mockea
+    pywebpush.webpush (nunca pega a un push service real en un test)."""
+    from src.server import push_sender
+
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "clave-privada-de-prueba")
+    monkeypatch.setenv("VAPID_CLAIMS_EMAIL", "owner@ejemplo.com")
+    llamadas = []
+    monkeypatch.setattr(push_sender, "webpush", lambda **kw: llamadas.append(kw))
+
+    users_json = str(tmp_path / "users_push.json")
+    with open(users_json, "w", encoding="utf-8") as f:
+        json.dump([
+            {"user_id": 100, "nombre": "Don Juan", "rol": "OWNER", "pin": "9999"},
+            {"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"},
+        ], f)
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+
+    db_directo = Database(db_file)
+    db_directo.guardar_push_suscripcion("https://fcm.googleapis.com/owner", user_id="100", p256dh="p", auth="a")
+    db_directo.guardar_push_suscripcion("https://fcm.googleapis.com/carlos", user_id="300", p256dh="p", auth="a")
+    db_directo.close()
+
+    c_carlos = app.test_client()
+    c_carlos.post("/login", data={"pin": "7777"})
+    r = c_carlos.post("/api/mensajes-equipo", json={"texto": "Se rompió la cerca"})
+    assert r.status_code == 200
+
+    # Le avisa a Don Juan (OWNER), pero no a Carlos (el propio autor).
+    assert len(llamadas) == 1
+    assert llamadas[0]["subscription_info"]["endpoint"] == "https://fcm.googleapis.com/owner"
+
+
 def test_api_sync_offline(client):
     eventos = [
         {"tipo": "pesaje", "fecha": "2026-09-01", "payload": {"tag": "47", "peso_kg": 460.5, "evento": "CONTROL"}},

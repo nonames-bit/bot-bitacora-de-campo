@@ -2539,7 +2539,11 @@
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     opts = opts || {};
     opts.icon = opts.icon || "/static/icon-192.png";
-    opts.badge = opts.badge || "/static/icon-192.png";
+    // badge (no icon): Android lo pinta como silueta desde el canal alfa --
+    // icon-192.png es opaco (medalla plateada), así que salía como un
+    // cuadrado blanco sólido en la barra de estado. badge-96.png es una
+    // silueta blanca sobre transparente, hecha para esto.
+    opts.badge = opts.badge || "/static/badge-96.png";
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then(function (reg) {
         if (reg && reg.showNotification) {
@@ -2566,6 +2570,39 @@
     }).catch(function () {});
   }
 
+  // Convierte la llave pública VAPID (base64url, la que expone el backend)
+  // al Uint8Array que exige PushManager.subscribe({applicationServerKey}).
+  function urlBase64ToUint8Array(base64String) {
+    var padding = "=".repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+    return outputArray;
+  }
+
+  // Crea una suscripción Web Push REAL contra el navegador (antes de esto,
+  // sin llave VAPID configurada en el servidor, nunca se llamaba a
+  // subscribe() -- solo se guardaba un endpoint de relleno "pwa-local://"
+  // que nunca pudo recibir nada). Si el servidor todavía no tiene VAPID
+  // configurada, o el navegador no soporta Push, el .catch() de quien la
+  // llama cae al mismo endpoint de relleno de siempre (para que al menos
+  // las notificaciones locales sigan funcionando con la pestaña abierta).
+  function suscribirPushReal(reg) {
+    return fetch("/api/push/vapid-key").then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d || !d.publicKey) throw new Error("vapid_no_configurada");
+        return reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(d.publicKey)
+        });
+      })
+      .then(function (sub) {
+        var sJson = sub.toJSON ? sub.toJSON() : {};
+        registrarSuscripcionPushEnServidor(sub.endpoint, sJson.keys);
+      });
+  }
+
   function iniciarWebPush(mostrarFeedback) {
     if (!("Notification" in window)) {
       if (mostrarFeedback) alert("Este navegador no soporta notificaciones Web Push.");
@@ -2576,28 +2613,28 @@
         if ("serviceWorker" in navigator) {
           navigator.serviceWorker.ready.then(function (reg) {
             if ("PushManager" in window && reg.pushManager) {
+              var devEndpointFallback = function () {
+                var devEndpoint = "pwa-local://" + (localStorage.getItem("bitacora_dev_id") || (function () {
+                  var nid = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+                  localStorage.setItem("bitacora_dev_id", nid);
+                  return nid;
+                })());
+                registrarSuscripcionPushEnServidor(devEndpoint, {});
+              };
               reg.pushManager.getSubscription().then(function (sub) {
                 if (sub) {
                   var sJson = sub.toJSON ? sub.toJSON() : {};
                   registrarSuscripcionPushEnServidor(sub.endpoint, sJson.keys);
                 } else {
-                  var devEndpoint = "pwa-local://" + (localStorage.getItem("bitacora_dev_id") || (function () {
-                    var nid = "dev_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-                    localStorage.setItem("bitacora_dev_id", nid);
-                    return nid;
-                  })());
-                  registrarSuscripcionPushEnServidor(devEndpoint, {});
+                  suscribirPushReal(reg).catch(devEndpointFallback);
                 }
-              }).catch(function () {
-                var devEndpoint = "pwa-local://" + (localStorage.getItem("bitacora_dev_id") || "dev_default");
-                registrarSuscripcionPushEnServidor(devEndpoint, {});
-              });
+              }).catch(devEndpointFallback);
             }
           });
         }
         if (mostrarFeedback) {
           mostrarNotificacionNativa("🔔 Notificaciones Activadas", {
-            body: "¡Listo! Recibirás alertas sanitarias, celos AM-PM y avisos de potrero en este dispositivo.",
+            body: "¡Listo! Recibirás alertas sanitarias, celos AM-PM, avisos de potrero y mensajes nuevos del chat de equipo en este dispositivo.",
             tag: "push-bienvenida"
           });
         }

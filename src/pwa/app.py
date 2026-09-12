@@ -1910,6 +1910,21 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         try:
             mid = db_m.registrar_mensaje_equipo(user_id=uid, nombre=nombre, rol=rol, texto=texto)
             fila = db_m.obtener_mensaje_equipo(mid)
+            try:
+                from ..server.push_sender import enviar_push
+            except (ImportError, ValueError):
+                from src.server.push_sender import enviar_push  # type: ignore
+            try:
+                enviar_push(
+                    db_m,
+                    titulo=f"👥 {nombre}",
+                    cuerpo=texto[:120],
+                    url="/",
+                    tag="chat-equipo",
+                    excluir_user_id=uid,
+                )
+            except Exception:
+                logger.exception("No se pudo enviar push del chat de equipo")
             return jsonify({"ok": True, "mensaje": dict(fila) if fila else None})
         finally:
             db_m.close()
@@ -3128,6 +3143,15 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": ok})
         finally:
             db_p.close()
+
+    @app.get("/api/push/vapid-key")
+    def api_push_vapid_key():
+        """Llave pública VAPID para reg.pushManager.subscribe() en el navegador.
+
+        Sin esto el frontend no puede crear una suscripción real -- antes de
+        esta ruta, iniciarWebPush() nunca llamaba a subscribe() (no tenía con
+        qué), solo guardaba un endpoint local de relleno."""
+        return jsonify({"publicKey": os.getenv("VAPID_PUBLIC_KEY") or ""})
 
     @app.get("/api/push/alertas")
     def api_push_alertas():
