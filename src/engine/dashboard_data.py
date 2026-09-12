@@ -320,6 +320,32 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         errores["eventos_recientes"] = str(e)
         eventos_recientes = []
 
+    try:
+        from .pronostico import obtener_pronostico_para_despacho
+        _pron_hoy = obtener_pronostico_para_despacho(db)
+        _dia_hoy = _pron_hoy["dias"][0] if _pron_hoy and _pron_hoy.get("dias") else None
+        clima_hoy = None
+        if _dia_hoy:
+            _f = _dia_hoy.get("fecha")
+            clima_hoy = {
+                "fecha": _f.isoformat() if hasattr(_f, "isoformat") else str(_f),
+                "temp_max_c": _dia_hoy.get("temp_max_c"),
+                "temp_min_c": _dia_hoy.get("temp_min_c"),
+                "lluvia_mm": _dia_hoy.get("lluvia_mm"),
+                "prob_lluvia_pct": _dia_hoy.get("prob_lluvia_pct"),
+            }
+    except Exception as e:
+        logger.error("seccion clima_hoy fallo", exc_info=True)
+        errores["clima_hoy"] = str(e)
+        clima_hoy = None
+
+    try:
+        precio_hoy = db.precio_referencia_hoy()
+    except Exception as e:
+        logger.error("seccion precio_hoy fallo", exc_info=True)
+        errores["precio_hoy"] = str(e)
+        precio_hoy = None
+
     out = {
         "activos": activos,
         "hembras": hembras,
@@ -331,6 +357,8 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "por_potrero": por_potrero,
         "potrero_filtro": potrero,
         "eventos_recientes": eventos_recientes,
+        "clima_hoy": clima_hoy,
+        "precio_hoy": precio_hoy,
     }
     if errores:
         out["errores"] = errores
