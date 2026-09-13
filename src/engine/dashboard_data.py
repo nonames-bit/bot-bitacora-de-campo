@@ -1402,47 +1402,48 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         logger.error("seccion movimientos fallo", exc_info=True)
         base["movimientos"] = []
 
-    # 10. Datos específicos de venta (si existe registro de venta)
+    # 10. Datos específicos de venta (solo aplicable si el animal está en estado VENDIDO)
     venta_info: Optional[dict[str, Any]] = None
     try:
-        v_row = db.query_one(
-            """SELECT fecha, tipo_movimiento, procedencia_destino, precio, notas
-               FROM movimientos
-               WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA'
-               ORDER BY fecha DESC, id DESC LIMIT 1""", (aid,)
-        )
-        if v_row:
-            venta_info = dict(v_row)
-            f_v = venta_info.get("fecha")
-            # Verificar si se vendió junto a su madre en la misma fecha
-            if an.get("madre_id") and f_v:
-                m_v = db.query_one(
-                    """SELECT a.tag, a.nombre FROM movimientos mo
-                       JOIN animales a ON a.id_animal = mo.animal_id
-                       WHERE mo.animal_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA' LIMIT 1""",
-                    (an["madre_id"], f_v)
-                )
-                if m_v:
-                    venta_info["madre_tag"] = m_v["tag"]
-                    venta_info["madre_nombre"] = m_v["nombre"]
-            # Verificar si se vendió con crías en la misma fecha
-            if f_v:
-                c_v = db.query(
-                    """SELECT a.tag, a.nombre FROM movimientos mo
-                       JOIN animales a ON a.id_animal = mo.animal_id
-                       WHERE a.madre_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA'""",
-                    (aid, f_v)
-                )
-                if c_v:
-                    venta_info["crias_vendidas"] = [{"tag": r["tag"], "nombre": r["nombre"]} for r in c_v]
-        elif str(an.get("estado") or "").upper() == "VENDIDO":
-            venta_info = {
-                "fecha": None,
-                "tipo_movimiento": "VENTA",
-                "procedencia_destino": None,
-                "precio": None,
-                "notas": "Estado marcado como VENDIDO en base de datos",
-            }
+        if str(an.get("estado") or "").upper() == "VENDIDO":
+            v_row = db.query_one(
+                """SELECT fecha, tipo_movimiento, procedencia_destino, precio, notas
+                   FROM movimientos
+                   WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA'
+                   ORDER BY fecha DESC, id DESC LIMIT 1""", (aid,)
+            )
+            if v_row:
+                venta_info = dict(v_row)
+                f_v = venta_info.get("fecha")
+                # Verificar si se vendió junto a su madre en la misma fecha
+                if an.get("madre_id") and f_v:
+                    m_v = db.query_one(
+                        """SELECT a.tag, a.nombre FROM movimientos mo
+                           JOIN animales a ON a.id_animal = mo.animal_id
+                           WHERE mo.animal_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA' LIMIT 1""",
+                        (an["madre_id"], f_v)
+                    )
+                    if m_v:
+                        venta_info["madre_tag"] = m_v["tag"]
+                        venta_info["madre_nombre"] = m_v["nombre"]
+                # Verificar si se vendió con crías en la misma fecha
+                if f_v:
+                    c_v = db.query(
+                        """SELECT a.tag, a.nombre FROM movimientos mo
+                           JOIN animales a ON a.id_animal = mo.animal_id
+                           WHERE a.madre_id = ? AND mo.fecha = ? AND UPPER(mo.tipo_movimiento) = 'VENTA'""",
+                        (aid, f_v)
+                    )
+                    if c_v:
+                        venta_info["crias_vendidas"] = [{"tag": r["tag"], "nombre": r["nombre"]} for r in c_v]
+            else:
+                venta_info = {
+                    "fecha": None,
+                    "tipo_movimiento": "VENTA",
+                    "procedencia_destino": None,
+                    "precio": None,
+                    "notas": "Estado marcado como VENDIDO en base de datos",
+                }
     except Exception as e:
         logger.error("seccion venta fallo", exc_info=True)
         errores["venta"] = str(e)

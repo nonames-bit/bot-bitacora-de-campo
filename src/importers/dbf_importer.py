@@ -472,6 +472,14 @@ def import_animales(db: Database, records, causas: dict) -> dict:
                     )
                     ventas_fecha_aproximada += 1
                 nuevas_ventas += 1
+        elif estado_nuevo == "ACTIVO":
+            # Si el animal figura como ACTIVO en SG (ej. corrección de un animal
+            # que antes estaba truncado o marcado erróneamente como vendido),
+            # se eliminan movimientos de VENTA obsoletos para mantener consistencia.
+            db.execute(
+                "DELETE FROM movimientos WHERE animal_id = ? AND UPPER(tipo_movimiento) = 'VENTA'",
+                (aid,),
+            )
     return {
         "animales": {
             "nuevos": nuevos_animales, "duplicados": duplicados_animales,

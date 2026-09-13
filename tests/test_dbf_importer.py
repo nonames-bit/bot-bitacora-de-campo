@@ -753,3 +753,43 @@ def test_import_outer_zip_con_fotos_zip(db, tmp_path):
     assert conteos2["fotos"]["nuevos"] == 0
     assert conteos2["fotos"]["duplicados"] == 2
 
+
+def test_import_animales_reactivado_en_sg_elimina_venta_obsoleta(db):
+    """Si un animal fue importado como VENDIDO pero luego se corrige en SG
+    a ACTIVO (como el caso JA457/JA458 truncadas), la nueva importación debe
+    marcarlo ACTIVO y eliminar el registro de VENTA obsoleto de movimientos."""
+    from src.engine.dashboard_data import datos_ficha_animal
+
+    # 1. Primera importación: marcado como VENDIDO
+    r_vendido = [{
+        "CODANI": "JA457", "NOMANI": "Vaca 457", "SEXO": "H",
+        "TIPORAZA": "I", "FECNACE": "2019-07-09", "CODPOT": "B01",
+        "TIPO": "V", "FECMUERTE": "2026-08-27",
+    }]
+    import_animales(db, r_vendido, causas={})
+    a = db.query_one("SELECT id_animal, estado FROM animales WHERE tag = 'JA457'")
+    assert a["estado"] == "VENDIDO"
+    n_v = db.query_one("SELECT COUNT(*) n FROM movimientos WHERE animal_id = ? AND tipo_movimiento = 'VENTA'", (a["id_animal"],))["n"]
+    assert n_v == 1
+    ficha1 = datos_ficha_animal(db, "JA457")
+    assert ficha1["estado"] == "VENDIDO"
+    assert ficha1["venta"] is not None
+
+    # 2. Segunda importación: en SG se corrigió y ahora es ACTIVO
+    r_activo = [{
+        "CODANI": "JA457", "NOMANI": "Vaca 457", "SEXO": "H",
+        "TIPORAZA": "I", "FECNACE": "2020-06-07", "CODPOT": "B02",
+        "TIPO": "", "FECMUERTE": None, "OBS": "HIJA SARA",
+    }]
+    import_animales(db, r_activo, causas={})
+    a2 = db.query_one("SELECT id_animal, estado, notas FROM animales WHERE tag = 'JA457'")
+    assert a2["estado"] == "ACTIVO"
+    assert a2["notas"] == "HIJA SARA"
+    # El movimiento de venta obsoleto debe haberse eliminado
+    n_v2 = db.query_one("SELECT COUNT(*) n FROM movimientos WHERE animal_id = ? AND tipo_movimiento = 'VENTA'", (a2["id_animal"],))["n"]
+    assert n_v2 == 0
+    ficha2 = datos_ficha_animal(db, "JA457")
+    assert ficha2["estado"] == "ACTIVO"
+    assert ficha2["venta"] is None
+
+

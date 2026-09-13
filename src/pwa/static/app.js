@@ -7517,7 +7517,7 @@
     var stUpper = String(f.estado || "").toUpperCase();
 
     // Banner destacado si el animal fue VENDIDO
-    if (stUpper === "VENDIDO" || (f.venta && f.venta.fecha)) {
+    if (stUpper === "VENDIDO") {
       var v = f.venta || {};
       var fecVenta = v.fecha ? fechaCorta(v.fecha) : (f.fecha_salida ? fechaCorta(f.fecha_salida) : "Fecha no registrada");
       var destVenta = v.procedencia_destino ? esc(v.procedencia_destino) : "Destino no especificado";
