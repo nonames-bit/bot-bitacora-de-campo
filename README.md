@@ -611,7 +611,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Gestión de Tareas con Asignación y Cumplimiento (Acknowledge)**: Permite programar tareas dirigidas a animales (`JA457`) o potreros (`OLEGARIO I`), adjudicadas al Encargado, Administrador o integrantes del equipo. Soporta confirmación de tarea realizada con notas del trabajo ejecutado, ejecutor y foto de comprobante opcional, registrándose en la bitácora histórica y canal de equipo.
     - **Botón Flotante Global (FAB +)**: Acceso rápido flotante a Captura en todos los módulos clave (Tablero, Inventario, Pasturas, Ficha, Agenda, etc.), con prellenado automático de animal y apilado responsivo perfecto sobre la burbuja de chat en móvil (390×844).
     - **Precio Bogotá Frigorífico Guadalupe**: Visualización priorizada en el Tablero del precio de referencia de Macho Gordo para la plaza de Bogotá (Frig. Guadalupe).
-- [x] Suite de pruebas con pytest: **821+ pruebas en verde** (100% pasando).
+- [x] **Genealogía JA218, Sugerencia Arete Cría en Parto (SG) y Eliminación de Eventos para OWNER (2026-09-13)**:
+    - **Corrección Árbol Genealógico en PWA (`JA218`)**: Solucionado `ReferenceError: click is not defined` en `app.js` al renderizar enlaces a fichas de padres/abuelos; ahora navega fluidamente usando atributos `data-ir-ficha`.
+    - **Sugerencia Automática de Arete de Cría (Regla Software Ganadero)**: Al registrar partos, el sistema sugiere automáticamente el arete de la cría como `<TagMadre>-<DígitoAño>` (ej. `JA457` en 2026 -> `JA457-6`, `n088` -> `n088-6`). Es 100% editable y opcional, cuenta con chip clickeable de sugerencia y previene envíos prematuros con la tecla Enter antes del paso 3.
+    - **Eliminación y Reversión de Eventos (Exclusivo OWNER)**: Endpoint seguro `POST /api/eventos/eliminar` y botones de papelera `[🗑️]` en PWA (Fichas técnicas de animal y Tablero de últimos eventos). Revierte atómicamente el estado del hato (restaura potrero en traslados erróneos, devuelve animales a `ACTIVO` si se elimina muerte/venta, limpia crías fantasma si se descarta un parto accidental, y anula alertas derivadas).
+    - **Mantenimiento VPS**: Eliminación directa del registro de parto accidental `id=618` de `JA457` en el servidor de producción.
+- [x] Suite de pruebas con pytest: **822+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

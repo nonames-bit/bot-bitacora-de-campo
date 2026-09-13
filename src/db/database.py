@@ -671,11 +671,14 @@ class Database:
     def registrar_muerte(self, animal_tag, fecha=None, causa_presunta=None,
                          notas=None, registrado_por=None) -> int:
         animal_id = self.resolve_animal(animal_tag, crear=True)
-        return self.insert("muertes", dict(
+        mid = self.insert("muertes", dict(
             animal_id=animal_id, fecha=iso(fecha), causa_presunta=causa_presunta,
             notas=notas,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+        if animal_id:
+            self.execute("UPDATE animales SET estado = 'MUERTO' WHERE id_animal = ?", (animal_id,))
+        return mid
 
     def _ahora(self) -> str:
         """Marca de tiempo de inserción (para /ultimos y /deshacer), distinta
@@ -1256,6 +1259,171 @@ class Database:
         )
         self.conn.commit()
         return cur.rowcount > 0
+
+    def eliminar_evento(self, tipo: str, eid: int, user_id: Optional[int] = None) -> dict:
+        """Elimina un evento zootécnico o de campo registrado por su tipo e ID.
+        Solo invocable por el rol OWNER.
+        Restaura estados derivados si aplica (ej. muerte -> ACTIVO, traslado -> potrero anterior).
+        """
+        t = (tipo or "").strip().lower()
+        if t in ("parto", "gemelar", "aborto", "reabsorcion", "momificacion", "maceracion", "muerte_fetal"):
+            fila = self.query_one("SELECT * FROM partos WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Parto #{eid} no encontrado."}
+            vaca_id = fila["vaca_id"]
+            cria_id = fila["id_cria"]
+            fecha_parto = fila["fecha"]
+            self.conn.execute("DELETE FROM partos WHERE id = ?", (eid,))
+            # Si el parto creó una cría recién registrada sin otros eventos en el sistema, eliminarla
+            if cria_id:
+                try:
+                    n_pes = self.query_one("SELECT COUNT(*) AS c FROM pesajes WHERE animal_id = ?", (cria_id,))["c"]
+                    n_trat = self.query_one("SELECT COUNT(*) AS c FROM tratamientos WHERE animal_id = ?", (cria_id,))["c"]
+                    n_tras = self.query_one("SELECT COUNT(*) AS c FROM traslados WHERE animal_id = ?", (cria_id,))["c"]
+                    n_part = self.query_one("SELECT COUNT(*) AS c FROM partos WHERE (vaca_id = ? OR id_cria = ?) AND id != ?", (cria_id, cria_id, eid))["c"]
+                    if n_pes == 0 and n_trat == 0 and n_tras == 0 and n_part == 0:
+                        self.conn.execute("DELETE FROM animales WHERE id_animal = ?", (cria_id,))
+                except Exception:
+                    pass
+            # Limpiar alertas reproductivas derivadas pendientes
+            try:
+                self.conn.execute(
+                    "DELETE FROM alertas WHERE animal_id = ? AND tipo_alerta IN ('palpacion_d60', 'eco_d35', 'secado', 'parto_inminente') AND fecha_programada >= ?",
+                    (vaca_id, fecha_parto),
+                )
+            except Exception:
+                pass
+            self.conn.commit()
+            return {"ok": True, "tipo": "parto", "id": eid, "mensaje": f"Parto #{eid} eliminado correctamente."}
+
+        elif t == "pesaje":
+            fila = self.query_one("SELECT * FROM pesajes WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Pesaje #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM pesajes WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "pesaje", "id": eid, "mensaje": f"Pesaje #{eid} eliminado correctamente."}
+
+        elif t == "tratamiento":
+            fila = self.query_one("SELECT * FROM tratamientos WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Tratamiento #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM tratamientos WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "tratamiento", "id": eid, "mensaje": f"Tratamiento #{eid} eliminado correctamente."}
+
+        elif t == "traslado":
+            fila = self.query_one("SELECT * FROM traslados WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Traslado #{eid} no encontrado."}
+            aid = fila["animal_id"]
+            orig_id = fila["potrero_origen"]
+            self.conn.execute("DELETE FROM traslados WHERE id = ?", (eid,))
+            # Si era el último traslado, restaurar al potrero previo (origen)
+            if aid and orig_id:
+                ult = self.query_one("SELECT potrero_destino FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1", (aid,))
+                nuevo_pot = ult["potrero_destino"] if ult else orig_id
+                self.conn.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (nuevo_pot, aid))
+            self.conn.commit()
+            return {"ok": True, "tipo": "traslado", "id": eid, "mensaje": f"Traslado #{eid} eliminado correctamente."}
+
+        elif t == "servicio":
+            fila = self.query_one("SELECT * FROM servicios WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Servicio #{eid} no encontrado."}
+            vid = fila["vaca_id"]
+            f_serv = fila["fecha"]
+            self.conn.execute("DELETE FROM servicios WHERE id = ?", (eid,))
+            try:
+                self.conn.execute(
+                    "DELETE FROM alertas WHERE animal_id = ? AND tipo_alerta IN ('eco_d35', 'palpacion_d60', 'fep') AND fecha_programada >= ?",
+                    (vid, f_serv),
+                )
+            except Exception:
+                pass
+            self.conn.commit()
+            return {"ok": True, "tipo": "servicio", "id": eid, "mensaje": f"Servicio #{eid} eliminado correctamente."}
+
+        elif t == "celo":
+            fila = self.query_one("SELECT * FROM celos WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Celo #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM celos WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "celo", "id": eid, "mensaje": f"Celo #{eid} eliminado correctamente."}
+
+        elif t == "muerte":
+            fila = self.query_one("SELECT * FROM muertes WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Muerte #{eid} no encontrada."}
+            aid = fila["animal_id"]
+            self.conn.execute("DELETE FROM muertes WHERE id = ?", (eid,))
+            if aid:
+                self.conn.execute("UPDATE animales SET estado = 'ACTIVO' WHERE id_animal = ? AND estado IN ('MUERTO', 'HISTORICO')", (aid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "muerte", "id": eid, "mensaje": f"Registro de muerte #{eid} eliminado y animal restaurado a ACTIVO."}
+
+        elif t in ("movimiento", "movimientos", "venta", "descarte", "compra"):
+            fila = self.query_one("SELECT * FROM movimientos WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Movimiento #{eid} no encontrado."}
+            aid = fila["animal_id"]
+            self.conn.execute("DELETE FROM movimientos WHERE id = ?", (eid,))
+            if aid:
+                self.conn.execute("UPDATE animales SET estado = 'ACTIVO' WHERE id_animal = ? AND estado IN ('VENDIDO', 'DESCARTE', 'HISTORICO')", (aid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "movimiento", "id": eid, "mensaje": f"Movimiento #{eid} eliminado y animal restaurado a ACTIVO."}
+
+        elif t == "destete":
+            fila = self.query_one("SELECT * FROM destetes WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Destete #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM destetes WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "destete", "id": eid, "mensaje": f"Destete #{eid} eliminado correctamente."}
+
+        elif t == "secado":
+            fila = self.query_one("SELECT * FROM secados WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Secado #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM secados WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "secado", "id": eid, "mensaje": f"Secado #{eid} eliminado correctamente."}
+
+        elif t in ("diagnostico", "diagnosticos_gestacion"):
+            fila = self.query_one("SELECT * FROM diagnosticos_gestacion WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Diagnóstico #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM diagnosticos_gestacion WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "diagnostico", "id": eid, "mensaje": f"Diagnóstico #{eid} eliminado correctamente."}
+
+        elif t in ("tarea", "recordatorio", "recordatorios_programados"):
+            fila = self.query_one("SELECT * FROM recordatorios_programados WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Tarea/Recordatorio #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM recordatorios_programados WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "tarea", "id": eid, "mensaje": f"Tarea/Recordatorio #{eid} eliminado correctamente."}
+
+        elif t in ("leche", "produccion_leche"):
+            fila = self.query_one("SELECT * FROM produccion_leche WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Control de leche #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM produccion_leche WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "leche", "id": eid, "mensaje": f"Control de leche #{eid} eliminado correctamente."}
+
+        elif t in ("gasto", "ingreso", "finanza", "gastos"):
+            fila = self.query_one("SELECT * FROM gastos WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Registro financiero #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM gastos WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "gasto", "id": eid, "mensaje": f"Registro financiero #{eid} eliminado correctamente."}
+
+        else:
+            return {"ok": False, "error": f"Tipo de evento no soportado para eliminación: '{tipo}'."}
 
     def registrar_leche(self, animal_tag, fecha=None, litros=None,
                         notas=None, registrado_por=None) -> int:

@@ -1990,6 +1990,57 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.post("/api/eventos/eliminar")
+    def api_eliminar_evento():
+        """Elimina un evento registrado en la base de datos.
+        Restringido estrictamente al rol OWNER.
+        """
+        rol = _rol_actual()
+        if rol != "OWNER":
+            return jsonify({
+                "ok": False,
+                "error": "Acceso restringido: solo el propietario (OWNER) puede eliminar eventos del sistema.",
+            }), 403
+
+        datos = request.get_json(silent=True) or request.form or {}
+        tipo = str(datos.get("tipo") or "").strip()
+        try:
+            eid = int(datos.get("id"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "ID de evento inválido o faltante."}), 400
+
+        if not tipo:
+            return jsonify({"ok": False, "error": "Tipo de evento no especificado."}), 400
+
+        db_r = _db(db_path)
+        try:
+            uid = session.get("user_id") if session is not None else None
+            res = db_r.eliminar_evento(tipo=tipo, eid=eid, user_id=uid)
+            if not res.get("ok"):
+                return jsonify(res), 404
+
+            # Notificar al canal de auditoría / equipo
+            try:
+                nombre_autor = session.get("nombre") or session.get("username") or "Propietario"
+                texto_aviso = f"🗑️ Evento de {tipo.upper()} #{eid} eliminado del sistema por {nombre_autor} (OWNER)."
+                db_r.conn.execute(
+                    "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
+                    (uid, nombre_autor, "OWNER", texto_aviso, db_r._ahora()),
+                )
+                db_r.conn.commit()
+            except Exception:
+                pass
+
+            return jsonify(res)
+        except Exception as e:
+            logger.exception("Error al eliminar evento %s #%s: %s", tipo, eid, e)
+            return jsonify({"ok": False, "error": f"Error interno al eliminar evento: {str(e)}"}), 500
+        finally:
+            try:
+                db_r.close()
+            except Exception:
+                pass
+
     @app.get("/api/equipo/integrantes")
     def api_equipo_integrantes():
         """Lista roles estándar y usuarios activos para asignación de tareas de campo."""

@@ -3586,3 +3586,25 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   #nav-principal .nav-grupo { display: contents; }
   #nav-principal .nav-grupo-titulo { display: none; }
 }
+
+/* Botón de eliminación de eventos (solo rol OWNER) */
+.btn-eliminar-evento {
+  background: none;
+  border: none;
+  color: var(--color-rojo-txt, #dc2626);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  opacity: 0.8;
+  transition: opacity 0.15s ease, transform 0.1s ease, background-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.btn-eliminar-evento:hover,
+.btn-eliminar-evento:focus {
+  opacity: 1;
+  background-color: rgba(220, 38, 38, 0.1);
+  transform: scale(1.08);
+}

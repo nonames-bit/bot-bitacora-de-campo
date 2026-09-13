@@ -370,12 +370,14 @@
     if (!eventos.length) {
       h += vacio("No hay eventos recientes registrados.");
     } else {
+      var esOwnerTab = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
       h += "<div class='tabla-scroll tabla-eventos'><table class='tabla-eventos' id='tabla-eventos-tablero'>"
         + "<tr>"
         + "<th>Tipo Evento</th>"
         + "<th>Fecha</th>"
         + "<th>Animal / Arete</th>"
         + "<th>Detalle de la Actividad</th>"
+        + (esOwnerTab ? "<th style='width:36px; text-align:center;'></th>" : "")
         + "</tr>";
 
       eventos.forEach(function (ev, idxEv) {
@@ -426,12 +428,17 @@
           descHtml += "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(ev.notas) + "</div>";
         }
 
+        var btnBorrarTab = (esOwnerTab && ev.id)
+          ? ("<td style='text-align:center;'>" + renderBtnEliminar(tipo.toLowerCase(), ev.id, ev.tipo + " - " + ev.tag + " (" + fechaCorta(ev.fecha) + ")") + "</td>")
+          : (esOwnerTab ? "<td></td>" : "");
+
         var filaOculta = idxEv >= LIMITE_EVENTOS_TABLERO;
         h += "<tr" + (filaOculta ? " class='fila-evento-extra' style='display:none'" : "") + ">"
           + "<td data-label='Tipo Evento'>" + chipHtml + "</td>"
           + "<td data-label='Fecha'><b style='font-family:var(--font-mono); font-size:12px;'>" + esc(fechaCorta(ev.fecha)) + "</b></td>"
           + "<td data-label='Animal / Arete'>" + linkAnimal + detalleExtra + "</td>"
           + "<td data-label='Detalle de la Actividad'>" + descHtml + "</td>"
+          + btnBorrarTab
           + "</tr>";
       });
 
@@ -2814,7 +2821,8 @@
           + "<small style='color:var(--texto-suave); font-weight:600;'>📅 " + fh + "</small>"
           + "</div>"
           + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
-          + "<div style='display:flex; justify-content:flex-end; margin-top:4px;'>"
+          + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
+          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
           + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
           + icon("check", 14) + "Marcar Realizado (Acknowledge)"
           + "</button>"
@@ -2852,6 +2860,7 @@
           + "<div style='font-size:12.5px; color:var(--texto-suave);'>👤 Ejecutado por: <b>" + quien + "</b></div>"
           + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>💬 " + esc(rc.notas_completado) + "</div>") : "")
           + fotoHtml
+          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<div style='display:flex; justify-content:flex-end; margin-top:6px;'><button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea realizada: " + esc(rc.mensaje || "") + "' title='Eliminar registro de tarea' style='font-size:11.5px; color:var(--color-rojo-txt);'>" + icon("trash", 12) + " Eliminar del historial</button></div>") : "")
           + "</div>";
       });
       h += "</div>";
@@ -3707,6 +3716,7 @@
         + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-parto-cria-wrap'>"
         + "<label id='cap-cria1-label'>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div id='cap-cria-sugerido-hint' style='font-size:11.5px; color:var(--verde-marca); margin:-4px 0 8px 2px; cursor:pointer; font-weight:600;'></div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Sexo de la Cría: <select id='cap-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
         + "<div style='flex:1;'><label>Estado Cría: <select id='cap-estado-cria' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
@@ -3989,7 +3999,10 @@
       }
       if (tagIni) {
         var fTagDef = document.getElementById("cap-tag");
-        if (fTagDef && !fTagDef.value) fTagDef.value = tagIni;
+        if (fTagDef && !fTagDef.value) {
+          fTagDef.value = tagIni;
+          fTagDef.dispatchEvent(new Event("change"));
+        }
         var chipTag = document.getElementById("cap-tag-chip");
         if (chipTag) chipTag.innerHTML = "<span class='chip azul'>📋 Animal: " + esc(tagIni) + "</span>";
         window.__capTagPendiente = null;
@@ -4103,6 +4116,7 @@
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
       bindTipoEventoParto();
+      bindSugerenciaTagCriaParto();
       bindCamposTarea();
       aplicarDefaultsCaptura();
     }
@@ -4129,6 +4143,27 @@
       });
       var bAtr3 = document.getElementById("btn-cap-atras3");
       if (bAtr3) bAtr3.addEventListener("click", function () { mostrarPasoCap(2); });
+
+      var formCap = document.getElementById("form-captura");
+      if (formCap && !formCap.__enterIntercepted) {
+        formCap.__enterIntercepted = true;
+        formCap.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" && e.target && e.target.tagName !== "TEXTAREA") {
+            if (_capPaso < 3) {
+              e.preventDefault();
+              if (_capPaso === 1) {
+                mostrarPasoCap(2);
+              } else if (_capPaso === 2) {
+                if (validarPaso2Cap()) {
+                  var prev = document.getElementById("cap-preview-resumen");
+                  if (prev) prev.innerHTML = resumenCapHtml();
+                  mostrarPasoCap(3);
+                }
+              }
+            }
+          }
+        });
+      }
     }
 
     function bindFotoCaptura() {
@@ -4687,6 +4722,72 @@
       }
       sel.addEventListener("change", toggle);
       toggle();
+    }
+
+    // Sugerencia de arete de cría para Parto (Madre + "-" + digitoAno, ej. n088-6, JA457-6 como en SG).
+    function bindSugerenciaTagCriaParto() {
+      if (_tipoCapturaActual !== "parto") return;
+      var fMadre = document.getElementById("cap-tag");
+      var fFecha = document.getElementById("cap-fecha");
+      var fCria = document.getElementById("cap-cria-tag");
+      var hint = document.getElementById("cap-cria-sugerido-hint");
+      var fCria2 = document.getElementById("cap-cria2-tag");
+      if (!fMadre || !fCria) return;
+
+      var _tagModificadoManualmente = false;
+
+      fCria.addEventListener("input", function () {
+        _tagModificadoManualmente = true;
+      });
+
+      function calcularSugerencia() {
+        var madre = (fMadre.value || "").trim();
+        if (!madre) {
+          if (hint) hint.innerHTML = "";
+          return null;
+        }
+        var fecha = (fFecha && fFecha.value) || new Date().toISOString().slice(0, 10);
+        var anoStr = fecha.split("-")[0] || String(new Date().getFullYear());
+        var digitoAno = anoStr.slice(-1); // e.g. 2026 -> "6"
+        var sug = madre + "-" + digitoAno;
+        return sug;
+      }
+
+      function actualizarSugerencia(forzar) {
+        var sug = calcularSugerencia();
+        if (!sug) return;
+        if (hint) {
+          hint.innerHTML = "💡 Sugerencia SG: <span style='text-decoration:underline;'>" + esc(sug) + "</span> <small style='color:var(--texto-suave); font-weight:normal;'>(opcional, clic para aplicar)</small>";
+        }
+        if (forzar || !_tagModificadoManualmente || !fCria.value.trim()) {
+          fCria.value = sug;
+          _tagModificadoManualmente = false;
+        }
+        if (fCria2 && !fCria2.value.trim()) {
+          fCria2.placeholder = "ej. " + sug + "-2";
+        }
+      }
+
+      if (hint) {
+        hint.addEventListener("click", function () {
+          var sug = calcularSugerencia();
+          if (sug) {
+            fCria.value = sug;
+            _tagModificadoManualmente = false;
+            fCria.focus();
+          }
+        });
+      }
+
+      fMadre.addEventListener("input", function () { actualizarSugerencia(false); });
+      fMadre.addEventListener("change", function () { actualizarSugerencia(false); });
+      if (fFecha) {
+        fFecha.addEventListener("change", function () { actualizarSugerencia(false); });
+      }
+
+      if (fMadre.value.trim()) {
+        actualizarSugerencia(false);
+      }
     }
 
     function ejecutarTrasladoMasivo(fecha) {
@@ -7741,6 +7842,7 @@
     return "<span class='chip gris'>" + esc(v) + "</span>";
   }
   function fichaTab(id, f) {
+    var esOwner = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
     if (id === "genealogia") {
       var g = f.genealogia_3g || {};
       var cons = g.consanguinidad || f.consanguinidad || {};
@@ -7776,7 +7878,7 @@
         var hie = an.hierro ? (" <span class='chip ambar' style='font-size:10px; padding:1px 4px;' title='Hierro'>" + esc(an.hierro) + "</span>") : "";
         return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
           + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
-          + "<div><a href='#' class='ficha-link' " + click + " style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span>" + hie + "</div>"
+          + "<div><a href='#' class='ficha-link' data-ir-ficha=\"" + esc(an.tag) + "\" style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span>" + hie + "</div>"
           + "</div>";
       }
 
@@ -7831,9 +7933,13 @@
             ? "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(cTag) + "\" style='font-size:14px; font-weight:bold; display:inline-flex; align-items:center; gap:5px; text-decoration:none;'>" + icon("calf", 14) + "<span>" + esc(cTag) + "</span></a>"
             : "<span style='color:var(--texto-suave); display:inline-flex; align-items:center; gap:5px;'>" + icon("calf", 14) + "<span>Sin arete</span></span>";
 
+          var btnBorrarCria = (esOwner && c.parto_id)
+            ? (" " + renderBtnEliminar("parto", c.parto_id, "Parto " + cTag + " (" + cFec + ")"))
+            : "";
+
           hg += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:10px 12px;'>"
             + "<div>" + linkTag + " <span style='font-size:13px; color:var(--texto);'>" + cNom + "</span> <span class='meta' style='font-size:12px;'>· " + esc(cSx) + " · Nac: <b>" + esc(cFec) + "</b>" + pNac + "</span></div>"
-            + "<div>" + estChip + "</div>"
+            + "<div style='display:flex; align-items:center; gap:6px;'>" + estChip + btnBorrarCria + "</div>"
             + "</div>";
         });
         hg += "</div>";
@@ -7858,35 +7964,60 @@
     }
     if (id === "repro") {
       var h = "";
-      h += "<h4>Partos registrados</h4>" + tabla(f.partos, [
+      var colsPartos = [
         ["fecha", "Fecha"], ["cria_tag", "Cría"], ["sexo_cria", "Sexo"],
         ["peso_nacimiento", "Peso nac.", "num"],
         ["estado_cria", "Estado", "text", function (v) {
           return String(v || "").toUpperCase() === "MUERTO"
             ? "<span class='chip rojo'>Muerto</span>" : "<span class='chip verde'>Vivo</span>";
         }]
-      ], "Sin partos registrados.");
-      h += "<h4>Servicios / IA</h4>" + tabla(f.servicios, [
+      ];
+      if (esOwner) {
+        colsPartos.push(["id", "", "text", function (id, r) {
+          return renderBtnEliminar("parto", id, "Parto " + (r.cria_tag || "cría") + " (" + fechaCorta(r.fecha) + ")");
+        }]);
+      }
+      h += "<h4>Partos registrados</h4>" + tabla(f.partos, colsPartos, "Sin partos registrados.");
+
+      var colsServ = [
         ["fecha", "Fecha"], ["tipo_servicio", "Tipo"], ["toro_pajilla", "Toro"],
         ["fep_calculada", "FEP", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
         ["estado", "Estado", "text", function (v) { return chipResultado(v); }]
-      ], "Sin servicios registrados.");
-      h += "<h4>Diagnósticos de gestación</h4>" + tabla(f.diagnosticos, [
+      ];
+      if (esOwner) {
+        colsServ.push(["id", "", "text", function (id, r) {
+          return renderBtnEliminar("servicio", id, "Servicio " + (r.tipo_servicio || "") + " (" + fechaCorta(r.fecha) + ")");
+        }]);
+      }
+      h += "<h4>Servicios / IA</h4>" + tabla(f.servicios, colsServ, "Sin servicios registrados.");
+
+      var colsDiag = [
         ["fecha", "Fecha"], ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
         ["dias_gestacion", "Días gest."]
-      ], "Sin diagnósticos registrados.");
+      ];
+      if (esOwner) {
+        colsDiag.push(["id", "", "text", function (id, r) {
+          return renderBtnEliminar("diagnostico", id, "Diagnóstico " + (r.resultado || "") + " (" + fechaCorta(r.fecha) + ")");
+        }]);
+      }
+      h += "<h4>Diagnósticos de gestación</h4>" + tabla(f.diagnosticos, colsDiag, "Sin diagnósticos registrados.");
       if (f.ultimo_servicio && f.ultimo_servicio.fep_calculada) {
         h += "<p class='aviso'>" + icon("calendar", 14) + "FEP (parto estimado): <b>" + esc(fechaCorta(f.ultimo_servicio.fep_calculada)) + "</b></p>";
       }
       return h;
     }
     if (id === "sanidad") {
-      return "<h4>Tratamientos y retiros</h4>"
-        + tabla(f.tratamientos, [
-          ["fecha", "Fecha"], ["producto", "Producto"], ["dosis", "Dosis"],
-          ["fecha_fin_retiro_leche", "Fin leche", "text", function (v) { return v ? esc(v) : "—"; }],
-          ["fecha_fin_retiro_carne", "Fin carne", "text", function (v) { return v ? esc(v) : "—"; }]
-        ], "Sin tratamientos registrados.");
+      var colsTrat = [
+        ["fecha", "Fecha"], ["producto", "Producto"], ["dosis", "Dosis"],
+        ["fecha_fin_retiro_leche", "Fin leche", "text", function (v) { return v ? esc(v) : "—"; }],
+        ["fecha_fin_retiro_carne", "Fin carne", "text", function (v) { return v ? esc(v) : "—"; }]
+      ];
+      if (esOwner) {
+        colsTrat.push(["id", "", "text", function (id, r) {
+          return renderBtnEliminar("tratamiento", id, "Tratamiento " + (r.producto || "") + " (" + fechaCorta(r.fecha) + ")");
+        }]);
+      }
+      return "<h4>Tratamientos y retiros</h4>" + tabla(f.tratamientos, colsTrat, "Sin tratamientos registrados.");
     }
     if (id === "leche") {
       var lac = f.lactancia || {};
@@ -7908,16 +8039,21 @@
     }
     if (id === "pesos") {
       var ult = f.pesajes && f.pesajes.length ? f.pesajes[0] : null;
-      var h2 = "<h4>Historial de pesajes</h4>"
-        + tabla(f.pesajes, [
-          ["fecha", "Fecha"], ["peso_kg", "kg", "num"],
-          ["gmd_calculada", "GMD (g/d)", "text", function (v) {
-            if (v == null) return "—";
-            var n = Number(v) * 1000;
-            var c = n < 0 ? "rojo" : n > 0 ? "verde" : "gris";
-            return "<span class='chip " + c + "'>" + esc(n.toFixed(0)) + "</span>";
-          }]
-        ], "Sin pesajes registrados.");
+      var colsPes = [
+        ["fecha", "Fecha"], ["peso_kg", "kg", "num"],
+        ["gmd_calculada", "GMD (g/d)", "text", function (v) {
+          if (v == null) return "—";
+          var n = Number(v) * 1000;
+          var c = n < 0 ? "rojo" : n > 0 ? "verde" : "gris";
+          return "<span class='chip " + c + "'>" + esc(n.toFixed(0)) + "</span>";
+        }]
+      ];
+      if (esOwner) {
+        colsPes.push(["id", "", "text", function (id, r) {
+          return renderBtnEliminar("pesaje", id, "Pesaje " + (r.peso_kg || "") + " kg (" + fechaCorta(r.fecha) + ")");
+        }]);
+      }
+      var h2 = "<h4>Historial de pesajes</h4>" + tabla(f.pesajes, colsPes, "Sin pesajes registrados.");
       if (ult) h2 += "<p class='aviso'>Último peso: <b>" + esc(ult.peso_kg) + " kg</b> el " + esc(fechaCorta(ult.fecha)) + "</p>";
       h2 += "<div class='grafico-wrap'><img src='/api/ficha/" + encodeURIComponent(f.tag)
         + "/grafico/peso' alt='Curva de peso' loading='lazy' data-onerror-hide='self'></div>";
@@ -8377,6 +8513,57 @@
     var btn = nav.querySelector("button[data-tab='" + tabId + "']");
     if (btn) btn.click();
   };
+  // Helper para renderizar botón de eliminación de eventos (solo rol OWNER)
+  function renderBtnEliminar(tipo, id, desc) {
+    var esOwner = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
+    if (!esOwner || !id) return "";
+    return "<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='" + esc(tipo) + "' data-id='" + esc(id) + "' data-desc='" + esc(desc || "") + "' title='Eliminar registro permanentemente (solo OWNER)' aria-label='Eliminar'>" + icon("trash", 13) + "</button>";
+  }
+  window.renderBtnEliminar = renderBtnEliminar;
+
+  function ejecutarEliminacionEvento(tipo, id, desc) {
+    var esOwner = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
+    if (!esOwner) {
+      alert("Acceso restringido: solo el propietario (OWNER) puede eliminar eventos registrados.");
+      return;
+    }
+    if (!tipo || !id) {
+      alert("Error: tipo o ID de evento no especificado.");
+      return;
+    }
+    var msg = "¿Seguro que deseas ELIMINAR permanentemente este registro del sistema?\n\n"
+      + "• " + (desc || (tipo.toUpperCase() + " #" + id)) + "\n\n"
+      + "⚠️ Esta acción es irreversible y revertirá estados o alertas derivadas si aplica (solo autorizada para el OWNER).\n\n¿Continuar?";
+    if (!window.confirm(msg)) return;
+
+    mostrarToast("Eliminando evento...", "ambar");
+    fetch("/api/eventos/eliminar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tipo: tipo, id: parseInt(id, 10) })
+    })
+    .then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, status: r.status, data: data }; });
+    })
+    .then(function (res) {
+      if (!res.ok || !res.data.ok) {
+        alert("Error al eliminar evento: " + ((res.data && res.data.error) || ("HTTP " + res.status)));
+        return;
+      }
+      mostrarToast("✓ " + (res.data.mensaje || "Evento eliminado correctamente"), "verde");
+      vibrarConfirmacion();
+      if (window.__ultimaFicha && window.__ultimaFicha.tag) {
+        abrirFichaDesdeTag(window.__ultimaFicha.tag);
+      }
+      cargar(true);
+      actualizarBadges();
+    })
+    .catch(function (err) {
+      alert("Error de conexión al eliminar evento: " + err.message);
+    });
+  }
+  window.ejecutarEliminacionEvento = ejecutarEliminacionEvento;
+
   // Delegado global de clics para HTML inyectado dinámicamente (innerHTML):
   // el CSP de producción (script-src 'self', sin unsafe-inline) bloquea
   // atributos onclick='' inline -- por eso todo lo que se genera con
@@ -8420,6 +8607,13 @@
         var card = elAcc.closest(".card");
         var pre = card && card.querySelector("pre");
         if (pre) navigator.clipboard.writeText(pre.innerText).then(function () { alert("Árbol copiado al portapapeles"); });
+      }
+      else if (acc === "eliminar-evento") {
+        e.preventDefault();
+        var tipoEv = elAcc.getAttribute("data-tipo");
+        var idEv = elAcc.getAttribute("data-id");
+        var descEv = elAcc.getAttribute("data-desc") || (tipoEv + " #" + idEv);
+        ejecutarEliminacionEvento(tipoEv, idEv, descEv);
       }
     }
   });

@@ -996,16 +996,16 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         base["ultimo_servicio"] = None
     try:
         base["pesajes"] = _filas_dict(db.query(
-            "SELECT fecha, peso_kg, gmd_calculada FROM pesajes WHERE animal_id = ? "
-            "ORDER BY fecha DESC LIMIT 5", (aid,)))
+            "SELECT id, fecha, peso_kg, gmd_calculada FROM pesajes WHERE animal_id = ? "
+            "ORDER BY fecha DESC LIMIT 15", (aid,)))
     except Exception as e:
         logger.error("seccion pesajes fallo", exc_info=True)
         errores["pesajes"] = str(e)
         base["pesajes"] = []
     try:
         base["tratamientos"] = _filas_dict(db.query(
-            "SELECT fecha, producto, dosis, fecha_fin_retiro_leche, fecha_fin_retiro_carne "
-            "FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT 5", (aid,)))
+            "SELECT id, fecha, producto, dosis, fecha_fin_retiro_leche, fecha_fin_retiro_carne "
+            "FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT 15", (aid,)))
     except Exception as e:
         logger.error("seccion tratamientos fallo", exc_info=True)
         errores["tratamientos"] = str(e)
@@ -1025,26 +1025,26 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     es_hembra = str(an["sexo"] or "").lower().startswith("h") or str(an["sexo"] or "").lower().startswith("f")
     try:
         base["partos"] = _filas_dict(db.query(
-            """SELECT p.fecha, p.sexo_cria, p.estado_cria, p.peso_nacimiento, c.tag AS cria_tag
+            """SELECT p.id, p.fecha, p.sexo_cria, p.estado_cria, p.peso_nacimiento, c.tag AS cria_tag
                FROM partos p LEFT JOIN animales c ON c.id_animal = p.id_cria
                WHERE p.vaca_id = ? AND (p.id_cria IS NULL OR p.id_cria != ?)
-               ORDER BY p.fecha DESC LIMIT 8""", (aid, aid)))
+               ORDER BY p.fecha DESC LIMIT 15""", (aid, aid)))
     except Exception as e:
         logger.error("seccion partos fallo", exc_info=True)
         errores["partos"] = str(e)
         base["partos"] = []
     try:
         base["servicios"] = _filas_dict(db.query(
-            """SELECT fecha, tipo_servicio, toro_pajilla, inseminador, fep_calculada, estado
-               FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 8""", (aid,)))
+            """SELECT id, fecha, tipo_servicio, toro_pajilla, inseminador, fep_calculada, estado
+               FROM servicios WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 15""", (aid,)))
     except Exception as e:
         logger.error("seccion servicios fallo", exc_info=True)
         errores["servicios"] = str(e)
         base["servicios"] = []
     try:
         base["diagnosticos"] = _filas_dict(db.query(
-            """SELECT fecha, resultado, dias_gestacion FROM diagnosticos_gestacion
-               WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 6""", (aid,)))
+            """SELECT id, fecha, resultado, dias_gestacion FROM diagnosticos_gestacion
+               WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 10""", (aid,)))
     except Exception as e:
         logger.error("seccion diagnosticos fallo", exc_info=True)
         errores["diagnosticos"] = str(e)
@@ -1163,7 +1163,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         crias_rows = db.query(
             """
             SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.estado, a.hierro,
-                   p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
+                   p.id AS parto_id, p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
             FROM animales a
             LEFT JOIN partos p ON p.id_cria = a.id_animal
             WHERE a.madre_id = ? OR a.padre_id = ?
@@ -1178,12 +1178,12 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         # Partos sin cría registrada formalmente en animales
         partos_sin_cria = db.query(
             """
-            SELECT NULL AS id_animal, 'Sin arete' AS tag, NULL AS nombre, sexo_cria AS sexo,
-                   NULL AS raza, fecha AS fecha_nacimiento, 'ACTIVO' AS estado,
-                   fecha AS fecha_parto, peso_nacimiento, estado_cria
-            FROM partos
-            WHERE vaca_id = ? AND id_cria IS NULL
-            ORDER BY fecha DESC
+            SELECT p.id AS parto_id, NULL AS id_animal, 'Sin arete' AS tag, NULL AS nombre, p.sexo_cria AS sexo,
+                   NULL AS raza, p.fecha AS fecha_nacimiento, 'ACTIVO' AS estado,
+                   p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
+            FROM partos p
+            WHERE p.vaca_id = ? AND p.id_cria IS NULL
+            ORDER BY p.fecha DESC
             """,
             (aid,),
         )
@@ -1235,6 +1235,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base["abuelo_mat"] = m_abuelo_mat
     base["abuela_mat"] = m_abuela_mat
     base["consanguinidad"] = consang_info
+    base["texto_arbol"] = texto_arbol
 
     base["genealogia_3g"] = {
         "animal": {"id_animal": an.get("id_animal"), "tag": an.get("tag"), "nombre": an.get("nombre"), "raza": an.get("raza"), "sexo": an.get("sexo")},
