@@ -225,7 +225,19 @@ CREATE TABLE IF NOT EXISTS recordatorios_programados (
     hora TEXT,
     creado_por INTEGER,
     estado TEXT DEFAULT 'PENDIENTE',
-    creado_en TEXT
+    creado_en TEXT,
+    asignado_a TEXT,
+    asignado_a_id INTEGER,
+    tipo_objetivo TEXT,
+    animal_tag TEXT,
+    potrero_nombre TEXT,
+    tipo_tarea TEXT,
+    prioridad TEXT DEFAULT 'NORMAL',
+    completado_en TEXT,
+    completado_por TEXT,
+    completado_por_id INTEGER,
+    notas_completado TEXT,
+    foto_completado TEXT
 );
 
 CREATE TABLE IF NOT EXISTS diagnosticos_gestacion (
@@ -312,6 +324,8 @@ CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha)
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
 CREATE INDEX IF NOT EXISTS idx_recordatorios_fecha_estado ON recordatorios_programados(fecha_programada, estado);
+CREATE INDEX IF NOT EXISTS idx_recordatorios_asignado ON recordatorios_programados(asignado_a, estado);
+CREATE INDEX IF NOT EXISTS idx_recordatorios_tag ON recordatorios_programados(animal_tag);
 CREATE INDEX IF NOT EXISTS idx_diagnosticos_vaca_fecha ON diagnosticos_gestacion(vaca_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro);
 CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);

@@ -975,6 +975,79 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.post("/api/sanidad/tratamiento")
+    def api_sanidad_crear_tratamiento():
+        """Registra un tratamiento individual desde la vista Sanidad (online).
+
+        Reusa Database.registrar_tratamiento (misma tabla que Telegram/Captura
+        y /api/sync) sin duplicar lógica de retiros. Exige animal con
+        estado='ACTIVO' (Regla Fundamental de Inventario): no crea animales
+        nuevos aquí — eso queda para Captura/Sync. Auth ya validada por
+        _requerir_login; cualquier rol autenticado puede registrar.
+        """
+        datos = request.get_json(silent=True) or {}
+        tag = str(datos.get("tag") or datos.get("animal_tag") or "").strip()
+        producto = str(datos.get("producto") or "").strip()
+        principio = str(datos.get("principio_activo") or "").strip() or None
+        dosis = str(datos.get("dosis") or "").strip() or None
+        via = str(datos.get("via") or "").strip().upper() or None
+        fecha = str(datos.get("fecha") or "").strip() or date.today().isoformat()
+        diagnostico = str(datos.get("diagnostico") or "").strip() or None
+        if not tag:
+            return jsonify({"ok": False, "error": "El arete/tag del animal es obligatorio."}), 400
+        if not producto:
+            return jsonify({"ok": False, "error": "El producto/fármaco es obligatorio."}), 400
+        if len(producto) > 120 or (principio and len(principio) > 120):
+            return jsonify({"ok": False, "error": "Producto/principio activo demasiado largo (máx 120)."}), 400
+        if dosis and len(dosis) > 60:
+            return jsonify({"ok": False, "error": "Dosis demasiado larga (máx 60)."}), 400
+        if via and via not in ("IM", "SC", "IV", "ORAL", "POUR-ON", "TOPICO", "INTRAMAMARIA"):
+            return jsonify({"ok": False, "error": "Vía inválida (IM/SC/IV/Oral/Pour-on/Tópico/Intramamaria)."}), 400
+        try:
+            if to_date(fecha) is None:
+                return jsonify({"ok": False, "error": "Fecha inválida. Use YYYY-MM-DD."}), 400
+        except Exception:
+            return jsonify({"ok": False, "error": "Fecha inválida. Use YYYY-MM-DD."}), 400
+        try:
+            d_leche = int(datos.get("dias_retiro_leche") or 0)
+            d_carne = int(datos.get("dias_retiro_carne") or 0)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "Días de retiro deben ser números enteros."}), 400
+        if d_leche < 0 or d_carne < 0 or d_leche > 365 or d_carne > 365:
+            return jsonify({"ok": False, "error": "Días de retiro entre 0 y 365."}), 400
+        db_s = _db(db_path)
+        try:
+            aid = db_s.resolve_animal(tag)
+            if aid is None:
+                return jsonify({"ok": False, "error": f"No se encontró el animal '{tag}'."}), 404
+            fila = db_s.get_animal(aid)
+            if not fila or (fila["estado"] or "") != "ACTIVO":
+                return jsonify({"ok": False, "error": f"El animal '{tag}' no está ACTIVO; no se puede tratar."}), 400
+            uid = session.get("user_id") if session is not None else None
+            tid = db_s.registrar_tratamiento(
+                animal_tag=fila["tag"], fecha=fecha, producto=producto,
+                principio_activo=principio, dosis=dosis, via=via,
+                dias_retiro_leche=d_leche, dias_retiro_carne=d_carne,
+                diagnostico=diagnostico, registrado_por=uid,
+            )
+            fila_t = db_s.query_one(
+                "SELECT fecha_fin_retiro_leche, fecha_fin_retiro_carne FROM tratamientos WHERE id = ?",
+                (tid,),
+            )
+            return jsonify({
+                "ok": True, "id": tid, "tag": fila["tag"], "fecha": fecha,
+                "fecha_fin_retiro_leche": fila_t["fecha_fin_retiro_leche"] if fila_t else None,
+                "fecha_fin_retiro_carne": fila_t["fecha_fin_retiro_carne"] if fila_t else None,
+            })
+        except Exception:
+            logger.exception("Error registrando tratamiento de sanidad")
+            return jsonify({"ok": False, "error": "No se pudo registrar el tratamiento."}), 500
+        finally:
+            try:
+                db_s.close()
+            except Exception:
+                pass
+
     @app.get("/api/pasturas")
     def api_pasturas():
         out = datos_pasturas(db_path)
@@ -1794,18 +1867,19 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.post("/api/agenda/recordatorio")
     def api_agenda_crear_recordatorio():
-        """Crea un evento/recordatorio de campo (misma tabla de /programar).
-
-        Cualquier rol autenticado puede crear (igual que Captura/Sync);
-        la sesión ya está validada por _requerir_login. Estados del evento:
-        se crea PENDIENTE y pasa a ENVIADO al completarse.
-        """
-        datos = request.get_json(silent=True) or {}
+        """Crea un evento/recordatorio o tarea asignada de campo (misma tabla de /programar)."""
+        datos = request.get_json(silent=True) or request.form or {}
         mensaje = str(datos.get("mensaje") or "").strip()
         fecha = str(datos.get("fecha") or "").strip()
         hora = str(datos.get("hora") or "").strip() or None
+        asignado_a = str(datos.get("asignado_a") or "").strip() or None
+        tipo_objetivo = str(datos.get("tipo_objetivo") or "").strip().upper() or None
+        animal_tag = str(datos.get("animal_tag") or datos.get("tag") or "").strip().upper() or None
+        potrero_nombre = str(datos.get("potrero_nombre") or datos.get("potrero") or "").strip() or None
+        tipo_tarea = str(datos.get("tipo_tarea") or "").strip().upper() or None
+        prioridad = str(datos.get("prioridad") or "NORMAL").strip().upper()
         if not mensaje:
-            return jsonify({"ok": False, "error": "El mensaje es obligatorio."}), 400
+            return jsonify({"ok": False, "error": "El mensaje o descripción de la tarea es obligatorio."}), 400
         if len(mensaje) > 500:
             return jsonify({"ok": False, "error": "El mensaje no puede superar 500 caracteres."}), 400
         if not fecha:
@@ -1821,9 +1895,31 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         try:
             uid = session.get("user_id") if session is not None else None
             rid = db_r.registrar_recordatorio(
-                mensaje=mensaje, fecha_programada=fecha, hora=hora, creado_por=uid,
+                mensaje=mensaje,
+                fecha_programada=fecha,
+                hora=hora,
+                creado_por=uid,
+                asignado_a=asignado_a,
+                tipo_objetivo=tipo_objetivo,
+                animal_tag=animal_tag,
+                potrero_nombre=potrero_nombre,
+                tipo_tarea=tipo_tarea,
+                prioridad=prioridad,
             )
-            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora})
+            # Notificar al canal del equipo
+            try:
+                dest = f" a {asignado_a}" if asignado_a else ""
+                obj = f" ({animal_tag or potrero_nombre})" if (animal_tag or potrero_nombre) else ""
+                texto_aviso = f"📋 Tarea asignada{dest}{obj}: {mensaje}"
+                nombre_creador = session.get("nombre") or (_rol_actual() or "Usuario")
+                db_r.conn.execute(
+                    "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
+                    (uid, nombre_creador, _rol_actual() or "USUARIO", texto_aviso, db_r._ahora()),
+                )
+                db_r.conn.commit()
+            except Exception:
+                pass
+            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora, "asignado_a": asignado_a})
         except Exception:
             logger.exception("Error creando recordatorio de agenda")
             return jsonify({"ok": False, "error": "No se pudo crear el recordatorio."}), 500
@@ -1835,22 +1931,56 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.post("/api/agenda/recordatorio/<int:rid>/completar")
     def api_agenda_completar_recordatorio(rid: int):
-        """Marca un recordatorio PENDIENTE como ENVIADO (completado).
-
-        Cualquier rol autenticado puede completar; la resolución de alertas
-        automáticas (eco/palpación/partos) sigue siendo del motor zootécnico.
-        """
+        """Marca un recordatorio PENDIENTE como REALIZADO (acknowledge con notas y foto opcional)."""
+        datos = request.get_json(silent=True) or request.form or {}
+        notas = str(datos.get("notas") or datos.get("notas_completado") or "").strip() or None
+        foto_b64 = datos.get("foto_base64")
+        completado_por = str(datos.get("completado_por") or session.get("nombre") or (_rol_actual() or "Usuario")).strip()
         db_r = _db(db_path)
         try:
             fila = db_r.query_one(
-                "SELECT id, estado FROM recordatorios_programados WHERE id = ?", (rid,),
+                "SELECT * FROM recordatorios_programados WHERE id = ?", (rid,),
             )
             if not fila:
                 return jsonify({"ok": False, "error": "El recordatorio no existe."}), 404
-            if (fila["estado"] or "PENDIENTE") != "PENDIENTE":
-                return jsonify({"ok": True, "id": rid, "estado": fila["estado"]})
-            db_r.marcar_enviado(rid)
-            return jsonify({"ok": True, "id": rid, "estado": "ENVIADO"})
+            uid = session.get("user_id") if session is not None else None
+            foto_ruta = None
+            if foto_b64 and isinstance(foto_b64, str):
+                tag_ref = fila.get("animal_tag") or "tarea"
+                fid_foto = _guardar_foto_evento(db_r, {"foto_base64": foto_b64, "animal_tag": tag_ref}, "tarea", date.today().isoformat(), uid)
+                if fid_foto:
+                    foto_row = db_r.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
+                    if foto_row and foto_row.get("ruta"):
+                        foto_ruta = foto_row["ruta"]
+
+            db_r.completar_recordatorio(
+                rid,
+                completado_por=completado_por,
+                completado_por_id=uid,
+                notas_completado=notas,
+                foto_completado=foto_ruta,
+            )
+            # Notificar al canal del equipo
+            try:
+                obj = f" ({fila.get('animal_tag') or fila.get('potrero_nombre')})" if (fila.get('animal_tag') or fila.get('potrero_nombre')) else ""
+                detalle = f" · {notas}" if notas else ""
+                texto_aviso = f"✅ Tarea realizada por {completado_por}{obj}: {fila.get('mensaje')}{detalle}"
+                db_r.conn.execute(
+                    "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
+                    (uid, completado_por, _rol_actual() or "USUARIO", texto_aviso, db_r._ahora()),
+                )
+                db_r.conn.commit()
+            except Exception:
+                pass
+
+            return jsonify({
+                "ok": True,
+                "id": rid,
+                "estado": "REALIZADO",
+                "completado_por": completado_por,
+                "notas": notas,
+                "foto_ruta": foto_ruta,
+            })
         except Exception:
             logger.exception("Error completando recordatorio de agenda")
             return jsonify({"ok": False, "error": "No se pudo completar el recordatorio."}), 500
@@ -1859,6 +1989,25 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 db_r.close()
             except Exception:
                 pass
+
+    @app.get("/api/equipo/integrantes")
+    def api_equipo_integrantes():
+        """Lista roles estándar y usuarios activos para asignación de tareas de campo."""
+        roles_base = ["Encargado", "Administrador", "Veterinario", "Trabajador"]
+        integrantes = [{"nombre": r, "tipo": "ROL"} for r in roles_base]
+        try:
+            try:
+                from ..server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth
+            auth_inst = Auth(users_file)
+            for u in auth_inst.listar_usuarios():
+                nom = (u.get("nombre") or u.get("username") or "").strip()
+                if nom and not any(it["nombre"].lower() == nom.lower() for it in integrantes):
+                    integrantes.append({"nombre": nom, "rol": u.get("rol"), "tipo": "USUARIO"})
+        except Exception:
+            pass
+        return jsonify({"ok": True, "integrantes": integrantes})
 
     @app.get("/api/buscar")
     def api_buscar():
@@ -2577,6 +2726,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             potrero_nombre=payload.get("potrero_nombre"),
                             punto_control=payload.get("punto_control"),
                             notas=payload.get("notas"),
+                        )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("tarea", "recordatorio"):
+                        msg_tarea = payload.get("mensaje") or payload.get("descripcion") or f"Tarea: {payload.get('tipo_tarea', 'Campo')}"
+                        db_sync.registrar_recordatorio(
+                            mensaje=msg_tarea,
+                            fecha_programada=fecha,
+                            hora=payload.get("hora"),
+                            creado_por=uid,
+                            asignado_a=payload.get("asignado_a"),
+                            tipo_objetivo=payload.get("tipo_objetivo"),
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            potrero_nombre=payload.get("potrero_nombre") or payload.get("potrero"),
+                            tipo_tarea=payload.get("tipo_tarea"),
+                            prioridad=payload.get("prioridad") or "NORMAL",
                         )
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1

@@ -340,7 +340,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         clima_hoy = None
 
     try:
-        precio_hoy = db.precio_referencia_hoy()
+        precio_hoy = db.precio_referencia_hoy(plaza="BOGOTA", producto="MACHO_GORDO")
     except Exception as e:
         logger.error("seccion precio_hoy fallo", exc_info=True)
         errores["precio_hoy"] = str(e)
@@ -477,29 +477,38 @@ def datos_sanidad(db: Database) -> dict:
     errores: dict[str, str] = {}
     try:
         retiros = _filas_dict(db.query(
-            """SELECT a.tag, t.producto, t.fecha, t.fecha_fin_retiro_leche,
-                      t.fecha_fin_retiro_carne FROM tratamientos t
-               JOIN animales a ON a.id_animal = t.animal_id
-               WHERE a.estado = 'ACTIVO'
-               AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
-                OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
-               ORDER BY t.fecha DESC LIMIT 30""", (hoy_iso, hoy_iso)))
+            """SELECT a.tag, a.nombre, t.producto, t.principio_activo, t.dosis, t.via,
+                      t.fecha, t.dias_retiro_leche, t.dias_retiro_carne,
+                      t.fecha_fin_retiro_leche, t.fecha_fin_retiro_carne FROM tratamientos t
+                JOIN animales a ON a.id_animal = t.animal_id
+                WHERE a.estado = 'ACTIVO'
+                AND ((t.fecha_fin_retiro_leche IS NOT NULL AND t.fecha_fin_retiro_leche >= ?)
+                 OR (t.fecha_fin_retiro_carne IS NOT NULL AND t.fecha_fin_retiro_carne >= ?))
+                ORDER BY t.fecha DESC LIMIT 30""", (hoy_iso, hoy_iso)))
         for r in retiros:
             for k in ("fecha_fin_retiro_leche", "fecha_fin_retiro_carne"):
                 if r.get(k):
                     try:
-                        r[k + "_dias"] = (date.fromisoformat(r[k]) - hoy).days
+                        r[k + "_dias"] = (date.fromisoformat(str(r[k])[:10]) - hoy).days
                     except Exception:
                         r[k + "_dias"] = None
+            # Estado operativo del retiro con días restantes (skill @plan-sanitario:
+            # Fin = última dosis + días de retiro; se muestra la cuenta regresiva).
+            d_leche = r.get("fecha_fin_retiro_leche_dias")
+            d_carne = r.get("fecha_fin_retiro_carne_dias")
+            dias = [d for d in (d_leche, d_carne) if isinstance(d, int)]
+            r["dias_restantes"] = max(dias) if dias else None
+            r["estado"] = "EN_RETIRO"
     except Exception as e:
         logger.error("seccion retiros fallo", exc_info=True)
         errores["retiros"] = str(e)
         retiros = []
     try:
         ultimos = _filas_dict(db.query(
-            """SELECT a.tag, t.producto, t.dosis, t.via, t.fecha FROM tratamientos t
-               JOIN animales a ON a.id_animal = t.animal_id
-               WHERE a.estado = 'ACTIVO' ORDER BY t.fecha DESC, t.id DESC LIMIT 20"""))
+            """SELECT a.tag, t.producto, t.principio_activo, t.dosis, t.via, t.fecha,
+                      t.dias_retiro_leche, t.dias_retiro_carne FROM tratamientos t
+                JOIN animales a ON a.id_animal = t.animal_id
+                WHERE a.estado = 'ACTIVO' ORDER BY t.fecha DESC, t.id DESC LIMIT 20"""))
     except Exception as e:
         logger.error("seccion ultimos_tratamientos fallo", exc_info=True)
         errores["ultimos_tratamientos"] = str(e)
@@ -1994,11 +2003,15 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
         logger.error("seccion agenda_retiros fallo", exc_info=True)
         errores["retiros"] = str(e)
     # Recordatorios de campo (/programar): vencidos + próximos en ventana.
-    # Reusa la misma tabla y estados PENDIENTE/ENVIADO del Despacho Matutino.
+    # Reusa la misma tabla y estados PENDIENTE/ENVIADO/REALIZADO del Despacho Matutino.
     recordatorios: list[dict] = []
+    recordatorios_completados: list[dict] = []
     try:
         rows_rec = db.query(
-            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por
+            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
+                      tipo_tarea, prioridad, completado_en, completado_por,
+                      notas_completado, foto_completado
                FROM recordatorios_programados
                WHERE estado = 'PENDIENTE'
                  AND (fecha_programada IS NULL OR fecha_programada <= ?)
@@ -2020,15 +2033,54 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "hora": r.get("hora"),
                 "faltan_dias": faltan,
                 "estado": r.get("estado") or "PENDIENTE",
+                "asignado_a": r.get("asignado_a"),
+                "tipo_objetivo": r.get("tipo_objetivo"),
+                "animal_tag": r.get("animal_tag"),
+                "potrero_nombre": r.get("potrero_nombre"),
+                "tipo_tarea": r.get("tipo_tarea"),
+                "prioridad": r.get("prioridad") or "NORMAL",
             })
     except Exception as e:
         logger.error("seccion agenda_recordatorios fallo", exc_info=True)
         errores["recordatorios"] = str(e)
+
+    try:
+        rows_comp = db.query(
+            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
+                      tipo_tarea, prioridad, completado_en, completado_por,
+                      notas_completado, foto_completado
+               FROM recordatorios_programados
+               WHERE estado IN ('REALIZADO', 'ENVIADO')
+               ORDER BY COALESCE(completado_en, fecha_programada) DESC, id DESC LIMIT 30"""
+        )
+        for r in _filas_dict(rows_comp):
+            recordatorios_completados.append({
+                "id": r.get("id"),
+                "mensaje": r.get("mensaje"),
+                "fecha": str(r.get("fecha_programada") or "")[:10] or None,
+                "hora": r.get("hora"),
+                "estado": r.get("estado") or "REALIZADO",
+                "asignado_a": r.get("asignado_a"),
+                "tipo_objetivo": r.get("tipo_objetivo"),
+                "animal_tag": r.get("animal_tag"),
+                "potrero_nombre": r.get("potrero_nombre"),
+                "tipo_tarea": r.get("tipo_tarea"),
+                "prioridad": r.get("prioridad") or "NORMAL",
+                "completado_en": r.get("completado_en"),
+                "completado_por": r.get("completado_por"),
+                "notas_completado": r.get("notas_completado"),
+                "foto_completado": r.get("foto_completado"),
+            })
+    except Exception as e:
+        logger.error("seccion agenda_recordatorios_completados fallo", exc_info=True)
+
     out: dict[str, Any] = {
         "dias": dias,
         "eventos": eventos,
         "retiros": retiros,
         "recordatorios": recordatorios,
+        "recordatorios_completados": recordatorios_completados,
     }
     if errores:
         out["errores"] = errores

@@ -67,7 +67,7 @@ def test_completar_recordatorio_cambia_estado(client):
         "mensaje": "Rotar potrero", "fecha": "2026-09-21"}).get_json()["id"]
     r = client.post(f"/api/agenda/recordatorio/{rid}/completar")
     assert r.status_code == 200
-    assert r.get_json()["estado"] == "ENVIADO"
+    assert r.get_json()["estado"] == "REALIZADO"
     # Ya no aparece entre pendientes de la agenda.
     agenda = client.get("/api/agenda").get_json()
     assert all(x["id"] != rid for x in agenda["recordatorios"])
@@ -75,3 +75,43 @@ def test_completar_recordatorio_cambia_estado(client):
 
 def test_completar_inexistente_404(client):
     assert client.post("/api/agenda/recordatorio/999999/completar").status_code == 404
+
+
+def test_asignar_tarea_y_acknowledge_con_notas(client):
+    from datetime import date, timedelta
+    f_tarea = (date.today() + timedelta(days=2)).isoformat()
+    r = client.post("/api/agenda/recordatorio", json={
+        "mensaje": "JA457: Aplicar 10ml oxitetraciclina",
+        "fecha": f_tarea,
+        "asignado_a": "Encargado",
+        "tipo_objetivo": "ANIMAL",
+        "animal_tag": "JA457",
+        "tipo_tarea": "TRATAMIENTO",
+        "prioridad": "URGENTE",
+    })
+    assert r.status_code == 200
+    rid = r.get_json()["id"]
+
+    # Verificar que aparece en pendientes con metadatos
+    agenda = client.get("/api/agenda").get_json()
+    tarea = next(x for x in agenda["recordatorios"] if x["id"] == rid)
+    assert tarea["asignado_a"] == "Encargado"
+    assert tarea["tipo_objetivo"] == "ANIMAL"
+    assert tarea["animal_tag"] == "JA457"
+    assert tarea["prioridad"] == "URGENTE"
+
+    # Marcar completado (acknowledge) con notas
+    ack = client.post(f"/api/agenda/recordatorio/{rid}/completar", json={
+        "notas": "Se aplicó dosis completa vía intramuscular sin novedad",
+        "completado_por": "Pedro Encargado",
+    })
+    assert ack.status_code == 200
+    assert ack.get_json()["ok"] is True
+    assert ack.get_json()["estado"] == "REALIZADO"
+
+    # Verificar en agenda que ahora está en completados con notas y autor
+    agenda2 = client.get("/api/agenda").get_json()
+    comp = next(x for x in agenda2["recordatorios_completados"] if x["id"] == rid)
+    assert comp["completado_por"] == "Pedro Encargado"
+    assert "intramuscular" in comp["notas_completado"]
+

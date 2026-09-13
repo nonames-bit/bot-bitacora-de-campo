@@ -203,6 +203,70 @@ async def main():
             shot6 = os.path.join(OUTPUT_DIR, "06_mobile_modal_rectificar_chapeta.png")
             await capture_screen(ws, shot6)
 
+            # Cerrar modal de rectificación
+            await cdp_call(ws, "Runtime.evaluate", {
+                "expression": "var c = document.getElementById('btn-cancelar-rect-tag'); if (c) c.click();"
+            })
+            await asyncio.sleep(0.5)
+
+            # Screenshot 7: Tablero con Precio Bogotá Guadalupe y Botón Flotante Global (+)
+            print("Navegando a Tablero (?v=tablero) para verificar Precio Bogotá y Global FAB...")
+            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=tablero"})
+            await asyncio.sleep(2.5)
+            shot7 = os.path.join(OUTPUT_DIR, "07_mobile_tablero_bogota_precio_fab.png")
+            await capture_screen(ws, shot7)
+
+            # Screenshot 8: Captura rápida con botón directo a Manga Corral y tipo de evento Tarea
+            print("Navegando a Captura rápida (?v=captura)...")
+            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=captura"})
+            await asyncio.sleep(2.5)
+            # Seleccionar evento Tarea
+            await cdp_call(ws, "Runtime.evaluate", {
+                "expression": """
+                (function() {
+                    var btnTarea = document.querySelector(\"[data-cap-tipo='tarea']\");
+                    if (btnTarea) btnTarea.click();
+                    setTimeout(function() {
+                        var inpDesc = document.getElementById('cap-tarea-desc');
+                        if (inpDesc) inpDesc.value = 'Aplicar 10ml oxitetraciclina IM';
+                        var inpTag = document.getElementById('cap-tag');
+                        if (inpTag) inpTag.value = 'JA457';
+                    }, 300);
+                })()
+                """
+            })
+            await asyncio.sleep(1.0)
+            shot8 = os.path.join(OUTPUT_DIR, "08_mobile_captura_manga_boton_y_tarea.png")
+            await capture_screen(ws, shot8)
+
+            # Screenshot 9: Agenda con tareas asignadas y modal de Confirmar Realizado (Acknowledge)
+            print("Navegando a Agenda (?v=agenda)...")
+            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=agenda"})
+            await asyncio.sleep(2.5)
+            # Abrir modal Acknowledge simulando click en tarea
+            await cdp_call(ws, "Runtime.evaluate", {
+                "expression": """
+                (function() {
+                    var btnComp = document.querySelector('.btn-rec-completar');
+                    if (btnComp) {
+                        btnComp.click();
+                    } else {
+                        var modal = document.getElementById('modal-ack-tarea');
+                        var info = document.getElementById('ack-tarea-info');
+                        if (info) info.innerHTML = '<b>📌 JA457: Aplicar 10ml oxitetraciclina</b><br><small style=\"color:var(--texto-suave);\">Asignado a: <b>Encargado</b></small>';
+                        var por = document.getElementById('ack-completado-por');
+                        if (por) por.value = 'Pedro Encargado';
+                        var notas = document.getElementById('ack-notas');
+                        if (notas) notas.value = 'Se aplicó la dosis completa vía intramuscular sin novedad en el lote ordeño.';
+                        if (modal) modal.style.display = 'flex';
+                    }
+                })()
+                """
+            })
+            await asyncio.sleep(1.2)
+            shot9 = os.path.join(OUTPUT_DIR, "09_mobile_agenda_tareas_y_modal_ack.png")
+            await capture_screen(ws, shot9)
+
             print("¡Todas las verificaciones visuales completadas exitosamente!")
 
     finally:

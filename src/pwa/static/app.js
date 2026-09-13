@@ -271,11 +271,13 @@
       var v = Number(precio.variacion_pct) || 0;
       var colorV = v > 0 ? "verde" : v < 0 ? "rojo" : "gris";
       var flecha = v > 0 ? "▲" : v < 0 ? "▼" : "—";
+      var labelPlaza = precio.plaza_label || (precio.plaza === "BOGOTA" ? "Bogotá · Frig. Guadalupe" : (precio.plaza || "Bogotá · Guadalupe"));
+      var labelProd = precio.producto_label || "Macho Gordo (400+ kg)";
       precioHtml = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
         + "<b style='font-size:15px;'>" + fmtMoneda(precio.precio) + "/kg</b>"
         + "<span class='chip " + colorV + "' style='font-size:11px;'>" + flecha + " " + esc(Math.abs(v)) + "%</span>"
         + "</div>"
-        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>Macho Gordo (400+ kg) · Granada (Meta)</div>";
+        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc(labelProd) + " · " + esc(labelPlaza) + "</div>";
     } else {
       precioHtml = "<span style='font-size:12.5px; color:var(--texto-suave);'>Sin cotizaciones registradas.</span>";
     }
@@ -481,7 +483,31 @@
     return h;
   }
   function renderSanidad(d) {
-    var h = "<h3>" + icon("shieldPlus") + "Sanidad</h3>" + erroresHtml(d) + "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
+    var h = "<h3>" + icon("shieldPlus") + "Sanidad</h3>" + erroresHtml(d);
+    // Alta operativa directa (misma tabla que Telegram/Captura vía POST /api/sanidad/tratamiento).
+    var hoySan = new Date().toISOString().slice(0, 10);
+    h += "<div class='card' style='padding:12px 14px; margin-bottom:12px; border-left:4px solid var(--verde-marca);'>"
+      + "<b>" + icon("syringe", 14) + " Registrar tratamiento</b>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin:2px 0 8px;'>Solo animales ACTIVOS. Calcula solo el retiro (leche/carne) con días restantes.</div>"
+      + "<form id='form-nuevo-tratamiento' style='display:flex; flex-direction:column; gap:8px;'>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Arete*<br><input id='san-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:130px; font-size:13px; font-weight:600;'>Fecha<br><input id='san-fecha' type='date' value='" + hoySan + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<label style='font-size:13px; font-weight:600;'>Producto / Fármaco*<br><input id='san-producto' placeholder='ej. Oxitetraciclina 20%' required maxlength='120' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='font-size:13px; font-weight:600;'>Principio activo (si figura en frasco)<br><input id='san-principio' placeholder='ej. Oxitetraciclina' maxlength='120' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Dosis<br><input id='san-dosis' placeholder='ej. 20 ml' maxlength='60' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Vía<br><select id='san-via' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'><option value='IM'>IM</option><option value='SC'>SC</option><option value='IV'>IV</option><option value='ORAL'>Oral</option><option value='POUR-ON'>Pour-on</option></select></label>"
+      + "</div>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Retiro leche (días)<br><input id='san-ret-leche' type='number' min='0' max='365' value='0' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Retiro carne (días)<br><input id='san-ret-carne' type='number' min='0' max='365' value='0' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<button type='submit' id='btn-san-guardar' class='btn-guardar-manga' style='margin-top:4px;'>Guardar tratamiento</button>"
+      + "<div id='san-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
+      + "</form></div>";
+    h += "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
     if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
@@ -492,16 +518,61 @@
           var b = rest != null && rest <= 0 ? "rojo" : (rest != null && rest <= 3 ? "ambar" : "verde");
           return "<td><span class='chip " + b + "'>" + esc(r[k]) + (rest != null ? " (" + rest + "d)" : "") + "</span></td>";
         }
-        return "<tr><td><b>" + esc(r.tag) + "</b></td><td>" + esc(r.producto) + "</td>" + celda("fecha_fin_retiro_leche") + celda("fecha_fin_retiro_carne") + "</tr>";
+        var prod = esc(r.producto) + (r.principio_activo ? "<br><small style='color:var(--texto-suave);'>" + esc(r.principio_activo) + "</small>" : "");
+        return "<tr><td><b>" + esc(r.tag) + "</b></td><td>" + prod + "</td>" + celda("fecha_fin_retiro_leche") + celda("fecha_fin_retiro_carne") + "</tr>";
       }).join("");
       h += "</table></div>";
     }
     h += "<h4>" + icon("pill") + "Últimos tratamientos</h4>"
       + tabla(d.ultimos_tratamientos, [
         ["tag", "Animal"], ["fecha", "Fecha"], ["producto", "Producto"],
-        ["dosis", "Dosis"], ["via", "Vía"]
+        ["principio_activo", "P. activo"], ["dosis", "Dosis"], ["via", "Vía"]
       ], "Sin tratamientos registrados.");
     return h;
+  }
+  function bindSanidad() {
+    // Alta de tratamiento desde Sanidad (POST /api/sanidad/tratamiento).
+    var formT = document.getElementById("form-nuevo-tratamiento");
+    if (formT && !formT.__bound) {
+      formT.__bound = true;
+      formT.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fb = document.getElementById("san-form-feedback");
+        var btn = document.getElementById("btn-san-guardar");
+        var tag = ((document.getElementById("san-tag") || {}).value || "").trim();
+        var producto = ((document.getElementById("san-producto") || {}).value || "").trim();
+        var fecha = ((document.getElementById("san-fecha") || {}).value || "").trim();
+        var principio = ((document.getElementById("san-principio") || {}).value || "").trim() || null;
+        var dosis = ((document.getElementById("san-dosis") || {}).value || "").trim() || null;
+        var via = ((document.getElementById("san-via") || {}).value || "").trim() || null;
+        var rLeche = parseInt((document.getElementById("san-ret-leche") || {}).value || 0, 10) || 0;
+        var rCarne = parseInt((document.getElementById("san-ret-carne") || {}).value || 0, 10) || 0;
+        if (!tag) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el arete del animal.</span>"; return; }
+        if (!producto) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el producto aplicado.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha.</span>"; return; }
+        if (btn) btn.disabled = true;
+        if (fb) fb.textContent = "⏳ Guardando...";
+        fetch("/api/sanidad/tratamiento", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tag: tag, producto: producto, principio_activo: principio, dosis: dosis, via: via, fecha: fecha, dias_retiro_leche: rLeche, dias_retiro_carne: rCarne })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (out) {
+            if (btn) btn.disabled = false;
+            if (!out.ok || !out.j.ok) {
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              return;
+            }
+            mostrarToast("Tratamiento guardado", "verde");
+            vibrarConfirmacion();
+            cargar(true);
+            actualizarBadges();
+          }).catch(function (err) {
+            if (btn) btn.disabled = false;
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+          });
+      });
+    }
   }
   // Modo Simple (default) vs Técnico para SPI y Monitoreo Satelital en Pasturas:
   // los números crudos (NDVI, RVI, SPI, kg/ha) son ilegibles para un ganadero
@@ -2660,29 +2731,132 @@
     var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días" + pdfBtn + "</h3>" + erroresHtml(d);
     // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
     // apilado, táctil grande, sin recargar la página.
+    // Crear evento / tarea asignada de campo: formulario móvil táctil grande
     var hoyIso = new Date().toISOString().slice(0, 10);
-    h += "<div class='card' style='padding:12px 14px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
-      + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nuevo evento / recordatorio</b>"
-      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Se guarda como recordatorio de campo (igual que /programar) y aparece en el Despacho y en la campanita.</p>"
-      + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:8px;'>"
-      + "<label style='font-size:13px; font-weight:600;'>¿Qué hay que hacer?<br><input id='ag-mensaje' maxlength='500' placeholder='ej. Vacunar aftosa lote ordeño' autocomplete='off' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Fecha<br><input id='ag-fecha' type='date' value='" + hoyIso + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
-      + "<label style='flex:1; min-width:120px; font-size:13px; font-weight:600;'>Hora (opcional)<br><input id='ag-hora' type='time' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+    h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
+      + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nueva Tarea / Evento Asignado</b>"
+      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
+      + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<div style='display:flex; gap:8px;'>"
+      + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
       + "</div>"
-      + "<button type='submit' id='btn-ag-guardar' class='btn-guardar-manga' style='margin-top:4px;'>Guardar evento</button>"
+      + "<input type='hidden' id='ag-obj-tipo' value='animal'>"
+      + "<div id='ag-wrap-animal'>"
+      + "<label style='font-size:13px; font-weight:600;'>Chapeta / Tag del Animal:<br>"
+      + "<input id='ag-tag' placeholder='ej. JA457' list='dl-tags' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; box-sizing:border-box;'>"
+      + "</label>"
+      + "</div>"
+      + "<div id='ag-wrap-potrero' style='display:none;'>"
+      + "<label style='font-size:13px; font-weight:600;'>Potrero:<br>"
+      + "<input id='ag-potrero' placeholder='ej. OLEGARIO I' list='dl-potreros' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; box-sizing:border-box;'>"
+      + "</label>"
+      + "</div>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Tipo de Tarea:<br>"
+      + "<select id='ag-tipo-tarea' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
+      + "<option value='MEDICAMENTO'>💉 Aplicar medicamento</option>"
+      + "<option value='FUMIGAR'>🌿 Fumigar</option>"
+      + "<option value='REVISION'>🔍 Revisión / Chequeo</option>"
+      + "<option value='TRASLADO'>🚚 Traslado</option>"
+      + "<option value='CERCA'>⚡ Arreglo de cerca</option>"
+      + "<option value='PESAJE'>⚖️ Pesaje</option>"
+      + "<option value='GENERAL'>📋 General</option>"
+      + "</select></label>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Adjudicar / Asignar a:<br>"
+      + "<input id='ag-asignado' list='dl-equipo-agenda' placeholder='ej. Encargado o Administrador' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
+      + "<datalist id='dl-equipo-agenda'>"
+      + "<option value='Encargado'></option>"
+      + "<option value='Administrador'></option>"
+      + "<option value='Veterinario'></option>"
+      + "<option value='Trabajador'></option>"
+      + "</datalist></label>"
+      + "</div>"
+      + "<label style='font-size:13px; font-weight:600;'>Instrucción / ¿Qué hay que hacer?<br>"
+      + "<input id='ag-mensaje' maxlength='500' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar maleza en callejón' autocomplete='off' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'>"
+      + "</label>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:130px; font-size:13px; font-weight:600;'>Fecha límite<br><input id='ag-fecha' type='date' value='" + hoyIso + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Hora (opcional)<br><input id='ag-hora' type='time' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Prioridad<br><select id='ag-prioridad' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label>"
+      + "</div>"
+      + "<button type='submit' id='btn-ag-guardar' class='btn-guardar-manga' style='margin-top:4px; font-size:14px;'>" + icon("plus", 14) + "Asignar Tarea / Programar Evento</button>"
       + "<div id='ag-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
       + "</form></div>";
-    // Recordatorios de campo próximos (estado PENDIENTE; al completar pasan a ENVIADO y se ocultan).
+    // Recordatorios y tareas asignadas pendientes
     var recs = d.recordatorios || [];
+    var recsComp = d.recordatorios_completados || [];
     var evs = d.eventos || [];
     var urgencia = function (f) {
       if (f.faltan_dias == null) return "gris";
       return f.faltan_dias <= 0 ? "rojo" : f.faltan_dias <= 2 ? "ambar" : "verde";
     };
     var chipUrg = function (v) {
-      return "<span class='chip " + urgencia(v) + "'>" + esc(v.faltan_dias != null ? (v.faltan_dias <= 0 ? "HOY" : v.faltan_dias + "d") : "?") + "</span>";
+      return "<span class='chip " + urgencia(v) + "'>" + esc(v.faltan_dias != null ? (v.faltan_dias <= 0 ? "HOY" : v.faltan_dias + "d") : "PENDIENTE") + "</span>";
     };
+
+    if (recs.length) {
+      h += "<h4>" + icon("calendar") + "Tareas Asignadas y Recordatorios Pendientes (" + recs.length + ")</h4>";
+      h += "<div style='display:flex; flex-direction:column; gap:10px; margin-bottom:16px;'>";
+      recs.forEach(function (rc) {
+        var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
+        var objChip = "";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+
+        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>👤 " + esc(rc.asignado_a) + "</span> ") : "";
+        var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>🚨 URGENTE</span> " : "";
+
+        h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "'>"
+          + "<div class='tarea-card-header'>"
+          + "<div>" + objChip + asigChip + prioChip + chipUrg(rc) + "</div>"
+          + "<small style='color:var(--texto-suave); font-weight:600;'>📅 " + fh + "</small>"
+          + "</div>"
+          + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
+          + "<div style='display:flex; justify-content:flex-end; margin-top:4px;'>"
+          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+          + icon("check", 14) + "Marcar Realizado (Acknowledge)"
+          + "</button>"
+          + "</div>"
+          + "</div>";
+      });
+      h += "</div>";
+    } else {
+      h += "<p class='aviso'>🎉 Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+    }
+
+    if (recsComp.length) {
+      h += "<h4>" + icon("shieldCheck") + "Bitácora de Tareas Cumplidas / Realizadas (" + recsComp.length + ")</h4>";
+      h += "<div style='display:flex; flex-direction:column; gap:8px; margin-bottom:16px;'>";
+      recsComp.forEach(function (rc) {
+        var fechaComp = esc(rc.completado_en || rc.fecha || "—");
+        var objChip = "";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+        var quien = esc(rc.completado_por || rc.asignado_a || "Equipo");
+
+        var fotoHtml = "";
+        if (rc.foto_completado) {
+          fotoHtml = "<div style='margin-top:6px;'><a href='/" + esc(rc.foto_completado) + "' target='_blank' style='display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--verde-marca); text-decoration:none; font-weight:600;'>"
+            + "<img src='/" + esc(rc.foto_completado) + "' alt='Comprobante' style='width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid var(--borde);'>"
+            + "<span>Ver foto comprobante ↗</span></a></div>";
+        }
+
+        h += "<div style='padding:10px 14px; border:1px solid var(--borde); border-radius:8px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
+          + "<div>" + objChip + "<span class='chip verde' style='font-size:11px;'>✓ REALIZADO</span></div>"
+          + "<small style='color:var(--texto-suave);'>🕒 " + fechaComp + "</small>"
+          + "</div>"
+          + "<div style='font-weight:600; font-size:13.5px; margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
+          + "<div style='font-size:12.5px; color:var(--texto-suave);'>👤 Ejecutado por: <b>" + quien + "</b></div>"
+          + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>💬 " + esc(rc.notas_completado) + "</div>") : "")
+          + fotoHtml
+          + "</div>";
+      });
+      h += "</div>";
+    }
+
     if (evs.length) {
       h += "<h4>" + icon("alert") + "Alertas programadas</h4><div class='tabla-scroll'><table><tr><th>Fecha</th><th>Tipo</th><th>Animal</th><th>Detalle</th><th>En</th></tr>";
       evs.forEach(function (e) {
@@ -2691,17 +2865,6 @@
       h += "</table></div>";
     } else {
       h += "<p class='aviso'>Sin alertas programadas en los próximos " + esc(d.dias) + " días.</p>";
-    }
-    if (recs.length) {
-      h += "<h4>" + icon("calendar") + "Eventos / recordatorios próximos</h4><div class='tabla-scroll'><table><tr><th>Fecha</th><th>Evento</th><th>En</th><th></th></tr>";
-      recs.forEach(function (rc) {
-        var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
-        h += "<tr><td><b>" + fh + "</b></td><td>" + esc(rc.mensaje || "—") + "</td><td>" + chipUrg(rc) + "</td>"
-          + "<td><button type='button' class='tema-btn btn-rec-completar' data-rec-id='" + esc(rc.id) + "' style='font-size:12px; padding:6px 10px; min-height:36px;'>Completar</button></td></tr>";
-      });
-      h += "</table></div>";
-    } else {
-      h += "<p class='aviso'>Sin eventos creados. Use el formulario de arriba para agendar el primero.</p>";
     }
     var ret = d.retiros || [];
     if (ret.length) {
@@ -2882,7 +3045,32 @@
   }
 
   function bindAgenda() {
-    // Alta de evento/recordatorio desde la Agenda (POST /api/agenda/recordatorio).
+    // Selector de objetivo (Animal / Potrero / General) en formulario de agenda
+    var agBtns = qa(".ag-obj-btn");
+    var wrapAgAnimal = document.getElementById("ag-wrap-animal");
+    var wrapAgPotrero = document.getElementById("ag-wrap-potrero");
+    var inpAgObj = document.getElementById("ag-obj-tipo");
+    agBtns.forEach(function (b) {
+      b.addEventListener("click", function () {
+        agBtns.forEach(function (x) { x.classList.remove("act"); });
+        b.classList.add("act");
+        var obj = b.getAttribute("data-obj");
+        if (inpAgObj) inpAgObj.value = obj;
+        if (wrapAgAnimal) wrapAgAnimal.style.display = (obj === "animal") ? "" : "none";
+        if (wrapAgPotrero) wrapAgPotrero.style.display = (obj === "potrero") ? "" : "none";
+      });
+    });
+    fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.integrantes) return;
+      var dl = document.getElementById("dl-equipo-agenda");
+      if (dl) {
+        dl.innerHTML = d.integrantes.map(function (it) {
+          return "<option value='" + esc(it.nombre) + "'>" + esc(it.rol ? it.rol : "") + "</option>";
+        }).join("");
+      }
+    }).catch(function () {});
+
+    // Alta de evento/tarea asignada desde la Agenda (POST /api/agenda/recordatorio).
     var formRec = document.getElementById("form-nuevo-recordatorio");
     if (formRec && !formRec.__bound) {
       formRec.__bound = true;
@@ -2890,17 +3078,38 @@
         e.preventDefault();
         var fb = document.getElementById("ag-form-feedback");
         var btn = document.getElementById("btn-ag-guardar");
-        var mensaje = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
+        var objTipo = (inpAgObj && inpAgObj.value) || "animal";
+        var tag = (document.getElementById("ag-tag") || {}).value || "";
+        var pot = (document.getElementById("ag-potrero") || {}).value || "";
+        var tipoTarea = (document.getElementById("ag-tipo-tarea") || {}).value || "GENERAL";
+        var asignado = (document.getElementById("ag-asignado") || {}).value || "";
+        var desc = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
         var fecha = ((document.getElementById("ag-fecha") || {}).value || "").trim();
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
-        if (!mensaje) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba qué hay que hacer.</span>"; return; }
-        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha del evento.</span>"; return; }
+        var prioridad = (document.getElementById("ag-prioridad") || {}).value || "NORMAL";
+
+        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha de la tarea.</span>"; return; }
+
+        var prefix = (objTipo === "animal" && tag.trim()) ? (tag.trim() + ": ") : ((objTipo === "potrero" && pot.trim()) ? (pot.trim() + ": ") : "");
+        var mensajeFinal = prefix + desc;
+
         if (btn) btn.disabled = true;
-        if (fb) fb.textContent = "⏳ Guardando...";
+        if (fb) fb.textContent = "⏳ Guardando tarea...";
         fetch("/api/agenda/recordatorio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ mensaje: mensaje, fecha: fecha, hora: hora || null })
+          body: JSON.stringify({
+            mensaje: mensajeFinal,
+            fecha: fecha,
+            hora: hora || null,
+            asignado_a: asignado.trim() || "Encargado",
+            tipo_objetivo: objTipo.toUpperCase(),
+            animal_tag: objTipo === "animal" ? tag.trim() : null,
+            potrero_nombre: objTipo === "potrero" ? pot.trim() : null,
+            tipo_tarea: tipoTarea,
+            prioridad: prioridad
+          })
         }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (out) {
             if (btn) btn.disabled = false;
@@ -2908,7 +3117,7 @@
               if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
               return;
             }
-            mostrarToast("Evento agendado", "verde");
+            mostrarToast("Tarea asignada y agendada ✓", "verde");
             vibrarConfirmacion();
             cargar(true);
             actualizarBadges();
@@ -2918,29 +3127,137 @@
           });
       });
     }
-    // Completar recordatorio PENDIENTE → ENVIADO (se oculta de pendientes).
+
+    // Modal de Acknowledge / Realización de tarea con foto opcional y notas
+    var modalAck = document.getElementById("modal-ack-tarea");
+    var formAck = document.getElementById("form-ack-tarea");
+    var inpAckId = document.getElementById("ack-rec-id");
+    var txtAckInfo = document.getElementById("ack-tarea-info");
+    var inpAckPor = document.getElementById("ack-completado-por");
+    var inpAckNotas = document.getElementById("ack-notas");
+    var inpAckFoto = document.getElementById("ack-foto-input");
+    var prevAckWrap = document.getElementById("ack-foto-preview");
+    var prevAckImg = document.getElementById("ack-foto-img");
+    var btnCerrarAck = document.getElementById("btn-cerrar-modal-ack");
+    var btnCancelarAck = document.getElementById("btn-cancelar-ack");
+    var _ackFotoB64 = null;
+
+    function cerrarModalAck() {
+      if (modalAck) modalAck.style.display = "none";
+      if (inpAckId) inpAckId.value = "";
+      if (inpAckNotas) inpAckNotas.value = "";
+      if (inpAckFoto) inpAckFoto.value = "";
+      if (prevAckWrap) prevAckWrap.style.display = "none";
+      if (prevAckImg) prevAckImg.src = "";
+      _ackFotoB64 = null;
+    }
+
+    if (btnCerrarAck && !btnCerrarAck.__bound) {
+      btnCerrarAck.__bound = true;
+      btnCerrarAck.addEventListener("click", cerrarModalAck);
+    }
+    if (btnCancelarAck && !btnCancelarAck.__bound) {
+      btnCancelarAck.__bound = true;
+      btnCancelarAck.addEventListener("click", cerrarModalAck);
+    }
+    if (modalAck && !modalAck.__bound) {
+      modalAck.__bound = true;
+      modalAck.addEventListener("click", function (e) {
+        if (e.target === modalAck) cerrarModalAck();
+      });
+    }
+
+    if (inpAckFoto && !inpAckFoto.__bound) {
+      inpAckFoto.__bound = true;
+      inpAckFoto.addEventListener("change", function () {
+        var file = inpAckFoto.files && inpAckFoto.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function (ev) {
+          var img = new Image();
+          img.onload = function () {
+            var maxDim = 1200;
+            var width = img.width;
+            var height = img.height;
+            if (width > maxDim || height > maxDim) {
+              if (width > height) {
+                height = Math.round((height * maxDim) / width);
+                width = maxDim;
+              } else {
+                width = Math.round((width * maxDim) / height);
+                height = maxDim;
+              }
+            }
+            var canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            var ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            _ackFotoB64 = canvas.toDataURL("image/jpeg", 0.82);
+            if (prevAckImg) prevAckImg.src = _ackFotoB64;
+            if (prevAckWrap) prevAckWrap.style.display = "block";
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Al pulsar "Marcar Realizado (Acknowledge)"
     qa(".btn-rec-completar").forEach(function (b) {
-      if (b.__bound) return;
-      b.__bound = true;
       b.addEventListener("click", function () {
         var rid = b.getAttribute("data-rec-id");
+        var msg = b.getAttribute("data-rec-msg") || "";
+        var asig = b.getAttribute("data-rec-asig") || "";
         if (!rid) return;
-        b.disabled = true;
-        fetch("/api/agenda/recordatorio/" + encodeURIComponent(rid) + "/completar", { method: "POST" })
-          .then(function (r) { return r.json(); })
+        if (inpAckId) inpAckId.value = rid;
+        if (txtAckInfo) {
+          var asigInfo = asig ? ("<br><small style='color:var(--texto-suave);'>Asignado a: <b>" + esc(asig) + "</b></small>") : "";
+          txtAckInfo.innerHTML = "<b>📌 " + esc(msg) + "</b>" + asigInfo;
+        }
+        var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
+        if (inpAckPor) inpAckPor.value = miNombre;
+        if (modalAck) modalAck.style.display = "flex";
+      });
+    });
+
+    if (formAck && !formAck.__bound) {
+      formAck.__bound = true;
+      formAck.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var rid = (inpAckId && inpAckId.value) || "";
+        if (!rid) return;
+        var btnConf = document.getElementById("btn-confirmar-ack");
+        var fbAck = document.getElementById("ack-feedback");
+        if (btnConf) btnConf.disabled = true;
+        if (fbAck) fbAck.textContent = "⏳ Registrando cumplimiento...";
+        var payloadAck = {
+          notas: (inpAckNotas && inpAckNotas.value || "").trim(),
+          completado_por: (inpAckPor && inpAckPor.value || "").trim(),
+          foto_base64: _ackFotoB64 || null
+        };
+        fetch("/api/agenda/recordatorio/" + encodeURIComponent(rid) + "/completar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payloadAck)
+        }).then(function (r) { return r.json(); })
           .then(function (res) {
+            if (btnConf) btnConf.disabled = false;
             if (res && res.ok) {
-              mostrarToast("Evento completado", "verde");
+              cerrarModalAck();
+              mostrarToast("¡Tarea marcada como realizada ✓!", "verde");
               vibrarConfirmacion();
               cargar(true);
               actualizarBadges();
             } else {
-              b.disabled = false;
-              mostrarToast((res && res.error) || "No se pudo completar", "rojo");
+              if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((res && res.error) || "Error al completar.") + "</span>";
             }
-          }).catch(function () { b.disabled = false; });
+          }).catch(function (err) {
+            if (btnConf) btnConf.disabled = false;
+            if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Error de conexión: " + esc(err.message || err) + "</span>";
+          });
       });
-    });
+    }
     var estadoEl = document.getElementById("push-estado-txt");
     var btnActivar = document.getElementById("btn-activar-push");
     var btnProbar = document.getElementById("btn-probar-push");
@@ -3327,11 +3644,17 @@
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
       { id: "muerte", nom: "Muerte / Descarte", ico: "cowSkull" },
-      { id: "gasto", nom: "Ingreso / Gasto", ico: "banknote" }
+      { id: "gasto", nom: "Ingreso / Gasto", ico: "banknote" },
+      { id: "tarea", nom: "Asignar Tarea", ico: "calendar" }
     ];
 
-    var h = "<h3>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>";
-    h += "<p class='aviso'>Registra eventos directamente en el potrero. Si estás sin señal, se guardarán en la cola local de tu celular y se sincronizarán al volver a la casa.</p>";
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+      + "<h3 style='margin:0;'>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>"
+      + "<button type='button' id='btn-cap-ir-manga' class='btn-guardar-manga' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+      + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
+      + "</button>"
+      + "</div>";
+    h += "<p class='aviso'>Registra eventos directamente en el potrero. Si vas a procesar o pesar varios animales seguidos en la manga, usa el botón de <b>Manga Corral</b> arriba.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
@@ -3438,6 +3761,7 @@
     } else if (tipo === "tratamiento") {
       h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Producto / Fármaco: <input id='cap-producto' placeholder='ej. Oxitetraciclina 20%' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Principio activo (si figura en frasco): <input id='cap-principio' placeholder='ej. Oxitetraciclina' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Dosis: <input id='cap-dosis' placeholder='ej. 20 ml' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Vía: <select id='cap-via' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IM'>IM (Intramuscular)</option><option value='SC'>SC (Subcutánea)</option><option value='IV'>IV</option><option value='Oral'>Oral</option><option value='Pour-on'>Pour-on</option></select></label></div>"
@@ -3583,6 +3907,44 @@
         + "</div>";
     }
 
+    if (tipo === "tarea") {
+      h += "<div style='display:flex; gap:8px; margin-bottom:10px;'>"
+        + "<button type='button' class='tema-btn cap-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
+        + "</div>"
+        + "<input type='hidden' id='cap-tarea-obj' value='animal'>"
+        + "<div id='cap-wrap-obj-animal'>"
+        + "<label>Chapeta / Tag del Animal: <input id='cap-tag' placeholder='ej. JA457' list='dl-tags' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "</div>"
+        + "<div id='cap-wrap-obj-potrero' style='display:none;'>"
+        + "<label>Potrero: <input id='cap-tarea-potrero' placeholder='ej. OLEGARIO I' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "</div>"
+        + "<label style='margin-top:6px;'>Tipo de Acción / Tarea: "
+        + "<select id='cap-tarea-tipo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+        + "<option value='MEDICAMENTO'>💉 Aplicar medicamento / Tratamiento</option>"
+        + "<option value='FUMIGAR'>🌿 Fumigar maleza / Potrero</option>"
+        + "<option value='REVISION'>🔍 Revisión veterinaria / Chequeo</option>"
+        + "<option value='TRASLADO'>🚚 Traslado de potrero</option>"
+        + "<option value='CERCA'>⚡ Arreglar cerca / Mantenimiento</option>"
+        + "<option value='PESAJE'>⚖️ Pesaje de control</option>"
+        + "<option value='OTRO'>📋 Otra tarea / General</option>"
+        + "</select></label>"
+        + "<label style='margin-top:6px;'>Indicación / Descripción de la tarea: <input id='cap-tarea-desc' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar borde cerca' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label style='margin-top:6px;'>Adjudicar / Asignar a: "
+        + "<input id='cap-tarea-asignado' list='dl-integrantes-equipo' placeholder='ej. Encargado, Administrador, o nombre...' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
+        + "<datalist id='dl-integrantes-equipo'>"
+        + "<option value='Encargado'></option>"
+        + "<option value='Administrador'></option>"
+        + "<option value='Veterinario'></option>"
+        + "<option value='Trabajador'></option>"
+        + "</datalist></label>"
+        + "<div style='display:flex; gap:10px; margin-top:6px;'>"
+        + "<div style='flex:1;'><label>Prioridad: <select id='cap-tarea-prioridad' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label></div>"
+        + "<div style='flex:1;'><label>Hora límite (opc): <input type='time' id='cap-tarea-hora' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>";
+    }
+
     return h;
   }
 
@@ -3671,16 +4033,43 @@
     }
 
     function nombreTipoCap(id) {
-      var noms = { parto: "Parto", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto" };
+      var noms = { parto: "Parto", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea" };
       return noms[id] || id;
+    }
+
+    function bindCamposTarea() {
+      if (_tipoCapturaActual !== "tarea") return;
+      var btns = qa(".cap-obj-btn");
+      var wrapAnimal = document.getElementById("cap-wrap-obj-animal");
+      var wrapPotrero = document.getElementById("cap-wrap-obj-potrero");
+      var inpObj = document.getElementById("cap-tarea-obj");
+      btns.forEach(function (b) {
+        b.addEventListener("click", function () {
+          btns.forEach(function (x) { x.classList.remove("act"); });
+          b.classList.add("act");
+          var obj = b.getAttribute("data-obj");
+          if (inpObj) inpObj.value = obj;
+          if (wrapAnimal) wrapAnimal.style.display = (obj === "animal") ? "" : "none";
+          if (wrapPotrero) wrapPotrero.style.display = (obj === "potrero") ? "" : "none";
+        });
+      });
+      fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
+        if (!d || !d.integrantes) return;
+        var dl = document.getElementById("dl-integrantes-equipo");
+        if (dl) {
+          dl.innerHTML = d.integrantes.map(function (it) {
+            return "<option value='" + esc(it.nombre) + "'>" + esc(it.rol ? it.rol : "") + "</option>";
+          }).join("");
+        }
+      }).catch(function () {});
     }
 
     // Paso 3: resumen legible en texto plano antes de guardar.
     function resumenCapHtml() {
       var d = recolectarCapDatos();
-      var tagR = d["cap-tag"] || d["cap-cria-tag"] || "—";
+      var tagR = d["cap-tag"] || d["cap-cria-tag"] || d["cap-tarea-potrero"] || "—";
       var fechaR = d["cap-fecha"] || new Date().toISOString().slice(0, 10);
-      var h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Vaca/Animal: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaR) + "</b>";
+      var h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Objetivo: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaR) + "</b>";
       Object.keys(d).forEach(function (k) {
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
@@ -3714,10 +4103,19 @@
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
       bindTipoEventoParto();
+      bindCamposTarea();
       aplicarDefaultsCaptura();
     }
 
     function wireStepperCap() {
+      var bManga = document.getElementById("btn-cap-ir-manga");
+      if (bManga) {
+        bManga.addEventListener("click", function () {
+          irAVista("manga");
+          cargar(true);
+          try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) {}
+        });
+      }
       var bSig1 = document.getElementById("btn-cap-sig1");
       if (bSig1) bSig1.addEventListener("click", function () { mostrarPasoCap(2); });
       var bAtr2 = document.getElementById("btn-cap-atras2");
@@ -4400,6 +4798,7 @@
         } else if (_tipoCapturaActual === "tratamiento") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.producto = (q("#cap-producto") && q("#cap-producto").value || "").trim();
+          payload.principio_activo = (q("#cap-principio") && q("#cap-principio").value || "").trim() || null;
           payload.dosis = (q("#cap-dosis") && q("#cap-dosis").value) || null;
           payload.via = (q("#cap-via") && q("#cap-via").value) || "IM";
           payload.dias_retiro_leche = parseInt(q("#cap-ret-leche") && q("#cap-ret-leche").value || 0, 10);
@@ -4438,6 +4837,24 @@
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
           payload.potrero = (q("#cap-fin-potrero") && q("#cap-fin-potrero").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        } else if (_tipoCapturaActual === "tarea") {
+          var objTipo = (q("#cap-tarea-obj") && q("#cap-tarea-obj").value) || "animal";
+          payload.tipo_objetivo = objTipo.toUpperCase();
+          if (objTipo === "animal") {
+            payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+            payload.tag = payload.animal_tag;
+          } else if (objTipo === "potrero") {
+            payload.potrero_nombre = (q("#cap-tarea-potrero") && q("#cap-tarea-potrero").value || "").trim();
+            payload.potrero = payload.potrero_nombre;
+          }
+          payload.tipo_tarea = (q("#cap-tarea-tipo") && q("#cap-tarea-tipo").value) || "GENERAL";
+          var txtDesc = (q("#cap-tarea-desc") && q("#cap-tarea-desc").value || "").trim();
+          var prefix = (objTipo === "animal" && payload.animal_tag) ? (payload.animal_tag + ": ") : ((objTipo === "potrero" && payload.potrero_nombre) ? (payload.potrero_nombre + ": ") : "");
+          payload.mensaje = prefix + txtDesc;
+          payload.descripcion = txtDesc;
+          payload.asignado_a = (q("#cap-tarea-asignado") && q("#cap-tarea-asignado").value || "").trim() || "Encargado";
+          payload.prioridad = (q("#cap-tarea-prioridad") && q("#cap-tarea-prioridad").value) || "NORMAL";
+          payload.hora = (q("#cap-tarea-hora") && q("#cap-tarea-hora").value) || null;
         }
 
         // Adjuntar foto opcional. Si ya se analizó con IA (leche/gasto), la
@@ -7309,12 +7726,6 @@
 
     head += "</div>";
 
-    // BLOQUE 4: FAB "Registrar evento" — salta a Captura con el tag actual.
-    head += "<button id='btn-ficha-registrar' class='fab-registrar' title='Registrar evento' aria-label='Registrar evento'>"
-      + icon("plus", 20)
-      + "<span style='position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;'>Registrar evento</span>"
-      + "</button>";
-
     var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
     html += "<div id='ficha-tabs' role='tablist'><div class='mini'>"
       + TABS.map(function (t, i) { return "<button role='tab' aria-selected='" + (i === 0 ? "true" : "false") + "' data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
@@ -8453,6 +8864,7 @@
   }
   function cargar(animar) {
     if (animar === undefined) animar = true;
+    actualizarFabGlobal();
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
@@ -8592,6 +9004,7 @@
       if (actual === "leche") bindLeche();
       if (actual === "finanzas") bindFinanzas();
       if (actual === "agenda") bindAgenda();
+      if (actual === "sanidad") bindSanidad();
     }, animar ? vista : null);
   }
 
@@ -8850,6 +9263,42 @@
     });
   }
 
+  function actualizarFabGlobal() {
+    var fab = document.getElementById("fab-global-registrar");
+    if (!fab) return;
+    // Ocultar FAB en captura (ya estamos en el formulario) y en manga (trabajo intensivo de lote)
+    if (actual === "captura" || actual === "manga") {
+      fab.style.display = "none";
+    } else {
+      fab.style.display = "flex";
+    }
+  }
+
+  function setupFabGlobal() {
+    var fab = document.getElementById("fab-global-registrar");
+    if (!fab) return;
+    fab.addEventListener("click", function (e) {
+      e.preventDefault();
+      vibrarConfirmacion();
+      var tagFab = "";
+      if (actual === "ficha") {
+        tagFab = (window.__ultimaFicha && window.__ultimaFicha.tag) || (q("#f-tag") && q("#f-tag").value.trim()) || "";
+      } else {
+        var inpTag = document.getElementById("f-tag");
+        if (inpTag && inpTag.value.trim()) {
+          tagFab = inpTag.value.trim();
+        }
+      }
+      if (tagFab) {
+        try { localStorage.setItem("bitacora_ultimo_tag", tagFab); } catch (eFabTag) { /* noop */ }
+        window.__capTagPendiente = tagFab;
+      }
+      irAVista("captura");
+      cargar(true);
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eFabScroll) { window.scrollTo(0, 0); }
+    });
+  }
+
   qa("#nav-principal button").forEach(function (b) {
     b.addEventListener("click", function () {
       if (b.id === "btn-nav-mas") {
@@ -8887,6 +9336,7 @@
       }
     }
     actual = v;
+    actualizarFabGlobal();
     if (v !== "ficha") {
       actualizarVacaHeader({ esFicha: false });
     }
@@ -9474,11 +9924,15 @@
     });
     setupChatModal();
     setupHeaderAyuda();
+    setupFabGlobal();
+    actualizarFabGlobal();
   } else {
     setupSyncOffline();
     setupChatModal();
     setupVozModal();
     setupModalMas();
+    setupFabGlobal();
+    actualizarFabGlobal();
     crearBadgesNav();
     setupCampana();
     setupHeaderAyuda();

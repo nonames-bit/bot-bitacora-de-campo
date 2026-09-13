@@ -72,6 +72,24 @@ class Database:
                 cols_f = {r[1] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()}
                 if "ocr_text" not in cols_f:
                     self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
+            if "recordatorios_programados" in tablas:
+                cols_r = {r[1] for r in self.conn.execute("PRAGMA table_info(recordatorios_programados)").fetchall()}
+                for col_name, col_type in [
+                    ("asignado_a", "TEXT"),
+                    ("asignado_a_id", "INTEGER"),
+                    ("tipo_objetivo", "TEXT"),
+                    ("animal_tag", "TEXT"),
+                    ("potrero_nombre", "TEXT"),
+                    ("tipo_tarea", "TEXT"),
+                    ("prioridad", "TEXT DEFAULT 'NORMAL'"),
+                    ("completado_en", "TEXT"),
+                    ("completado_por", "TEXT"),
+                    ("completado_por_id", "INTEGER"),
+                    ("notas_completado", "TEXT"),
+                    ("foto_completado", "TEXT"),
+                ]:
+                    if col_name not in cols_r:
+                        self.conn.execute(f"ALTER TABLE recordatorios_programados ADD COLUMN {col_name} {col_type}")
         except Exception:
             pass
 
@@ -1194,10 +1212,16 @@ class Database:
             "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
         )
 
-    def registrar_recordatorio(self, mensaje: str, fecha_programada=None, hora=None, creado_por=None) -> int:
+    def registrar_recordatorio(self, mensaje: str, fecha_programada=None, hora=None,
+                               creado_por=None, asignado_a=None, asignado_a_id=None,
+                               tipo_objetivo=None, animal_tag=None, potrero_nombre=None,
+                               tipo_tarea=None, prioridad="NORMAL") -> int:
         return self.insert("recordatorios_programados", dict(
             mensaje=mensaje, fecha_programada=iso(fecha_programada) if fecha_programada else None,
             hora=hora, creado_por=creado_por, estado="PENDIENTE", creado_en=self._ahora(),
+            asignado_a=asignado_a, asignado_a_id=asignado_a_id,
+            tipo_objetivo=tipo_objetivo, animal_tag=animal_tag, potrero_nombre=potrero_nombre,
+            tipo_tarea=tipo_tarea, prioridad=prioridad or "NORMAL",
         ))
 
     def listar_recordatorios_pendientes(self, fecha=None) -> list:
@@ -1207,8 +1231,29 @@ class Database:
             )
         return self.query("SELECT * FROM recordatorios_programados WHERE estado='PENDIENTE' ORDER BY fecha_programada, hora, id")
 
+    def completar_recordatorio(self, rid: int, completado_por: str = None,
+                               completado_por_id: int = None,
+                               notas_completado: str = None,
+                               foto_completado: str = None) -> bool:
+        cur = self.conn.execute(
+            """UPDATE recordatorios_programados
+               SET estado = 'REALIZADO',
+                   completado_en = ?,
+                   completado_por = ?,
+                   completado_por_id = ?,
+                   notas_completado = ?,
+                   foto_completado = ?
+               WHERE id = ?""",
+            (self._ahora(), completado_por, completado_por_id, notas_completado, foto_completado, rid),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
     def marcar_enviado(self, rid: int) -> bool:
-        cur = self.conn.execute("UPDATE recordatorios_programados SET estado='ENVIADO' WHERE id = ?", (rid,))
+        cur = self.conn.execute(
+            "UPDATE recordatorios_programados SET estado='REALIZADO', completado_en=? WHERE id = ?",
+            (self._ahora(), rid,),
+        )
         self.conn.commit()
         return cur.rowcount > 0
 
@@ -3615,10 +3660,10 @@ class Database:
             ]
         }
 
-    def precio_referencia_hoy(self, plaza: str = "GRANADA", producto: str = "MACHO_GORDO") -> Optional[dict[str, Any]]:
+    def precio_referencia_hoy(self, plaza: str = "BOGOTA", producto: str = "MACHO_GORDO") -> Optional[dict[str, Any]]:
         """Última cotización + variación vs. la anterior para UNA plaza/producto
-        puntual -- widget "Precio del día" del Tablero. Reusa el mismo patrón
-        LAG (ROW_NUMBER + self-join) de obtener_datos_mercado_completos, pero
+        puntual -- widget "Precio del día" del Tablero (Bogotá Guadalupe por defecto). Reusa
+        el mismo patrón LAG (ROW_NUMBER + self-join) de obtener_datos_mercado_completos, pero
         filtrado a una sola serie para no pagar el costo de consolidar las 8
         plazas y todas las categorías solo para mostrar un número en el Tablero.
         """
@@ -3641,9 +3686,12 @@ class Database:
         precio = float(fila["precio"])
         precio_ant = float(fila["precio_anterior"]) if fila["precio_anterior"] is not None else None
         variacion_pct = round((precio - precio_ant) / precio_ant * 100, 2) if precio_ant else 0.0
+        plaza_label = "Bogotá · Frig. Guadalupe" if plaza == "BOGOTA" else plaza.title()
         return {
             "plaza": plaza,
+            "plaza_label": plaza_label,
             "producto": producto,
+            "producto_label": "Macho Gordo (400+ kg)",
             "precio": precio,
             "variacion_pct": variacion_pct,
             "fecha": fila["fecha"],
