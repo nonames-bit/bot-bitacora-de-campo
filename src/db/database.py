@@ -2782,12 +2782,12 @@ class Database:
         """Devuelve un mapa {str(user_id): info_presencia} con cálculo de estado en línea."""
         self._ensure_presencia_table()
         try:
-            filas = self.query_all("SELECT * FROM usuarios_presencia")
+            filas = self.query("SELECT * FROM usuarios_presencia")
         except Exception as e:
             logger.debug("Error al consultar usuarios_presencia: %s", e)
             return {}
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         res = {}
         for r in filas:
             uid = str(r["user_id"])
@@ -2799,8 +2799,13 @@ class Database:
 
             if act_str:
                 try:
-                    limpio = act_str.replace("Z", "")
-                    dt_act = datetime.fromisoformat(limpio)
+                    limpio = act_str.strip()
+                    if limpio.endswith("Z"):
+                        dt_act = datetime.fromisoformat(limpio.replace("Z", "+00:00"))
+                    elif "+" in limpio or "-" in limpio[10:]:
+                        dt_act = datetime.fromisoformat(limpio)
+                    else:
+                        dt_act = datetime.fromisoformat(limpio).replace(tzinfo=timezone.utc)
                     segundos_diff = max(0, int((now - dt_act).total_seconds()))
                     if segundos_diff <= 300:  # 5 minutos
                         en_linea = True

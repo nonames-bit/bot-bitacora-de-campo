@@ -582,8 +582,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Inventario y Finanzas Responsivos**: Eliminación de floats desalineados en cabeceras; cuadrícula de KPIs simétrica 2x2 en móviles llenando el 100% del ancho.
     - **Tablero Despejado con Búsqueda Inteligente**: Barra de filtros oculta por defecto en móviles al entrar al Tablero, accesible mediante botón rápido `[🔍 Buscar]`.
     - **Ficha Animal Limpia**: Botones de acción en fila inferior en pantallas pequeñas, previniendo quiebres de texto vertical en edad y hierro, y corrección de desborde en input de foto de arete.
-    - **Chat Dock Expandido Pulido**: Eliminación de botón redundante y badge huérfano en cabecera de pestañas.
-- [x] Suite de pruebas con pytest: **803 pruebas en verde** (100% pasando).
+- [x] **Corrección del Monitor de Conexiones en Vivo (Exclusivo OWNER, 2026-09-12)**:
+    - **Causa raíz eliminada en SQLite**: Corrección de `self.query_all` por `self.query` en `obtener_usuarios_presencia` (`src/db/database.py`), eliminando la excepción silenciada que devolvía un diccionario de presencias vacío `{}`.
+    - **Cálculo de presencia UTC de precisión**: Diferencia temporal con objetos `datetime` timezone-aware en UTC, evitando desincronizaciones horarias y alertas deprecadas.
+    - **Resolución multi-canal de presencia**: Helper `_resolver_presencia_usuario` en `src/pwa/app.py` que enlaza la actividad por `user_id` local, `telegram_id` del bot o sesión `"Propietario"` de la PWA, priorizando el canal activo más reciente.
+    - **Latido instantáneo y visualización en vivo**: Disparo inmediato de `POST /api/heartbeat` al abrir la PWA, al ingresar a la vista de personal y al presionar "Actualizar Estados"; enriquecimiento de la tarjeta de monitoreo mostrando el contador vivo y los nombres y canales (`Jaime (PWA)`, `Sebastian (Telegram)`) de los operarios conectados.
+    - **Test unitario automatizado**: `test_usuarios_presencia_y_monitor_en_linea` en `tests/test_pwa_api.py`.
+- [x] Suite de pruebas con pytest: **804 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

@@ -5672,9 +5672,14 @@
 
     // Tarjeta Monitor en Vivo (Exclusivo OWNER)
     if (miRol === "OWNER") {
-      var enLineaCount = usuarios.filter(function (u) {
+      var onlineUsers = usuarios.filter(function (u) {
         return u.online_info && u.online_info.en_linea;
-      }).length;
+      });
+      var enLineaCount = onlineUsers.length;
+      var nombresOnline = onlineUsers.map(function (u) {
+        var c = u.online_info && u.online_info.canal ? " (" + u.online_info.canal + ")" : "";
+        return (u.nombre || "Usuario") + c;
+      }).join(", ");
       h += "<div class='card card-banner'>"
         + "<div>"
         + "<div style='display:flex; align-items:center; gap:8px;'>"
@@ -5683,6 +5688,7 @@
         + "</div>"
         + "<div style='font-size:12.5px; color:var(--texto-suave); margin-top:3px;'>"
         + (enLineaCount === 1 ? "<b>1 usuario en línea ahora</b>" : "<b>" + enLineaCount + " usuarios en línea ahora</b>")
+        + (enLineaCount > 0 ? " — <span style='color:var(--color-verde-txt, #16a34a); font-weight:600;'>" + esc(nombresOnline) + "</span>" : "")
         + " · Monitoreo confidencial de presencia por Web PWA y Telegram Bot."
         + "</div>"
         + "</div>"
@@ -5867,7 +5873,12 @@
 
     if (btnRefrescarUsr) {
       btnRefrescarUsr.addEventListener("click", function () {
-        cargar(true);
+        btnRefrescarUsr.disabled = true;
+        fetch("/api/heartbeat", { method: "POST" })
+          .catch(function () {})
+          .finally(function () {
+            cargar(true);
+          });
       });
     }
 
@@ -8116,11 +8127,13 @@
     if (actual === "usuarios") {
       if (!animar) return; // En polling silencioso no resetear el formulario de usuarios
       if (animar) skeleton(vista, "usuarios");
-      fetchJSON("/api/usuarios", function (d) {
-        if (!vista) return;
-        montarVista(vista, renderUsuarios(d), animar);
-        bindUsuarios(d);
-      }, animar ? vista : null);
+      fetch("/api/heartbeat", { method: "POST" }).catch(function () {}).finally(function () {
+        fetchJSON("/api/usuarios", function (d) {
+          if (!vista) return;
+          montarVista(vista, renderUsuarios(d), animar);
+          bindUsuarios(d);
+        }, animar ? vista : null);
+      });
       return;
     }
 
@@ -9007,6 +9020,7 @@
     setupHeaderAyuda();
     actualizarBadges();
     actualizarContadorSync();
+    fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
     enviarTelemetriaSilenciosa("apertura_app");
     setInterval(function () {
       enviarTelemetriaSilenciosa("latido_periodico");

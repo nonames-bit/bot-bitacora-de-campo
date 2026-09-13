@@ -1223,6 +1223,51 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     assert r_vet_revocado.status_code == 401
 
 
+def test_usuarios_presencia_y_monitor_en_linea(tmp_path):
+    users_data = [
+        {"user_id": 100, "nombre": "Patron", "rol": "OWNER", "pin": "1234", "telegram_id": 111111},
+        {"user_id": 200, "nombre": "Capataz", "rol": "ADMIN", "pin": "2222", "telegram_id": 222222},
+        {"user_id": 300, "nombre": "Juan Peon", "rol": "TRABAJADOR", "pin": "3333"},
+    ]
+    uf = tmp_path / "users.json"
+    uf.write_text(json.dumps(users_data), encoding="utf-8")
+    db_path = str(tmp_path / "bitacora.db")
+    app = crear_app(db_path=db_path, users_file=str(uf), password="secret_password")
+
+    # 1. Login de patron (OWNER) por PIN y registro de presencia via heartbeat
+    c_owner = app.test_client()
+    c_owner.post("/login", data={"pin": "1234"})
+    r_hb = c_owner.post("/api/heartbeat")
+    assert r_hb.status_code == 200
+
+    # 2. Consultar /api/usuarios como OWNER y verificar presencia en línea
+    r_usrs = c_owner.get("/api/usuarios")
+    assert r_usrs.status_code == 200
+    data = r_usrs.get_json()
+    assert data["ok"] is True
+    u100 = next(u for u in data["usuarios"] if u["user_id"] == 100)
+    assert u100["online_info"]["en_linea"] is True
+    assert u100["online_info"]["estado"] == "online"
+    assert u100["online_info"]["canal"] == "PWA"
+
+    # 3. Simular presencia por Telegram para Capataz (user_id 200)
+    db = Database(db_path)
+    db.registrar_presencia(user_id=200, nombre="Capataz", rol="ADMIN", canal="Telegram", detalles="tg_id:222222")
+    db.close()
+
+    r_usrs2 = c_owner.get("/api/usuarios")
+    data2 = r_usrs2.get_json()
+    u200 = next(u for u in data2["usuarios"] if u["user_id"] == 200)
+    assert u200["online_info"]["en_linea"] is True
+    assert u200["online_info"]["canal"] == "Telegram"
+
+    # 4. Verificar endpoint /api/usuarios/online
+    r_on = c_owner.get("/api/usuarios/online")
+    assert r_on.status_code == 200
+    on_data = r_on.get_json()
+    assert on_data["en_linea_count"] == 2
+
+
 def test_telemetria_gps_ping_y_rutas(tmp_path):
     users_data = [
         {"user_id": 100, "nombre": "Patron", "rol": "OWNER", "pin": "1234"},

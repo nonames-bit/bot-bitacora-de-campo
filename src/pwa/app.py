@@ -1768,6 +1768,26 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     def api_usuario():
         return jsonify(_usuario_actual())
 
+    def _resolver_presencia_usuario(u: dict, presencias: dict[str, dict]) -> dict:
+        uid = str(u.get("user_id"))
+        tg_id = str(u.get("telegram_id")) if u.get("telegram_id") else None
+        rol_u = str(u.get("rol", "")).upper()
+
+        candidatos = []
+        if uid in presencias:
+            candidatos.append(presencias[uid])
+        if tg_id and tg_id in presencias:
+            candidatos.append(presencias[tg_id])
+        if rol_u == "OWNER" and "Propietario" in presencias:
+            candidatos.append(presencias["Propietario"])
+
+        if not candidatos:
+            return {}
+
+        # Priorizar sesión que esté 'en_linea'; en empate, la de menor segundos_desde (más reciente)
+        candidatos.sort(key=lambda c: (0 if c.get("en_linea") else 1, c.get("segundos_desde", 999999)))
+        return candidatos[0]
+
     @app.get("/api/usuarios")
     def api_listar_usuarios():
         rol = _rol_actual()
@@ -1794,8 +1814,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 except Exception:
                     presencias = {}
                 for u in usuarios:
-                    uid = str(u.get("user_id"))
-                    p = presencias.get(uid, {})
+                    p = _resolver_presencia_usuario(u, presencias)
                     u["online_info"] = {
                         "en_linea": p.get("en_linea", False),
                         "estado": p.get("estado", "offline"),
@@ -1829,8 +1848,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             resultado = []
             en_linea_cnt = 0
             for u in usuarios:
-                uid = str(u.get("user_id"))
-                p = presencias.get(uid, {})
+                p = _resolver_presencia_usuario(u, presencias)
                 en_linea = p.get("en_linea", False)
                 if en_linea:
                     en_linea_cnt += 1
