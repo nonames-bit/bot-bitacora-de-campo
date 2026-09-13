@@ -213,14 +213,18 @@
     bubble.innerHTML = txt;
     bubble.style.display = "block";
     try {
-      bubble.style.transform = "translateX(-50%)";
-      var rect = bubble.getBoundingClientRect();
-      if (rect.left < 10) {
-        var diffL = 10 - rect.left;
-        bubble.style.transform = "translateX(calc(-50% + " + Math.ceil(diffL) + "px))";
-      } else if (rect.right > window.innerWidth - 10) {
-        var diffR = rect.right - (window.innerWidth - 10);
-        bubble.style.transform = "translateX(calc(-50% - " + Math.ceil(diffR) + "px))";
+      if (window.innerWidth > 640) {
+        bubble.style.transform = "translateX(-50%)";
+        var rect = bubble.getBoundingClientRect();
+        if (rect.left < 10) {
+          var diffL = 10 - rect.left;
+          bubble.style.transform = "translateX(calc(-50% + " + Math.ceil(diffL) + "px))";
+        } else if (rect.right > window.innerWidth - 10) {
+          var diffR = rect.right - (window.innerWidth - 10);
+          bubble.style.transform = "translateX(calc(-50% - " + Math.ceil(diffR) + "px))";
+        }
+      } else {
+        bubble.style.transform = "none";
       }
     } catch (e) { /* noop */ }
 
@@ -307,6 +311,21 @@
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
       });
     }
+    var btnToggleFiltros = document.getElementById("btn-toggle-filtros");
+    if (btnToggleFiltros) {
+      btnToggleFiltros.addEventListener("click", function () {
+        var bf = document.getElementById("barra-filtros");
+        if (bf) {
+          var estabaOculto = bf.style.display === "none";
+          bf.style.display = estabaOculto ? "" : "none";
+          bf.__forzadoVisible = estabaOculto;
+          if (estabaOculto) {
+            var inp = document.getElementById("f-tag") || document.getElementById("f-potrero");
+            if (inp) inp.focus();
+          }
+        }
+      });
+    }
   }
   function renderTablero(d) {
     window.__datosUltimoTablero = d;
@@ -318,8 +337,12 @@
       actualizarClimaHeader();
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:5px 12px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
-    var h = "<h3>" + icon("grid") + "Tablero finca" + pot + pdfBtn + "</h3>";
+    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='font-size:12px; text-decoration:none; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
+    var searchBtn = "<button type='button' id='btn-toggle-filtros' class='tema-btn' style='font-size:12px; padding:5px 10px; display:inline-flex; align-items:center; gap:4px;' title='Buscar potrero o arete'>" + icon("search", 13) + "Buscar</button>";
+    var h = "<div class='tablero-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px; font-size:18px;'>" + icon("grid") + "Tablero finca" + pot + "</h3>"
+      + "<div style='display:flex; gap:6px; align-items:center;'>" + searchBtn + pdfBtn + "</div>"
+      + "</div>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
       + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
@@ -966,8 +989,11 @@
 
   function renderFinanzas(d) {
     var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
-    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
-    var h = "<h3>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad" + btnGasto + "</h3>" + erroresHtml(d);
+    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
+    var h = "<div class='finanzas-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
+      + btnGasto
+      + "</div>" + erroresHtml(d);
 
     var anoActual = new Date().getFullYear();
     var opcionesAno = "";
@@ -2388,12 +2414,15 @@
   }
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
     var rolInv = window.__usuarioActual && window.__usuarioActual.rol;
     if (rolInv === "OWNER" || rolInv === "ADMIN") {
-      expBtn = "<button type='button' class='tema-btn' data-accion='crear-animal' style='float:right; font-size:12px; padding:4px 10px; margin-top:-4px; margin-right:8px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>" + icon("plus", 14) + "Crear Animal</button>" + expBtn;
+      expBtn = "<button type='button' class='tema-btn' data-accion='crear-animal' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 14) + "Crear Animal</button>" + expBtn;
     }
-    var h = "<h3>" + icon("cow") + "Inventario y Población" + expBtn + "</h3>" + erroresHtml(d);
+    var h = "<div class='inv-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("cow") + "Inventario y Población</h3>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + expBtn + "</div>"
+      + "</div>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
       + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
@@ -6851,7 +6880,7 @@
       if (sheetUsuarios) sheetUsuarios.style.display = "";
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "";
-      qa("#nav-principal > button").forEach(function (b) {
+      qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (v === "gps") b.style.display = "none";
         else b.style.display = "";
@@ -6870,7 +6899,7 @@
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
-      qa("#nav-principal > button").forEach(function (b) {
+      qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
@@ -6890,7 +6919,7 @@
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "none";
       var permitidas = ["captura", "manga", "ficha"];
-      qa("#nav-principal > button").forEach(function (b) {
+      qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
         if (permitidas.indexOf(v) !== -1) {
@@ -6937,7 +6966,7 @@
       + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
       + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
       + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
-      + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1'>"
+      + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1; min-width:0; max-width:100%; box-sizing:border-box;'>"
       + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
       + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
       + "</div>"
@@ -6997,7 +7026,7 @@
     var btnEditar = (rolEd === "OWNER" || rolEd === "ADMIN")
       ? "<button type='button' class='tema-btn' data-accion='editar-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; cursor:pointer;'>" + icon("pencil", 15) + "Editar</button>"
       : "";
-    head += "<div style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
+    head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
       + btnEditar
@@ -7622,7 +7651,7 @@
     tag = String(tag).trim();
     if (!tag) return;
 
-    var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
+    var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === "ficha"; })[0];
     if (!destino) {
       // Si estamos en la página standalone /ficha/<tag> (usa #ficha, no #vista)
       var destinoStandalone = vista || document.getElementById("ficha");
@@ -7704,7 +7733,7 @@
   }, true);
   function vincularTagsFicha(root) {
     if (!root) return;
-    if (!qa("#nav-principal > button").length) return; // solo en el dashboard con navegación
+    if (!qa("#nav-principal button").length) return; // solo en el dashboard con navegación
     var trs = qa("table tr", root);
     trs.forEach(function (tr) {
       var celdas = qa("td", tr);
@@ -8016,8 +8045,15 @@
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
-      if (actual === "tablero" || actual === "ficha" || actual === "inventario") {
+      if (actual === "ficha") {
         barraFiltros.style.display = "";
+      } else if (actual === "tablero" || actual === "inventario") {
+        var hayFiltro = (q("#f-potrero") && q("#f-potrero").value.trim()) || (q("#f-tag") && q("#f-tag").value.trim());
+        if (window.innerWidth <= 640 && !hayFiltro && !barraFiltros.__forzadoVisible) {
+          barraFiltros.style.display = "none";
+        } else {
+          barraFiltros.style.display = "";
+        }
       } else {
         barraFiltros.style.display = "none";
       }
@@ -8151,7 +8187,7 @@
   var badgesCache = {};
   function crearBadgesNav() {
     VISTAS_BADGE.forEach(function (v) {
-      var btn = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+      var btn = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
       if (!btn || btn.querySelector(".nav-badge")) return;
       var span = document.createElement("span");
       span.className = "nav-badge";
@@ -8167,7 +8203,7 @@
         var totalSecundario = 0;
         VISTAS_BADGE.forEach(function (v) {
           var n = parseInt(d && d[v], 10) || 0;
-          var btn = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+          var btn = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
           if (btn) {
             var span = btn.querySelector(".nav-badge");
             if (span) {
@@ -8241,7 +8277,7 @@
       if ("Notification" in window && Notification.permission === "default") {
         iniciarWebPush(false).catch(function () {});
       }
-      var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
+      var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
       if (destino) destino.click();
     });
   }
@@ -8348,7 +8384,7 @@
     });
   }
 
-  qa("#nav-principal > button").forEach(function (b) {
+  qa("#nav-principal button").forEach(function (b) {
     b.addEventListener("click", function () {
       if (b.id === "btn-nav-mas") {
         if (typeof window.__abrirModalMas === "function") window.__abrirModalMas();
@@ -8388,9 +8424,9 @@
     if (v !== "ficha") {
       actualizarVacaHeader({ esFicha: false });
     }
-    qa("#nav-principal > button").forEach(function (x) { x.classList.remove("act"); });
+    qa("#nav-principal button").forEach(function (x) { x.classList.remove("act"); });
     qa("#nav-principal button[data-v]").forEach(function (b) { b.removeAttribute("aria-current"); });
-    var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+    var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
     if (destino) { destino.classList.add("act"); if (destino.hasAttribute("data-v")) destino.setAttribute("aria-current", "page"); }
 
     // Sincronizar botón Más en barra móvil
@@ -8535,8 +8571,8 @@
     if (pot && q("#f-potrero")) q("#f-potrero").value = pot;
     if (tag && q("#f-tag")) q("#f-tag").value = tag;
     if (!v && (pot || tag)) v = pot ? "tablero" : "ficha";
-    if (v && qa("#nav-principal > button").length) {
-      var destino = qa("#nav-principal > button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
+    if (v && qa("#nav-principal button").length) {
+      var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === v; })[0];
       if (destino) {
         irAVista(v);
         cargar();

@@ -576,7 +576,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Chips `chip amarillo` → `chip ambar` (4 sitios `app.js`); 2 gradientes inline → `.btn-satelite-sar` / `.card-banner` con override tema Sol.
     - Táctil `min-height:44px` en móvil (header, captura/manga, reintento offline); feed Tablero como cards en `≤640px` (`data-label`), tabla en escritorio.
     - CSP `offline.html` sin `onclick` inline (enlace sin JS); bump caché `?v=84` en `index/ficha/login/offline.html`.
-- [x] Suite de pruebas con pytest: **790 pruebas en verde** (100% pasando).
+- [x] **Rediseño y Optimización UX/UI Móvil PWA (2026-09-12)**:
+    - **Bocadillo Vaquita Móvil**: Despliegue como toast flotante centrado con z-index alto bajo el header, sin colisionar con botones ni salirse de pantalla.
+    - **Despeje de Botón Flotante Chat vs Siguiente**: Contenedor `main` con padding inferior ampliado a 125px + safe-area, previniendo toques accidentales sobre el FAB.
+    - **Inventario y Finanzas Responsivos**: Eliminación de floats desalineados en cabeceras; cuadrícula de KPIs simétrica 2x2 en móviles llenando el 100% del ancho.
+    - **Tablero Despejado con Búsqueda Inteligente**: Barra de filtros oculta por defecto en móviles al entrar al Tablero, accesible mediante botón rápido `[🔍 Buscar]`.
+    - **Ficha Animal Limpia**: Botones de acción en fila inferior en pantallas pequeñas, previniendo quiebres de texto vertical en edad y hierro, y corrección de desborde en input de foto de arete.
+    - **Chat Dock Expandido Pulido**: Eliminación de botón redundante y badge huérfano en cabecera de pestañas.
+- [x] Suite de pruebas con pytest: **803 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

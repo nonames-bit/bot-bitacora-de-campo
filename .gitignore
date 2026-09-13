@@ -48,6 +48,8 @@ yarn-debug.log*
 data/
 media/
 backups/
+*cookies.txt
+screenshots_mobile/
 scratch/
 src/server/users.json
 

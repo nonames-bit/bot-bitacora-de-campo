@@ -289,59 +289,37 @@ header .tema-btn:hover {
 }
 #barra-red.visible { display: block; }
 
-/* Navegación Principal: sidebar vertical en desktop (móvil se restaura en @media max-width:640px) */
+/* Navegación Principal */
 #nav-principal {
-  position: fixed;
-  top: 74px;
-  left: 0;
-  bottom: 0;
-  width: 230px;
-  display: block;
-  overflow-y: auto;
-  padding: 16px 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
   background: var(--superficie);
-  border-right: 1px solid var(--borde);
-  border-bottom: none;
-  z-index: 10;
+  border-bottom: 1px solid var(--borde);
 }
-#nav-principal > .nav-grupo-titulo {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--texto-suave);
-  padding: 0 10px 6px;
-  font-weight: 700;
-}
-#nav-principal > button {
+#nav-principal button {
   font-family: var(--font-base);
   position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 9px;
-  border: 1px solid transparent;
+  border: 1px solid var(--borde);
   background: var(--superficie);
   color: var(--texto-suave);
-  border-radius: 8px;
-  padding: 8px 12px;
-  min-height: 42px;
-  margin-bottom: 4px;
-  text-align: left;
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-height: 40px;
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
   transition: background .1s ease, color .1s ease, border-color .1s ease;
 }
-#nav-principal > button:hover {
+#nav-principal button:hover {
   background: var(--fondo);
   color: var(--texto);
 }
-#nav-principal > button.act {
+#nav-principal button.act {
   background: var(--verde-marca-pastel);
   color: var(--verde-marca);
-  border-color: transparent;
-  box-shadow: inset 3px 0 0 var(--verde-marca);
+  border-color: var(--verde-marca);
   font-weight: 600;
 }
 #nav-principal .nav-btn-mas {
@@ -349,10 +327,9 @@ header .tema-btn:hover {
 }
 
 main {
-  margin-left: 230px;
-  margin-right: 0;
-  max-width: none;
-  padding: 24px clamp(20px, 3vw, 48px) 90px;
+  padding: 20px;
+  max-width: 1120px;
+  margin: auto;
 }
 
 /* Tarjetas */
@@ -910,7 +887,6 @@ button:active {
 /* --- 3. Responsive y Navegación Móvil Fija Abajo --- */
 @media (max-width: 640px) {
   main {
-    margin-left: 0;
     padding: 12px;
     padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px));
   }
@@ -956,10 +932,8 @@ button:active {
   #nav-principal {
     position: fixed;
     bottom: 0;
-    top: auto;
     left: 0;
     right: 0;
-    width: auto;
     z-index: 1000;
     display: grid !important;
     grid-template-columns: repeat(5, 1fr);
@@ -967,28 +941,23 @@ button:active {
     padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
     background: var(--superficie);
     border-top: 1px solid var(--borde-fuerte);
-    border-right: none;
     border-bottom: none;
     box-shadow: 0 -3px 12px rgba(0, 0, 0, 0.08);
     overflow: hidden;
   }
-#nav-principal > .nav-grupo-titulo { display: none; }
   #nav-principal .nav-secundario {
     display: none !important;
   }
   #nav-principal .nav-btn-mas {
     display: flex !important;
   }
-  #nav-principal > button {
+  #nav-principal button {
     display: flex;
-    width: auto;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     min-height: 48px;
     padding: 4px 1px;
-    margin-bottom: 0;
-    text-align: center;
     gap: 2px;
     border-radius: 8px;
     border: none;
@@ -998,16 +967,16 @@ button:active {
     cursor: pointer;
     transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
   }
-  #nav-principal > button:active {
+  #nav-principal button:active {
     transform: scale(0.96);
   }
-  #nav-principal > button .svg-icon {
+  #nav-principal button .svg-icon {
     margin: 0;
     width: 20px;
     height: 20px;
     top: 0;
   }
-  #nav-principal > button .nav-txt {
+  #nav-principal button .nav-txt {
     font-size: 10px;
     font-weight: 500;
     line-height: 1.1;
@@ -1017,7 +986,7 @@ button:active {
     max-width: 100%;
     color: inherit;
   }
-  #nav-principal > button .nav-badge {
+  #nav-principal button .nav-badge {
     top: 2px;
     right: 14%;
     font-size: 11px;
@@ -1026,13 +995,12 @@ button:active {
     line-height: 16px;
     border-radius: 99px;
   }
-  #nav-principal > button.act {
+  #nav-principal button.act {
     background: var(--verde-marca-pastel);
     color: var(--verde-marca);
     border: none;
-    box-shadow: none;
   }
-  #nav-principal > button.act .nav-txt {
+  #nav-principal button.act .nav-txt {
     font-weight: 700;
   }
   
@@ -1052,6 +1020,48 @@ button:active {
   .ficha-head img.avatar {
     width: 60px;
     height: 60px;
+  }
+  /* KPIs balanceados en 2 columnas simétricas para móvil */
+  .kpis {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+    clear: both !important;
+  }
+  .kpis > .kpi {
+    flex: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  /* Ficha de animal responsive: acciones en fila completa para que edad/hierro respiren */
+  .ficha-head {
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding: 12px !important;
+  }
+  .ficha-head .datos {
+    min-width: 0 !important;
+    flex: 1 1 180px !important;
+  }
+  .ficha-head-acciones {
+    width: 100% !important;
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    margin-top: 6px !important;
+    border-top: 1px solid var(--borde) !important;
+    padding-top: 8px !important;
+  }
+  .ficha-head-acciones a,
+  .ficha-head-acciones button {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+  /* Input de archivo para foto de arete */
+  #f-ident-foto {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
   }
 }
 
@@ -1214,7 +1224,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   padding: 0 14px;
   font-size: 13px;
 }
-:root[data-theme="sun"] #nav-principal > button {
+:root[data-theme="sun"] #nav-principal button {
   min-height: 44px;
 }
 :root[data-theme="sun"] .chat-btn-ico,
@@ -1226,7 +1236,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
   font-size: 12px;
 }
 @media (max-width: 640px) {
-  :root[data-theme="sun"] #nav-principal > button .nav-txt {
+  :root[data-theme="sun"] #nav-principal button .nav-txt {
     font-size: 12px;
   }
   :root[data-theme="sun"] header .tema-btn {
@@ -2650,7 +2660,24 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 @media (max-width: 640px) {
   .header-pasto { flex: 1 1 56px; min-width: 56px; max-width: 140px; display: flex; visibility: visible; opacity: .95; }
   .vaca-img { width: 44px; }
-  .vaca-speech-bubble { max-width: min(240px, calc(100vw - 20px)); font-size: 11px; padding: 6px 10px; }
+  .vaca-speech-bubble {
+    position: fixed !important;
+    top: calc(env(safe-area-inset-top, 0px) + 98px) !important;
+    left: 14px !important;
+    right: 14px !important;
+    transform: none !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    font-size: 12px !important;
+    padding: 8px 14px !important;
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.35) !important;
+    z-index: 2500 !important;
+  }
+  .vaca-speech-bubble::before,
+  .vaca-speech-bubble::after {
+    display: none !important;
+  }
   .clima-sol svg { width: 18px; height: 18px; }
   .clima-luna svg { width: 16px; height: 16px; }
   .clima-nubes .nube-1 { width: 17px; height: 10px; }
@@ -2952,18 +2979,27 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   }
   .chat-dock.expandido {
     bottom: calc(56px + env(safe-area-inset-bottom, 0px));
-    left: 6px;
-    right: 6px;
+    left: 8px;
+    right: 8px;
     width: auto;
-    height: 72vh;
+    height: 75vh;
     max-height: calc(100vh - 75px);
     border-radius: 16px;
+    z-index: 1500;
+  }
+  .chat-dock.expandido .chat-dock-footer {
+    padding: 8px 8px !important;
+  }
+  .chat-dock-form {
+    gap: 6px !important;
+  }
+  .chat-dock-form input {
+    font-size: 13px !important;
+    padding: 0 12px !important;
   }
   main {
-    /* La burbuja del chat ahora es un círculo flotante en la esquina (no una
-       barra de ancho completo), así que ya no necesita tanto espacio reservado
-       abajo -- solo lo justo para la barra de navegación inferior. */
-    padding-bottom: 75px !important;
+    /* Espacio reservado para barra de navegación (56px) + botón flotante de chat (52px) + holgura */
+    padding-bottom: calc(125px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 @media (min-width: 769px) {
@@ -3356,3 +3392,55 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .fab-registrar { position:fixed; bottom:76px; right:16px; z-index:50; background:var(--verde-marca); color:#fff; border:none; border-radius:50%; width:56px; height:56px; box-shadow:0 4px 12px rgba(0,0,0,0.25); cursor:pointer; display:flex; align-items:center; justify-content:center; }
 .fab-registrar:hover { opacity:0.92; }
 .cap-potrero-hint { font-size:11px; color:var(--verde-marca); font-weight:600; cursor:pointer; border:1px solid var(--verde-marca); border-radius:999px; padding:2px 8px; margin-left:6px; }
+
+/* ==========================================================================
+   Diseño híbrido: sidebar agrupada en desktop, barra inferior intacta en móvil
+   ========================================================================== */
+/* Desktop (laptop): sidebar fija de 230px bajo el header, agrupada. */
+@media (min-width: 641px) {
+  body { padding-bottom: 0; }
+  #nav-principal {
+    position: fixed;
+    top: 57px;
+    left: 0;
+    bottom: 0;
+    width: 230px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex-wrap: nowrap;
+    overflow-y: auto;
+    padding: 14px 12px 20px;
+    background: var(--superficie);
+    border-bottom: none;
+    border-right: 1px solid var(--borde);
+    z-index: 15;
+  }
+  #nav-principal .nav-grupo { display: flex; flex-direction: column; gap: 4px; }
+  #nav-principal .nav-grupo-titulo {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--texto-suave);
+    padding: 2px 10px 4px;
+  }
+  #nav-principal .nav-grupo button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+  }
+  #nav-principal .nav-btn-mas { display: none !important; }
+  main { margin-left: 230px; max-width: calc(1120px + 230px); }
+}
+
+/* Móvil: los wrappers son transparentes (display:contents), sin títulos ni
+   duplicados; la barra inferior de 5 botones + Más queda intacta. */
+@media (max-width: 640px) {
+  #nav-principal .nav-grupo { display: contents; }
+  #nav-principal .nav-grupo-titulo { display: none; }
+}
