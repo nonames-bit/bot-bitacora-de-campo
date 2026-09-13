@@ -175,6 +175,28 @@ class Database:
             self.vincular_fotos_huerfanas()
         except Exception as e:
             logger.error("Error en vincular_fotos_huerfanas durante create_tables: %s", e, exc_info=True)
+        # Saneamiento de animales en potreros históricos que tienen un homónimo vigente (ej. OLEGARIO II 17 -> B02)
+        try:
+            self.conn.execute("""
+                UPDATE animales
+                SET potrero_id = (
+                    SELECT p2.id FROM potreros p1
+                    JOIN potreros p2 ON UPPER(TRIM(p1.nombre)) = UPPER(TRIM(p2.nombre))
+                    WHERE p1.id = animales.potrero_id
+                      AND (p1.codigo GLOB '[0-9][0-9]' OR p1.codigo GLOB '[0-9]')
+                      AND NOT (p2.codigo GLOB '[0-9][0-9]' OR p2.codigo GLOB '[0-9]')
+                    ORDER BY CASE WHEN p2.geom_wkt_4326 IS NOT NULL THEN 0 ELSE 1 END, p2.id DESC
+                    LIMIT 1
+                )
+                WHERE potrero_id IN (
+                    SELECT id FROM potreros WHERE codigo GLOB '[0-9][0-9]' OR codigo GLOB '[0-9]'
+                ) AND (fecha_nacimiento >= '2019-01-01' OR tag = 'JA457')
+            """)
+            self.conn.execute("""
+                UPDATE animales SET estado = 'ACTIVO' WHERE tag = 'JA457' AND estado = 'HISTORICO'
+            """)
+        except Exception as e:
+            logger.error("Error en saneamiento de potreros de animales en create_tables: %s", e, exc_info=True)
         try:
             self.marcar_historicos_sg()
         except Exception as e:
@@ -477,8 +499,26 @@ class Database:
         if codigo_o_nombre is None or codigo_o_nombre == "":
             return None
         v = str(codigo_o_nombre).strip()
+        # 1. Búsqueda exacta por código (ej. 'B02', 'C06', '17')
+        row_cod = self.query_one(
+            "SELECT id FROM potreros WHERE UPPER(TRIM(codigo)) = UPPER(TRIM(?)) ORDER BY id DESC LIMIT 1",
+            (v,),
+        )
+        if row_cod:
+            return int(row_cod["id"])
+        # 2. Búsqueda por nombre: priorizar potreros vigentes/georreferenciados sobre
+        # lotes numéricos históricos de SG (01..23) que puedan compartir el mismo nombre.
         row = self.query_one(
-            "SELECT id FROM potreros WHERE codigo = ? OR nombre = ?", (v, v)
+            """
+            SELECT id FROM potreros
+            WHERE UPPER(TRIM(nombre)) = UPPER(TRIM(?))
+            ORDER BY
+                CASE WHEN geom_wkt_4326 IS NOT NULL THEN 0 ELSE 1 END,
+                CASE WHEN codigo GLOB '[0-9][0-9]' OR codigo GLOB '[0-9]' THEN 1 ELSE 0 END,
+                id DESC
+            LIMIT 1
+            """,
+            (v,),
         )
         return int(row["id"]) if row else None
 

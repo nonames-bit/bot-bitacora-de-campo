@@ -174,3 +174,34 @@ def test_api_eliminar_evento_control_acceso_rbac():
             os.remove(p)
         except Exception:
             pass
+
+
+def test_potrero_resolucion_prioriza_vigente_sobre_historico():
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = f.name
+    try:
+        db = Database(db_path).create_tables()
+        # Crear potrero 17 histórico y potrero 29 vigente ambos llamados OLEGARIO II
+        id_hist = db.insert("potreros", {"codigo": "17", "nombre": "OLEGARIO II"})
+        id_vig = db.insert("potreros", {"codigo": "B02", "nombre": "OLEGARIO II", "geom_wkt_4326": "POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))"})
+
+        # Resolver por nombre debe dar el vigente
+        assert db.resolve_potrero("OLEGARIO II") == id_vig
+        # Resolver por código exacto debe respetar el código
+        assert db.resolve_potrero("17") == id_hist
+        assert db.resolve_potrero("B02") == id_vig
+
+        # Probar saneamiento de animal en potrero histórico
+        db.conn.execute("INSERT INTO animales (tag, potrero_id, estado, fecha_nacimiento) VALUES ('JA457', ?, 'HISTORICO', '2020-06-07')", (id_hist,))
+        db.conn.commit()
+        db.create_tables()
+        an = db.get_animal("JA457")
+        assert an["potrero_id"] == id_vig
+        assert an["estado"] == "ACTIVO"
+        db.close()
+    finally:
+        try:
+            os.remove(db_path)
+        except Exception:
+            pass
+
