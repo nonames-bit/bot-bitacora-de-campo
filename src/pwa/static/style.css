@@ -256,8 +256,17 @@ header .reloj {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--header-txt);
-  opacity: 0.85;
+  opacity: 0.9;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
 }
+header .reloj .reloj-fecha { font-weight: 600; }
+header .reloj .reloj-sep { opacity: 0.45; }
 header .tema-btn {
   background: rgba(255, 255, 255, 0.1);
   color: var(--header-txt);
@@ -898,7 +907,14 @@ button:active {
     gap: 6px;
   }
   header b { font-size: 12.5px; }
-  header .reloj { display: none; }
+  header .reloj {
+    display: inline-flex;
+    font-size: 9.5px;
+    padding: 2px 5px;
+    min-height: 22px;
+    opacity: 0.85;
+    order: -1;
+  }
   header .acciones { gap: 4px; flex-wrap: wrap; }
   header .tema-btn {
     min-height: 44px;
@@ -1348,11 +1364,17 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   max-height: 90vh;
 }
 .chat-msg {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border-radius: 12px;
   font-size: 13.5px;
   line-height: 1.45;
   max-width: 88%;
+  word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.chat-msg-texto {
   word-break: break-word;
 }
 .chat-msg.bot {
@@ -1436,13 +1458,49 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .chat-msg-rol { font-weight: 600; font-size: 10px; opacity: .75; margin-left: 4px; }
 .chat-msg-hora {
   font-size: 10px;
-  opacity: .7;
+  opacity: .75;
   align-self: flex-end;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  margin-top: 2px;
+  user-select: none;
+}
+.chat-msg.user .chat-msg-hora,
+.chat-msg.equipo.mio .chat-msg-hora {
+  color: rgba(255, 255, 255, 0.85);
+}
+.chat-msg.bot .chat-msg-hora,
+.chat-msg.equipo.otro .chat-msg-hora {
+  color: var(--texto-suave);
 }
 .chat-msg-borrar { cursor: pointer; opacity: .8; }
+.chat-msg-borrar:hover { opacity: 1; }
+
+/* Modal de animales por potrero */
+.modal-potrero-kpis {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.modal-potrero-busqueda {
+  width: 100%;
+  padding: 7px 11px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  border-radius: 6px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--texto);
+  box-sizing: border-box;
+}
+.link-potrero-animales {
+  cursor: pointer;
+}
+.link-potrero-animales:hover {
+  text-decoration: underline;
+}
 .chat-msg-borrar:hover { opacity: 1; }
 .chat-sugerencias {
   display: flex;

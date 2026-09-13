@@ -387,6 +387,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Droplet de producción redimensionado de 1 GB a 2 GB de RAM (quedaba con ~130 MB libres bajo carga normal).
 
 ### ⏳ En Progreso / Calibración Continua
+- [x] **Mejoras UX PWA — Fecha en cabecera, hora en chat y listado interactivo de animales por potrero (2026-09-12)**:
+  - **Fecha compacta en cabecera**: Indicador tipo pill con día de la semana, fecha y hora (`Sáb, 12 de sept · 11:55 p. m.`) en `#reloj-hora` para dashboard y ficha técnica, adaptado a viewport móvil sin desbordes.
+  - **Hora en mensajes de chat (Asistente IA y Equipo)**: Inclusión de marca de tiempo (`chat-msg-hora`) en cada burbuja de mensaje (usuario, bot, notas de voz y chat de equipo).
+  - **Listado interactivo de animales por potrero (Pasturas / Voisin)**:
+    - Endpoint `@app.get("/api/potrero/<potrero_ref>/animales")` y función `animales_de_potrero()` con filtrado estricto `estado = 'ACTIVO'` (Regla Fundamental de Inventario).
+    - Enlace táctil en nombres de potreros y botón `👥 Listar` en la tabla de rotación y ocupación.
+    - Modal móvil optimizado (390×844 DPR=2) con resumen de categorías SG (`NV`, `VS`, `VP`, `CH`, `CM`, `HL`, `ML`, `MC`, `TR`), buscador en tiempo real y tabla con columnas: Número (con salto a ficha técnica), Nombre, Edad, Estado y Días en el potrero.
+    - Formateo de hectáreas a 1 decimal (`10.0 ha`) y 104 pruebas unitarias de API pasando al 100%.
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
 - [x] **Fase 6.2 — Capacidad de Carga Dinámica e Integración Pluviométrica & Balance Forrajero Estacional**:
   - Modelado zootécnico de Materia Seca (MS): demanda diaria al $2.8\%$ del Peso Vivo ($12.6\text{ kg MS/UGG/día}$).

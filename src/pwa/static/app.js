@@ -638,18 +638,26 @@
         if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌾</span>";
         return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🍂</span>";
       }
-      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th>Ocupación</th><th>Reposo</th><th>Ha</th></tr>";
+      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th>Ocupación</th><th>Reposo</th><th>Ha</th><th style='text-align:center;'>Animales</th></tr>";
       h += d.potreros.map(function (p) {
+        var nom = p.nombre || p.codigo || p.id;
         var st = p.semaforo === "🟢" ? "Descanso ok" : p.semaforo === "🟡" ? "Rotar pronto" : p.semaforo === "🔴" ? "Sobreocupado" : "Sin datos";
-        return "<tr><td><b>" + esc(p.nombre || p.codigo || p.id) + "</b></td><td>" + chipEstado(p.semaforo + " " + st) + "</td>"
-          + "<td>" + (p.dias_ocupacion != null ? p.dias_ocupacion + " d" : "—") + "</td>"
-          + "<td>" + iconoPastoVoisin(p.dias_reposo) + (p.dias_reposo != null ? p.dias_reposo + " d" : "—") + "</td>"
-          + "<td>" + (p.area_has != null ? p.area_has + " ha" : "—") + "</td></tr>";
+        var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "—";
+        return "<tr><td style='white-space:nowrap;'><a href='#' class='link-potrero-animales' data-potrero='" + esc(nom) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
+          + esc(nom) + "</a></td><td style='white-space:nowrap;'>" + chipEstado(p.semaforo + " " + st) + "</td>"
+          + "<td style='white-space:nowrap; text-align:center;'>" + (p.dias_ocupacion != null ? p.dias_ocupacion + " d" : "—") + "</td>"
+          + "<td style='white-space:nowrap; text-align:center;'>" + iconoPastoVoisin(p.dias_reposo) + (p.dias_reposo != null ? p.dias_reposo + " d" : "—") + "</td>"
+          + "<td style='white-space:nowrap; text-align:right;'>" + haTxt + "</td>"
+          + "<td style='text-align:center; white-space:nowrap;'><button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11px; padding:3px 8px; border-radius:5px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
+          + icon("cow", 12) + "<span>Listar</span></button></td></tr>";
       }).join("");
       h += "</table></div>";
     }
+    var colPotrero = ["potrero", "Potrero", "text", function (v) {
+      return "<a href='#' class='link-potrero-animales' data-potrero='" + esc(v) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales en " + esc(v) + "'>" + esc(v) + "</a>";
+    }];
     var columnasNdvi = simple ? [
-      ["potrero", "Potrero"],
+      colPotrero,
       ["ndvi_promedio", "Estado", "text", function (v) {
         var n = Number(v);
         var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
@@ -658,7 +666,7 @@
       }],
       ["fecha", "Fecha"],
     ] : [
-      ["potrero", "Potrero"],
+      colPotrero,
       ["fuente", "Sensor / Modo", "text", function (v) {
         var s = String(v || "");
         if (s.indexOf("Sentinel-1") >= 0 || s.indexOf("SAR") >= 0 || s.indexOf("Radar") >= 0) {
@@ -803,6 +811,142 @@
         });
     });
   }
+
+  function abrirModalAnimalesPotrero(nomPotrero) {
+    if (!nomPotrero) return;
+    var idModal = "modal-animales-potrero";
+    var previo = document.getElementById(idModal);
+    if (previo) previo.remove();
+
+    var html = "<div id='" + idModal + "' class='modal-overlay' style='display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; padding:12px; box-sizing:border-box;'>"
+      + "<div class='modal-contenido' style='max-width:620px; width:100%; max-height:88vh; display:flex; flex-direction:column; background:var(--superficie); border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,0.3); overflow:hidden;'>"
+      + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center;'>"
+      + "<div style='display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:#fff;'>"
+      + icon("cow", 18)
+      + "<span>Potrero: " + esc(nomPotrero) + "</span>"
+      + "</div>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-pot-animales' style='color:#fff; font-size:20px; padding:4px 8px;'>✕</button>"
+      + "</div>"
+      + "<div id='pot-modal-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
+      + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
+      + "<div style='font-size:24px; margin-bottom:8px;'>⏳</div>"
+      + "Consultando animales activos en <b>" + esc(nomPotrero) + "</b>..."
+      + "</div>"
+      + "</div>"
+      + "</div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById(idModal);
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-pot-animales");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) {
+      if (e.target === ov) cerrar();
+    });
+
+    fetch("/api/potrero/" + encodeURIComponent(nomPotrero) + "/animales")
+      .then(function (r) {
+        if (!r.ok) throw new Error("Error HTTP " + r.status);
+        return r.json();
+      })
+      .then(function (data) {
+        var body = document.getElementById("pot-modal-body");
+        if (!body) return;
+        if (!data || !data.ok) {
+          body.innerHTML = "<p class='aviso'>⚠️ " + esc((data && data.error) || "No se pudo cargar la información del potrero.") + "</p>";
+          return;
+        }
+        var animales = data.animales || [];
+        var total = data.total_animales || 0;
+        var categorias = data.resumen_categorias || {};
+
+        var catsHtml = "";
+        Object.keys(categorias).forEach(function (cat) {
+          catsHtml += "<span class='chip' style='font-size:11px; padding:2px 7px; margin-right:4px;'><b>" + esc(cat) + "</b>: " + esc(categorias[cat]) + "</span>";
+        });
+
+        var content = "<div class='modal-potrero-kpis' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding:8px 12px; background:var(--tarjeta-fondo); border-radius:6px; border:1px solid var(--borde);'>"
+          + "<div><b>Total: " + esc(total) + "</b> " + (total === 1 ? "animal activo" : "animales activos") + "</div>"
+          + "<div style='display:flex; gap:4px; flex-wrap:wrap;'>" + catsHtml + "</div>"
+          + "</div>";
+
+        if (!animales.length) {
+          content += "<div style='text-align:center; padding:30px 10px; color:var(--texto-suave);'>"
+            + "<div style='font-size:28px; margin-bottom:8px;'>🌾</div>"
+            + "No hay animales activos asignados actualmente a este potrero."
+            + "</div>";
+          body.innerHTML = content;
+          return;
+        }
+
+        content += "<input type='search' id='filtro-animal-potrero' class='modal-potrero-busqueda' placeholder='🔍 Filtrar por número, nombre o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
+
+        content += "<div class='tabla-scroll' style='max-height:50vh; overflow-y:auto; overflow-x:hidden;'><table id='tabla-modal-potrero' style='width:100%; font-size:12px; border-collapse:collapse; table-layout:fixed;'>"
+          + "<thead><tr>"
+          + "<th style='width:25%; text-align:left; padding:6px 4px;'>Número</th>"
+          + "<th style='width:33%; text-align:left; padding:6px 4px;'>Nombre</th>"
+          + "<th style='width:15%; text-align:center; padding:6px 2px;'>Edad</th>"
+          + "<th style='width:13%; text-align:center; padding:6px 2px;'>Estado</th>"
+          + "<th style='width:14%; text-align:right; padding:6px 4px;'>Días</th>"
+          + "</tr></thead>"
+          + "<tbody>";
+
+        animales.forEach(function (a) {
+          var tagLink = "<a href='#' class='ficha-link' data-ir-ficha='" + esc(a.tag) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:3px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='Ver ficha'>"
+            + icon(a.sexo === "Macho" ? "bull" : "cow", 12)
+            + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(a.tag) + "</span></a>";
+
+          var nomTxt = a.nombre && a.nombre !== a.tag ? esc(a.nombre) : "<span style='color:var(--texto-suave);'>—</span>";
+          var edadTxt = a.edad || "—";
+          var chipCat = "<span class='chip' style='font-size:10.5px; font-weight:700; padding:2px 4px;' title='" + esc(a.categoria_desc || a.categoria_sg) + (a.estado_reprod ? " · " + esc(a.estado_reprod) : "") + "'>" + esc(a.categoria_sg || "—") + "</span>";
+          var diasTxt = a.dias_texto || (a.dias_en_potrero != null ? a.dias_en_potrero + " d" : "—");
+
+          content += "<tr data-busqueda='" + esc((a.tag + " " + (a.nombre || "") + " " + (a.categoria_sg || "") + " " + (a.categoria_desc || "")).toLowerCase()) + "'>"
+            + "<td style='padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>" + tagLink + "</td>"
+            + "<td style='padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='" + (a.nombre || "") + "'>" + nomTxt + "</td>"
+            + "<td style='padding:6px 2px; text-align:center; white-space:nowrap; font-size:11px;'>" + esc(edadTxt) + "</td>"
+            + "<td style='padding:6px 2px; text-align:center; white-space:nowrap;'>" + chipCat + "</td>"
+            + "<td style='padding:6px 4px; text-align:right; font-weight:600; white-space:nowrap; font-size:11.5px;'>" + esc(diasTxt) + "</td>"
+            + "</tr>";
+        });
+
+        content += "</tbody></table></div>";
+        content += "<div id='conteo-filtrados-pot' style='margin-top:8px; font-size:11.5px; color:var(--texto-suave); text-align:right;'>Mostrando " + animales.length + " de " + total + "</div>";
+        body.innerHTML = content;
+
+        var inputFiltro = document.getElementById("filtro-animal-potrero");
+        var contadorEl = document.getElementById("conteo-filtrados-pot");
+        if (inputFiltro) {
+          inputFiltro.addEventListener("input", function () {
+            var qVal = (this.value || "").trim().toLowerCase();
+            var filas = body.querySelectorAll("tbody tr");
+            var visibles = 0;
+            filas.forEach(function (tr) {
+              var str = tr.getAttribute("data-busqueda") || "";
+              if (!qVal || str.indexOf(qVal) >= 0) {
+                tr.style.display = "";
+                visibles++;
+              } else {
+                tr.style.display = "none";
+              }
+            });
+            if (contadorEl) {
+              contadorEl.textContent = "Mostrando " + visibles + " de " + total;
+            }
+          });
+        }
+      })
+      .catch(function (err) {
+        var body = document.getElementById("pot-modal-body");
+        if (body) {
+          body.innerHTML = "<p class='aviso'>❌ Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
+        }
+      });
+  }
+  window.abrirModalAnimalesPotrero = abrirModalAnimalesPotrero;
 
   function cargarRondasRecientes() {
     var box = document.getElementById("rondas-recientes");
@@ -6215,12 +6359,35 @@
     var equipoUltimoId = 0;
     var equipoUltimoVistoId = parseInt(localStorage.getItem(LS_EQUIPO_VISTO) || "0", 10) || 0;
 
+    function horaCortaActual() {
+      try {
+        return new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+      } catch (e) {
+        var d = new Date();
+        var hh = d.getHours(), mm = d.getMinutes();
+        return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+      }
+    }
+
+    function formatearHora(iso) {
+      if (!iso) return horaCortaActual();
+      var s = String(iso).trim();
+      var d = new Date(s.replace(" ", "T"));
+      if (!isNaN(d.getTime())) {
+        try {
+          return d.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+        } catch (e) {
+          var hh = d.getHours(), mm = d.getMinutes();
+          return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+        }
+      }
+      var m = s.match(/(\d{1,2}):(\d{2})/);
+      if (m) return m[1] + ":" + m[2];
+      return horaCortaActual();
+    }
+
     function equipoHoraCorta(iso) {
-      if (!iso) return "";
-      var d = new Date(String(iso).replace(" ", "T"));
-      if (isNaN(d.getTime())) return "";
-      var hh = d.getHours(), mm = d.getMinutes();
-      return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+      return formatearHora(iso);
     }
 
     function equipoMarcarVisto(id) {
@@ -6369,7 +6536,7 @@
 
     if (btnLimpiar && hist) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div>";
+        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
       });
     }
 
@@ -6414,10 +6581,11 @@
 
         var botPlaceholder;
         if (hist) {
-          hist.innerHTML += "<div class='chat-msg user'>" + esc(txt) + "</div>";
+          var hUser = horaCortaActual();
+          hist.innerHTML += "<div class='chat-msg user'><div class='chat-msg-texto'>" + esc(txt) + "</div><div class='chat-msg-hora'>" + hUser + "</div></div>";
           botPlaceholder = document.createElement("div");
           botPlaceholder.className = "chat-msg bot";
-          botPlaceholder.innerHTML = "<i>Consultando información ganadera...</i>";
+          botPlaceholder.innerHTML = "<div class='chat-msg-texto'><i>Consultando información ganadera...</i></div>";
           hist.appendChild(botPlaceholder);
           hist.scrollTop = hist.scrollHeight;
         }
@@ -6432,10 +6600,12 @@
           .then(function (d) {
             var resp = d.respuesta || d.error || "Sin respuesta.";
             var formateada = formatearMensajeChat(resp);
-            if (botPlaceholder) botPlaceholder.innerHTML = formateada;
+            var hBot = horaCortaActual();
+            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formateada + "</div><div class='chat-msg-hora'>" + hBot + "</div>";
             if (hist) hist.scrollTop = hist.scrollHeight;
           }).catch(function (err) {
-            if (botPlaceholder) botPlaceholder.innerHTML = "❌ Error de conexión: " + esc(err.message);
+            var hErr = horaCortaActual();
+            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
           });
       });
     }
@@ -6529,9 +6699,10 @@
         }
 
         // Crear placeholders en chat mientras procesa
+        var hAudio = horaCortaActual();
         var userMsgPlaceholder = document.createElement("div");
         userMsgPlaceholder.className = "chat-msg user";
-        userMsgPlaceholder.innerHTML = "🎙️ <i>Audio enviado (procesando nota de voz)...</i>";
+        userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio enviado (procesando nota de voz)...</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
         if (hist) {
           hist.appendChild(userMsgPlaceholder);
           hist.scrollTop = hist.scrollHeight;
@@ -6539,7 +6710,7 @@
 
         var botPlaceholder = document.createElement("div");
         botPlaceholder.className = "chat-msg bot";
-        botPlaceholder.innerHTML = "<i>Transcribiendo con Whisper y consultando información ganadera...</i>";
+        botPlaceholder.innerHTML = "<div class='chat-msg-texto'><i>Transcribiendo con Whisper y consultando información ganadera...</i></div>";
         if (hist) {
           hist.appendChild(botPlaceholder);
           hist.scrollTop = hist.scrollHeight;
@@ -6547,8 +6718,8 @@
 
         _chatMediaRecorder.addEventListener("stop", function () {
           if (!_chatAudioChunks.length) {
-            userMsgPlaceholder.innerHTML = "🎙️ <i>Audio vacío.</i>";
-            botPlaceholder.innerHTML = "⚠️ No se detectó sonido.";
+            userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio vacío.</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+            botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ No se detectó sonido.</div><div class='chat-msg-hora'>" + esc(horaCortaActual()) + "</div>";
             detenerAudioGrabacion(true);
             return;
           }
@@ -6562,18 +6733,20 @@
           fetch("/api/voz", { method: "POST", body: fd })
             .then(function (r) { return r.json(); })
             .then(function (data) {
+              var hBot = horaCortaActual();
               if (data.ok) {
-                userMsgPlaceholder.innerHTML = "🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b>";
-                botPlaceholder.innerHTML = formatearMensajeChat(data.respuesta || "Registrado correctamente.");
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formatearMensajeChat(data.respuesta || "Registrado correctamente.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
                 actualizarBadges();
               } else {
-                userMsgPlaceholder.innerHTML = "🎙️ <i>Nota de voz</i>";
-                botPlaceholder.innerHTML = "⚠️ " + esc(data.error || "No se pudo procesar el audio.");
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ " + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               }
               if (hist) hist.scrollTop = hist.scrollHeight;
             }).catch(function (err) {
-              userMsgPlaceholder.innerHTML = "🎙️ <i>Nota de voz</i>";
-              botPlaceholder.innerHTML = "❌ Error de conexión: " + esc(err.message);
+              var hBot = horaCortaActual();
+              userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+              botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               if (hist) hist.scrollTop = hist.scrollHeight;
             });
         }, { once: true });
@@ -7708,9 +7881,18 @@
   // cadenas HTML usa data-ir-ficha / data-ir-tab / data-accion en vez de
   // onclick, y un único listener delegado en document los resuelve aquí.
   document.addEventListener("click", function (e) {
+    var elPot = e.target.closest(".btn-listar-animales-pot, .link-potrero-animales, [data-listar-potrero]");
+    if (elPot) {
+      e.preventDefault();
+      var potNom = elPot.getAttribute("data-potrero") || elPot.getAttribute("data-listar-potrero");
+      if (potNom) abrirModalAnimalesPotrero(potNom);
+      return;
+    }
     var elFicha = e.target.closest("[data-ir-ficha]");
     if (elFicha) {
       e.preventDefault();
+      var modalPot = document.getElementById("modal-animales-potrero");
+      if (modalPot) modalPot.remove();
       abrirFichaDesdeTag(elFicha.getAttribute("data-ir-ficha"));
       return;
     }
@@ -8510,7 +8692,15 @@
   var reloj = document.getElementById("reloj-hora");
   function tick() {
     if (reloj) {
-      try { reloj.textContent = new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }); } catch (e) { /* noop */ }
+      try {
+        var ahora = new Date();
+        var fStr = ahora.toLocaleDateString("es-CO", { weekday: "short", day: "numeric", month: "short" });
+        if (fStr) {
+          fStr = fStr.replace(/^\w/, function (c) { return c.toUpperCase(); }).replace(/\./g, "");
+        }
+        var hStr = ahora.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+        reloj.innerHTML = "<span class='reloj-fecha'>" + esc(fStr) + "</span> <span class='reloj-sep'>·</span> <span class='reloj-hora'>" + esc(hStr) + "</span>";
+      } catch (e) { /* noop */ }
     }
     actualizarVacaHeader();
     actualizarClimaHeader();

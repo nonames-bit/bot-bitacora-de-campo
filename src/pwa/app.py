@@ -981,6 +981,32 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.get("/api/potrero/<potrero_ref>/animales")
+    @app.get("/api/potreros/<potrero_ref>/animales")
+    def api_potrero_animales(potrero_ref):
+        """Lista animales activos de un potrero (número, nombre, edad, categoría SG y días en potrero)."""
+        from urllib.parse import unquote
+        pot_clean = unquote(str(potrero_ref or "")).strip()
+        db_p = _db(db_path)
+        try:
+            try:
+                from ..engine.dashboard_data import animales_de_potrero
+            except (ImportError, ValueError):
+                from src.engine.dashboard_data import animales_de_potrero  # type: ignore
+            res = animales_de_potrero(db_p, pot_clean)
+            if not res.get("ok"):
+                return jsonify(res), 404
+            return jsonify(res)
+        finally:
+            db_p.close()
+
+    @app.get("/api/potrero/animales")
+    def api_potrero_animales_query():
+        pot_ref = request.args.get("potrero") or request.args.get("q") or ""
+        if not pot_ref:
+            return jsonify({"ok": False, "error": "Parámetro 'potrero' requerido."}), 400
+        return api_potrero_animales(pot_ref)
+
     @app.post("/api/pasturas/ronda")
     def api_pasturas_ronda():
         """Evalúa y registra una ronda Voisin de aforo (D2). Cualquier rol

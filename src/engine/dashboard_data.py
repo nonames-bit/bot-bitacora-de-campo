@@ -653,6 +653,167 @@ def datos_pasturas(db: Database) -> dict:
     return out
 
 
+def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date] = None) -> dict:
+    """Retorna los animales ACTIVOS en el potrero indicado, con su clasificación
+    zootécnica SG (NV, VS, VP, CH, CM, HL, ML, MC, TR/RP), edad y días en el potrero.
+    Cumple estrictamente la Regla Fundamental de Inventario (estado = 'ACTIVO').
+    """
+    hoy_date = hoy or date.today()
+    from ..utils import to_date, normalizar
+
+    p_row = None
+    pot_id = None
+    if isinstance(potrero_ref, int) or (isinstance(potrero_ref, str) and str(potrero_ref).isdigit()):
+        pot_id = int(potrero_ref)
+        p_row = db.get_potrero(pot_id)
+
+    if not p_row:
+        pot_id = db.resolve_potrero(potrero_ref)
+        if pot_id:
+            p_row = db.get_potrero(pot_id)
+
+    if not p_row:
+        norm_ref = normalizar(str(potrero_ref)).strip().upper()
+        todos_p = db.query("SELECT * FROM potreros")
+        for p in todos_p:
+            nom_p = normalizar(p["nombre"] or p["codigo"] or "").strip().upper()
+            if nom_p and (norm_ref == nom_p or norm_ref in nom_p):
+                p_row = p
+                pot_id = p["id"]
+                break
+
+    if not p_row or pot_id is None:
+        return {
+            "ok": False,
+            "error": f"Potrero '{potrero_ref}' no encontrado.",
+            "animales": [],
+            "total": 0,
+        }
+
+    nom_potrero = p_row["nombre"] or p_row["codigo"] or f"Potrero #{pot_id}"
+
+    sql = """
+        WITH ult_traslado AS (
+            SELECT animal_id, potrero_destino, fecha,
+                   ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+            FROM traslados
+        )
+        SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
+               COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
+               ut.fecha as fecha_ingreso
+        FROM animales a
+        LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+        WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) = ?
+        ORDER BY a.tag ASC
+    """
+    filas = db.query(sql, (pot_id,))
+
+    animales_out = []
+    conteo_cat: dict[str, int] = {}
+
+    for f in filas:
+        aid = f["id_animal"]
+        tag = f["tag"] or str(aid)
+        nombre = f["nombre"] or "—"
+        sexo = (f["sexo"] or "").strip().lower()
+        es_hembra = bool(sexo.startswith("h") or sexo.startswith("f") or sexo in ("vaca", "novilla", "ternera"))
+
+        # Edad
+        f_nac = to_date(f["fecha_nacimiento"])
+        edad_dias = max(0, (hoy_date - f_nac).days) if f_nac else None
+        if f_nac and edad_dias is not None:
+            if edad_dias < 30:
+                edad_str = f"{edad_dias}d"
+            elif edad_dias < 365:
+                meses = edad_dias // 30
+                edad_str = f"{meses}m"
+            else:
+                anios = edad_dias // 365
+                meses_rem = (edad_dias % 365) // 30
+                edad_str = f"{anios}a {meses_rem}m" if meses_rem > 0 else f"{anios}a"
+        else:
+            edad_str = "S/D"
+
+        # Días en potrero
+        f_ing = to_date(f["fecha_ingreso"])
+        if f_ing:
+            dias_pot = max(0, (hoy_date - f_ing).days)
+        else:
+            dias_pot = None
+
+        # Categoría SG
+        if es_hembra:
+            if edad_dias is not None and edad_dias < 365:
+                cat = "CH"
+                cat_desc = "Cria Hembra (<1 año)"
+            elif edad_dias is not None and edad_dias < 730:
+                cat = "HL"
+                cat_desc = "Hembra Levante (1-2 años)"
+            else:
+                p_ult = db.ultimo_parto(aid)
+                if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
+                    dp = (hoy_date - to_date(p_ult["fecha"])).days
+                    if dp <= 305:
+                        cat = "VP"
+                        cat_desc = "Vaca Parida (<=305 DEL)"
+                    else:
+                        cat = "VS"
+                        cat_desc = "Vaca Seca / Escotera (>305 DEL)"
+                else:
+                    cat = "NV"
+                    cat_desc = "Novilla de Vientre (>=2 años)"
+        else:
+            nom_m = f"{f['nombre'] or ''} {f['notas'] or ''} {f['tag'] or ''}".upper()
+            if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_dias is not None and edad_dias >= 1095):
+                cat = "TR"
+                cat_desc = "Toro Reproductor"
+            elif edad_dias is not None and edad_dias < 365:
+                cat = "CM"
+                cat_desc = "Cría Macho (<1 año)"
+            elif edad_dias is not None and edad_dias < 730:
+                cat = "ML"
+                cat_desc = "Macho Levante (1-2 años)"
+            else:
+                cat = "MC"
+                cat_desc = "Macho Ceba / Torete (>2 años)"
+
+        conteo_cat[cat] = conteo_cat.get(cat, 0) + 1
+
+        animales_out.append({
+            "id_animal": aid,
+            "tag": tag,
+            "nombre": nombre,
+            "sexo": "Hembra" if es_hembra else "Macho",
+            "edad": edad_str,
+            "edad_dias": edad_dias,
+            "estado": cat,
+            "estado_desc": cat_desc,
+            "categoria_sg": cat,
+            "categoria_desc": cat_desc,
+            "dias_en_potrero": dias_pot,
+            "dias_texto": f"{dias_pot} d" if dias_pot is not None else "—",
+            "fecha_ingreso": str(f["fecha_ingreso"]) if f["fecha_ingreso"] else None,
+        })
+
+    p_dict = dict(p_row) if p_row else {}
+    return {
+        "ok": True,
+        "potrero": {
+            "id": pot_id,
+            "nombre": nom_potrero,
+            "codigo": p_dict.get("codigo"),
+            "area_has": p_dict.get("area_has"),
+            "dias_ocupacion": p_dict.get("dias_ocupacion"),
+            "dias_reposo": p_dict.get("dias_reposo"),
+        },
+        "potrero_nombre": nom_potrero,
+        "total": len(animales_out),
+        "total_animales": len(animales_out),
+        "resumen_categorias": conteo_cat,
+        "animales": animales_out,
+    }
+
+
 def datos_leche(db: Database) -> dict:
     """Leche: serie del tanque (produccion_leche) + últimos controles.
 

@@ -2118,6 +2118,40 @@ def test_api_mercado_sincronizar_permisos_y_ejecucion(client):
     assert d["trm_actual"] == 4125.0
 
 
+def test_api_potrero_animales_lista_activos_y_excluye_historicos(client, db_file):
+    """Verifica que /api/potrero/<potrero>/animales liste los animales del
+    potrero con número, nombre, edad, categoría SG y días en potrero,
+    cumpliendo la Regla Fundamental de Inventario (solo estado = 'ACTIVO')."""
+    # En fixture db_file: tag '47' está ACTIVO en 'Guayabal', y tag '99' está VENDIDO.
+    r = client.get("/api/potrero/Guayabal/animales")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["potrero_nombre"] == "Guayabal"
+    assert d["potrero"]["nombre"] == "Guayabal"
+    assert d["total_animales"] == 1
+
+    tags = [a["tag"] for a in d["animales"]]
+    assert "47" in tags
+    assert "99" not in tags  # '99' está VENDIDO -> NUNCA debe figurar
+
+    an = d["animales"][0]
+    assert an["tag"] == "47"
+    assert "edad" in an
+    assert "categoria_sg" in an
+    assert "dias_en_potrero" in an
+    assert "dias_texto" in an
+    assert "resumen_categorias" in d
+
+
+def test_api_potrero_animales_potrero_inexistente_devuelve_404(client):
+    r = client.get("/api/potrero/PotreroFantasmaInexistente123/animales")
+    assert r.status_code == 404
+    d = r.get_json()
+    assert d["ok"] is False
+
+
+
 
 
 
