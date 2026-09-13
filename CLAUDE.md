@@ -1,4 +1,4 @@
-﻿# 🤖 Claude Code Guidelines
+# 🤖 Claude Code Guidelines
 
 Este proyecto sigue los estándares y reglas definidos en [AGENTS.md](./AGENTS.md).
 
@@ -9,6 +9,10 @@ Este proyecto sigue los estándares y reglas definidos en [AGENTS.md](./AGENTS.m
 
 
 ## Reglas Especificas del Dominio
+
+### 📱 Verificación y Navegación Visual de la PWA
+- En tareas de interfaz, backend con impacto visual o flujos de usuario, **navegar y revisar activamente la PWA** (local o producción).
+- Probar y capturar en viewport móvil (**390×844**) para validar usabilidad táctil, visibilidad de tarjetas, modales y ausencia de desbordes.
 
 ### ⚠️ Regla Fundamental de Inventario (Hato Activo vs Histórico)
 - Toda consulta de inventario presente, conteos de hato, animales por potrero, ocupación o estado actual **DEBE filtrar estrictamente por `estado = 'ACTIVO'`**.

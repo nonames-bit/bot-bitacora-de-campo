@@ -1,4 +1,4 @@
-﻿# 🤖 Directrices del Asistente de IA (AGENTS.md)
+# 🤖 Directrices del Asistente de IA (AGENTS.md)
 
 Este archivo define las reglas de comportamiento, estándares y herramientas para este proyecto.
 
@@ -24,6 +24,9 @@ Este archivo define las reglas de comportamiento, estándares y herramientas par
   - `docs/`: Documentación técnica, diagramas y especificaciones.
   - `tests/`: Pruebas unitarias, scripts de simulación o validaciones.
   - `scripts/`: Utilidades y scripts de automatización.
+- **Verificación y Navegación Visual de la PWA (Agy / Antigravity)**:
+  - Cuando agy trabaje en el proyecto (especialmente en UI, backend que impacte vistas o flujos de usuario), **DEBE revisar, navegar e interactuar activamente con la PWA** (localmente o en producción `https://ganaderiaja.duckdns.org/`).
+  - Emular y capturar primordialmente en **viewport móvil (390×844 DPR=2)** además de escritorio, verificando visualmente que los banners, botones, modales, tarjetas y tablas respondan correctamente y sin desbordes ni fallos antes de cerrar la tarea.
 - **Regla Fundamental de Inventario (Hato Activo vs Histórico)**:
   - En Software Ganadero (SG), la base contiene todo el histórico (animales muertos, vendidos, descartados o con estado NULL).
   - **Toda consulta de inventario presente, conteos de hato, animales por potrero, ocupación o estado actual DEBE filtrar estrictamente por `estado = 'ACTIVO'`** (NUNCA usar `COALESCE(estado, 'ACTIVO')` ni omitir el filtro de estado, para no inflar el inventario sumando registros históricos).
