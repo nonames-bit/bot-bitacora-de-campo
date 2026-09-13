@@ -67,6 +67,7 @@ from .formatters import (
     formatear_balance_forrajero_panel,
     formatear_clima_panel,
     formatear_despacho_matutino,
+    formatear_despacho_tarde,
     formatear_deteccion_potrero_gps,
     formatear_diagnosticos_recientes,
     formatear_duplicados_geneticos,

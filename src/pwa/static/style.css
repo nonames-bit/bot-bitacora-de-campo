@@ -906,43 +906,87 @@ button:active {
     padding-right: calc(10px + env(safe-area-inset-right, 0px));
     gap: 6px;
   }
-  header b { font-size: 12.5px; }
-  header .reloj {
-    display: inline-flex;
-    font-size: 9.5px;
-    padding: 2px 5px;
-    min-height: 22px;
-    opacity: 0.85;
-    order: -1;
-  }
-  header .acciones { gap: 4px; flex-wrap: wrap; }
-  header .tema-btn {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 8px;
-    font-size: 11px;
-  }
-  /* Objetivos táctiles >=44px en header (sin tocar escritorio) */
-  header .acciones button {
-    min-height: 44px;
-    min-width: 44px;
-  }
-  header #select-tema {
-    max-width: 95px;
-    font-size: 10.5px;
-    padding: 0 4px;
-  }
-  header a.salir {
-    min-height: 44px;
+  header b { font-size: 12px; line-height: 1.15; }
+  .marca-titulo {
     display: inline-flex;
     align-items: center;
-    padding: 0 10px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .marca-textos {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    line-height: 1.15;
+    gap: 1px;
+  }
+  header .reloj {
+    display: inline-flex;
+    font-size: 8.5px;
+    padding: 0;
+    min-height: 0;
+    background: none;
+    border: none;
+    opacity: 0.82;
+    line-height: 1.1;
+    white-space: nowrap;
+    order: 0;
+  }
+  header .reloj .reloj-sep { opacity: 0.5; margin: 0 1px; }
+  header .acciones {
+    gap: 4px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    width: 100%;
+  }
+  header .tema-btn {
+    min-height: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 6px;
+    font-size: 11px;
+    box-sizing: border-box;
+  }
+  /* Objetivos táctiles compactos en header móvil para evitar salto a 3 filas */
+  header .acciones button {
+    min-height: 36px;
+    min-width: 36px;
+    height: 36px;
+    padding: 0 6px;
+    box-sizing: border-box;
+  }
+  header #select-tema {
+    max-width: 82px;
     font-size: 10.5px;
+    padding: 0 4px;
+    height: 36px;
+    min-height: 36px;
+    box-sizing: border-box;
+  }
+  header a.salir {
+    min-height: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    font-size: 10.5px;
+    box-sizing: border-box;
+  }
+  header .btn-instalar {
+    height: 36px;
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0 6px;
+    box-sizing: border-box;
   }
   .logo-ja {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
     border-radius: 5px;
+  }
+  .user-badge {
+    font-size: 9.5px;
+    padding: 1px 5px;
   }
   
   #nav-principal {
@@ -1263,6 +1307,7 @@ header .acciones .tema-btn, header .acciones button { position: relative; }
 }
 /* --- Badge de Usuario & Sincronización en Header --- */
 .marca-titulo { display: inline-flex; align-items: center; gap: 8px; }
+.marca-textos { display: inline-flex; align-items: center; gap: 8px; }
 .user-badge {
   font-size: 11px;
   font-weight: 600;

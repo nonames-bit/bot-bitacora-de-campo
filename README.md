@@ -596,6 +596,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Resolución multi-canal de presencia**: Helper `_resolver_presencia_usuario` en `src/pwa/app.py` que enlaza la actividad por `user_id` local, `telegram_id` del bot o sesión `"Propietario"` de la PWA, priorizando el canal activo más reciente.
     - **Latido instantáneo y visualización en vivo**: Disparo inmediato de `POST /api/heartbeat` al abrir la PWA, al ingresar a la vista de personal y al presionar "Actualizar Estados"; enriquecimiento de la tarjeta de monitoreo mostrando el contador vivo y los nombres y canales (`Jaime (PWA)`, `Sebastian (Telegram)`) de los operarios conectados.
     - **Test unitario automatizado**: `test_usuarios_presencia_y_monitor_en_linea` en `tests/test_pwa_api.py`.
+- [x] **Optimización Compacta del Header Móvil PWA (2026-09-13)**:
+    - **Reubicación de Fecha/Hora**: Integración de la fecha y hora pequeña (`reloj-hora`) dentro de `.marca-textos` apilada directamente bajo el título `GANADERÍA JA`, eliminando la sobrecarga horizontal en `.acciones`.
+    - **Eliminación de la 3ª Fila en Móvil**: La barra `.acciones` ahora se mantiene estrictamente en 1 sola fila sin desbordes (`flex-wrap: nowrap`), manteniendo los botones de Temas y Salir junto a los íconos (Sync, Ayuda, Notif).
+    - **Recuperación de Espacio Vertical**: Reducción de la altura del header móvil de ~150px a ~80px (ahorro de más de 60px verticales), proporcionando mayor espacio libre en pantalla para el Tablero y modales.
 - [x] Suite de pruebas con pytest: **804 pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
