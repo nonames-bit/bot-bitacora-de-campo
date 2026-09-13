@@ -2151,6 +2151,81 @@ def test_api_potrero_animales_potrero_inexistente_devuelve_404(client):
     assert d["ok"] is False
 
 
+def test_api_rectificar_tag_exclusivo_owner(client, db_file):
+    """Verifica que el proceso especial de rectificación de chapeta esté
+    restringido exclusivamente para el Propietario (OWNER)."""
+    # 1. TRABAJADOR es bloqueado con 403
+    with client.session_transaction() as sess:
+        sess["rol"] = "TRABAJADOR"
+    r_trab = client.post("/api/animal/rectificar-tag", json={"tag_actual": "47", "tag_nuevo": "47-CORREGIDO"})
+    assert r_trab.status_code == 403
+    assert r_trab.get_json()["ok"] is False
+
+    # 2. ADMIN es bloqueado con 403 (proceso exclusivo OWNER)
+    with client.session_transaction() as sess:
+        sess["rol"] = "ADMIN"
+    r_adm = client.post("/api/animal/rectificar-tag", json={"tag_actual": "47", "tag_nuevo": "47-CORREGIDO"})
+    assert r_adm.status_code == 403
+    assert r_adm.get_json()["ok"] is False
+
+    # 3. OWNER sí tiene acceso
+    with client.session_transaction() as sess:
+        sess["rol"] = "OWNER"
+    r_owner = client.post("/api/animal/rectificar-tag", json={"tag_actual": "47", "tag_nuevo": "47-CORREGIDO"})
+    assert r_owner.status_code == 200
+    assert r_owner.get_json()["ok"] is True
+    assert r_owner.get_json()["accion"] == "renombrado"
+
+
+def test_api_rectificar_tag_conflicto_y_fusion(client, db_file):
+    """Verifica la detección de conflicto (409) si el tag nuevo ya existe,
+    y la fusión exitosa al enviar fusionar_si_existe=True."""
+    from src.db.database import Database
+
+    db = Database(db_file)
+    db.registrar_animal("JA83", sexo="Hembra")
+    db.registrar_pesaje(animal_tag="JA83", peso_kg=350.0)
+    db.registrar_animal("JA88", sexo="Hembra")
+    db.registrar_pesaje(animal_tag="JA88", peso_kg=340.0)
+    db.close()
+
+    with client.session_transaction() as sess:
+        sess["rol"] = "OWNER"
+
+    # Conflicto sin fusionar -> 409 con diagnóstico
+    r_conflicto = client.post("/api/animal/rectificar-tag", json={
+        "tag_actual": "JA83",
+        "tag_nuevo": "JA88",
+        "fusionar_si_existe": False
+    })
+    assert r_conflicto.status_code == 409
+    d_conf = r_conflicto.get_json()
+    assert d_conf["ok"] is False
+    assert d_conf["requiere_confirmacion_fusion"] is True
+    assert "destino" in d_conf
+
+    # Fusión confirmada -> 200
+    r_fusion = client.post("/api/animal/rectificar-tag", json={
+        "tag_actual": "JA83",
+        "tag_nuevo": "JA88",
+        "fusionar_si_existe": True
+    })
+    assert r_fusion.status_code == 200
+    d_fus = r_fusion.get_json()
+    assert d_fus["ok"] is True
+    assert d_fus["accion"] == "fusionado"
+
+    db = Database(db_file)
+    try:
+        assert db.animal_id("JA83") is None
+        assert db.animal_id("JA88") is not None
+        pesajes = db.ultimos_pesajes("JA88", 5)
+        assert len(pesajes) == 2
+    finally:
+        db.close()
+
+
+
 
 
 

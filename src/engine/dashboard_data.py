@@ -1922,6 +1922,10 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
     """Agenda próxima (ventana de ``dias``): alertas PENDIENTES con fecha
     programada (partos, eco d35, palpación d60, secados, recargas de N₂) más
     los retiros sanitarios ACTIVOS — lo que el mayordomo debe saber HOY.
+    Incluye además los recordatorios de campo PENDIENTES
+    (``recordatorios_programados``, misma tabla del comando ``/programar``:
+    vencidos + próximos dentro de la ventana) para que la vista Agenda y la
+    campanita muestren una sola lista coherente sin duplicar lógica.
     """
     errores: dict[str, str] = {}
     hoy = date.today()
@@ -1988,10 +1992,42 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
     except Exception as e:
         logger.error("seccion agenda_retiros fallo", exc_info=True)
         errores["retiros"] = str(e)
+    # Recordatorios de campo (/programar): vencidos + próximos en ventana.
+    # Reusa la misma tabla y estados PENDIENTE/ENVIADO del Despacho Matutino.
+    recordatorios: list[dict] = []
+    try:
+        rows_rec = db.query(
+            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por
+               FROM recordatorios_programados
+               WHERE estado = 'PENDIENTE'
+                 AND (fecha_programada IS NULL OR fecha_programada <= ?)
+               ORDER BY
+                 CASE WHEN fecha_programada IS NULL THEN 1 ELSE 0 END,
+                 fecha_programada, hora, id LIMIT 80""",
+            (limite,),
+        )
+        for r in _filas_dict(rows_rec):
+            fprog = str(r.get("fecha_programada") or "")[:10] or None
+            try:
+                faltan = (date.fromisoformat(fprog) - hoy).days if fprog else None
+            except Exception:
+                faltan = None
+            recordatorios.append({
+                "id": r.get("id"),
+                "mensaje": r.get("mensaje"),
+                "fecha": fprog,
+                "hora": r.get("hora"),
+                "faltan_dias": faltan,
+                "estado": r.get("estado") or "PENDIENTE",
+            })
+    except Exception as e:
+        logger.error("seccion agenda_recordatorios fallo", exc_info=True)
+        errores["recordatorios"] = str(e)
     out: dict[str, Any] = {
         "dias": dias,
         "eventos": eventos,
         "retiros": retiros,
+        "recordatorios": recordatorios,
     }
     if errores:
         out["errores"] = errores
@@ -2004,6 +2040,7 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
     Un único endpoint liviano (una llamada por polling en vez de 3) con los
     totales que el mayordomo debe ver sin abrir cada vista:
     - agenda:  alertas PENDIENTES con fecha en [hoy, hoy+dias] + retiros activos
+    + recordatorios PENDIENTES vencidos/próximos (misma ventana que la vista)
     - repro:   vacas con FEP ≤30d + eco/palpaciones pendientes
     - sanidad: animales en retiro activo (leche/carne)
 
@@ -2036,7 +2073,18 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
         )
         alertas = int(r["n"]) if r else 0
         retiros = _cnt_retiros_activos()
-        agenda = alertas + retiros
+        # Recordatorios de campo pendientes (vencidos + ventana): misma fuente
+        # que datos_agenda, sin duplicar lógica de negocio en la PWA.
+        try:
+            rr = db.query_one(
+                "SELECT COUNT(*) n FROM recordatorios_programados "
+                "WHERE estado='PENDIENTE' AND (fecha_programada IS NULL OR fecha_programada <= ?)",
+                (lim,),
+            )
+            recs = int(rr["n"]) if rr else 0
+        except Exception:
+            recs = 0
+        agenda = alertas + retiros + recs
     except Exception as e:
         logger.error("seccion badges_agenda fallo", exc_info=True)
         errores["agenda"] = str(e)

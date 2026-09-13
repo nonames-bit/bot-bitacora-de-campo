@@ -2658,6 +2658,23 @@
   function renderAgenda(d) {
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
     var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días" + pdfBtn + "</h3>" + erroresHtml(d);
+    // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
+    // apilado, táctil grande, sin recargar la página.
+    var hoyIso = new Date().toISOString().slice(0, 10);
+    h += "<div class='card' style='padding:12px 14px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
+      + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nuevo evento / recordatorio</b>"
+      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Se guarda como recordatorio de campo (igual que /programar) y aparece en el Despacho y en la campanita.</p>"
+      + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:8px;'>"
+      + "<label style='font-size:13px; font-weight:600;'>¿Qué hay que hacer?<br><input id='ag-mensaje' maxlength='500' placeholder='ej. Vacunar aftosa lote ordeño' autocomplete='off' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Fecha<br><input id='ag-fecha' type='date' value='" + hoyIso + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:120px; font-size:13px; font-weight:600;'>Hora (opcional)<br><input id='ag-hora' type='time' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:16px; min-height:44px; box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<button type='submit' id='btn-ag-guardar' class='btn-guardar-manga' style='margin-top:4px;'>Guardar evento</button>"
+      + "<div id='ag-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
+      + "</form></div>";
+    // Recordatorios de campo próximos (estado PENDIENTE; al completar pasan a ENVIADO y se ocultan).
+    var recs = d.recordatorios || [];
     var evs = d.eventos || [];
     var urgencia = function (f) {
       if (f.faltan_dias == null) return "gris";
@@ -2674,6 +2691,17 @@
       h += "</table></div>";
     } else {
       h += "<p class='aviso'>Sin alertas programadas en los próximos " + esc(d.dias) + " días.</p>";
+    }
+    if (recs.length) {
+      h += "<h4>" + icon("calendar") + "Eventos / recordatorios próximos</h4><div class='tabla-scroll'><table><tr><th>Fecha</th><th>Evento</th><th>En</th><th></th></tr>";
+      recs.forEach(function (rc) {
+        var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
+        h += "<tr><td><b>" + fh + "</b></td><td>" + esc(rc.mensaje || "—") + "</td><td>" + chipUrg(rc) + "</td>"
+          + "<td><button type='button' class='tema-btn btn-rec-completar' data-rec-id='" + esc(rc.id) + "' style='font-size:12px; padding:6px 10px; min-height:36px;'>Completar</button></td></tr>";
+      });
+      h += "</table></div>";
+    } else {
+      h += "<p class='aviso'>Sin eventos creados. Use el formulario de arriba para agendar el primero.</p>";
     }
     var ret = d.retiros || [];
     if (ret.length) {
@@ -2854,6 +2882,65 @@
   }
 
   function bindAgenda() {
+    // Alta de evento/recordatorio desde la Agenda (POST /api/agenda/recordatorio).
+    var formRec = document.getElementById("form-nuevo-recordatorio");
+    if (formRec && !formRec.__bound) {
+      formRec.__bound = true;
+      formRec.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fb = document.getElementById("ag-form-feedback");
+        var btn = document.getElementById("btn-ag-guardar");
+        var mensaje = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
+        var fecha = ((document.getElementById("ag-fecha") || {}).value || "").trim();
+        var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
+        if (!mensaje) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha del evento.</span>"; return; }
+        if (btn) btn.disabled = true;
+        if (fb) fb.textContent = "⏳ Guardando...";
+        fetch("/api/agenda/recordatorio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ mensaje: mensaje, fecha: fecha, hora: hora || null })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (out) {
+            if (btn) btn.disabled = false;
+            if (!out.ok || !out.j.ok) {
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              return;
+            }
+            mostrarToast("Evento agendado", "verde");
+            vibrarConfirmacion();
+            cargar(true);
+            actualizarBadges();
+          }).catch(function (err) {
+            if (btn) btn.disabled = false;
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+          });
+      });
+    }
+    // Completar recordatorio PENDIENTE → ENVIADO (se oculta de pendientes).
+    qa(".btn-rec-completar").forEach(function (b) {
+      if (b.__bound) return;
+      b.__bound = true;
+      b.addEventListener("click", function () {
+        var rid = b.getAttribute("data-rec-id");
+        if (!rid) return;
+        b.disabled = true;
+        fetch("/api/agenda/recordatorio/" + encodeURIComponent(rid) + "/completar", { method: "POST" })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res && res.ok) {
+              mostrarToast("Evento completado", "verde");
+              vibrarConfirmacion();
+              cargar(true);
+              actualizarBadges();
+            } else {
+              b.disabled = false;
+              mostrarToast((res && res.error) || "No se pudo completar", "rojo");
+            }
+          }).catch(function () { b.disabled = false; });
+      });
+    });
     var estadoEl = document.getElementById("push-estado-txt");
     var btnActivar = document.getElementById("btn-activar-push");
     var btnProbar = document.getElementById("btn-probar-push");
@@ -7210,10 +7297,14 @@
     var btnEditar = (rolEd === "OWNER" || rolEd === "ADMIN")
       ? "<button type='button' class='tema-btn' data-accion='editar-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; cursor:pointer;'>" + icon("pencil", 15) + "Editar</button>"
       : "";
+    var btnRectificar = (rolEd === "OWNER")
+      ? "<button type='button' class='tema-btn btn-rectificar-tag' data-accion='rectificar-tag' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); font-weight:600;' title='Proceso especial: rectificar chapeta mal leída en campo'>" + icon("tag", 14) + "Rectificar Chapeta</button>"
+      : "";
     head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
       + btnEditar
+      + btnRectificar
       + "</div>";
 
     head += "</div>";
@@ -7910,6 +8001,10 @@
       else if (acc === "reload") { location.reload(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
       else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }
+      else if (acc === "rectificar-tag") {
+        var tTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+        mostrarModalRectificarTag(tTag);
+      }
       else if (acc === "copiar-arbol") {
         var card = elAcc.closest(".card");
         var pre = card && card.querySelector("pre");
@@ -7989,6 +8084,9 @@
       + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form'>✕</button></div>"
       + "<form id='form-animal' style='padding:16px; display:flex; flex-direction:column; gap:10px; max-height:70vh; overflow-y:auto;'>"
       + campo("an-tag", "Arete / Tag *", val((f && f.tag) || tagPrellenado), esEdicion ? " disabled" : " required autofocus placeholder='ej. 47'")
+      + (esEdicion && (window.__usuarioActual && window.__usuarioActual.rol === "OWNER")
+          ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-rectificar' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;'>" + icon("tag", 12) + " ¿Arete equivocado en campo? Rectificar chapeta aquí</button></div>"
+          : "")
       + campo("an-nombre", "Nombre", val(f && f.nombre), " placeholder='ej. Carranga'")
       + "<label style='display:block; font-size:12.5px; font-weight:600;'>Sexo<select id='an-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px;'>"
       + "<option value=''>—</option>"
@@ -8016,6 +8114,14 @@
     function cerrarModal() { if (ov) ov.remove(); }
     var btnCerrar = document.getElementById("btn-cerrar-animal-form");
     if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+    var btnIrRect = document.getElementById("btn-ir-rectificar");
+    if (btnIrRect) {
+      btnIrRect.addEventListener("click", function () {
+        var t = (f && f.tag) || "";
+        cerrarModal();
+        mostrarModalRectificarTag(t);
+      });
+    }
     ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
 
     var form = document.getElementById("form-animal");
@@ -8049,6 +8155,118 @@
         }).catch(function (err) {
           if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
         });
+    });
+  }
+
+  function mostrarModalRectificarTag(tagActual) {
+    window.mostrarModalRectificarTag = mostrarModalRectificarTag;
+    if (!tagActual) {
+      tagActual = (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+    }
+    var overlay = document.getElementById("rectificar-tag-modal");
+    if (overlay) overlay.remove();
+
+    var html = "<div id='rectificar-tag-modal' class='modal-overlay' style='display:flex; align-items:center; justify-content:center;'>"
+      + "<div class='modal-contenido' style='max-width:440px; width:92%;'>"
+      + "<div class='modal-header'>"
+      + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("tag", 16) + "Rectificar Chapeta / Número</b>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-rect-modal'>✕</button>"
+      + "</div>"
+      + "<form id='form-rectificar-tag' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
+      + "<div class='aviso' style='background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.4;'>"
+      + "👑 <b>Exclusivo Propietario (OWNER)</b><br>"
+      + "Utilice este proceso si en campo leyeron o anotaron mal la chapeta (ej. se registró como <b>" + esc(tagActual) + "</b> pero la chapeta real era otra). Todo el historial de eventos se conservará."
+      + "</div>"
+      + "<label style='display:block; font-size:12.5px; font-weight:600;'>Chapeta / Arete Actual"
+      + "<input id='rect-tag-actual' value='" + esc(tagActual) + "' disabled style='width:100%; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo); font-weight:700; margin-top:3px; box-sizing:border-box;'>"
+      + "</label>"
+      + "<label style='display:block; font-size:12.5px; font-weight:600;'>Nueva Chapeta / Arete Correcto *"
+      + "<input id='rect-tag-nuevo' placeholder='ej. JA88 o 47' required autofocus style='width:100%; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:700; margin-top:3px; text-transform:uppercase; box-sizing:border-box;'>"
+      + "</label>"
+      + "<div id='rect-box-fusion' style='display:none; background:var(--color-rojo-bg); color:var(--color-rojo-txt); border:1px solid var(--color-rojo-txt); border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.4;'>"
+      + "<div id='rect-fusion-mensaje' style='margin-bottom:8px; font-weight:600;'></div>"
+      + "<label style='display:flex; align-items:flex-start; gap:8px; font-size:12px; cursor:pointer; font-weight:600;'>"
+      + "<input type='checkbox' id='chk-rect-fusion' style='margin-top:2px;'>"
+      + "<span>Confirmar fusión: transferir todos los eventos hacia el animal existente y retirar el registro erróneo.</span>"
+      + "</label>"
+      + "</div>"
+      + "<p id='rect-form-error' class='aviso' style='display:none;'></p>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
+      + "<button type='button' id='btn-cancelar-rect' class='tema-btn' style='padding:8px 14px;'>Cancelar</button>"
+      + "<button type='submit' id='btn-submit-rect' class='tema-btn' style='padding:8px 16px; background:var(--color-ambar-txt); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+      + icon("check", 14) + "<span id='rect-btn-txt'>Rectificar Chapeta</span>"
+      + "</button>"
+      + "</div>"
+      + "</form>"
+      + "</div>"
+      + "</div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("rectificar-tag-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-rect-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    var btnCanc = document.getElementById("btn-cancelar-rect");
+    if (btnCanc) btnCanc.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var form = document.getElementById("form-rectificar-tag");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var tagAct = (document.getElementById("rect-tag-actual").value || "").trim();
+      var tagNv = (document.getElementById("rect-tag-nuevo").value || "").trim();
+      var chkFusion = document.getElementById("chk-rect-fusion");
+      var fusionar = chkFusion ? chkFusion.checked : false;
+      var errEl = document.getElementById("rect-form-error");
+      var boxFusion = document.getElementById("rect-box-fusion");
+      var msgFusion = document.getElementById("rect-fusion-mensaje");
+      var btnTxt = document.getElementById("rect-btn-txt");
+      if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+
+      if (!tagNv) return;
+      if (tagAct.toUpperCase() === tagNv.toUpperCase()) {
+        if (errEl) { errEl.textContent = "❌ El nuevo número es idéntico al actual."; errEl.style.display = "block"; }
+        return;
+      }
+
+      fetch("/api/animal/rectificar-tag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tag_actual: tagAct,
+          tag_nuevo: tagNv,
+          fusionar_si_existe: fusionar
+        })
+      }).then(function (r) {
+        return r.json().then(function (d) { return { status: r.status, body: d }; });
+      }).then(function (res) {
+        if (res.status === 200 && res.body.ok) {
+          cerrar();
+          mostrarToast(res.body.mensaje || "Chapeta rectificada con éxito.", "verde");
+          var destino = document.getElementById("ficha") || vista;
+          abrirFicha(tagNv, destino, true);
+          if (typeof irAVista === "function" && actual !== "ficha") irAVista("ficha");
+        } else if (res.status === 409 && res.body.requiere_confirmacion_fusion) {
+          if (boxFusion && msgFusion) {
+            boxFusion.style.display = "block";
+            msgFusion.innerHTML = "⚠️ " + esc(res.body.mensaje);
+            if (btnTxt) btnTxt.textContent = "Confirmar Fusión y Rectificar";
+          }
+        } else {
+          if (errEl) {
+            errEl.textContent = "❌ " + (res.body.error || "No se pudo rectificar el arete.");
+            errEl.style.display = "block";
+          }
+        }
+      }).catch(function (err) {
+        if (errEl) {
+          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.style.display = "block";
+        }
+      });
     });
   }
   function abrirFicha(tag, target, showIdent, animar) {
@@ -8465,6 +8683,60 @@
       }).catch(function () { /* sin red: se ocultan */ });
   }
 
+  // Panel de la campanita: muestra pendientes/próximos (alertas + eventos +
+  // retiros) en un modal táctil y ofrece ir a la Agenda completa. Reusa
+  // /api/agenda, sin duplicar la lógica de renderAgenda.
+  function abrirPanelCampana() {
+    if (document.getElementById("modal-campana-agenda")) return;
+    var html = "<div id='modal-campana-agenda' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:520px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden;'>"
+      + "<div class='modal-header'><b>🔔 Pendientes y próximos</b><button type='button' class='modal-cerrar' id='btn-cerrar-campana'>✕</button></div>"
+      + "<div id='campana-cuerpo' style='padding:14px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; font-size:13.5px;'>Cargando agenda...</div>"
+      + "<div style='padding:10px 16px; border-top:1px solid var(--borde); display:flex; gap:8px;'>"
+      + "<button type='button' id='btn-campana-ver-agenda' class='btn-guardar-manga' style='flex:1;'>Abrir Agenda completa</button>"
+      + "</div></div></div>";
+    document.body.insertAdjacentHTML("beforeend", html);
+    var ov = document.getElementById("modal-campana-agenda");
+    function cerrar() { if (ov) ov.remove(); }
+    document.getElementById("btn-cerrar-campana").addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+    document.getElementById("btn-campana-ver-agenda").addEventListener("click", function () {
+      cerrar();
+      var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
+      if (destino) destino.click();
+    });
+    var cuerpo = document.getElementById("campana-cuerpo");
+    fetch("/api/agenda?dias=7").then(function (r) { return r.json(); }).then(function (d) {
+      if (!cuerpo) return;
+      var evs = (d && d.eventos) || [];
+      var recs = (d && d.recordatorios) || [];
+      var rets = (d && d.retiros) || [];
+      if (!evs.length && !recs.length && !rets.length) {
+        cuerpo.innerHTML = "<p class='aviso'>🎉 Sin pendientes en los próximos " + esc((d && d.dias) || 7) + " días.</p>";
+        return;
+      }
+      var h = "";
+      recs.slice(0, 5).forEach(function (rc) {
+        h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
+          + "<b>📌 " + esc(rc.mensaje || "Evento") + "</b><br>"
+          + "<small style='color:var(--texto-suave);'>" + esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "") + " · " + esc(rc.faltan_dias != null ? (rc.faltan_dias <= 0 ? "HOY" : "en " + rc.faltan_dias + "d") : "PENDIENTE") + "</small></div>";
+      });
+      evs.slice(0, 5).forEach(function (e) {
+        h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
+          + "<b>" + esc(e.etiqueta || e.tipo || "Alerta") + "</b> · " + esc(e.fecha || "") + "<br>"
+          + "<small style='color:var(--texto-suave);'>" + esc((e.tag ? e.tag + " — " : "") + (e.descripcion || "")) + "</small></div>";
+      });
+      rets.slice(0, 3).forEach(function (r) {
+        h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
+          + "<b>💊 Retiro: " + esc(r.tag || "") + "</b><br>"
+          + "<small style='color:var(--texto-suave);'>" + esc(r.producto || "") + "</small></div>";
+      });
+      cuerpo.innerHTML = h;
+    }).catch(function () {
+      if (cuerpo) cuerpo.innerHTML = "<p class='aviso'>⚠️ Sin conexión: no se pudo cargar la agenda.</p>";
+    });
+  }
+
   function setupCampana() {
     var camp = document.getElementById("btn-notif");
     if (!camp) return;
@@ -8472,8 +8744,7 @@
       if ("Notification" in window && Notification.permission === "default") {
         iniciarWebPush(false).catch(function () {});
       }
-      var destino = qa("#nav-principal button").filter(function (b) { return b.getAttribute("data-v") === "agenda"; })[0];
-      if (destino) destino.click();
+      abrirPanelCampana();
     });
   }
 
@@ -9194,10 +9465,13 @@
   setupLightboxVisor();
   setupInstalacionApp();
   setupVacaHeaderInteractivo();
+  window.mostrarModalRectificarTag = mostrarModalRectificarTag;
 
   if (fb) {
     var tag = document.body.getAttribute("data-tag") || "";
-    abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
+    cargarUsuario().finally(function () {
+      abrirFicha(tag, fb, false, false); // QR ya identifica el animal: sin panel de foto
+    });
     setupChatModal();
     setupHeaderAyuda();
   } else {

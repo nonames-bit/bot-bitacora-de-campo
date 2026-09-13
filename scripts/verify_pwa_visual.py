@@ -176,6 +176,33 @@ async def main():
             shot4 = os.path.join(OUTPUT_DIR, "04_mobile_chat_dock_con_hora.png")
             await capture_screen(ws, shot4)
 
+            # Screenshot 5: Ficha de animal mostrando botón Rectificar Chapeta para OWNER
+            print("Navegando a ficha de animal T02 en SPA (?v=ficha&tag=T02)...")
+            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=ficha&tag=T02"})
+            await asyncio.sleep(3.0)
+            shot5 = os.path.join(OUTPUT_DIR, "05_mobile_ficha_rectificar_btn.png")
+            await capture_screen(ws, shot5)
+
+            # Screenshot 6: Modal de rectificación de chapeta con detección de conflicto en vivo
+            print("Abriendo modal de rectificación de chapeta...")
+            await cdp_call(ws, "Runtime.evaluate", {
+                "expression": """
+                (function() {
+                    window.mostrarModalRectificarTag('T02');
+                    setTimeout(function() {
+                        var inp = document.getElementById('rect-tag-nuevo');
+                        if (inp) {
+                            inp.value = 'MF01';
+                            inp.dispatchEvent(new Event('input'));
+                        }
+                    }, 400);
+                })()
+                """
+            })
+            await asyncio.sleep(2.0)
+            shot6 = os.path.join(OUTPUT_DIR, "06_mobile_modal_rectificar_chapeta.png")
+            await capture_screen(ws, shot6)
+
             print("¡Todas las verificaciones visuales completadas exitosamente!")
 
     finally:

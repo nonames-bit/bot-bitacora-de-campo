@@ -1702,6 +1702,45 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.post("/api/animal/rectificar-tag")
+    def api_animal_rectificar_tag():
+        """Proceso especial para rectificar o corregir el número/chapeta de un animal
+        (ej. cuando se leyó mal en campo: JA83 era en realidad JA88).
+        RESERVADO EXCLUSIVAMENTE AL PROPIETARIO (OWNER).
+        """
+        if _rol_actual() != "OWNER":
+            return jsonify({
+                "ok": False,
+                "error": "Acceso denegado. Este proceso especial de rectificación de chapeta está reservado exclusivamente para el Propietario (OWNER)."
+            }), 403
+
+        datos = request.get_json(silent=True) or request.form or {}
+        tag_actual = (datos.get("tag_actual") or "").strip()
+        tag_nuevo = (datos.get("tag_nuevo") or "").strip()
+        fusionar = bool(datos.get("fusionar_si_existe"))
+
+        if not tag_actual or not tag_nuevo:
+            return jsonify({"ok": False, "error": "Debe especificar 'tag_actual' y 'tag_nuevo'."}), 400
+
+        db_r = _db(db_path)
+        try:
+            res = db_r.rectificar_tag_animal(
+                tag_actual=tag_actual,
+                tag_nuevo=tag_nuevo,
+                fusionar_si_existe=fusionar,
+                usuario_id=session.get("user_id")
+            )
+            status_code = 200 if res.get("ok") else (409 if res.get("requiere_confirmacion_fusion") else 400)
+            return jsonify(res), status_code
+        except Exception as e:
+            logger.exception("Error al rectificar tag %s -> %s: %s", tag_actual, tag_nuevo, e)
+            return jsonify({"ok": False, "error": f"Error al rectificar animal: {e}"}), 500
+        finally:
+            try:
+                db_r.close()
+            except Exception:
+                pass
+
     @app.get("/api/cria-activa")
     def api_cria_activa():
         """Resuelve la cría ACTIVA sin destetar de una vaca, para Captura >
@@ -1752,6 +1791,74 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out = datos_agenda(db_path, dias=dias)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.post("/api/agenda/recordatorio")
+    def api_agenda_crear_recordatorio():
+        """Crea un evento/recordatorio de campo (misma tabla de /programar).
+
+        Cualquier rol autenticado puede crear (igual que Captura/Sync);
+        la sesión ya está validada por _requerir_login. Estados del evento:
+        se crea PENDIENTE y pasa a ENVIADO al completarse.
+        """
+        datos = request.get_json(silent=True) or {}
+        mensaje = str(datos.get("mensaje") or "").strip()
+        fecha = str(datos.get("fecha") or "").strip()
+        hora = str(datos.get("hora") or "").strip() or None
+        if not mensaje:
+            return jsonify({"ok": False, "error": "El mensaje es obligatorio."}), 400
+        if len(mensaje) > 500:
+            return jsonify({"ok": False, "error": "El mensaje no puede superar 500 caracteres."}), 400
+        if not fecha:
+            return jsonify({"ok": False, "error": "Fecha inválida. Use YYYY-MM-DD."}), 400
+        try:
+            if to_date(fecha) is None:
+                return jsonify({"ok": False, "error": "Fecha inválida. Use YYYY-MM-DD."}), 400
+        except Exception:
+            return jsonify({"ok": False, "error": "Fecha inválida. Use YYYY-MM-DD."}), 400
+        if hora and not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", hora):
+            return jsonify({"ok": False, "error": "Hora inválida. Use HH:MM (24h)."}), 400
+        db_r = _db(db_path)
+        try:
+            uid = session.get("user_id") if session is not None else None
+            rid = db_r.registrar_recordatorio(
+                mensaje=mensaje, fecha_programada=fecha, hora=hora, creado_por=uid,
+            )
+            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora})
+        except Exception:
+            logger.exception("Error creando recordatorio de agenda")
+            return jsonify({"ok": False, "error": "No se pudo crear el recordatorio."}), 500
+        finally:
+            try:
+                db_r.close()
+            except Exception:
+                pass
+
+    @app.post("/api/agenda/recordatorio/<int:rid>/completar")
+    def api_agenda_completar_recordatorio(rid: int):
+        """Marca un recordatorio PENDIENTE como ENVIADO (completado).
+
+        Cualquier rol autenticado puede completar; la resolución de alertas
+        automáticas (eco/palpación/partos) sigue siendo del motor zootécnico.
+        """
+        db_r = _db(db_path)
+        try:
+            fila = db_r.query_one(
+                "SELECT id, estado FROM recordatorios_programados WHERE id = ?", (rid,),
+            )
+            if not fila:
+                return jsonify({"ok": False, "error": "El recordatorio no existe."}), 404
+            if (fila["estado"] or "PENDIENTE") != "PENDIENTE":
+                return jsonify({"ok": True, "id": rid, "estado": fila["estado"]})
+            db_r.marcar_enviado(rid)
+            return jsonify({"ok": True, "id": rid, "estado": "ENVIADO"})
+        except Exception:
+            logger.exception("Error completando recordatorio de agenda")
+            return jsonify({"ok": False, "error": "No se pudo completar el recordatorio."}), 500
+        finally:
+            try:
+                db_r.close()
+            except Exception:
+                pass
 
     @app.get("/api/buscar")
     def api_buscar():

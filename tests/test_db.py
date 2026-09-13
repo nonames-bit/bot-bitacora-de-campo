@@ -697,6 +697,45 @@ def test_renombrar_animal_tag_nuevo_ya_ocupado_no_lo_hace(db):
     assert db.animal_id("A090-6") is not None
 
 
+def test_rectificar_tag_animal_renombrado_libre(db):
+    aid = db.registrar_animal(tag="JA83", sexo="Hembra")
+    db.registrar_pesaje(animal_tag="JA83", peso_kg=350.0, fecha="2026-09-01")
+    res = db.rectificar_tag_animal("JA83", "JA88")
+    assert res["ok"] is True
+    assert res["accion"] == "renombrado"
+    assert db.animal_id("JA83") is None
+    assert db.animal_id("JA88") == aid
+    ult = db.ultimos_pesajes("JA88", 1)
+    assert len(ult) == 1 and ult[0]["peso_kg"] == 350.0
+
+
+def test_rectificar_tag_animal_destino_existente_fusion(db):
+    aid_err = db.registrar_animal(tag="JA83", sexo="Hembra", notas="Leído mal en manga")
+    db.registrar_pesaje(animal_tag="JA83", peso_kg=320.0, fecha="2026-09-02")
+
+    aid_real = db.registrar_animal(tag="JA88", sexo="Hembra")
+    db.registrar_pesaje(animal_tag="JA88", peso_kg=310.0, fecha="2026-08-01")
+
+    # Sin fusionar: pide confirmación
+    res1 = db.rectificar_tag_animal("JA83", "JA88", fusionar_si_existe=False)
+    assert res1["ok"] is False
+    assert res1["requiere_confirmacion_fusion"] is True
+    assert res1["origen"]["id"] == aid_err
+    assert res1["destino"]["id"] == aid_real
+
+    # Con fusión confirmada
+    res2 = db.rectificar_tag_animal("JA83", "JA88", fusionar_si_existe=True)
+    assert res2["ok"] is True
+    assert res2["accion"] == "fusionado"
+    assert db.animal_id("JA83") is None
+    assert db.animal_id("JA88") == aid_real
+
+    pesajes = db.ultimos_pesajes("JA88", 5)
+    assert len(pesajes) == 2  # Ambos pesajes ahora pertenecen a JA88
+    pesos = {p["peso_kg"] for p in pesajes}
+    assert 320.0 in pesos and 310.0 in pesos
+
+
 # ---------------------------------------------------------------------------
 # Registro de importaciones de Software Ganadero (¿está usando el backup de
 # hoy?)

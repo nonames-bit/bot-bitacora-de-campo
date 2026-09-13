@@ -108,6 +108,7 @@ implementado todavía.
 | `/descartar_backup` | ✅ | ✅ | — |
 | `/agregar_usuario` | ✅ | — | — |
 | `/quitar_usuario` | ✅ | — | — |
+| `/renombrar_animal` [tag_viejo] [tag_nuevo] [--fusionar] | ✅ | — | — |
 | `/logs` | ✅ | — | — |
 
 ### Comandos principales
@@ -128,7 +129,7 @@ implementado todavía.
   Límite de Telegram: **20 MB**; archivos más pesados se suben por SSH y se importan
   con `scripts/importar_backup.sh` (ver [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)).
 - **Solo OWNER:** `/agregar_usuario <user_id> <ROL> [nombre]`,
-  `/quitar_usuario <user_id>` y `/logs`.
+  `/quitar_usuario <user_id>`, `/renombrar_animal <tag_viejo> <tag_nuevo> [--fusionar]` (rectificación de chapetas mal leídas con fusión atómica de eventos) y `/logs`.
 
 ### Setup rápido (local)
 
@@ -600,7 +601,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Reubicación de Fecha/Hora**: Integración de la fecha y hora pequeña (`reloj-hora`) dentro de `.marca-textos` apilada directamente bajo el título `GANADERÍA JA`, eliminando la sobrecarga horizontal en `.acciones`.
     - **Eliminación de la 3ª Fila en Móvil**: La barra `.acciones` ahora se mantiene estrictamente en 1 sola fila sin desbordes (`flex-wrap: nowrap`), manteniendo los botones de Temas y Salir junto a los íconos (Sync, Ayuda, Notif).
     - **Recuperación de Espacio Vertical**: Reducción de la altura del header móvil de ~150px a ~80px (ahorro de más de 60px verticales), proporcionando mayor espacio libre en pantalla para el Tablero y modales.
-- [x] Suite de pruebas con pytest: **804 pruebas en verde** (100% pasando).
+- [x] **Proceso Especial de Rectificación de Chapeta / Tag (Exclusivo OWNER, 2026-09-13)**:
+    - **Manejo de Errores de Lectura en Campo**: Permite al OWNER corregir números de arete leídos o digitados por error (ej: `JA83` por `JA88`) preservando el historial zootécnico.
+    - **Detección Automática de Conflictos y Fusión Atómica**: Si el nuevo tag no existe en la base, renombra limpiamente el animal (`animales` y `fotos`) manteniendo su ID e historial. Si el tag destino ya existe (la vaca real ya estaba registrada y se le cargaron eventos a la chapeta errónea), detecta la colisión, devuelve diagnóstico detallado (HTTP 409) y, bajo confirmación explícita del OWNER (`fusionar_si_existe=True`), transfiere atómicamente todos los eventos (partos, pesajes, tratamientos, palpaciones, celos, servicios, fotos, etc.) al animal destino y elimina el registro erróneo sin violar integridad referencial.
+    - **Seguridad RBAC Estricta**: Bloqueo con HTTP 403 para roles `ADMIN` y `TRABAJADOR`; habilitado única y exclusivamente para el rol `OWNER` tanto en PWA como en Telegram.
+    - **Integración UI PWA & Telegram**: Botón `🏷️ Rectificar Chapeta` en la Ficha del Animal (y acceso rápido desde "Editar Animal") con modal interactivo de confirmación y advertencia en caso de fusión. Comando `/renombrar_animal <tag_viejo> <tag_nuevo> [--fusionar]` en Telegram bot.
+- [x] Suite de pruebas con pytest: **808+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

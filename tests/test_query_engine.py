@@ -1410,6 +1410,18 @@ def test_consulta_ultimas_notas_campo(db):
     assert "Cría macho pesó 35 kg" in resp
 
 
+def test_consulta_ayuda_rectificar_chapeta(db):
+    """Verifica que preguntas sobre rectificar chapetas devuelvan la guía para el Propietario."""
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp1 = qe.responder("¿cómo rectificar una chapeta?")
+    assert "Rectificación de Chapetas" in resp1
+    assert "Exclusivo Propietario" in resp1
+    assert "/renombrar_animal" in resp1
+
+    resp2 = qe.responder("leí mal la chapeta de un animal")
+    assert "Rectificación de Chapetas" in resp2
+
+
 
 
 

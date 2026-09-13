@@ -285,8 +285,175 @@ class Database:
         nuevo = str(tag_nuevo).strip()
         if not nuevo or self.animal_id(nuevo) is not None:
             return None
-        self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (nuevo, aid))
+        with self.transaccion():
+            self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (nuevo, aid))
+            self.execute("UPDATE fotos SET tag = ? WHERE animal_id = ? OR tag = ?", (nuevo, aid, str(tag_viejo).strip()))
         return aid
+
+    def rectificar_tag_animal(
+        self,
+        tag_actual: str,
+        tag_nuevo: str,
+        fusionar_si_existe: bool = False,
+        usuario_id: Optional[int] = None,
+    ) -> dict:
+        """Proceso especial para rectificar o corregir el arete/número de un animal
+        (ej. cuando leen mal la chapeta en campo: anotaron JA83 pero era JA88).
+
+        Si tag_nuevo no existe en la base:
+            Renombra el animal conservando su id_animal y todo su historial.
+        Si tag_nuevo ya existe en la base y fusionar_si_existe es False:
+            Devuelve un diagnóstico con los datos de ambos animales para que el
+            usuario decida y confirme la fusión.
+        Si tag_nuevo ya existe y fusionar_si_existe es True:
+            Transfiere atómicamente todos los eventos (partos, servicios, celos,
+            tratamientos, traslados, pesajes, destetes, secados, leche, fotos,
+            parentesco) hacia el animal real (tag_nuevo) y retira el registro erróneo.
+        """
+        tag_act = str(tag_actual or "").strip()
+        tag_nv = str(tag_nuevo or "").strip()
+        if not tag_act or not tag_nv:
+            return {"ok": False, "error": "Debe proporcionar el tag actual y el nuevo tag."}
+
+        if tag_act.upper() == tag_nv.upper():
+            return {"ok": False, "error": "El nuevo número de arete es idéntico al actual."}
+
+        aid_origen = self.animal_id(tag_act)
+        if aid_origen is None:
+            return {"ok": False, "error": f"No se encontró ningún animal con el arete '{tag_act}'."}
+
+        animal_origen = self.get_animal(aid_origen)
+        aid_destino = self.animal_id(tag_nv)
+
+        # Caso 1: El nuevo arete está libre -> renombramiento directo
+        if aid_destino is None:
+            with self.transaccion():
+                self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (tag_nv, aid_origen))
+                self.execute("UPDATE fotos SET tag = ? WHERE animal_id = ? OR tag = ?", (tag_nv, aid_origen, tag_act))
+                nota_rect = f"\n[Rectificación arete: {tag_act} -> {tag_nv} (usuario {usuario_id or 'OWNER'})]"
+                self.execute("UPDATE animales SET notas = COALESCE(notas, '') || ? WHERE id_animal = ?", (nota_rect, aid_origen))
+            return {
+                "ok": True,
+                "accion": "renombrado",
+                "tag_anterior": tag_act,
+                "tag_nuevo": tag_nv,
+                "id_animal": aid_origen,
+                "mensaje": f"Arete rectificado exitosamente: '{tag_act}' ahora es '{tag_nv}'. Todo el historial de eventos se conservó intacto.",
+            }
+
+        # Caso 2: El nuevo arete ya existe en la base de datos
+        animal_destino = self.get_animal(aid_destino)
+
+        def _contar_eventos(aid: int, tag_str: str) -> int:
+            total = 0
+            tablas_cols = [
+                ("partos", "vaca_id"), ("partos", "id_cria"),
+                ("muertes", "animal_id"), ("servicios", "vaca_id"),
+                ("celos", "vaca_id"), ("tratamientos", "animal_id"),
+                ("traslados", "animal_id"), ("destetes", "animal_id"),
+                ("destetes", "madre_id"), ("secados", "animal_id"),
+                ("pesajes", "animal_id"), ("movimientos", "animal_id"),
+                ("condicion_corporal", "animal_id"), ("produccion_leche", "animal_id"),
+                ("diagnosticos_gestacion", "vaca_id"), ("alertas", "animal_id"),
+            ]
+            for tabla, col in tablas_cols:
+                try:
+                    r = self.conn.execute(f"SELECT COUNT(*) AS c FROM {tabla} WHERE {col} = ?", (aid,)).fetchone()
+                    total += (r[0] if r else 0)
+                except Exception:
+                    pass
+            try:
+                r = self.conn.execute("SELECT COUNT(*) AS c FROM fotos WHERE animal_id = ? OR tag = ?", (aid, tag_str)).fetchone()
+                total += (r[0] if r else 0)
+            except Exception:
+                pass
+            return total
+
+        ev_origen = _contar_eventos(aid_origen, tag_act)
+        ev_destino = _contar_eventos(aid_destino, tag_nv)
+
+        if not fusionar_si_existe:
+            return {
+                "ok": False,
+                "requiere_confirmacion_fusion": True,
+                "tag_actual": tag_act,
+                "tag_nuevo": tag_nv,
+                "origen": {
+                    "id": aid_origen,
+                    "tag": tag_act,
+                    "nombre": animal_origen["nombre"] if animal_origen else None,
+                    "estado": animal_origen["estado"] if animal_origen else None,
+                    "eventos": ev_origen,
+                },
+                "destino": {
+                    "id": aid_destino,
+                    "tag": tag_nv,
+                    "nombre": animal_destino["nombre"] if animal_destino else None,
+                    "estado": animal_destino["estado"] if animal_destino else None,
+                    "eventos": ev_destino,
+                },
+                "mensaje": (
+                    f"El animal '{tag_nv}' ya existe en el sistema ({ev_destino} eventos). "
+                    f"¿Desea fusionar todos los eventos de '{tag_act}' ({ev_origen} eventos) "
+                    f"hacia '{tag_nv}' y eliminar el registro erróneo '{tag_act}'?"
+                ),
+            }
+
+        # Caso 3: Fusión confirmada por el usuario
+        with self.transaccion():
+            # Transferir todos los eventos zootécnicos
+            self.execute("UPDATE partos SET vaca_id = ? WHERE vaca_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE partos SET id_cria = ? WHERE id_cria = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE muertes SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE servicios SET vaca_id = ? WHERE vaca_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE servicios SET toro_pajilla = ? WHERE UPPER(TRIM(toro_pajilla)) = ?", (tag_nv, tag_act.upper()))
+            self.execute("UPDATE celos SET vaca_id = ? WHERE vaca_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE tratamientos SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE traslados SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE destetes SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE destetes SET madre_id = ? WHERE madre_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE secados SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE pesajes SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE movimientos SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE condicion_corporal SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE produccion_leche SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE alertas SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE diagnosticos_gestacion SET vaca_id = ? WHERE vaca_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE fotos SET animal_id = ?, tag = ? WHERE animal_id = ? OR tag = ?", (aid_destino, tag_nv, aid_origen, tag_act))
+            self.execute("UPDATE animales SET madre_id = ? WHERE madre_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE animales SET padre_id = ? WHERE padre_id = ?", (aid_destino, aid_origen))
+            try:
+                self.execute("DELETE FROM consultas_animal WHERE animal_id = ?", (aid_origen,))
+            except Exception:
+                pass
+
+            # Completar atributos vacíos en destino con lo que tenía origen si aplica
+            if animal_origen:
+                self.execute("""
+                    UPDATE animales SET
+                        potrero_id = COALESCE(potrero_id, ?),
+                        hierro = COALESCE(hierro, ?),
+                        chip = COALESCE(chip, ?),
+                        color = COALESCE(color, ?)
+                    WHERE id_animal = ?
+                """, (animal_origen["potrero_id"], animal_origen["hierro"], animal_origen["chip"], animal_origen["color"], aid_destino))
+
+            # Registro de auditoría en destino
+            nota_fusion = f"\n[Fusión por rectificación de chapeta: {tag_act} -> {tag_nv} ({ev_origen} eventos transferidos)]"
+            self.execute("UPDATE animales SET notas = COALESCE(notas, '') || ? WHERE id_animal = ?", (nota_fusion, aid_destino))
+
+            # Eliminar registro origen duplicado/erróneo
+            self.execute("DELETE FROM animales WHERE id_animal = ?", (aid_origen,))
+
+        return {
+            "ok": True,
+            "accion": "fusionado",
+            "tag_anterior": tag_act,
+            "tag_nuevo": tag_nv,
+            "id_animal": aid_destino,
+            "eventos_transferidos": ev_origen,
+            "mensaje": f"Se rectificó la chapeta: todos los eventos registrados bajo '{tag_act}' fueron transferidos al animal '{tag_nv}', y el registro erróneo '{tag_act}' fue eliminado.",
+        }
 
     def potrero_id(self, codigo_o_nombre) -> Optional[int]:
         if codigo_o_nombre is None or codigo_o_nombre == "":

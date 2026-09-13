@@ -95,6 +95,8 @@ class QueryEngine(
             return self._ayuda_modo_offline()
         if re.search(r"\b(?:como\s+(?:se\s+)?pesa[rn]?|pesaje\s+en\s+manga|manga\s+corral|pesar\s+ganado|pesar\s+animales|pesar\s+en\s+la\s+manga|pesar\s+en\s+manga|pesaje\s+manga|pesajes?\s+continuos?)\b", t) and not tag_con_digito:
             return self._ayuda_manga_pesaje()
+        if re.search(r"\b(?:(?:rectificar|cambiar|editar|corregir)\s+(?:el\s+|la\s+|un\s+|una\s+)?(?:chapeta|arete|numero|tag)(?:\s+del?\s+animal)?|chapetas?\s+(?:equivocada|mal\s+le[ií]da)|aretes?\s+(?:equivocado|mal\s+le[ií]do)|le[ií]\s+mal\s+(?:la\s+|el\s+)?(?:chapeta|arete|numero))\b", t):
+            return self._ayuda_rectificar_chapeta()
         if re.search(r"\b(?:ayuda|como\s+funciona|que\s+puedes\s+hacer|que\s+puedo\s+preguntar|manual|guia|tutorial)\b", t) and not tag_con_digito:
             return self._ayuda_general_sistema()
 
@@ -503,7 +505,22 @@ class QueryEngine(
             "• <b>Inventario & Hato:</b> <i>'¿cuántas vacas hay en ordeño?'</i>, <i>'¿cuánto ganado hay en Guayabal?'</i>, <i>'total hato'</i>\n"
             "• <b>Sanidad & Retiro:</b> <i>'¿qué animales están en retiro de leche?'</i>, <i>'¿la vaca 47 tiene retiro?'</i>\n"
             "• <b>Pasturas & Voisin:</b> <i>'¿qué potreros tienen más reposo?'</i>, <i>'¿qué potreros están ocupados?'</i>\n"
-            "• <b>Uso de la App:</b> <i>'¿cómo instalo la app?'</i>, <i>'¿cómo funciona sin internet?'</i>, <i>'¿cómo pesar en manga?'</i>"
+            "• <b>Uso de la App:</b> <i>'¿cómo instalo la app?'</i>, <i>'¿cómo funciona sin internet?'</i>, <i>'¿cómo pesar en manga?'</i>, <i>'¿cómo rectificar chapeta?'</i>"
+        )
+
+    def _ayuda_rectificar_chapeta(self) -> str:
+        return (
+            "🏷️ <b>Rectificación de Chapetas / Aretes (Exclusivo Propietario / OWNER)</b>\n\n"
+            "Si en el potrero leyeron o anotaron mal una chapeta (ej. registraron <b>JA83</b> pero la vaca era realmente <b>JA88</b>), "
+            "el Propietario puede rectificarla sin perder ningún evento registrado:\n\n"
+            "📱 <b>Desde la PWA (Celular o PC):</b>\n"
+            "1. Busca y abre la Ficha del animal equivocado (ej. <code>JA83</code>).\n"
+            "2. En la cabecera de la ficha, toca el botón amarillo <b>[🏷️ Rectificar Chapeta]</b>.\n"
+            "3. Escribe el número correcto (ej. <code>JA88</code>) y presiona Confirmar.\n"
+            "• Si <code>JA88</code> no existía, se renombra conservando el 100% de su historial.\n"
+            "• Si <code>JA88</code> ya existía en el inventario, el sistema te preguntará si deseas <b>fusionar</b> todos los eventos hacia dicho animal y retirar el registro erróneo.\n\n"
+            "💬 <b>Desde Telegram:</b>\n"
+            "Envía: <code>/renombrar_animal JA83 JA88</code> (o con <code>--fusionar</code> si ya existe)."
         )
 
     def _ayuda(self, texto: str = "") -> str:

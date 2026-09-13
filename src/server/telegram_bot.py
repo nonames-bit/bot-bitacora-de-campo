@@ -1308,31 +1308,43 @@ def construir_application(
             if not update.effective_user or not update.message:
                 return
             user_id = update.effective_user.id
-            if not auth.puede_administrar(user_id):
-                await update.message.reply_text("⛔ No autorizado.")
+            if not auth.es_owner(user_id):
+                await update.message.reply_text("⛔ No autorizado: este proceso especial de rectificación de chapeta está reservado exclusivamente para el Propietario (OWNER).")
                 return
-            if len(context.args) != 2:
+            if len(context.args) < 2:
                 await update.message.reply_text(
-                    "Uso: /renombrar_animal <tag_viejo> <tag_nuevo>\n"
-                    "Ej. /renombrar_animal A090-6 B234\n\n"
-                    "Úselo cuando una cría tenía el código temporal que asigna "
-                    "el registro al nacer y ya le pusieron la chapeta "
-                    "definitiva: conserva todo el historial ya registrado."
+                    "🏷️ <b>Rectificación de Chapetas / Aretes (Exclusivo Propietario)</b>\n"
+                    "Uso: <code>/renombrar_animal &lt;tag_actual&gt; &lt;tag_nuevo&gt; [--fusionar]</code>\n\n"
+                    "Ejemplo: <code>/renombrar_animal JA83 JA88</code>\n\n"
+                    "💡 Úselo si leyeron mal la chapeta en campo (ej. anotaron JA83 pero era JA88). "
+                    "Se conserva el 100% del historial.\n"
+                    "Si el animal destino ya existe, use <code>--fusionar</code> para transferir los eventos y eliminar el registro erróneo.",
+                    parse_mode="HTML",
                 )
                 return
-            tag_viejo, tag_nuevo = context.args
-            if db.animal_id(tag_viejo) is None:
-                await update.message.reply_text(f"⚠️ No existe ningún animal con el tag «{tag_viejo}».")
+            tag_viejo = context.args[0].strip()
+            tag_nuevo = context.args[1].strip()
+            flags = [a.lower() for a in context.args[2:]]
+            fusionar = ("--fusionar" in flags or "-f" in flags or "fusionar" in flags)
+
+            res = db.rectificar_tag_animal(tag_viejo, tag_nuevo, fusionar_si_existe=fusionar, usuario_id=user_id)
+            if not res.get("ok"):
+                if res.get("requiere_confirmacion_fusion"):
+                    await update.message.reply_text(
+                        f"⚠️ <b>El animal «{tag_nuevo}» ya existe en el sistema</b> ({res['destino']['eventos']} eventos).\n\n"
+                        f"El animal erróneo «{tag_viejo}» tiene {res['origen']['eventos']} eventos.\n\n"
+                        f"Para transferir todos los eventos de «{tag_viejo}» hacia «{tag_nuevo}» y retirar el registro erróneo, envíe:\n"
+                        f"<code>/renombrar_animal {tag_viejo} {tag_nuevo} --fusionar</code>",
+                        parse_mode="HTML",
+                    )
+                else:
+                    await update.message.reply_text(f"❌ {res.get('error', 'No se pudo rectificar el arete.')}")
                 return
-            if db.animal_id(tag_nuevo) is not None:
-                await update.message.reply_text(f"⚠️ Ya existe un animal con el tag «{tag_nuevo}». No se puede renombrar.")
-                return
-            aid = db.renombrar_animal(tag_viejo, tag_nuevo)
-            if aid is None:
-                await update.message.reply_text("❌ No se pudo renombrar el animal.")
-                return
+
             await update.message.reply_text(
-                f"🏷️ Listo: «{tag_viejo}» ahora es «{tag_nuevo}» (se conservó todo su historial).",
+                f"🏷️ <b>Listo:</b> «{tag_viejo}» rectificado a «{tag_nuevo}».\n"
+                f"{res.get('mensaje')}",
+                parse_mode="HTML",
                 reply_markup=crear_teclado_animal(tag_nuevo),
             )
         except Exception as e:
