@@ -596,7 +596,7 @@ class Database:
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
                         notas=None, potrero_cria=None, potrero_madre=None,
                         registrado_por=None, tipo_evento="PARTO",
-                        grupo_parto_id=None) -> Optional[int]:
+                        grupo_parto_id=None, padre_tag=None) -> Optional[int]:
         """Registra un parto/evento reproductivo. Retorna el id (int) de la
         fila creada o ya existente (reintento idempotente); retorna None si
         el registro fue rechazado por autorreferencia (vaca == cría)."""
@@ -627,6 +627,7 @@ class Database:
 
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
+        padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
 
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
             return None
@@ -651,6 +652,10 @@ class Database:
                     self.execute(
                         "UPDATE animales SET potrero_id = COALESCE(potrero_id, ?) WHERE id_animal = ?", (fila_vaca["id"], id_cria)
                     )
+            if padre_id is not None and id_cria != padre_id:
+                self.execute(
+                    "UPDATE animales SET padre_id = COALESCE(padre_id, ?) WHERE id_animal = ? AND (padre_id IS NULL OR padre_id != ?)", (padre_id, id_cria, id_cria)
+                )
             if sexo_cria:
                 self.execute(
                     "UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria)
@@ -693,6 +698,11 @@ class Database:
                 if fila is not None and fila["grupo_parto_id"] is None:
                     self.execute("UPDATE partos SET grupo_parto_id = ? WHERE id = ?", (grupo_parto_id, existente))
             return existente
+
+        if padre_tag and ("toro" not in (notas or "").lower() and "padre" not in (notas or "").lower()):
+            tag_p_limpio = str(padre_tag).strip()
+            notas = f"Toro/Padre: {tag_p_limpio}. {notas}" if notas else f"Toro/Padre: {tag_p_limpio}"
+
         nuevo_id = self.insert("partos", dict(
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,

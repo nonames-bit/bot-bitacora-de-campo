@@ -619,6 +619,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Cotejo con Respaldo Real (`Datos20260913.Zip`)**: Verificación automatizada con `scripts/comparar_backup_sg.py`. Total activos en SG: **328**, Total activos en Bitácora: **328**. Coincidencia total del 100% (0 diferencias de inventario, 0 animales faltantes, 0 discrepancias de potrero en animales activos).
     - **Resolución Priorizada de Potreros Vigentes**: Corrección en `src/db/database.py` (`potrero_id` y migración de auto-reparación en `create_tables`) para priorizar potreros georreferenciados y con prefijo de letra sobre códigos históricos numéricos obsoletos de SG (01..23), garantizando que animales como `JA457` mantengan su potrero activo `B02 - OLEGARIO II` (`id=29`) y no queden catalogados como `HISTORICO`.
     - **Depuración de Eventos Fantasma**: Eliminación del traslado automático de `JA457` (id 166) originado durante la importación comparativa, restableciendo la cronología real de eventos en el Tablero de la PWA.
+    - **Captura de Parto con Toro/Padre y Revisión Completa de Cría**:
+      - Selector opcional de Toro / Padre (`GET /api/toros`) con reproductores activos (`T01` BRUNO, `T02` PERLA OHIO, etc.), machos activos del hato y opción para toro externo o pajuela; enlazado automáticamente al árbol genealógico del ternero (`padre_id`).
+      - Autocompletado completo e instantáneo de animales activos (`#dl-tags`) y potreros (`#dl-potreros`) tanto en tecleo como al enfocar cualquier campo de captura.
+      - Visualización destacada en el paso 3 ("Revise y guarde") mostrando número de cría sugerido/asignado, sexo, estado, peso y toro/padre.
 - [x] Suite de pruebas con pytest: **829+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

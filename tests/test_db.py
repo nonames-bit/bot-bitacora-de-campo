@@ -71,6 +71,23 @@ def test_registrar_parto_enlaza_cria(db):
     assert len(h_cria["nacimiento"]) == 1
 
 
+def test_registrar_parto_enlaza_padre_toro(db):
+    db.registrar_animal("T01", sexo="Macho", nombre="BRUNO", estado="ACTIVO")
+    db.registrar_parto(vaca_tag="47", fecha="2026-08-25", sexo_cria="Hembra",
+                       estado_cria="VIVO", peso_nacimiento=32.0, id_cria_tag="481",
+                       padre_tag="T01")
+    cria = db.get_animal("481")
+    assert cria is not None
+    vaca = db.get_animal("47")
+    toro = db.get_animal("T01")
+    assert cria["madre_id"] == vaca["id_animal"]
+    assert cria["padre_id"] == toro["id_animal"]
+    # En partos notas se registra la referencia al toro
+    p = db.query_one("SELECT notas FROM partos WHERE id_cria = ?", (cria["id_animal"],))
+    assert p is not None
+    assert "T01" in (p["notas"] or "")
+
+
 def test_registrar_parto_hereda_potrero_real_de_la_madre(db):
     pid = db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="A24")
     db.execute("UPDATE potreros SET geom_wkt_4326 = ? WHERE id = ?", ("POLYGON((0 0,0 1,1 1,1 0,0 0))", pid))

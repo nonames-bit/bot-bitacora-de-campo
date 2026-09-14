@@ -3713,7 +3713,7 @@
 
     if (tipo === "parto") {
       h += "<label>Tipo de evento: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option><option value='ABORTO'>Aborto</option><option value='REABSORCION'>Reabsorción embrionaria</option><option value='MOMIFICACION'>Momificación fetal</option><option value='MACERACION'>Maceración fetal</option><option value='MUERTE_FETAL'>Muerte fetal</option></select></label>"
-        + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-parto-cria-wrap'>"
         + "<label id='cap-cria1-label'>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-cria-sugerido-hint' style='font-size:11.5px; color:var(--verde-marca); margin:-4px 0 8px 2px; cursor:pointer; font-weight:600;'></div>"
@@ -3723,6 +3723,10 @@
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<div style='margin-top:6px; margin-bottom:8px;'>"
+        + "<label>Toro / Padre de la cría (opcional): <select id='cap-toro-padre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>-- Sin especificar (opcional) --</option></select></label>"
+        + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajuela...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
         + "</div>"
         + "<div id='cap-gemelo2-wrap' style='display:none; padding:10px; border:1px dashed var(--borde-fuerte); border-radius:8px;'>"
         + "<p class='aviso' style='margin:2px 0 8px;'>Segunda cría (gemelo/a):</p>"
@@ -3734,8 +3738,8 @@
         + "<div style='margin-top:8px;'><label>Peso al nacer Cría 2 (kg): <input type='number' step='0.5' id='cap-peso-nacer2' placeholder='ej. 28' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
-        + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
-        + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "</div>"
         + "<p id='cap-perdida-aviso' class='aviso' style='display:none; margin:2px 0;'>Se registra como un evento reproductivo de la vaca (sin cría), separado de un Parto normal.</p>"
@@ -4077,14 +4081,113 @@
       }).catch(function () {});
     }
 
-    // Paso 3: resumen legible en texto plano antes de guardar.
+    function obtenerToroPadreSeleccionado() {
+      var sel = document.getElementById("cap-toro-padre");
+      if (!sel) return null;
+      var v = (sel.value || "").trim();
+      if (v === "OTRO") {
+        var inpOtro = document.getElementById("cap-toro-otro");
+        return (inpOtro && inpOtro.value || "").trim() || null;
+      }
+      return v || null;
+    }
+
+    function bindToroParto() {
+      if (_tipoCapturaActual !== "parto") return;
+      var sel = document.getElementById("cap-toro-padre");
+      var wrapOtro = document.getElementById("cap-toro-otro-wrap");
+      var inpOtro = document.getElementById("cap-toro-otro");
+      if (!sel) return;
+      cargarListaToros(sel);
+      sel.addEventListener("change", function () {
+        if (sel.value === "OTRO") {
+          if (wrapOtro) wrapOtro.style.display = "block";
+          if (inpOtro) inpOtro.focus();
+        } else {
+          if (wrapOtro) wrapOtro.style.display = "none";
+          if (inpOtro) inpOtro.value = "";
+        }
+      });
+    }
+
+    // Paso 3: resumen legible y estructurado antes de guardar.
     function resumenCapHtml() {
       var d = recolectarCapDatos();
-      var tagR = d["cap-tag"] || d["cap-cria-tag"] || d["cap-tarea-potrero"] || "—";
       var fechaR = d["cap-fecha"] || new Date().toISOString().slice(0, 10);
-      var h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Objetivo: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaR) + "</b>";
+      var h = "";
+
+      if (_capTipo === "parto") {
+        var tipoEv = d["cap-tipo-evento"] || "PARTO";
+        var esPerdida = TIPOS_EVENTO_SIN_CRIA.indexOf(tipoEv) !== -1;
+        var vaca = d["cap-tag"] || "—";
+        var criaTag = d["cap-cria-tag"] || "(sin arete)";
+        var toroPadre = obtenerToroPadreSeleccionado();
+
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
+          + "🐮 " + esc(nombreTipoCap(_capTipo)) + " · " + esc(tipoEv)
+          + "</div>"
+          + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
+          + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+          + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Madre (Vaca):</small>"
+          + "<b style='font-size:15px; color:var(--texto); font-family:var(--font-mono);'>" + esc(vaca) + "</b>"
+          + "</div>"
+          + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+          + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Fecha del Parto:</small>"
+          + "<b style='font-size:13.5px; color:var(--texto); font-family:var(--font-mono);'>" + esc(fechaCorta(fechaR)) + "</b>"
+          + "</div>"
+          + "</div>";
+
+        if (!esPerdida) {
+          h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+            + "<div style='font-size:13px; color:var(--texto);'>"
+            + "👶 <b>Número de la Cría:</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(criaTag) + "</span>"
+            + "</div>"
+            + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
+            + "Sexo: <b>" + esc(d["cap-sexo"] || "Hembra") + "</b>"
+            + " · Estado: <b>" + esc(d["cap-estado-cria"] || "Vivo") + "</b>"
+            + (d["cap-peso-nacer"] ? (" · Peso al nacer: <b>" + esc(d["cap-peso-nacer"]) + " kg</b>") : "")
+            + "</div>"
+            + "</div>";
+
+          if (tipoEv === "GEMELAR") {
+            var cria2Tag = d["cap-cria2-tag"] || "(sin arete)";
+            h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+              + "<div style='font-size:13px; color:var(--texto);'>"
+              + "👶 <b>Número de Cría 2 (Gemelo):</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(cria2Tag) + "</span>"
+              + "</div>"
+              + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
+              + "Sexo: <b>" + esc(d["cap-sexo2"] || "Hembra") + "</b>"
+              + " · Estado: <b>" + esc(d["cap-estado-cria2"] || "Vivo") + "</b>"
+              + (d["cap-peso-nacer2"] ? (" · Peso: <b>" + esc(d["cap-peso-nacer2"]) + " kg</b>") : "")
+              + "</div>"
+              + "</div>";
+          }
+        }
+
+        if (toroPadre) {
+          h += "<div style='margin-bottom:6px; font-size:13px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+            + "🐂 <b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
+            + "</div>";
+        }
+        if (d["cap-pot-cria"] || d["cap-pot-madre"]) {
+          h += "<div style='margin-bottom:6px; font-size:12.5px; color:var(--texto-suave);'>"
+            + "📍 " + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
+            + (d["cap-pot-cria"] ? ("· Cría en <b>" + esc(d["cap-pot-cria"]) + "</b>") : "")
+            + "</div>";
+        }
+        if (d["cap-notas"]) {
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic; color:var(--texto-suave);'>💬 " + esc(d["cap-notas"]) + "</div>";
+        }
+        return h;
+      }
+
+      var tagR = d["cap-tag"] || d["cap-cria-tag"] || d["cap-tarea-potrero"] || "—";
+      h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Objetivo: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaCorta(fechaR)) + "</b>";
+      if (d["cap-cria-tag"] && d["cap-tag"]) {
+        h += "<br>Cría a destetar: <b>" + esc(d["cap-cria-tag"]) + "</b>";
+      }
       Object.keys(d).forEach(function (k) {
-        if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag") return;
+        if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
       return h;
@@ -4117,8 +4220,18 @@
       bindDesteteBusquedaCria();
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
+      bindToroParto();
       bindCamposTarea();
       aplicarDefaultsCaptura();
+
+      var fTag = document.getElementById("cap-tag");
+      if (fTag) {
+        fTag.addEventListener("input", onInputSugerir);
+        fTag.addEventListener("focus", function () {
+          var dl = document.getElementById("dl-tags");
+          if (!dl || !dl.children.length) cargarListasAutocompletar();
+        });
+      }
     }
 
     function wireStepperCap() {
@@ -4870,6 +4983,11 @@
           payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          var toroPadre = (typeof obtenerToroPadreSeleccionado === "function") ? obtenerToroPadreSeleccionado() : null;
+          if (toroPadre) {
+            payload.padre_tag = toroPadre;
+            payload.toro = toroPadre;
+          }
           if (payload.tipo_evento === "GEMELAR") {
             payload.gemelo = {
               id_cria_tag: (q("#cap-cria2-tag") && q("#cap-cria2-tag").value || "").trim() || null,
@@ -9026,33 +9144,95 @@
     });
     if (btnQr) btnQr.addEventListener("click", escanearQRCamara);
   }
-  // Autocompletar (datalist) para tag y potrero.
+  // Autocompletar (datalist) para tag, potrero y toros.
   function rellenarDatalist(id, items) {
     var dl = document.getElementById(id);
-    if (!dl) return;
-    dl.innerHTML = items.map(function (x) { return "<option value='" + esc(x) + "'>"; }).join("");
+    if (!dl || !items) return;
+    dl.innerHTML = items.map(function (x) {
+      if (typeof x === "object" && x !== null) {
+        var val = x.value !== undefined ? String(x.value) : "";
+        var lbl = x.label !== undefined ? String(x.label) : "";
+        if (lbl && lbl !== val) {
+          return "<option value='" + esc(val) + "' label='" + esc(lbl) + "'>" + esc(lbl) + "</option>";
+        }
+        return "<option value='" + esc(val) + "'>";
+      }
+      return "<option value='" + esc(x) + "'>";
+    }).join("");
   }
   function sugerirDesde(q) {
-    if (!q) return;
+    if (!q) { cargarListasAutocompletar(); return; }
     fetch("/api/buscar?q=" + encodeURIComponent(q)).then(function (r) { return r.json(); })
       .then(function (d) {
-        if (d && d.animales) rellenarDatalist("dl-tags", d.animales.map(function (a) { return a.tag; }));
-        if (d && d.potreros) rellenarDatalist("dl-potreros", d.potreros.map(function (p) { return p.nombre || p.codigo; }));
+        if (d && d.animales) {
+          rellenarDatalist("dl-tags", d.animales.map(function (a) {
+            var desc = (a.tag || "") + (a.nombre ? " · " + a.nombre : "") + (a.categoria ? " (" + a.categoria + ")" : "");
+            return { value: a.tag, label: desc };
+          }));
+        }
+        if (d && d.potreros) {
+          rellenarDatalist("dl-potreros", d.potreros.map(function (p) { return p.nombre || p.codigo; }));
+        }
       }).catch(function () { /* best-effort */ });
   }
   var _deb = null;
   function onInputSugerir(ev) {
-    var v = (ev.target.value || "").trim();
-    if (!v) { cargarListaPotreros(); return; }
+    var v = (ev.target && ev.target.value || "").trim();
+    if (!v) { cargarListasAutocompletar(); return; }
     clearTimeout(_deb);
     _deb = setTimeout(function () { sugerirDesde(v); }, 250);
   }
-  // Llena el datalist de potreros con la lista COMPLETA (selector desplegable).
-  function cargarListaPotreros() {
+  // Llena los datalists de potreros y tags activos con la lista completa.
+  function cargarListasAutocompletar() {
     fetch("/api/buscar?q=").then(function (r) { return r.json(); })
       .then(function (d) {
         if (d && d.potreros) {
           rellenarDatalist("dl-potreros", d.potreros.map(function (p) { return p.nombre || p.codigo; }));
+        }
+        if (d && d.animales && d.animales.length) {
+          rellenarDatalist("dl-tags", d.animales.map(function (a) {
+            var desc = (a.tag || "") + (a.nombre ? " · " + a.nombre : "") + (a.categoria ? " (" + a.categoria + ")" : "");
+            return { value: a.tag, label: desc };
+          }));
+        }
+      }).catch(function () { /* best-effort */ });
+  }
+  var cargarListaPotreros = cargarListasAutocompletar; // Alias de retrocompatibilidad
+
+  var _cacheToros = null;
+  function cargarListaToros(selEl) {
+    function poblar(toros) {
+      if (!toros) toros = [];
+      var itemsDl = toros.map(function (t) {
+        var desc = (t.tag || "") + (t.nombre ? " · " + t.nombre : "") + (t.raza ? " (" + t.raza + ")" : "");
+        return { value: t.tag, label: desc };
+      });
+      rellenarDatalist("dl-toros", itemsDl);
+
+      var sel = selEl || document.getElementById("cap-toro-padre");
+      if (sel) {
+        var valActual = sel.value || "";
+        var optHtml = "<option value=''>-- Sin especificar (opcional) --</option>";
+        toros.forEach(function (t) {
+          var label = (t.tag || "") + (t.nombre ? " · " + t.nombre : "") + (t.raza ? " [" + t.raza + "]" : "");
+          optHtml += "<option value='" + esc(t.tag) + "'>" + esc(label) + "</option>";
+        });
+        optHtml += "<option value='OTRO'>-- Otro toro / Pajuela / Externo --</option>";
+        sel.innerHTML = optHtml;
+        if (valActual) sel.value = valActual;
+      }
+    }
+
+    if (_cacheToros) {
+      poblar(_cacheToros);
+      return;
+    }
+
+    fetch("/api/toros").then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.toros) {
+          _cacheToros = d.toros;
+          poblar(_cacheToros);
         }
       }).catch(function () { /* best-effort */ });
   }
@@ -9578,20 +9758,33 @@
   // Autocompletar: tecleo en tag/potrero consulta /api/buscar y llena datalist.
   var inpPotrero = document.getElementById("f-potrero");
   var inpTag = document.getElementById("f-tag");
-  if (inpTag) inpTag.addEventListener("input", onInputSugerir);
+  if (inpTag) {
+    inpTag.addEventListener("input", onInputSugerir);
+    inpTag.addEventListener("focus", function () { cargarListasAutocompletar(); });
+    inpTag.addEventListener("click", function () { cargarListasAutocompletar(); });
+  }
   if (inpPotrero) {
     inpPotrero.addEventListener("input", onInputSugerir);
-    // Al enfocar (o tocar en móvil) se ofrece la lista completa para elegir.
-    inpPotrero.addEventListener("focus", function () { cargarListaPotreros(); });
-    inpPotrero.addEventListener("click", function () { cargarListaPotreros(); });
+    inpPotrero.addEventListener("focus", function () { cargarListasAutocompletar(); });
+    inpPotrero.addEventListener("click", function () { cargarListasAutocompletar(); });
   }
-  // El datalist #dl-potreros es compartido por TODOS los campos de potrero de
-  // la app (filtro superior, Traslado, Finanzas, Manga, editar animal), pero
-  // antes solo se llenaba al tocar el campo del filtro superior -- si el
-  // usuario nunca pasaba por ahí, los demás campos (con list='dl-potreros'
-  // en su HTML) se veían sin autocompletar. Se precarga una vez al iniciar
-  // para que esté listo en cualquier campo desde el principio.
-  cargarListaPotreros();
+  // Delegación global para inputs con datalist para que siempre estén precargados al enfocar o teclear
+  document.addEventListener("focusin", function (e) {
+    var list = e.target && e.target.getAttribute && e.target.getAttribute("list");
+    if (list === "dl-tags" || list === "dl-potreros") {
+      cargarListasAutocompletar();
+    } else if (list === "dl-toros") {
+      cargarListaToros();
+    }
+  });
+  document.addEventListener("input", function (e) {
+    var list = e.target && e.target.getAttribute && e.target.getAttribute("list");
+    if (list === "dl-tags" || list === "dl-potreros") {
+      onInputSugerir(e);
+    }
+  });
+  cargarListasAutocompletar();
+  cargarListaToros();
 
   /* ---------- Online/offline + polling ---------- */
   var barra = document.getElementById("barra-red");

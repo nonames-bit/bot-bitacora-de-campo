@@ -1535,9 +1535,9 @@ def datos_buscar(db: Database, q: str, limite: int = 8) -> dict:
     out: dict[str, Any] = {"animales": [], "potreros": []}
     errores: dict[str, str] = {}
     if not texto:
-        # Selector de potreros: con búsqueda vacía se devuelve la lista
-        # completa (el input "Potrero" del filtro superior debe poder elegir
-        # cualquier potrero sin teclear). Solo potreros, nunca animales.
+        # Selector de potreros y animales activos: con búsqueda vacía se devuelve
+        # la lista completa de potreros vigentes y de animales activos para
+        # alimentar los datalists de la PWA (#dl-potreros y #dl-tags).
         try:
             filas_p = db.query(
                 "SELECT nombre, codigo FROM potreros WHERE geom_wkt_4326 IS NOT NULL "
@@ -1547,6 +1547,16 @@ def datos_buscar(db: Database, q: str, limite: int = 8) -> dict:
         except Exception as e:
             logger.error("seccion potreros_lista_completa fallo", exc_info=True)
             errores["potreros"] = str(e)
+        try:
+            filas_a = db.query(
+                """SELECT a.tag, a.nombre, a.sexo, a.raza FROM animales a
+                   WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
+                   ORDER BY a.tag LIMIT 500"""
+            )
+            out["animales"] = _filas_dict(filas_a)
+        except Exception as e:
+            logger.error("seccion animales_lista_completa fallo", exc_info=True)
+            errores["animales"] = str(e)
         if errores:
             out["errores"] = errores
         return out
@@ -1557,7 +1567,7 @@ def datos_buscar(db: Database, q: str, limite: int = 8) -> dict:
                WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL
                  AND (UPPER(a.tag) LIKE UPPER(?) OR UPPER(COALESCE(a.nombre,'')) LIKE UPPER(?))
                ORDER BY a.tag LIMIT ?""",
-            (like, like, limite),
+            (like, like, max(limite, 50)),
         )
         out["animales"] = _filas_dict(filas)
     except Exception as e:
@@ -2073,7 +2083,7 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "notas_completado": r.get("notas_completado"),
                 "foto_completado": r.get("foto_completado"),
             })
-    except Exception as e:
+    except Exception:
         logger.error("seccion agenda_recordatorios_completados fallo", exc_info=True)
 
     out: dict[str, Any] = {

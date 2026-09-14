@@ -2066,6 +2066,36 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out = datos_buscar(db_path, q=q)
         return jsonify(out)
 
+    @app.get("/api/toros")
+    def api_toros():
+        """Lista de toros reproductores activos y machos disponibles en la finca."""
+        db_t = _db(db_path)
+        try:
+            filas = db_t.query("""
+                SELECT tag, nombre, raza, fecha_nacimiento FROM animales
+                WHERE estado = 'ACTIVO' AND UPPER(sexo) = 'MACHO'
+                ORDER BY CASE WHEN tag LIKE 'T%' THEN 0 ELSE 1 END, tag ASC
+            """)
+            toros = [
+                {
+                    "tag": r["tag"],
+                    "nombre": r["nombre"] or "",
+                    "raza": r["raza"] or "",
+                    "fecha_nacimiento": r["fecha_nacimiento"] or "",
+                    "es_reproductor": str(r["tag"]).upper().startswith("T"),
+                }
+                for r in filas
+            ]
+            return jsonify({"ok": True, "toros": toros})
+        except Exception as e:
+            logger.exception("Error al listar toros: %s", e)
+            return jsonify({"ok": False, "error": str(e), "toros": []}), 500
+        finally:
+            try:
+                db_t.close()
+            except Exception:
+                pass
+
     @app.get("/api/badges")
     def api_badges():
         # Contadores ligeros para los badges de la navegación (Agenda/Repro/Sanidad).
@@ -2569,6 +2599,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 try:
                     if tipo == "parto":
                         tipo_evento = str(payload.get("tipo_evento") or "PARTO").upper()
+                        padre_tag = payload.get("padre_tag") or payload.get("toro_tag") or payload.get("toro") or None
                         primer_id = db_sync.registrar_parto(
                             vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
                             fecha=fecha,
@@ -2581,6 +2612,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             potrero_madre=payload.get("potrero_madre"),
                             registrado_por=uid,
                             tipo_evento=tipo_evento,
+                            padre_tag=padre_tag,
                         )
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
@@ -2605,6 +2637,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                                 registrado_por=uid,
                                 tipo_evento="GEMELAR",
                                 grupo_parto_id=primer_id,
+                                padre_tag=padre_tag,
                             )
                     elif tipo == "destete":
                         db_sync.registrar_destete(
