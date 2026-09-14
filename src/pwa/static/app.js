@@ -8801,6 +8801,11 @@
         + " style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px;'></label>";
     }
 
+    var esToro = Boolean(
+      (f && f.tag && /^T\d+/i.test(f.tag)) ||
+      (f && f.notas && (/\[REPRODUCTOR\]/i.test(f.notas) || /\bTORO\b/i.test(f.notas)))
+    );
+
     var html = "<div id='animal-form-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
       + "<div class='modal-header'><b>" + icon(esEdicion ? "pencil" : "plus", 15) + (esEdicion ? "Editar Animal " + val(f.tag) : "Crear Animal Nuevo") + "</b>"
@@ -8816,6 +8821,11 @@
       + "<option value='Hembra'" + ((f && f.sexo) === "Hembra" ? " selected" : "") + ">Hembra</option>"
       + "<option value='Macho'" + ((f && f.sexo) === "Macho" ? " selected" : "") + ">Macho</option>"
       + "</select></label>"
+      + "<div id='an-toro-wrap' style='display:" + ((f && f.sexo) === "Macho" ? "block" : "none") + "; margin:2px 0 4px; padding:8px 12px; background:rgba(34,197,94,0.08); border-radius:6px; border:1px solid rgba(34,197,94,0.25);'>"
+      + "<label style='display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; cursor:pointer; margin:0;'>"
+      + "<input type='checkbox' id='an-es-toro'" + (esToro ? " checked" : "") + " style='width:16px; height:16px;'> "
+      + "🐂 ¿Es Reproductor / Toro activo de la finca?"
+      + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
@@ -8837,6 +8847,13 @@
     function cerrarModal() { if (ov) ov.remove(); }
     var btnCerrar = document.getElementById("btn-cerrar-animal-form");
     if (btnCerrar) btnCerrar.addEventListener("click", cerrarModal);
+    var selSexo = document.getElementById("an-sexo");
+    var wrapToro = document.getElementById("an-toro-wrap");
+    if (selSexo && wrapToro) {
+      selSexo.addEventListener("change", function () {
+        wrapToro.style.display = selSexo.value === "Macho" ? "block" : "none";
+      });
+    }
     var btnIrRect = document.getElementById("btn-ir-rectificar");
     if (btnIrRect) {
       btnIrRect.addEventListener("click", function () {
@@ -8851,13 +8868,22 @@
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var tag = (q("#an-tag").value || "").trim();
+      var chkEsToro = document.getElementById("an-es-toro");
+      var notasVal = (q("#an-notas") && q("#an-notas").value) || "";
+      if (chkEsToro && chkEsToro.checked) {
+        if (!/\[REPRODUCTOR\]/i.test(notasVal)) {
+          notasVal = (notasVal ? notasVal + " " : "") + "[REPRODUCTOR]";
+        }
+      } else if (chkEsToro && !chkEsToro.checked) {
+        notasVal = notasVal.replace(/\[REPRODUCTOR\]/gi, "").trim();
+      }
       var payload = {
         nombre: q("#an-nombre").value, sexo: q("#an-sexo").value,
         raza: q("#an-raza").value, fecha_nacimiento: q("#an-nacimiento").value,
         madre_tag: q("#an-madre").value, padre_tag: q("#an-padre").value,
         potrero: q("#an-potrero").value, hierro: q("#an-hierro").value,
         chip: q("#an-chip").value, color: q("#an-color").value,
-        notas: q("#an-notas").value,
+        notas: notasVal,
       };
       if (!esEdicion) payload.tag = tag;
       var errorEl = document.getElementById("animal-form-error");
@@ -8869,6 +8895,8 @@
         .then(function (res) {
           if (res.status >= 200 && res.status < 300 && res.body.ok) {
             cerrarModal();
+            _cacheToros = null;
+            cargarListaToros();
             abrirFicha(tag, vista, true);
             irAVista("ficha");
           } else if (errorEl) {
