@@ -2068,13 +2068,13 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/toros")
     def api_toros():
-        """Lista de toros reproductores activos y machos disponibles en la finca."""
+        """Lista de toros reproductores activos oficiales de la finca (T01 a T05)."""
         db_t = _db(db_path)
         try:
             filas = db_t.query("""
                 SELECT tag, nombre, raza, fecha_nacimiento FROM animales
-                WHERE estado = 'ACTIVO' AND UPPER(sexo) = 'MACHO'
-                ORDER BY CASE WHEN tag LIKE 'T%' THEN 0 ELSE 1 END, tag ASC
+                WHERE estado = 'ACTIVO' AND UPPER(tag) IN ('T01', 'T02', 'T03', 'T04', 'T05')
+                ORDER BY tag ASC
             """)
             toros = [
                 {
@@ -2082,7 +2082,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     "nombre": r["nombre"] or "",
                     "raza": r["raza"] or "",
                     "fecha_nacimiento": r["fecha_nacimiento"] or "",
-                    "es_reproductor": str(r["tag"]).upper().startswith("T"),
+                    "es_reproductor": True,
                 }
                 for r in filas
             ]
