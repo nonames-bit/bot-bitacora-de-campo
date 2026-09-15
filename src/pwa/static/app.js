@@ -716,15 +716,28 @@
         if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌾</span>";
         return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🍂</span>";
       }
-      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th>Ocupación</th><th>Reposo</th><th>Ha</th><th style='text-align:center;'>Animales</th></tr>";
+      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th style='text-align:center;'>Animales</th><th style='text-align:center;'>Ocupación</th><th style='text-align:center;'>Reposo</th><th style='text-align:right;'>Ha</th><th style='text-align:center;'>Acción</th></tr>";
       h += d.potreros.map(function (p) {
         var nom = p.nombre || p.codigo || p.id;
-        var st = p.semaforo === "🟢" ? "Descanso ok" : p.semaforo === "🟡" ? "Rotar pronto" : p.semaforo === "🔴" ? "Sobreocupado" : "Sin datos";
+        var nAnim = Number(p.total_animales) || 0;
+        var st = p.estado_rotacion || (nAnim > 0 ? (p.semaforo === "🟢" ? "Pastoreo óptimo" : p.semaforo === "🟡" ? "Rotar pronto" : "Sobreocupado") : "En reposo");
         var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "—";
+        var ocupTxt = nAnim > 0
+          ? (p.dias_ocupacion != null ? p.dias_ocupacion + " d" : "<span style='color:var(--verde-marca); font-weight:600;'>Activo</span>")
+          : "<span style='color:var(--texto-suave);'>—</span>";
+        var repTxt = nAnim > 0
+          ? "<span style='color:var(--texto-suave);'>—</span>"
+          : (iconoPastoVoisin(p.dias_reposo) + (p.dias_reposo != null ? p.dias_reposo + " d" : "—"));
+        var animCol = nAnim > 0
+          ? "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11.5px; padding:3px 9px; border-radius:5px; font-weight:700; display:inline-flex; align-items:center; gap:5px; background:rgba(46,125,50,0.12); color:var(--verde-marca); border:1px solid var(--verde-marca);' title='Ver " + nAnim + " animales en " + esc(nom) + "'>"
+            + icon("cow", 12) + "<span><b>" + nAnim + "</b> cab.</span></button>"
+          : "<span style='color:var(--texto-suave); font-size:12px;'>0 (Vacío)</span>";
+
         return "<tr><td style='white-space:nowrap;'><a href='#' class='link-potrero-animales' data-potrero='" + esc(nom) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
           + esc(nom) + "</a></td><td style='white-space:nowrap;'>" + chipEstado(p.semaforo + " " + st) + "</td>"
-          + "<td style='white-space:nowrap; text-align:center;'>" + (p.dias_ocupacion != null ? p.dias_ocupacion + " d" : "—") + "</td>"
-          + "<td style='white-space:nowrap; text-align:center;'>" + iconoPastoVoisin(p.dias_reposo) + (p.dias_reposo != null ? p.dias_reposo + " d" : "—") + "</td>"
+          + "<td style='text-align:center; white-space:nowrap;'>" + animCol + "</td>"
+          + "<td style='white-space:nowrap; text-align:center; font-weight:600;'>" + ocupTxt + "</td>"
+          + "<td style='white-space:nowrap; text-align:center;'>" + repTxt + "</td>"
           + "<td style='white-space:nowrap; text-align:right;'>" + haTxt + "</td>"
           + "<td style='text-align:center; white-space:nowrap;'><button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11px; padding:3px 8px; border-radius:5px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
           + icon("cow", 12) + "<span>Listar</span></button></td></tr>";
@@ -890,25 +903,28 @@
     });
   }
 
-  function abrirModalAnimalesPotrero(nomPotrero) {
-    if (!nomPotrero) return;
-    var idModal = "modal-animales-potrero";
-    var previo = document.getElementById(idModal);
+  function abrirModalListaAnimales(cfg) {
+    if (!cfg || !cfg.url) return;
+    var idModal = "modal-animales-lista";
+    var previo = document.getElementById(idModal) || document.getElementById("modal-animales-potrero");
     if (previo) previo.remove();
 
+    var icName = cfg.icono || "cow";
+    var tituloModal = cfg.titulo || "Animales Activos";
+
     var html = "<div id='" + idModal + "' class='modal-overlay' style='display:flex; align-items:center; justify-content:center; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; padding:12px; box-sizing:border-box;'>"
-      + "<div class='modal-contenido' style='max-width:620px; width:100%; max-height:88vh; display:flex; flex-direction:column; background:var(--superficie); border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,0.3); overflow:hidden;'>"
+      + "<div class='modal-contenido' style='max-width:640px; width:100%; max-height:88vh; display:flex; flex-direction:column; background:var(--superficie); border-radius:10px; box-shadow:0 8px 32px rgba(0,0,0,0.3); overflow:hidden;'>"
       + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center;'>"
-      + "<div style='display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:#fff;'>"
-      + icon("cow", 18)
-      + "<span>Potrero: " + esc(nomPotrero) + "</span>"
+      + "<div style='display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>"
+      + icon(icName, 18)
+      + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(tituloModal) + "</span>"
       + "</div>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-pot-animales' style='color:#fff; font-size:20px; padding:4px 8px;'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;'>✕</button>"
       + "</div>"
-      + "<div id='pot-modal-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
+      + "<div id='modal-lista-anim-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
       + "<div style='font-size:24px; margin-bottom:8px;'>⏳</div>"
-      + "Consultando animales activos en <b>" + esc(nomPotrero) + "</b>..."
+      + "Consultando animales activos..."
       + "</div>"
       + "</div>"
       + "</div></div>";
@@ -919,26 +935,26 @@
 
     var ov = document.getElementById(idModal);
     function cerrar() { if (ov) ov.remove(); }
-    var btnC = document.getElementById("btn-cerrar-pot-animales");
+    var btnC = document.getElementById("btn-cerrar-modal-lista-anim");
     if (btnC) btnC.addEventListener("click", cerrar);
     ov.addEventListener("click", function (e) {
       if (e.target === ov) cerrar();
     });
 
-    fetch("/api/potrero/" + encodeURIComponent(nomPotrero) + "/animales")
+    fetch(cfg.url)
       .then(function (r) {
         if (!r.ok) throw new Error("Error HTTP " + r.status);
         return r.json();
       })
       .then(function (data) {
-        var body = document.getElementById("pot-modal-body");
+        var body = document.getElementById("modal-lista-anim-body");
         if (!body) return;
         if (!data || !data.ok) {
-          body.innerHTML = "<p class='aviso'>⚠️ " + esc((data && data.error) || "No se pudo cargar la información del potrero.") + "</p>";
+          body.innerHTML = "<p class='aviso'>⚠️ " + esc((data && data.error) || "No se pudo cargar la información de los animales.") + "</p>";
           return;
         }
         var animales = data.animales || [];
-        var total = data.total_animales || 0;
+        var total = data.total != null ? data.total : (data.total_animales || animales.length);
         var categorias = data.resumen_categorias || {};
 
         var catsHtml = "";
@@ -954,21 +970,23 @@
         if (!animales.length) {
           content += "<div style='text-align:center; padding:30px 10px; color:var(--texto-suave);'>"
             + "<div style='font-size:28px; margin-bottom:8px;'>🌾</div>"
-            + "No hay animales activos asignados actualmente a este potrero."
+            + "No hay animales activos registrados en este grupo actualmente."
             + "</div>";
           body.innerHTML = content;
           return;
         }
 
-        content += "<input type='search' id='filtro-animal-potrero' class='modal-potrero-busqueda' placeholder='🔍 Filtrar por número, nombre o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
+        content += "<input type='search' id='filtro-animal-lista' class='modal-potrero-busqueda' placeholder='🔍 Filtrar por número, nombre, potrero o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
 
-        content += "<div class='tabla-scroll' style='max-height:50vh; overflow-y:auto; overflow-x:hidden;'><table id='tabla-modal-potrero' style='width:100%; font-size:12px; border-collapse:collapse; table-layout:fixed;'>"
+        var col5Tit = cfg.esPotrero ? "Días" : "Potrero";
+
+        content += "<div class='tabla-scroll' style='max-height:50vh; overflow-y:auto; overflow-x:hidden;'><table id='tabla-modal-lista' style='width:100%; font-size:12px; border-collapse:collapse; table-layout:fixed;'>"
           + "<thead><tr>"
-          + "<th style='width:25%; text-align:left; padding:6px 4px;'>Número</th>"
-          + "<th style='width:33%; text-align:left; padding:6px 4px;'>Nombre</th>"
+          + "<th style='width:24%; text-align:left; padding:6px 4px;'>Número</th>"
+          + "<th style='width:28%; text-align:left; padding:6px 4px;'>Nombre</th>"
           + "<th style='width:15%; text-align:center; padding:6px 2px;'>Edad</th>"
           + "<th style='width:13%; text-align:center; padding:6px 2px;'>Estado</th>"
-          + "<th style='width:14%; text-align:right; padding:6px 4px;'>Días</th>"
+          + "<th style='width:20%; text-align:" + (cfg.esPotrero ? "right" : "left") + "; padding:6px 4px;'>" + col5Tit + "</th>"
           + "</tr></thead>"
           + "<tbody>";
 
@@ -980,23 +998,31 @@
           var nomTxt = a.nombre && a.nombre !== a.tag ? esc(a.nombre) : "<span style='color:var(--texto-suave);'>—</span>";
           var edadTxt = a.edad || "—";
           var chipCat = "<span class='chip' style='font-size:10.5px; font-weight:700; padding:2px 4px;' title='" + esc(a.categoria_desc || a.categoria_sg) + (a.estado_reprod ? " · " + esc(a.estado_reprod) : "") + "'>" + esc(a.categoria_sg || "—") + "</span>";
-          var diasTxt = a.dias_texto || (a.dias_en_potrero != null ? a.dias_en_potrero + " d" : "—");
 
-          content += "<tr data-busqueda='" + esc((a.tag + " " + (a.nombre || "") + " " + (a.categoria_sg || "") + " " + (a.categoria_desc || "")).toLowerCase()) + "'>"
+          var col5Val;
+          if (cfg.esPotrero) {
+            col5Val = a.dias_texto || (a.dias_en_potrero != null ? a.dias_en_potrero + " d" : "—");
+          } else {
+            col5Val = a.potrero_nombre || "Sin potrero";
+          }
+
+          var bStr = (a.tag + " " + (a.nombre || "") + " " + (a.categoria_sg || "") + " " + (a.categoria_desc || "") + " " + (a.potrero_nombre || "") + " " + (a.estado_reprod || "")).toLowerCase();
+
+          content += "<tr data-busqueda='" + esc(bStr) + "'>"
             + "<td style='padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>" + tagLink + "</td>"
             + "<td style='padding:6px 4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' title='" + (a.nombre || "") + "'>" + nomTxt + "</td>"
             + "<td style='padding:6px 2px; text-align:center; white-space:nowrap; font-size:11px;'>" + esc(edadTxt) + "</td>"
             + "<td style='padding:6px 2px; text-align:center; white-space:nowrap;'>" + chipCat + "</td>"
-            + "<td style='padding:6px 4px; text-align:right; font-weight:600; white-space:nowrap; font-size:11.5px;'>" + esc(diasTxt) + "</td>"
+            + "<td style='padding:6px 4px; text-align:" + (cfg.esPotrero ? "right" : "left") + "; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11.5px;' title='" + esc(col5Val) + "'>" + esc(col5Val) + "</td>"
             + "</tr>";
         });
 
         content += "</tbody></table></div>";
-        content += "<div id='conteo-filtrados-pot' style='margin-top:8px; font-size:11.5px; color:var(--texto-suave); text-align:right;'>Mostrando " + animales.length + " de " + total + "</div>";
+        content += "<div id='conteo-filtrados-lista' style='margin-top:8px; font-size:11.5px; color:var(--texto-suave); text-align:right;'>Mostrando " + animales.length + " de " + total + "</div>";
         body.innerHTML = content;
 
-        var inputFiltro = document.getElementById("filtro-animal-potrero");
-        var contadorEl = document.getElementById("conteo-filtrados-pot");
+        var inputFiltro = document.getElementById("filtro-animal-lista");
+        var contadorEl = document.getElementById("conteo-filtrados-lista");
         if (inputFiltro) {
           inputFiltro.addEventListener("input", function () {
             var qVal = (this.value || "").trim().toLowerCase();
@@ -1018,13 +1044,37 @@
         }
       })
       .catch(function (err) {
-        var body = document.getElementById("pot-modal-body");
+        var body = document.getElementById("modal-lista-anim-body");
         if (body) {
           body.innerHTML = "<p class='aviso'>❌ Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
         }
       });
   }
+
+  function abrirModalAnimalesPotrero(nomPotrero) {
+    if (!nomPotrero) return;
+    abrirModalListaAnimales({
+      titulo: "Potrero: " + nomPotrero,
+      url: "/api/potrero/" + encodeURIComponent(nomPotrero) + "/animales",
+      icono: "grass",
+      esPotrero: true
+    });
+  }
   window.abrirModalAnimalesPotrero = abrirModalAnimalesPotrero;
+
+  function abrirModalGrupoInventario(tipo, valor, sexo, titulo) {
+    if (!tipo || !valor) return;
+    var tit = titulo || (tipo === "estructura" ? "Estructura del hato: " + valor : (tipo === "bracket" ? "Categoría de edad: " + valor : valor));
+    var url = "/api/inventario/animales?tipo=" + encodeURIComponent(tipo) + "&valor=" + encodeURIComponent(valor);
+    if (sexo) url += "&sexo=" + encodeURIComponent(sexo);
+    abrirModalListaAnimales({
+      titulo: tit,
+      url: url,
+      icono: tipo === "potrero" ? "grass" : "cow",
+      esPotrero: (tipo === "potrero")
+    });
+  }
+  window.abrirModalGrupoInventario = abrirModalGrupoInventario;
 
   function cargarRondasRecientes() {
     var box = document.getElementById("rondas-recientes");
@@ -2750,17 +2800,15 @@
     filas.forEach(function (f) {
       var color = COLORES_HATO_SG[f.categoria] || "#90a4ae";
       var pct = Math.max(0, Number(f.pct) || 0);
-      segs += "<div style='width:" + pct + "%; background:" + color + ";' title=\"" + esc(f.categoria) + ": " + esc(f.n) + " (" + esc(f.pct) + "%)\"></div>";
-      leyenda += "<span style='display:inline-flex; align-items:center; gap:5px;'>"
+      segs += "<div class='link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='width:" + pct + "%; background:" + color + "; cursor:pointer;' title=\"" + esc(f.categoria) + ": " + esc(f.n) + " (" + esc(f.pct) + "%) — Clic para listar\"></div>";
+      leyenda += "<span class='link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='display:inline-flex; align-items:center; gap:5px; cursor:pointer; padding:2px 4px; border-radius:4px;' title='Clic para listar " + esc(f.categoria) + "'>"
         + "<span style='width:10px; height:10px; border-radius:2px; background:" + color + "; display:inline-block; flex-shrink:0;'></span>"
         + esc(f.categoria) + " <b>" + esc(f.n) + "</b> (" + esc(f.pct) + "%)</span>";
     });
     return "<div style='display:flex; height:30px; border-radius:7px; overflow:hidden; border:1px solid var(--borde-fuerte); margin-bottom:12px;'>" + segs + "</div>"
       + "<div style='display:flex; flex-wrap:wrap; gap:8px 16px; font-size:12.5px; margin-bottom:6px;'>" + leyenda + "</div>";
   }
-  // Lista de potreros con barra proporcional al más cargado (reemplaza la
-  // tabla plana "Potrero | Cabezas" -- de un vistazo se ve cuál potrero
-  // concentra más animales, sin tener que leer y comparar números).
+  // Lista de potreros con barra proporcional al más cargado y clic directo para listar animales
   function barraDistribucionPotreros(filas) {
     if (!filas || !filas.length) return vacio("Ningún potrero con animales.");
     var max = 0;
@@ -2770,20 +2818,15 @@
       var nom = String(f.potrero || "");
       var n = Number(f.n) || 0;
       var pct = max > 0 ? Math.max(4, Math.round((n / max) * 100)) : 0;
-      var esReal = nom && nom.toLowerCase() !== "sin potrero";
-      var etiqueta = esReal
-        ? "<a href='/?v=tablero&potrero=" + encodeURIComponent(nom) + "' style='font-weight:600; font-size:13px; text-decoration:none; color:var(--texto-color);'>" + esc(nom) + "</a>"
-        : "<span style='font-weight:600; font-size:13px; color:var(--texto-suave);'>" + esc(nom) + "</span>";
-      // Nombre en su propia línea (nunca se corta, sin importar largo) y la
-      // barra a todo el ancho debajo -- así todas arrancan en el mismo x y
-      // quedan alineadas, sin depender de una columna de etiqueta fija que
-      // truncaba nombres largos como "CASA ABAJO VERSALLES".
-      h += "<div>"
-        + "<div style='display:flex; justify-content:space-between; align-items:baseline; gap:8px; margin-bottom:3px;'>"
+      var etiqueta = "<a href='#' class='link-potrero-animales' data-potrero='" + esc(nom) + "' style='font-weight:700; font-size:13px; text-decoration:none; color:var(--verde-marca); display:inline-flex; align-items:center; gap:4px;' title='Ver " + n + " animales en " + esc(nom) + "'>"
+        + icon("grass", 13) + esc(nom) + "</a>";
+      h += "<div style='background:var(--tarjeta-fondo); padding:8px 12px; border-radius:8px; border:1px solid var(--borde);'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;'>"
         + "<span>" + etiqueta + "</span>"
-        + "<b style='font-size:13px; flex-shrink:0;'>" + esc(n) + "</b>"
+        + "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11.5px; padding:2px 8px; border-radius:5px; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>"
+        + icon("cow", 12) + "<span>" + esc(n) + " cab.</span></button>"
         + "</div>"
-        + "<div style='background:var(--superficie); border-radius:6px; height:16px; overflow:hidden; border:1px solid var(--borde-suave);'>"
+        + "<div class='btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='cursor:pointer; background:var(--superficie); border-radius:6px; height:14px; overflow:hidden; border:1px solid var(--borde-suave);' title='Clic para ver animales en " + esc(nom) + "'>"
         + "<div style='width:" + pct + "%; height:100%; background:var(--verde-marca); border-radius:6px;'></div>"
         + "</div>"
         + "</div>";
@@ -2816,18 +2859,30 @@
       h += vacio("Sin animales activos para clasificar.");
     } else {
       h += barraApiladaCategorias(eh.filas);
-      h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Cabezas</th><th>%</th><th>UGG (est.)</th></tr>";
+      h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th style='text-align:center;'>Cabezas</th><th>%</th><th>UGG (est.)</th><th style='text-align:center;'>Acción</th></tr>";
       eh.filas.forEach(function (f) {
-        h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.ugg) + "</td></tr>";
+        h += "<tr>"
+          + "<td><a href='#' class='link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
+          + "<td style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700;'>" + esc(f.n) + "</span></td>"
+          + "<td>" + esc(f.pct) + "%</td>"
+          + "<td>" + esc(f.ugg) + "</td>"
+          + "<td style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:11px; padding:2px 8px; border-radius:4px;'>Listar</button></td>"
+          + "</tr>";
       });
-      h += "<tr style='font-weight:700;'><td>Total</td><td>" + esc(eh.total) + "</td><td>100%</td><td>" + esc(eh.total_ugg) + "</td></tr>";
+      h += "<tr style='font-weight:700;'><td>Total</td><td style='text-align:center;'>" + esc(eh.total) + "</td><td>100%</td><td>" + esc(eh.total_ugg) + "</td><td></td></tr>";
       h += "</table></div>";
       h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
     }
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
-    h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th>Nro</th><th>Distrib.</th><th>Acum.</th></tr>";
+    h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th style='text-align:center;'>Nro</th><th>Distrib.</th><th>Acum.</th><th style='text-align:center;'>Acción</th></tr>";
     (d.filas || []).forEach(function (f) {
-      h += "<tr><td>" + esc(f.categoria) + "</td><td>" + esc(f.n) + "</td><td>" + esc(f.pct) + "%</td><td>" + esc(f.acum) + "%</td></tr>";
+      h += "<tr>"
+        + "<td><a href='#' class='link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
+        + "<td style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700;'>" + esc(f.n) + "</span></td>"
+        + "<td>" + esc(f.pct) + "%</td>"
+        + "<td>" + esc(f.acum) + "%</td>"
+        + "<td style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:11px; padding:2px 8px; border-radius:4px;'>Listar</button></td>"
+        + "</tr>";
     });
     h += "</table></div>";
     h += "<h4>" + icon("grass") + "Distribución por potrero</h4>";
@@ -2844,9 +2899,11 @@
         var hB = Math.round((Number(f.hembras) || 0) / maxP * 100);
         var mB = Math.round((Number(f.machos) || 0) / maxP * 100);
         h += "<div class='pir-fila'>"
-          + "<div class='pir-pista der'><div class='pir-barra hembra' style='width:" + hB + "%'></div></div>"
-          + "<div class='pir-banda'>" + esc(f.banda) + "<br><small>" + esc(f.hembras) + " H · " + esc(f.machos) + " M</small></div>"
-          + "<div class='pir-pista izq'><div class='pir-barra macho' style='width:" + mB + "%'></div></div>"
+          + "<div class='pir-pista der'><div class='pir-barra hembra link-grupo-inventario' data-grupo-tipo='piramide' data-grupo-valor='" + esc(f.banda) + "' data-sexo='H' style='width:" + hB + "%; cursor:pointer;' title='Ver " + esc(f.hembras) + " hembras (" + esc(f.banda) + ")'></div></div>"
+          + "<div class='pir-banda link-grupo-inventario' data-grupo-tipo='piramide' data-grupo-valor='" + esc(f.banda) + "' style='cursor:pointer;' title='Ver animales en banda " + esc(f.banda) + "'>"
+          + esc(f.banda) + "<br><small><span class='link-grupo-inventario' data-grupo-tipo='piramide' data-grupo-valor='" + esc(f.banda) + "' data-sexo='H' style='color:var(--verde-marca); font-weight:700;'>" + esc(f.hembras) + " H</span> · "
+          + "<span class='link-grupo-inventario' data-grupo-tipo='piramide' data-grupo-valor='" + esc(f.banda) + "' data-sexo='M' style='color:#1976d2; font-weight:700;'>" + esc(f.machos) + " M</span></small></div>"
+          + "<div class='pir-pista izq'><div class='pir-barra macho link-grupo-inventario' data-grupo-tipo='piramide' data-grupo-valor='" + esc(f.banda) + "' data-sexo='M' style='width:" + mB + "%; cursor:pointer;' title='Ver " + esc(f.machos) + " machos (" + esc(f.banda) + ")'></div></div>"
           + "</div>";
       });
       h += "</div>";
@@ -9041,10 +9098,22 @@
       if (potNom) abrirModalAnimalesPotrero(potNom);
       return;
     }
+    var elGrupo = e.target.closest(".link-grupo-inventario, .fila-grupo-inventario, [data-grupo-tipo]");
+    if (elGrupo) {
+      e.preventDefault();
+      var gTipo = elGrupo.getAttribute("data-grupo-tipo");
+      var gVal = elGrupo.getAttribute("data-grupo-valor");
+      var gSexo = elGrupo.getAttribute("data-sexo") || "";
+      var gTit = elGrupo.getAttribute("data-grupo-titulo") || "";
+      if (gTipo && gVal) {
+        abrirModalGrupoInventario(gTipo, gVal, gSexo, gTit);
+        return;
+      }
+    }
     var elFicha = e.target.closest("[data-ir-ficha]");
     if (elFicha) {
       e.preventDefault();
-      var modalPot = document.getElementById("modal-animales-potrero");
+      var modalPot = document.getElementById("modal-animales-potrero") || document.getElementById("modal-animales-lista");
       if (modalPot) modalPot.remove();
       abrirFichaDesdeTag(elFicha.getAttribute("data-ir-ficha"));
       return;

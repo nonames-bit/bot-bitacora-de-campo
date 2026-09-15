@@ -635,6 +635,16 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Depuración de Duplicados & Corrección de Captura**: Eliminación del registro accidental de suma acumulada (fila 473 de 5,092 L) y protección en `app.js` (`bindTablaReciboIa`) para no volcar la suma quincenal en el campo de un solo día.
     - **Gráfico Interactivo de Producción Diaria (SVG responsivo)**: Curva de barras con litros por día, línea de promedio diario destacada (318.2 L/d), picos y pisos identificados, y tooltips vectoriales adaptados a móvil (390×844) y escritorio.
     - **KPIs Ejecutivos & Tabla Detallada**: Total período (5,092 L en 16 días), promedio diario (318.2 L/d), pico más alto (368 L el 24-Ago), piso más bajo (276 L el 26-Ago) y desglose día a día con variación vs promedio (+/- L) y foto de respaldo.
+- [x] **Ocupación Dinámica de Potreros & Listado Interactivo de Animales en Inventario (`v=pasturas`, `v=inventario`, 2026-09-14)**:
+    - **Ocupación Dinámica Real Voisin (`datos_pasturas`)**: Corrección de ocupaciones estáticas en 0 d. Ahora calcula en tiempo real los días de ocupación basados en la fecha del último traslado o entrada (`traslados.fecha` / `potreros.fecha_entrada`) para potreros con animales activos (`estado = 'ACTIVO'`), y días de reposo con estadios de pastura (🌱 Rebrote, 🌿 Desarrollo, 🌾 Óptimo, 🍂 Pasado) para potreros en descanso.
+    - **Columna Total Animales en Tabla de Pasturas**: Despliegue de cabezas activas por potrero (ej. `🐄 53 cab.`, `🐄 100 cab.`, o `0 (Vacío)`) con botón de acción directa "Listar" para consultar los animales presentes sin salir de la vista.
+    - **Exploración Interactiva de Inventario Completo (`/api/inventario/animales`)**:
+      - **Estructura del Hato (Categorías SG)**: Clic en cualquier categoría (Cría macho/hembra, Novillas, Vacas paridas/secas, Machos ceba, Reproductores), barra apilada o botón "Listar" abre un modal interactivo con el censo de animales activos.
+      - **Categorías de Edad (Brackets)**: Exploración interactiva por grupos etarios (<1a H, 1-2a H, 2-4a H, 4-8a H, 8-10a H, >10a H, <1a M, 1-2a M, Reproductores).
+      - **Distribución por Potrero**: Tarjetas y barras de ocupación con acceso inmediato a los animales de cada potrero y del grupo "Sin potrero".
+      - **Pirámide de Edades**: Clic directo en las barras o leyendas (ej. `47 H · 53 M`) para listar los animales de cada género y grupo etario.
+    - **Filtro Estricto de Hato Activo**: Conforme a la directriz de `AGENTS.md`, todas las consultas filtran rigurosamente por `estado = 'ACTIVO'` (336 animales en total), evitando inflar el inventario con registros históricos.
+    - **Verificación Visual Móvil**: Pruebas automáticas CDP en viewport móvil (390×844 DPR=2) y validación de sintaxis con hooks locales.
 - [x] Suite de pruebas con pytest: **831+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))

@@ -538,15 +538,102 @@ def datos_pasturas(db: Database) -> dict:
         errores["potreros"] = str(e)
         potreros = []
     for p in potreros:
-        oc = p.get("dias_ocupacion")
-        try:
-            oc_i = int(oc) if oc is not None else None
-        except Exception:
-            oc_i = None
-        # Semáforo Voisin: 1-3 verde, 4-6 amarillo, ≥7 rojo.
-        p["semaforo"] = ("🟢" if (oc_i is not None and oc_i <= 3)
-                         else "🟡" if (oc_i is not None and oc_i <= 6)
-                         else "🔴" if oc_i is not None else "⚪")
+        p["total_animales"] = 0
+
+    hoy_date = date.today()
+    from ..utils import to_date
+
+    # Conteo dinámico de animales activos y fecha de ingreso más reciente por potrero
+    info_por_pot: dict[int, dict] = {}
+    try:
+        sql_anim = """
+            WITH ult_traslado AS (
+                SELECT animal_id, potrero_destino, fecha,
+                       ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+                FROM traslados
+            )
+            SELECT COALESCE(ut.potrero_destino, a.potrero_id) as pot_id,
+                   COUNT(*) as total_animales,
+                   MAX(ut.fecha) as ult_fecha_ingreso
+            FROM animales a
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) IS NOT NULL
+            GROUP BY COALESCE(ut.potrero_destino, a.potrero_id)
+        """
+        for f in db.query(sql_anim):
+            info_por_pot[f["pot_id"]] = dict(f)
+    except Exception:
+        logger.error("error calculando animales por potrero en pasturas", exc_info=True)
+
+    # Última salida registrada para potreros en reposo
+    info_salida: dict[int, str] = {}
+    try:
+        sql_sal = """
+            SELECT potrero_origen, MAX(fecha) as ult_fecha_salida
+            FROM traslados
+            WHERE potrero_origen IS NOT NULL
+            GROUP BY potrero_origen
+        """
+        for f in db.query(sql_sal):
+            if f["potrero_origen"] is not None and f["ult_fecha_salida"]:
+                info_salida[f["potrero_origen"]] = f["ult_fecha_salida"]
+    except Exception:
+        logger.error("error calculando fechas de salida en pasturas", exc_info=True)
+
+    for p in potreros:
+        pid = p["id"]
+        anim = info_por_pot.get(pid)
+        n_anim = anim["total_animales"] if anim else 0
+        p["total_animales"] = n_anim
+
+        if n_anim > 0:
+            # Potrero ocupado
+            f_ing = (anim.get("ult_fecha_ingreso") if anim else None) or p.get("fecha_entrada")
+            dias_ocup = None
+            if f_ing and to_date(f_ing):
+                dias_ocup = max(1, (hoy_date - to_date(f_ing)).days)
+            elif p.get("dias_ocupacion") and int(p["dias_ocupacion"]) > 0:
+                dias_ocup = int(p["dias_ocupacion"])
+
+            p["dias_ocupacion"] = dias_ocup
+            p["dias_reposo"] = None  # En pastoreo activo
+
+            if dias_ocup is not None:
+                if dias_ocup <= 3:
+                    p["semaforo"] = "🟢"
+                    p["estado_rotacion"] = f"Pastoreo óptimo ({dias_ocup} d)"
+                elif dias_ocup <= 6:
+                    p["semaforo"] = "🟡"
+                    p["estado_rotacion"] = f"Rotar pronto ({dias_ocup} d)"
+                else:
+                    p["semaforo"] = "🔴"
+                    p["estado_rotacion"] = f"Sobreocupado ({dias_ocup} d)"
+            else:
+                p["semaforo"] = "🟢"
+                p["estado_rotacion"] = "Pastoreo activo"
+        else:
+            # Potrero desocupado / en reposo
+            p["dias_ocupacion"] = None
+            dias_rep = None
+            f_sal = p.get("fecha_salida") or info_salida.get(pid)
+            if f_sal and to_date(f_sal):
+                dias_rep = max(0, (hoy_date - to_date(f_sal)).days)
+            elif p.get("dias_reposo") is not None:
+                try:
+                    dias_rep = int(p["dias_reposo"])
+                except Exception:
+                    dias_rep = None
+
+            p["dias_reposo"] = dias_rep
+            if dias_rep is not None and dias_rep >= 30:
+                p["semaforo"] = "🟢"
+                p["estado_rotacion"] = f"Listo pastoreo ({dias_rep} d)"
+            elif dias_rep is not None:
+                p["semaforo"] = "🌱"
+                p["estado_rotacion"] = f"En reposo ({dias_rep} d)"
+            else:
+                p["semaforo"] = "🌱"
+                p["estado_rotacion"] = "En reposo"
     try:
         ndvi = _filas_dict(db.query(
             """SELECT p.nombre potrero, n.fecha, n.ndvi_promedio, n.biomasa_estimada_kg_ha,
@@ -683,13 +770,18 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
 
     if not p_row:
         norm_ref = normalizar(str(potrero_ref)).strip().upper()
-        todos_p = db.query("SELECT * FROM potreros")
-        for p in todos_p:
-            nom_p = normalizar(p["nombre"] or p["codigo"] or "").strip().upper()
-            if nom_p and (norm_ref == nom_p or norm_ref in nom_p):
-                p_row = p
-                pot_id = p["id"]
-                break
+        if norm_ref in ("SIN POTRERO", "SIN_POTRERO", "NINGUNO", "NULL", "SIN"):
+            pot_id = -1
+            nom_potrero = "Sin potrero"
+            p_row = {"id": -1, "nombre": "Sin potrero", "codigo": "SIN"}
+        else:
+            todos_p = db.query("SELECT * FROM potreros")
+            for p in todos_p:
+                nom_p = normalizar(p["nombre"] or p["codigo"] or "").strip().upper()
+                if nom_p and (norm_ref == nom_p or norm_ref in nom_p):
+                    p_row = p
+                    pot_id = p["id"]
+                    break
 
     if not p_row or pot_id is None:
         return {
@@ -701,21 +793,38 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
 
     nom_potrero = p_row["nombre"] or p_row["codigo"] or f"Potrero #{pot_id}"
 
-    sql = """
-        WITH ult_traslado AS (
-            SELECT animal_id, potrero_destino, fecha,
-                   ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
-            FROM traslados
-        )
-        SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
-               COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
-               ut.fecha as fecha_ingreso
-        FROM animales a
-        LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
-        WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) = ?
-        ORDER BY a.tag ASC
-    """
-    filas = db.query(sql, (pot_id,))
+    if pot_id == -1:
+        sql = """
+            WITH ult_traslado AS (
+                SELECT animal_id, potrero_destino, fecha,
+                       ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+                FROM traslados
+            )
+            SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
+                   COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
+                   ut.fecha as fecha_ingreso
+            FROM animales a
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) IS NULL
+            ORDER BY a.tag ASC
+        """
+        filas = db.query(sql)
+    else:
+        sql = """
+            WITH ult_traslado AS (
+                SELECT animal_id, potrero_destino, fecha,
+                       ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+                FROM traslados
+            )
+            SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
+                   COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
+                   ut.fecha as fecha_ingreso
+            FROM animales a
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) = ?
+            ORDER BY a.tag ASC
+        """
+        filas = db.query(sql, (pot_id,))
 
     animales_out = []
     conteo_cat: dict[str, int] = {}
@@ -820,6 +929,281 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
         "total_animales": len(animales_out),
         "resumen_categorias": conteo_cat,
         "animales": animales_out,
+    }
+
+
+def animales_por_grupo_inventario(
+    db: Database,
+    tipo: str,
+    valor: str,
+    sexo: Optional[str] = None,
+    hoy: Optional[date] = None,
+) -> dict:
+    """Retorna los animales ACTIVOS de un grupo del inventario (Estructura del hato,
+    Categorías de edad / Brackets, Distribución por potrero, o Pirámide).
+    Cumple estrictamente la Regla Fundamental de Inventario (estado = 'ACTIVO').
+    """
+    hoy_date = hoy or date.today()
+    from ..utils import to_date, normalizar
+
+    tipo_norm = (tipo or "").strip().lower()
+    valor_norm = normalizar(str(valor or "")).strip().lower()
+    sexo_norm = (sexo or "").strip().upper()
+
+    # Si el tipo es potrero, delegar a animales_de_potrero
+    if tipo_norm in ("potrero", "potreros"):
+        res = animales_de_potrero(db, valor, hoy=hoy_date)
+        if res.get("ok"):
+            return {
+                "ok": True,
+                "tipo": "potrero",
+                "valor": valor,
+                "titulo": f"Potrero: {res.get('potrero_nombre', valor)}",
+                "total": res.get("total", 0),
+                "total_animales": res.get("total_animales", 0),
+                "resumen_categorias": res.get("resumen_categorias", {}),
+                "animales": res.get("animales", []),
+            }
+
+    sql = """
+        WITH ult_traslado AS (
+            SELECT animal_id, potrero_destino, fecha, lote,
+                   ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+            FROM traslados
+        ),
+        ult_parto AS (
+            SELECT vaca_id, MAX(fecha) as ult_parto_fecha
+            FROM partos
+            GROUP BY vaca_id
+        )
+        SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.madre_id, a.notas,
+               COALESCE(ut.potrero_destino, a.potrero_id) as pot_id,
+               p.nombre as potrero_nombre,
+               ut.fecha as fecha_traslado,
+               up.ult_parto_fecha
+        FROM animales a
+        LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+        LEFT JOIN ult_parto up ON up.vaca_id = a.id_animal
+        LEFT JOIN potreros p ON p.id = COALESCE(ut.potrero_destino, a.potrero_id)
+        WHERE a.estado = 'ACTIVO'
+        ORDER BY a.tag ASC
+    """
+    filas = _filas_dict(db.query(sql))
+
+    todos = []
+    for a in filas:
+        aid = a["id_animal"]
+        tag = a["tag"] or str(aid)
+        nombre = a["nombre"] or "—"
+
+        fn = to_date(a["fecha_nacimiento"])
+        if not fn:
+            p = db.query_one(
+                "SELECT fecha FROM partos WHERE id_cria = ? AND (vaca_id IS NULL OR vaca_id != ?) ORDER BY fecha DESC LIMIT 1",
+                (aid, aid),
+            )
+            if p and p["fecha"]:
+                fn = to_date(p["fecha"])
+            elif a["madre_id"] and a["madre_id"] != aid:
+                p_m = db.query_one(
+                    "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                    (a["madre_id"],),
+                )
+                if p_m and p_m["fecha"]:
+                    d_m = to_date(p_m["fecha"])
+                    if d_m and (hoy_date - d_m).days <= 450:
+                        fn = d_m
+
+        edad_dias = max(0, (hoy_date - fn).days) if fn else None
+        if fn and edad_dias is not None:
+            if edad_dias < 30:
+                edad_str = f"{edad_dias}d"
+            elif edad_dias < 365:
+                edad_str = f"{edad_dias // 30}m"
+            else:
+                anios = edad_dias // 365
+                meses_rem = (edad_dias % 365) // 30
+                edad_str = f"{anios}a {meses_rem}m" if meses_rem > 0 else f"{anios}a"
+        else:
+            edad_str = "S/D"
+
+        s_raw = (a["sexo"] or "").strip().lower()
+        if not s_raw or s_raw in ("i", "indefinido", "indeterminado", "desconocido", "?"):
+            p_cria = db.query_one(
+                "SELECT sexo_cria FROM partos WHERE id_cria = ? AND sexo_cria IS NOT NULL ORDER BY fecha DESC LIMIT 1",
+                (aid,),
+            )
+            if p_cria and p_cria["sexo_cria"]:
+                s_raw = p_cria["sexo_cria"].strip().lower()
+
+        es_macho = bool(s_raw.startswith("m") or s_raw in ("macho", "toro", "ternero", "novillo", "buey"))
+        es_hembra = bool(s_raw.startswith("h") or s_raw in ("hembra", "vaca", "novilla", "ternera"))
+
+        cat_sg = "S/C"
+        cat_desc = "Sin clasificar"
+        bracket = "Sin clasificar"
+        pir_banda = "Desconocida"
+        estado_reprod = ""
+
+        if es_hembra:
+            sexo_str = "Hembra"
+            if edad_dias is not None and edad_dias < 365:
+                cat_sg = "CH"
+                cat_desc = "Cría hembra"
+                bracket = "Hembras <1 año"
+                pir_banda = "< 1 año"
+                estado_reprod = "Cría al pie"
+            elif edad_dias is not None and edad_dias < 730:
+                cat_sg = "HL"
+                cat_desc = "Levante hembra"
+                bracket = "Hembras 1-2 años"
+                pir_banda = "1 - 2 años"
+                estado_reprod = "Levante"
+            else:
+                pir_banda = "2+ años"
+                if edad_dias is not None:
+                    if edad_dias < 1460:
+                        bracket = "Hembras 2-4 años"
+                    elif edad_dias <= 2921:
+                        bracket = "Hembras 4-8 años"
+                    elif edad_dias <= 3651:
+                        bracket = "Hembras 8-10 años"
+                    else:
+                        bracket = "Hembras >10 años"
+                else:
+                    bracket = "Hembras >10 años"
+
+                ult_p = a.get("ult_parto_fecha")
+                if ult_p and to_date(ult_p):
+                    del_dias = (hoy_date - to_date(ult_p)).days
+                    if del_dias <= 305:
+                        cat_sg = "VP"
+                        cat_desc = "Vaca parida"
+                        estado_reprod = f"Parida ({del_dias} DEL)"
+                    else:
+                        cat_sg = "VS"
+                        cat_desc = "Vaca seca"
+                        estado_reprod = f"Seca ({del_dias} DEL)"
+                else:
+                    cat_sg = "NV"
+                    cat_desc = "Novilla de vientre"
+                    estado_reprod = "Novilla de vientre"
+        elif es_macho:
+            sexo_str = "Macho"
+            nom_m = f"{a['nombre'] or ''} {a['notas'] or ''} {a['tag'] or ''}".upper()
+            if "REPRODUCTOR" in nom_m or "PADRON" in nom_m or "TORO" in nom_m or (edad_dias is not None and edad_dias >= 1095):
+                cat_sg = "TR"
+                cat_desc = "Reproductor"
+                bracket = "Reproductor"
+                pir_banda = "2+ años"
+                estado_reprod = "Toro reproductor"
+            elif edad_dias is not None and edad_dias < 365:
+                cat_sg = "CM"
+                cat_desc = "Cría macho"
+                bracket = "Machos <1 año"
+                pir_banda = "< 1 año"
+                estado_reprod = "Cría al pie"
+            elif edad_dias is not None and edad_dias < 730:
+                cat_sg = "ML"
+                cat_desc = "Levante macho"
+                bracket = "Machos 1-2 años"
+                pir_banda = "1 - 2 años"
+                estado_reprod = "Levante"
+            else:
+                cat_sg = "MC"
+                cat_desc = "Macho de ceba/levante adulto"
+                bracket = "Machos >2 años"
+                pir_banda = "2+ años"
+                estado_reprod = "Ceba / Engorde"
+        else:
+            sexo_str = "Indefinido"
+            cat_sg = "MC"
+            cat_desc = "Macho de ceba/levante adulto"
+            bracket = "Sin clasificar"
+            pir_banda = "Desconocida"
+
+        pot_nom = a["potrero_nombre"] or "Sin potrero"
+        f_ing = to_date(a["fecha_traslado"])
+        dias_pot = max(0, (hoy_date - f_ing).days) if f_ing else None
+
+        todos.append({
+            "id_animal": aid,
+            "tag": tag,
+            "nombre": nombre,
+            "sexo": sexo_str,
+            "edad": edad_str,
+            "edad_dias": edad_dias,
+            "categoria_sg": cat_sg,
+            "categoria_desc": cat_desc,
+            "bracket": bracket,
+            "piramide_banda": pir_banda,
+            "potrero_id": a["pot_id"],
+            "potrero_nombre": pot_nom,
+            "dias_en_potrero": dias_pot,
+            "dias_texto": f"{dias_pot} d" if dias_pot is not None else "—",
+            "estado_reprod": estado_reprod,
+        })
+
+    filtrados = []
+    titulo = valor
+
+    if tipo_norm in ("estructura", "categoria_sg", "categoria"):
+        for anim in todos:
+            c_desc_norm = normalizar(anim["categoria_desc"]).strip().lower()
+            c_sg_norm = anim["categoria_sg"].strip().lower()
+            if valor_norm in (c_desc_norm, c_sg_norm) or c_desc_norm.startswith(valor_norm) or valor_norm in c_desc_norm:
+                filtrados.append(anim)
+        titulo = f"Estructura del hato: {valor}"
+
+    elif tipo_norm in ("bracket", "edad", "categoria_edad"):
+        for anim in todos:
+            b_norm = normalizar(anim["bracket"]).strip().lower()
+            if valor_norm == b_norm or valor_norm in b_norm or b_norm.startswith(valor_norm):
+                filtrados.append(anim)
+        titulo = f"Categoría de Edad: {valor}"
+
+    elif tipo_norm in ("piramide", "piramide_edad"):
+        for anim in todos:
+            b_norm = normalizar(anim["piramide_banda"]).strip().lower()
+            banda_match = (valor_norm in b_norm or b_norm in valor_norm or
+                           ("< 1" in valor_norm and "< 1" in b_norm) or
+                           ("1 - 2" in valor_norm and "1 - 2" in b_norm) or
+                           ("2+" in valor_norm and "2+" in b_norm))
+            if banda_match:
+                if sexo_norm:
+                    if sexo_norm.startswith("H") and anim["sexo"] == "Hembra":
+                        filtrados.append(anim)
+                    elif sexo_norm.startswith("M") and anim["sexo"] == "Macho":
+                        filtrados.append(anim)
+                else:
+                    filtrados.append(anim)
+        sexo_txt = "Hembras" if sexo_norm.startswith("H") else ("Machos" if sexo_norm.startswith("M") else "Hato")
+        titulo = f"Pirámide: {sexo_txt} ({valor})"
+
+    elif tipo_norm in ("potrero", "potreros"):
+        for anim in todos:
+            p_norm = normalizar(anim["potrero_nombre"]).strip().lower()
+            if valor_norm in p_norm or p_norm in valor_norm:
+                filtrados.append(anim)
+        titulo = f"Potrero: {valor}"
+    else:
+        filtrados = todos
+        titulo = "Animales Activos"
+
+    resumen_cats: dict[str, int] = {}
+    for anim in filtrados:
+        cat_k = anim["categoria_sg"]
+        resumen_cats[cat_k] = resumen_cats.get(cat_k, 0) + 1
+
+    return {
+        "ok": True,
+        "tipo": tipo,
+        "valor": valor,
+        "titulo": titulo,
+        "total": len(filtrados),
+        "total_animales": len(filtrados),
+        "resumen_categorias": resumen_cats,
+        "animales": filtrados,
     }
 
 

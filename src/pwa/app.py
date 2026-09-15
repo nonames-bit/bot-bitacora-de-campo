@@ -1080,6 +1080,29 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": False, "error": "Parámetro 'potrero' requerido."}), 400
         return api_potrero_animales(pot_ref)
 
+    @app.get("/api/inventario/animales")
+    def api_inventario_animales():
+        """Lista animales activos pertenecientes a un grupo de inventario:
+        - tipo='estructura' (o 'categoria_sg'): valor=Vaca parida, Cría hembra...
+        - tipo='bracket': valor=Hembras <1 año, Hembras 1-2 años...
+        - tipo='potrero': valor=ORDENO SANTA MARTHA...
+        - tipo='piramide': valor=< 1 año, 1 - 2 años, 2+ años; sexo=H/M
+        Cumple estrictamente la Regla Fundamental de Inventario (estado = 'ACTIVO').
+        """
+        tipo = request.args.get("tipo") or "estructura"
+        valor = request.args.get("valor") or ""
+        sexo = request.args.get("sexo") or ""
+        db_p = _db(db_path)
+        try:
+            try:
+                from ..engine.dashboard_data import animales_por_grupo_inventario
+            except (ImportError, ValueError):
+                from src.engine.dashboard_data import animales_por_grupo_inventario  # type: ignore
+            res = animales_por_grupo_inventario(db_p, tipo=tipo, valor=valor, sexo=sexo)
+            return jsonify(res)
+        finally:
+            db_p.close()
+
     @app.post("/api/pasturas/ronda")
     def api_pasturas_ronda():
         """Evalúa y registra una ronda Voisin de aforo (D2). Cualquier rol
