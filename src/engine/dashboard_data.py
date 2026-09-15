@@ -2897,3 +2897,416 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
         out["errores"] = errores
     return out
 
+
+# ------------------------------------------------------------------ #
+# Extracción de Datos Estructurados JSON para Gráficos Vectoriales (PWA)
+# ------------------------------------------------------------------ #
+def datos_grafico(db: Database, tipo: str, hoy: Optional[date] = None, **kwargs) -> dict[str, Any]:
+    """Extrae y estructura los datos para que el cliente PWA dibuje gráficos
+    vectoriales interactivos (SVG/HTML) adaptados a los temas CSS sin depender
+    de imágenes estáticas del servidor. Mantiene retrocompatibilidad."""
+    import statistics
+    hoy = hoy or date.today()
+    tipo = (tipo or "").strip().lower()
+
+    if tipo == "evolucion":
+        meses = kwargs.get("meses", 12)
+        periodos = []
+        y, m = hoy.year, hoy.month
+        for _ in range(meses):
+            periodos.append((y, m))
+            m -= 1
+            if m == 0:
+                m, y = 12, y - 1
+        periodos.reverse()
+
+        nacimientos, muertes_m, compras, ventas, etiquetas = [], [], [], [], []
+        meses_es = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        for (yy, mm) in periodos:
+            desde = date(yy, mm, 1).isoformat()
+            hasta = (date(yy + 1, 1, 1) if mm == 12 else date(yy, mm + 1, 1)).isoformat()
+            n_nac = db.query_one(
+                "SELECT COUNT(*) AS n FROM partos WHERE fecha >= ? AND fecha < ? AND (id_cria IS NULL OR id_cria != vaca_id)",
+                (desde, hasta),
+            )["n"]
+            n_mue = db.query_one(
+                "SELECT COUNT(*) AS n FROM muertes WHERE fecha >= ? AND fecha < ?", (desde, hasta)
+            )["n"]
+            n_compra = db.query_one(
+                "SELECT COUNT(*) AS n FROM movimientos WHERE fecha >= ? AND fecha < ? AND UPPER(tipo_movimiento) IN ('COMPRA', 'ENTRADA')",
+                (desde, hasta),
+            )["n"]
+            n_venta = db.query_one(
+                "SELECT COUNT(*) AS n FROM movimientos WHERE fecha >= ? AND fecha < ? AND UPPER(tipo_movimiento) IN ('VENTA', 'SALIDA')",
+                (desde, hasta),
+            )["n"]
+            nacimientos.append(n_nac)
+            muertes_m.append(n_mue)
+            compras.append(n_compra)
+            ventas.append(n_venta)
+            etiquetas.append(f"{meses_es[mm]} {yy}")
+
+        activos_hoy = db.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado='ACTIVO'")["n"]
+        niveles = [0] * len(periodos)
+        niveles[-1] = activos_hoy
+        for i in range(len(periodos) - 2, -1, -1):
+            delta_sig = nacimientos[i + 1] + compras[i + 1] - muertes_m[i + 1] - ventas[i + 1]
+            niveles[i] = niveles[i + 1] - delta_sig
+
+        series = []
+        for i in range(len(etiquetas)):
+            series.append({
+                "mes": etiquetas[i],
+                "nacimientos": nacimientos[i],
+                "compras": compras[i],
+                "ventas": ventas[i],
+                "muertes": muertes_m[i],
+                "inventario": niveles[i],
+            })
+
+        return {
+            "ok": True,
+            "tipo": "evolucion",
+            "titulo": "Evolución del Rebaño",
+            "subtitulo": f"{len(etiquetas)} meses · inventario final estimado: {niveles[-1]} animales",
+            "series": series,
+            "totales": {
+                "nacimientos": sum(nacimientos),
+                "compras": sum(compras),
+                "ventas": sum(ventas),
+                "muertes": sum(muertes_m),
+                "inventario_final": niveles[-1],
+            },
+        }
+
+    if tipo in ("reproductivo_hato", "reproductivo"):
+        hembras = db.query(
+            "SELECT id_animal, fecha_nacimiento FROM animales "
+            "WHERE estado = 'ACTIVO' AND LOWER(SUBSTR(sexo, 1, 1)) = 'h'"
+        )
+        n_prenadas = 0
+        n_vacias_servidas = 0
+        n_nunca_servidas = 0
+        for h in hembras:
+            fnac = to_date_safe(h["fecha_nacimiento"])
+            if fnac and (hoy - fnac).days < 365:
+                continue
+            ult_serv = db.ultimo_servicio(h["id_animal"])
+            if ult_serv is None:
+                n_nunca_servidas += 1
+                continue
+            parto_post = db.query_one(
+                "SELECT 1 FROM partos WHERE vaca_id = ? AND fecha >= ?",
+                (h["id_animal"], ult_serv["fecha"]),
+            )
+            if not parto_post:
+                n_prenadas += 1
+            else:
+                n_vacias_servidas += 1
+
+        expuestas = n_prenadas + n_vacias_servidas
+        tasa = (n_prenadas / expuestas * 100) if expuestas > 0 else 0.0
+        total_hembras = expuestas + n_nunca_servidas
+
+        return {
+            "ok": True,
+            "tipo": "reproductivo_hato",
+            "titulo": "Estado Reproductivo del Hato",
+            "subtitulo": f"{total_hembras} hembras activas ≥1 año · Tasa preñez sobre expuestas: {tasa:.1f}%",
+            "total_hembras": total_hembras,
+            "expuestas": expuestas,
+            "tasa_prenez": round(tasa, 1),
+            "categorias": [
+                {
+                    "nombre": "Preñadas (est.)",
+                    "n": n_prenadas,
+                    "pct": round(n_prenadas / total_hembras * 100, 1) if total_hembras else 0,
+                    "color": "var(--verde-marca)",
+                },
+                {
+                    "nombre": "Vacías (servidas)",
+                    "n": n_vacias_servidas,
+                    "pct": round(n_vacias_servidas / total_hembras * 100, 1) if total_hembras else 0,
+                    "color": "#f9a825",
+                },
+                {
+                    "nombre": "Nunca servidas",
+                    "n": n_nunca_servidas,
+                    "pct": round(n_nunca_servidas / total_hembras * 100, 1) if total_hembras else 0,
+                    "color": "#78909c",
+                },
+            ],
+        }
+
+    if tipo in ("ocupacion", "ocupacion_potreros"):
+        from .query.helpers import calcular_existencias_potreros_sg
+        grupos = calcular_existencias_potreros_sg(db, hoy)
+        items = []
+        for g in (grupos or []):
+            f_ingreso = g.get("fecha_ingreso_reciente")
+            d = (hoy - to_date_safe(f_ingreso)).days if f_ingreso and to_date_safe(f_ingreso) else None
+            if d is None:
+                continue
+            color = "#2e7d32" if d <= 3 else ("#f9a825" if d <= 6 else "#c62828")
+            sem = "🟢" if d <= 3 else ("🟡" if d <= 6 else "🔴")
+            items.append({
+                "nombre": g["display"],
+                "dias": d,
+                "animales": g.get("total", 0),
+                "semaforo": sem,
+                "color": color,
+            })
+        items.sort(key=lambda x: -x["dias"])
+        return {
+            "ok": True,
+            "tipo": "ocupacion",
+            "titulo": "Ocupación de Potreros (Rotación Voisin)",
+            "subtitulo": f"{len(items)} potrero(s) ocupado(s) · Meta Voisin: ≤3 días",
+            "meta_dias": 3,
+            "potreros": items,
+        }
+
+    if tipo in ("aforo", "aforo_potreros"):
+        potreros = db.query(
+            "SELECT nombre, codigo, tipo_pasto, aforo_kg_m2 FROM potreros "
+            "WHERE aforo_kg_m2 IS NOT NULL ORDER BY aforo_kg_m2 DESC"
+        )
+        items = []
+        for p in (potreros or []):
+            val = float(p["aforo_kg_m2"])
+            items.append({
+                "nombre": (p["nombre"] or p["codigo"] or "?"),
+                "aforo_kg_m2": val,
+                "tipo_pasto": (p["tipo_pasto"] or "Sin dato"),
+            })
+        prom = sum(it["aforo_kg_m2"] for it in items) / len(items) if items else 0.0
+        return {
+            "ok": True,
+            "tipo": "aforo",
+            "titulo": "Aforo de Forraje por Potrero",
+            "subtitulo": f"{len(items)} potrero(s) con aforo registrado · Promedio: {prom:.2f} kg/m²",
+            "promedio": round(prom, 2),
+            "potreros": items,
+        }
+
+    if tipo in ("flujo_caja", "flujo"):
+        desde = date(hoy.year, 1, 1).isoformat()
+        hasta = date(hoy.year, 12, 31).isoformat()
+        filas = db.flujo_caja_mensual(desde, hasta)
+        items = []
+        for f in (filas or []):
+            items.append({
+                "mes": f["mes"],
+                "ingresos": float(f["ingresos"] or 0),
+                "egresos": float(f["egresos"] or 0),
+                "utilidad": float(f["utilidad"] or 0),
+            })
+        total_util = sum(it["utilidad"] for it in items)
+        return {
+            "ok": True,
+            "tipo": "flujo_caja",
+            "titulo": "Flujo de Caja Mensual",
+            "subtitulo": f"{len(items)} mes(es) · Utilidad total del periodo: ${total_util:,.0f}".replace(",", "."),
+            "total_utilidad": total_util,
+            "meses": items,
+        }
+
+    if tipo in ("waterfall_inventario", "waterfall"):
+        meses = kwargs.get("meses", 12)
+        evol = datos_grafico(db, "evolucion", hoy, meses=meses)
+        series = evol.get("series", [])
+        if not series:
+            return {"ok": True, "tipo": "waterfall_inventario", "inicio": 0, "actual": 0, "pasos": []}
+        deltas = [s["nacimientos"] + s["compras"] - s["muertes"] - s["ventas"] for s in series]
+        inicio = series[0]["inventario"] - deltas[0]
+        niveles = [inicio] + [s["inventario"] for s in series]
+
+        pasos = [{"etiqueta": "Inicio", "tipo": "base", "valor": inicio, "base": 0}]
+        for i, s in enumerate(series):
+            pasos.append({
+                "etiqueta": s["mes"],
+                "tipo": "delta",
+                "delta": deltas[i],
+                "base": min(niveles[i], niveles[i + 1]),
+                "valor": abs(deltas[i]),
+                "nuevo": niveles[i + 1],
+            })
+        pasos.append({"etiqueta": "Actual", "tipo": "base", "valor": niveles[-1], "base": 0})
+
+        return {
+            "ok": True,
+            "tipo": "waterfall_inventario",
+            "titulo": "Waterfall de Inventario Mensual",
+            "subtitulo": f"{len(series)} meses · balance neto acumulado",
+            "inicio": inicio,
+            "actual": niveles[-1],
+            "pasos": pasos,
+        }
+
+    if tipo in ("gmd_hato", "gmd"):
+        animales = db.query(
+            "SELECT id_animal, tag, sexo, fecha_nacimiento FROM animales WHERE estado='ACTIVO'"
+        )
+        puntos_h, puntos_m = [], []
+        for a in animales:
+            pesajes = db.query(
+                "SELECT fecha, peso_kg FROM pesajes WHERE animal_id = ? AND peso_kg IS NOT NULL "
+                "ORDER BY fecha DESC LIMIT 2", (a["id_animal"],),
+            )
+            if len(pesajes) < 2:
+                continue
+            ultimo, anterior = pesajes[0], pesajes[1]
+            f1, f2 = to_date_safe(anterior["fecha"]), to_date_safe(ultimo["fecha"])
+            fnac = to_date_safe(a["fecha_nacimiento"])
+            if not f1 or not f2 or (f2 - f1).days <= 0 or not fnac:
+                continue
+            gmd = (float(ultimo["peso_kg"]) - float(anterior["peso_kg"])) / (f2 - f1).days
+            edad = (f2 - fnac).days
+            sexo = (a["sexo"] or "").strip().lower()
+            punto = {"tag": a["tag"], "edad_dias": edad, "gmd": round(gmd, 3)}
+            if sexo.startswith("h"):
+                puntos_h.append(punto)
+            elif sexo.startswith("m"):
+                puntos_m.append(punto)
+
+        todos = [p["gmd"] for p in (puntos_h + puntos_m)]
+        mediana = statistics.median(todos) if todos else 0.0
+        negativos = sum(1 for v in todos if v < 0)
+
+        return {
+            "ok": True,
+            "tipo": "gmd_hato",
+            "titulo": "Ganancia Media Diaria del Hato",
+            "subtitulo": f"{len(todos)} animales con 2+ pesajes · Mediana: {mediana:.2f} kg/día",
+            "mediana": round(mediana, 2),
+            "n_negativos": negativos,
+            "hembras": puntos_h,
+            "machos": puntos_m,
+        }
+
+    if tipo in ("composicion_racial", "razas"):
+        NOMBRES_RAZAS = {
+            "I": "Holstein / Cruce Lechero",
+            "T": "Tricross / Cebú Comercial",
+            "C": "Cebú / Brahman / Gyr",
+            "M": "Mestizo / Doble Propósito",
+            "SIN RAZA": "Sin Clasificar",
+        }
+        COLORES_RAZAS = {
+            "I": "var(--verde-marca)",
+            "T": "#66bb6a",
+            "C": "#8d6e63",
+            "M": "#78909c",
+            "SIN RAZA": "#d4a373",
+        }
+        rows = db.query(
+            "SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') raza, COUNT(*) n "
+            "FROM animales WHERE estado = 'ACTIVO' GROUP BY raza ORDER BY n DESC"
+        )
+        total = sum(int(r["n"]) for r in rows)
+        items = []
+        for r in rows:
+            c = r["raza"]
+            n = int(r["n"])
+            items.append({
+                "codigo": c,
+                "nombre": NOMBRES_RAZAS.get(c, c),
+                "n": n,
+                "pct": round(n / total * 100, 1) if total else 0.0,
+                "color": COLORES_RAZAS.get(c, "#52796f"),
+            })
+        return {
+            "ok": True,
+            "tipo": "composicion_racial",
+            "titulo": "Composición Genética (Razas)",
+            "subtitulo": f"{total} animales activos al {hoy.isoformat()}",
+            "total": total,
+            "items": items,
+        }
+
+    if tipo in ("subastas_comparativa", "subastas_tendencia", "subastas"):
+        datos = db.obtener_datos_mercado_completos()
+        comp = datos.get("comparativa_por_categoria", {}).get("MACHO_GORDO", [])
+        prom_nal = next((x["precio_promedio"] for x in comp if x["plaza_key"] == "PROMEDIO_NACIONAL"), None)
+
+        plazas = []
+        for it in comp:
+            plazas.append({
+                "plaza_key": it["plaza_key"],
+                "nombre": it["nombre"],
+                "distancia": f"{it['distancia_km']}km" if it.get("distancia_km") else "Nacional",
+                "precio": it["precio_promedio"],
+                "es_local": (it["plaza_key"] == "GRANADA"),
+                "es_mejor": it.get("es_mejor_precio", False),
+                "tendencia": it.get("tendencia", "ESTABLE"),
+                "variacion_pct": it.get("variacion_pct", 0),
+            })
+        plazas.sort(key=lambda x: x["precio"])
+        return {
+            "ok": True,
+            "tipo": tipo,
+            "titulo": "Subastas Ganaderas · Comparativa de Precios ($/kg)",
+            "subtitulo": "Macho Gordo en plazas comerciales relevantes",
+            "promedio_nacional": prom_nal,
+            "plazas": plazas,
+        }
+
+    if tipo in ("mapa_potreros", "mapa"):
+        potreros = db.query(
+            "SELECT id, nombre, codigo, area_has FROM potreros ORDER BY nombre"
+        )
+        items = []
+        for p in (potreros or []):
+            nom = p["nombre"] or p["codigo"] or str(p["id"])
+            cnt = db.query_one(
+                "SELECT COUNT(*) n FROM animales WHERE estado='ACTIVO' AND potrero_id = ?",
+                (p["id"],),
+            )
+            n = int(cnt["n"]) if cnt else 0
+            items.append({
+                "id": p["id"],
+                "nombre": nom,
+                "area_has": p["area_has"],
+                "animales": n,
+                "estado": "Ocupado" if n > 0 else "Reposo",
+                "semaforo": "🟢" if n > 0 else "🌱",
+            })
+        return {
+            "ok": True,
+            "tipo": "mapa_potreros",
+            "titulo": "Mapa y Estado de Potreros",
+            "subtitulo": f"{len(items)} potreros registrados en la finca",
+            "potreros": items,
+        }
+
+    if tipo in ("carga_animal", "carga"):
+        from .query.helpers import calcular_existencias_potreros_sg
+        grupos = calcular_existencias_potreros_sg(db, hoy)
+        items = []
+        for g in (grupos or []):
+            area = g.get("area_has")
+            tot_anim = g.get("total", 0)
+            if area and float(area) > 0:
+                carga = tot_anim / float(area)
+                items.append({
+                    "nombre": g["display"],
+                    "carga_ugg_ha": round(carga, 2),
+                    "animales": tot_anim,
+                    "area_has": area,
+                })
+        items.sort(key=lambda x: -x["carga_ugg_ha"])
+        return {
+            "ok": True,
+            "tipo": "carga_animal",
+            "titulo": "Carga Animal por Potrero (Cab/ha)",
+            "subtitulo": f"{len(items)} potreros con área registrada",
+            "potreros": items,
+        }
+
+    return {
+        "ok": False,
+        "tipo": tipo,
+        "error": f"Tipo de gráfico '{tipo}' no soportado para datos estructurados.",
+    }
+
+

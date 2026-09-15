@@ -68,14 +68,576 @@
     var msgs = Object.keys(d.errores).map(function (k) { return esc(k) + ": " + esc(d.errores[k]); });
     return "<p class='aviso'>⚠️ Sección con error: " + msgs.join(" · ") + "</p>";
   }
-  function grafico(tipo, alt) {
-    return "<div class='grafico-wrap'><img src='/api/grafico/" + tipo + "' alt='" + esc(alt) +
-      "' loading='lazy' data-onerror-hide='self'></div>";
-  }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
   function fmtMoneda(n) {
     var v = Number(n) || 0;
     return "$" + Math.round(v).toLocaleString("es-CO");
+  }
+
+  // ------------------------------------------------------------------ //
+  // Motor de Gráficos Vectoriales SVG Nativos Adaptados a Temas (PWA)
+  // ------------------------------------------------------------------ //
+  function grafico(tipo, alt, datosDirectos) {
+    var idUnico = "grafico-box-" + String(tipo || "").replace(/[^a-zA-Z0-9_-]/g, "") + "-" + Math.random().toString(36).substring(2, 7);
+    var tNow = Date.now();
+    var datosJsonAttr = datosDirectos ? " data-datos-inline='" + esc(JSON.stringify(datosDirectos)) + "'" : "";
+
+    var h = "<div class='tarjeta-grafico-ja' id='" + idUnico + "' data-chart-tipo='" + esc(tipo) + "' data-chart-alt='" + esc(alt) + "'" + datosJsonAttr + " style='background:var(--superficie); border:1px solid var(--borde); border-radius:10px; padding:14px; margin:16px 0; box-shadow:0 1px 4px var(--sombra);'>"
+      + "<div class='grafico-header-ja' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<div>"
+      + "<div style='font-size:14px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("chartBar", 16) + "<span>" + esc(alt) + "</span>"
+      + "</div>"
+      + "<small class='grafico-sub-info' style='color:var(--texto-suave); font-size:11.5px; display:block; margin-top:2px;'>Visualización vectorial interactiva · adaptada al tema activo</small>"
+      + "</div>"
+      + "<div style='display:flex; align-items:center; gap:6px;'>"
+      + "<span class='chip' style='font-size:11px; padding:2px 8px; border-radius:12px; background:rgba(46,125,50,0.1); color:var(--verde-marca); font-weight:600;'>Vectorial Interactivo</span>"
+      + "</div>"
+      + "</div>";
+
+    // Contenedor interactivo (SVG nativo responsivo)
+    h += "<div class='grafico-svg-target' style='width:100%; min-height:160px;'>"
+      + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave); font-size:12px;'>"
+      + "<div style='font-size:20px; margin-bottom:6px;'>⏳</div>Cargando visualización..."
+      + "</div>"
+      + "</div>";
+
+    // Opción desplegable dual con Matplotlib (igual que en Leche)
+    h += "<details class='grafico-details-servidor' style='margin-top:12px; border-top:1px dashed var(--borde); padding-top:6px;'>"
+      + "<summary style='cursor:pointer; font-size:12px; font-weight:600; color:var(--texto-suave); padding:4px 0; display:inline-flex; align-items:center; gap:5px;'>"
+      + icon("image", 13) + "Ver gráfico original del servidor (Matplotlib PNG)"
+      + "</summary>"
+      + "<div class='grafico-wrap' style='margin-top:8px; border:none; padding:0; background:transparent;'><img src='/api/grafico/" + tipo + "?t=" + tNow + "' alt='" + esc(alt) + "' loading='lazy' data-onerror-hide='self'></div>"
+      + "</details>";
+
+    h += "</div>";
+    return h;
+  }
+
+  function renderSvgEvolucion(d) {
+    var series = (d && d.series) || [];
+    if (!series.length) return vacio("Sin datos de evolución para graficar.");
+    var n = series.length;
+    var maxVal = 1;
+    var maxNivel = 1;
+    series.forEach(function (s) {
+      var m = Math.max(s.nacimientos || 0, s.compras || 0, s.ventas || 0, s.muertes || 0);
+      if (m > maxVal) maxVal = m;
+      if ((s.inventario || 0) > maxNivel) maxNivel = s.inventario;
+    });
+    var yMaxBarras = Math.ceil(maxVal * 1.2) || 10;
+    var yMaxNivel = Math.ceil(maxNivel * 1.15) || 400;
+
+    var w = Math.max(540, n * 44);
+    var h = 250;
+    var padL = 40, padR = 45, padT = 28, padB = 46;
+    var chW = w - padL - padR;
+    var chH = h - padT - padB;
+    var slotW = chW / n;
+
+    var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:360px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
+
+    // Grid horizontal
+    for (var g = 0; g <= 4; g++) {
+      var yP = padT + chH - (g / 4) * chH;
+      var valB = Math.round((yMaxBarras / 4) * g);
+      var valN = Math.round((yMaxNivel / 4) * g);
+      svg += "<line x1='" + padL + "' y1='" + yP + "' x2='" + (w - padR) + "' y2='" + yP + "' stroke='var(--borde)' stroke-width='1' stroke-dasharray='" + (g === 0 ? "none" : "3,3") + "' />";
+      svg += "<text x='" + (padL - 6) + "' y='" + (yP + 3.5) + "' fill='var(--texto-suave)' font-size='9.5' text-anchor='end'>" + valB + "</text>";
+      svg += "<text x='" + (w - padR + 6) + "' y='" + (yP + 3.5) + "' fill='#d97706' font-size='9.5' text-anchor='start'>" + valN + "</text>";
+    }
+
+    // Leyenda superior
+    svg += "<g transform='translate(" + padL + ", 12)' font-size='10' font-weight='600'>"
+      + "<rect x='0' y='-8' width='10' height='10' rx='2' fill='var(--verde-marca)' /><text x='14' y='0' fill='var(--texto)'>Nac</text>"
+      + "<rect x='52' y='-8' width='10' height='10' rx='2' fill='#66bb6a' /><text x='66' y='0' fill='var(--texto)'>Compras</text>"
+      + "<rect x='130' y='-8' width='10' height='10' rx='2' fill='#8d6e63' /><text x='144' y='0' fill='var(--texto)'>Ventas</text>"
+      + "<rect x='200' y='-8' width='10' height='10' rx='2' fill='#ef5350' /><text x='214' y='0' fill='var(--texto)'>Muertes</text>"
+      + "<circle cx='280' cy='-3' r='4' fill='#d97706' /><line x1='272' y1='-3' x2='288' y2='-3' stroke='#d97706' stroke-width='2' /><text x='294' y='0' fill='#d97706'>Inventario</text>"
+      + "</g>";
+
+    // Puntos para la línea de inventario
+    var puntosNivel = [];
+
+    series.forEach(function (s, i) {
+      var xCenter = padL + (i + 0.5) * slotW;
+      var bW = Math.max(5, Math.min(8, slotW * 0.2));
+
+      // 4 barras por mes
+      var tiposB = [
+        { v: s.nacimientos || 0, c: "var(--verde-marca)", n: "Nacimientos" },
+        { v: s.compras || 0, c: "#66bb6a", n: "Compras" },
+        { v: s.ventas || 0, c: "#8d6e63", n: "Ventas" },
+        { v: s.muertes || 0, c: "#ef5350", n: "Muertes" }
+      ];
+
+      tiposB.forEach(function (tb, bi) {
+        var bH = (tb.v / yMaxBarras) * chH;
+        var bX = xCenter + (bi - 1.5) * (bW + 2) - bW / 2;
+        var bY = padT + chH - bH;
+        if (tb.v > 0) {
+          svg += "<rect x='" + bX + "' y='" + bY + "' width='" + bW + "' height='" + bH + "' rx='2' fill='" + tb.c + "'>"
+            + "<title>" + esc(s.mes) + " · " + tb.n + ": " + tb.v + "</title></rect>";
+        }
+      });
+
+      // Punto inventario
+      var yNiv = padT + chH - ((s.inventario || 0) / yMaxNivel) * chH;
+      puntosNivel.push({ x: xCenter, y: yNiv, val: s.inventario, mes: s.mes });
+
+      // Etiqueta eje X
+      svg += "<text x='" + xCenter + "' y='" + (h - padB + 16) + "' fill='var(--texto-suave)' font-size='9.5' font-weight='500' text-anchor='middle'>" + esc(s.mes) + "</text>";
+    });
+
+    // Dibujar línea de inventario
+    if (puntosNivel.length > 1) {
+      var pathD = "M " + puntosNivel.map(function (p) { return p.x + " " + p.y; }).join(" L ");
+      svg += "<path d='" + pathD + "' fill='none' stroke='#d97706' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' />";
+      puntosNivel.forEach(function (p, idx) {
+        svg += "<circle cx='" + p.x + "' cy='" + p.y + "' r='3.5' fill='#d97706' stroke='var(--superficie)' stroke-width='1.5'>"
+          + "<title>" + esc(p.mes) + " · Inventario: " + p.val + " cabezas</title></circle>";
+        if (idx === puntosNivel.length - 1 || idx === 0) {
+          svg += "<text x='" + p.x + "' y='" + (p.y - 7) + "' fill='#d97706' font-size='9' font-weight='700' text-anchor='middle'>" + p.val + "</text>";
+        }
+      });
+    }
+
+    svg += "</svg></div>";
+    return svg;
+  }
+
+  function renderSvgRepro(d) {
+    var cats = (d && d.categorias) || [];
+    var total = (d && d.total_hembras) || 0;
+    var tasa = (d && d.tasa_prenez) || 0;
+    if (!cats.length) return vacio("Sin datos reproductivos.");
+
+    var h = "<div style='display:flex; flex-direction:column; gap:12px;'>";
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--verde-marca-pastel, rgba(46,125,50,0.08)); border-radius:8px;'>"
+      + "<div style='font-size:13px; font-weight:700; color:var(--verde-marca);'>Tasa de Preñez (sobre expuestas): <b>" + tasa + "%</b></div>"
+      + "<div style='font-size:12px; color:var(--texto-suave);'>Total: <b>" + total + "</b> hembras ≥1a</div>"
+      + "</div>";
+
+    cats.forEach(function (c) {
+      var pct = total > 0 ? Math.round((c.n / total) * 100) : 0;
+      h += "<div style='padding:10px 12px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;'>"
+        + "<b style='font-size:13px; color:var(--texto);'>" + esc(c.nombre) + "</b>"
+        + "<span style='font-size:12.5px; font-weight:700; color:" + c.color + ";'>" + c.n + " cab. (" + pct + "%)</span>"
+        + "</div>"
+        + "<div style='background:var(--borde); border-radius:6px; height:12px; overflow:hidden;'>"
+        + "<div style='width:" + pct + "%; height:100%; background:" + c.color + "; border-radius:6px; transition:width 0.4s ease;'></div>"
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  function renderSvgOcupacion(d) {
+    var potreros = (d && d.potreros) || [];
+    if (!potreros.length) return vacio("No hay potreros ocupados en este momento.");
+
+    var maxDias = potreros.reduce(function (m, p) { return Math.max(m, p.dias || 0); }, 7);
+    var xMax = Math.ceil((maxDias * 1.15) / 5) * 5;
+
+    var h = "<div style='display:flex; flex-direction:column; gap:8px;'>";
+    potreros.forEach(function (p) {
+      var pct = Math.min(100, Math.round(((p.dias || 0) / xMax) * 100));
+      var col = p.color || (p.dias <= 3 ? "var(--verde-marca)" : (p.dias <= 6 ? "#f9a825" : "#ef5350"));
+      var sem = p.semaforo || (p.dias <= 3 ? "🟢" : (p.dias <= 6 ? "🟡" : "🔴"));
+
+      h += "<div style='padding:8px 12px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;'>"
+        + "<a href='#' class='link-potrero-animales' data-potrero='" + esc(p.nombre) + "' style='font-size:13px; font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:4px;'>"
+        + icon("grass", 13) + esc(p.nombre) + "</a>"
+        + "<div style='display:flex; align-items:center; gap:8px; font-size:12px;'>"
+        + "<span style='font-weight:700; color:" + col + ";'>" + sem + " " + p.dias + " d</span>"
+        + "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(p.nombre) + "' style='font-size:11px; padding:2px 7px; border-radius:4px;'>"
+        + icon("cow", 11) + p.animales + " cab.</button>"
+        + "</div>"
+        + "</div>"
+        + "<div style='position:relative; background:var(--borde); border-radius:5px; height:12px; overflow:hidden;'>"
+        + "<div style='width:" + pct + "%; height:100%; background:" + col + "; border-radius:5px;'></div>"
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  function renderSvgAforo(d) {
+    var potreros = (d && d.potreros) || [];
+    if (!potreros.length) return vacio("Sin mediciones de aforo cargadas en los potreros.");
+
+    var maxAforo = potreros.reduce(function (m, p) { return Math.max(m, p.aforo_kg_m2 || 0); }, 3.0);
+    var xMax = Math.ceil(maxAforo * 1.2);
+    var prom = d.promedio || 0;
+
+    var h = "<div style='display:flex; flex-direction:column; gap:8px;'>";
+    if (prom > 0) {
+      h += "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:4px;'>Aforo promedio de la finca: <b style='color:var(--verde-marca);'>" + prom + " kg/m²</b></div>";
+    }
+    potreros.forEach(function (p) {
+      var pct = Math.min(100, Math.round(((p.aforo_kg_m2 || 0) / xMax) * 100));
+      h += "<div style='padding:8px 12px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        + "<div><b style='font-size:13px; color:var(--texto);'>" + esc(p.nombre) + "</b> <small style='color:var(--texto-suave);'>(" + esc(p.tipo_pasto) + ")</small></div>"
+        + "<b style='font-size:12.5px; color:var(--verde-marca);'>" + (p.aforo_kg_m2 ? p.aforo_kg_m2.toFixed(2) : "—") + " kg/m²</b>"
+        + "</div>"
+        + "<div style='background:var(--borde); border-radius:5px; height:12px; overflow:hidden;'>"
+        + "<div style='width:" + pct + "%; height:100%; background:var(--verde-marca); border-radius:5px;'></div>"
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  function renderSvgFlujoCaja(d) {
+    var meses = (d && d.meses) || [];
+    if (!meses.length) return vacio("Sin movimientos financieros en el periodo.");
+
+    var n = meses.length;
+    var maxVal = 1;
+    meses.forEach(function (m) {
+      var v = Math.max(m.ingresos || 0, m.egresos || 0, Math.abs(m.utilidad || 0));
+      if (v > maxVal) maxVal = v;
+    });
+    var yMax = Math.ceil((maxVal * 1.15) / 1000000) * 1000000;
+    if (yMax <= 0) yMax = 5000000;
+
+    var w = Math.max(520, n * 52);
+    var h = 230;
+    var padL = 60, padR = 20, padT = 24, padB = 40;
+    var chW = w - padL - padR;
+    var chH = h - padT - padB;
+    var slotW = chW / n;
+    var bW = Math.max(8, Math.min(18, slotW * 0.32));
+
+    var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:340px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
+
+    // Grid horizontal
+    for (var g = 0; g <= 4; g++) {
+      var yP = padT + chH - (g / 4) * chH;
+      var val = (yMax / 4) * g;
+      var lbl = val >= 1000000 ? (val / 1000000).toFixed(1) + "M" : (val / 1000) + "k";
+      svg += "<line x1='" + padL + "' y1='" + yP + "' x2='" + (w - padR) + "' y2='" + yP + "' stroke='var(--borde)' stroke-width='1' stroke-dasharray='" + (g === 0 ? "none" : "3,3") + "' />";
+      svg += "<text x='" + (padL - 6) + "' y='" + (yP + 3.5) + "' fill='var(--texto-suave)' font-size='9.5' text-anchor='end'>$" + lbl + "</text>";
+    }
+
+    // Barras de ingresos y egresos
+    meses.forEach(function (m, i) {
+      var xCenter = padL + (i + 0.5) * slotW;
+      var hIng = ((m.ingresos || 0) / yMax) * chH;
+      var hEgr = ((m.egresos || 0) / yMax) * chH;
+
+      var xIng = xCenter - bW - 2;
+      var yIng = padT + chH - hIng;
+      var xEgr = xCenter + 2;
+      var yEgr = padT + chH - hEgr;
+
+      if (hIng > 0) {
+        svg += "<rect x='" + xIng + "' y='" + yIng + "' width='" + bW + "' height='" + hIng + "' rx='2' fill='var(--verde-marca)'>"
+          + "<title>" + esc(m.mes) + " · Ingresos: " + fmtMoneda(m.ingresos) + "</title></rect>";
+      }
+      if (hEgr > 0) {
+        svg += "<rect x='" + xEgr + "' y='" + yEgr + "' width='" + bW + "' height='" + hEgr + "' rx='2' fill='#ef5350'>"
+          + "<title>" + esc(m.mes) + " · Egresos: " + fmtMoneda(m.egresos) + "</title></rect>";
+      }
+
+      svg += "<text x='" + xCenter + "' y='" + (h - padB + 16) + "' fill='var(--texto-suave)' font-size='9.5' font-weight='500' text-anchor='middle'>" + esc(m.mes) + "</text>";
+    });
+
+    svg += "</svg></div>";
+    return svg;
+  }
+
+  function renderSvgWaterfall(d) {
+    var pasos = (d && d.pasos) || [];
+    if (!pasos.length) return vacio("Sin balance de inventario para graficar.");
+
+    var n = pasos.length;
+    var maxVal = pasos.reduce(function (m, p) { return Math.max(m, p.valor || 0, (p.base || 0) + (p.valor || 0)); }, 400);
+    var yMax = Math.ceil((maxVal * 1.15) / 50) * 50;
+
+    var w = Math.max(540, n * 48);
+    var h = 230;
+    var padL = 40, padR = 20, padT = 24, padB = 40;
+    var chW = w - padL - padR;
+    var chH = h - padT - padB;
+    var slotW = chW / n;
+    var bW = Math.max(14, Math.min(26, slotW * 0.6));
+
+    var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:360px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
+
+    for (var g = 0; g <= 4; g++) {
+      var yP = padT + chH - (g / 4) * chH;
+      var val = Math.round((yMax / 4) * g);
+      svg += "<line x1='" + padL + "' y1='" + yP + "' x2='" + (w - padR) + "' y2='" + yP + "' stroke='var(--borde)' stroke-width='1' stroke-dasharray='" + (g === 0 ? "none" : "3,3") + "' />";
+      svg += "<text x='" + (padL - 6) + "' y='" + (yP + 3.5) + "' fill='var(--texto-suave)' font-size='9.5' text-anchor='end'>" + val + "</text>";
+    }
+
+    pasos.forEach(function (p, i) {
+      var xCenter = padL + (i + 0.5) * slotW;
+      var xBar = xCenter - bW / 2;
+      var esBase = p.tipo === "base";
+      var dVal = p.delta != null ? p.delta : 0;
+      var col = esBase ? "var(--texto-suave)" : (dVal >= 0 ? "var(--verde-marca)" : "#ef5350");
+
+      var bBottom = esBase ? (padT + chH) : (padT + chH - ((p.base || 0) / yMax) * chH);
+      var bH = esBase ? (((p.valor || 0) / yMax) * chH) : ((Math.abs(dVal) / yMax) * chH);
+      var yBar = bBottom - bH;
+
+      svg += "<rect x='" + xBar + "' y='" + yBar + "' width='" + bW + "' height='" + Math.max(3, bH) + "' rx='2' fill='" + col + "'>"
+        + "<title>" + esc(p.etiqueta) + ": " + (esBase ? p.valor : (dVal > 0 ? "+" + dVal : dVal)) + "</title></rect>";
+
+      var txtLbl = esBase ? p.valor : (dVal > 0 ? "+" + dVal : dVal);
+      svg += "<text x='" + xCenter + "' y='" + (yBar - 5) + "' fill='" + col + "' font-size='9' font-weight='700' text-anchor='middle'>" + txtLbl + "</text>";
+      svg += "<text x='" + xCenter + "' y='" + (h - padB + 16) + "' fill='var(--texto-suave)' font-size='9.5' font-weight='500' text-anchor='middle'>" + esc(p.etiqueta) + "</text>";
+    });
+
+    svg += "</svg></div>";
+    return svg;
+  }
+
+  function renderSvgGmd(d) {
+    var hem = (d && d.hembras) || [];
+    var mac = (d && d.machos) || [];
+    var todos = hem.concat(mac);
+    if (!todos.length) return vacio("Se requieren al menos 2 animales con 2+ pesajes para calcular GMD.");
+
+    var med = d.mediana || 0;
+    var w = 540, h = 230;
+    var padL = 45, padR = 20, padT = 24, padB = 40;
+    var chW = w - padL - padR, chH = h - padT - padB;
+
+    var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:340px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
+
+    // Eje X: 0 .. 1200 días. Eje Y: -0.2 .. 1.2 kg/día
+    var yMin = -0.2, yMax = 1.2;
+    var xMax = 1200;
+
+    // Línea 0
+    var y0 = padT + chH - ((0 - yMin) / (yMax - yMin)) * chH;
+    svg += "<line x1='" + padL + "' y1='" + y0 + "' x2='" + (w - padR) + "' y2='" + y0 + "' stroke='#888' stroke-width='1.2' stroke-dasharray='2,2' />";
+    svg += "<text x='" + (padL - 6) + "' y='" + (y0 + 3.5) + "' fill='var(--texto-suave)' font-size='9' text-anchor='end'>0.0</text>";
+
+    // Línea mediana
+    var yMed = padT + chH - ((med - yMin) / (yMax - yMin)) * chH;
+    svg += "<line x1='" + padL + "' y1='" + yMed + "' x2='" + (w - padR) + "' y2='" + yMed + "' stroke='var(--verde-marca)' stroke-width='1.5' stroke-dasharray='4,3' />";
+    svg += "<text x='" + (w - padR) + "' y='" + (yMed - 5) + "' fill='var(--verde-marca)' font-size='9.5' font-weight='700' text-anchor='end'>Mediana: " + med + " kg/d</text>";
+
+    // Puntos hembras
+    hem.forEach(function (p) {
+      var xP = padL + Math.min(chW, (p.edad_dias / xMax) * chW);
+      var yP = padT + chH - Math.max(0, Math.min(chH, ((p.gmd - yMin) / (yMax - yMin)) * chH));
+      svg += "<circle cx='" + xP + "' cy='" + yP + "' r='3.5' fill='var(--verde-marca)' opacity='0.75'>"
+        + "<title>" + esc(p.tag) + " (Hembra): " + p.gmd + " kg/d · " + p.edad_dias + " d</title></circle>";
+    });
+
+    // Puntos machos
+    mac.forEach(function (p) {
+      var xP = padL + Math.min(chW, (p.edad_dias / xMax) * chW);
+      var yP = padT + chH - Math.max(0, Math.min(chH, ((p.gmd - yMin) / (yMax - yMin)) * chH));
+      svg += "<circle cx='" + xP + "' cy='" + yP + "' r='3.5' fill='#d97706' opacity='0.75'>"
+        + "<title>" + esc(p.tag) + " (Macho): " + p.gmd + " kg/d · " + p.edad_dias + " d</title></circle>";
+    });
+
+    svg += "<text x='" + (w / 2) + "' y='" + (h - 6) + "' fill='var(--texto-suave)' font-size='10' text-anchor='middle'>Edad al último pesaje (días)</text>";
+    svg += "</svg></div>";
+    return svg;
+  }
+
+  function renderSvgComposicionRacial(d) {
+    var razas = (d && d.items) || [];
+    var total = (d && d.total) || 0;
+    if (!razas.length) return vacio("Sin datos raciales registrados.");
+
+    var h = "<div style='display:flex; flex-wrap:wrap; align-items:center; gap:20px; justify-content:center; padding:10px 0;'>";
+
+    // Donut SVG
+    var size = 180, r = 68, c = 2 * Math.PI * r;
+    var acumuladoPct = 0;
+    var pathsSvg = "";
+
+    razas.forEach(function (rz) {
+      var pct = (rz.pct || 0) / 100;
+      var dash = pct * c;
+      var offset = (1 - acumuladoPct) * c;
+      pathsSvg += "<circle cx='90' cy='90' r='" + r + "' fill='none' stroke='" + (rz.color || "var(--verde-marca)") + "' stroke-width='28' "
+        + "stroke-dasharray='" + dash + " " + (c - dash) + "' stroke-dashoffset='" + offset + "'>"
+        + "<title>" + esc(rz.nombre) + ": " + rz.n + " (" + rz.pct + "%)</title></circle>";
+      acumuladoPct += pct;
+    });
+
+    h += "<div style='width:180px; height:180px; flex-shrink:0; position:relative;'>"
+      + "<svg viewBox='0 0 " + size + " " + size + "' style='width:100%; height:100%; transform:rotate(-90deg);'>"
+      + pathsSvg
+      + "</svg>"
+      + "<div style='position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;'>"
+      + "<b style='font-size:22px; color:var(--verde-marca); line-height:1;'>" + total + "</b>"
+      + "<span style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>animales</span>"
+      + "</div>"
+      + "</div>";
+
+    // Leyenda lateral
+    h += "<div style='display:flex; flex-direction:column; gap:8px; flex:1; min-width:200px;'>";
+    razas.forEach(function (rz) {
+      h += "<div style='display:flex; justify-content:space-between; align-items:center; padding:6px 10px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:6px;'>"
+        + "<div style='display:flex; align-items:center; gap:8px;'>"
+        + "<span style='width:12px; height:12px; border-radius:3px; background:" + (rz.color || "var(--verde-marca)") + "; display:inline-block;'></span>"
+        + "<span style='font-size:12.5px; font-weight:600; color:var(--texto);'>" + esc(rz.nombre) + "</span>"
+        + "</div>"
+        + "<span style='font-size:12px; font-weight:700; color:var(--texto);'>" + rz.n + " <small style='color:var(--texto-suave);'>(" + rz.pct + "%)</small></span>"
+        + "</div>";
+    });
+    h += "</div></div>";
+    return h;
+  }
+
+  function renderSvgSubastasComparativa(d) {
+    var plazas = (d && d.plazas) || [];
+    if (!plazas.length) return vacio("Sin cotizaciones de subastas registradas.");
+
+    var maxP = plazas.reduce(function (m, p) { return Math.max(m, p.precio || 0); }, 10000);
+    var prom = d.promedio_nacional || 0;
+
+    var h = "<div style='display:flex; flex-direction:column; gap:8px;'>";
+    if (prom > 0) {
+      h += "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:4px;'>Promedio Nacional: <b style='color:var(--texto);'>$" + Math.round(prom).toLocaleString("es-CO") + "/kg</b></div>";
+    }
+
+    plazas.forEach(function (pz) {
+      var pct = Math.min(100, Math.round(((pz.precio || 0) / maxP) * 100));
+      var esLocal = pz.es_local;
+      var esMejor = pz.es_mejor;
+      var col = esLocal ? "var(--verde-marca)" : (esMejor ? "#2e7d32" : "#52796f");
+
+      h += "<div style='padding:8px 12px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid " + (esLocal ? "var(--verde-marca)" : "var(--borde)") + "; border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        + "<div><b style='font-size:13px; color:var(--texto);'>" + esc(pz.nombre) + "</b> <small style='color:var(--texto-suave);'>(" + esc(pz.distancia) + ")</small></div>"
+        + "<b style='font-size:13px; color:" + col + ";'>$" + Math.round(pz.precio || 0).toLocaleString("es-CO") + "/kg</b>"
+        + "</div>"
+        + "<div style='background:var(--borde); border-radius:5px; height:12px; overflow:hidden;'>"
+        + "<div style='width:" + pct + "%; height:100%; background:" + col + "; border-radius:5px;'></div>"
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  function renderSvgMapaPotreros(d) {
+    var potreros = (d && d.potreros) || [];
+    if (!potreros.length) return vacio("Sin potreros registrados.");
+
+    var h = "<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px; margin-bottom:12px;'>";
+    potreros.forEach(function (p) {
+      var nAnim = Number(p.animales) || 0;
+      var sem = p.semaforo || (nAnim > 0 ? "🟢" : "🌱");
+      var haTxt = p.area_has != null ? Number(p.area_has).toFixed(1) + " ha" : "—";
+      h += "<div style='background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px; padding:8px 10px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center;'>"
+        + "<span style='font-size:14px;'>" + sem + "</span>"
+        + "<span style='font-size:11px; color:var(--texto-suave);'>" + haTxt + "</span>"
+        + "</div>"
+        + "<div style='font-size:12px; font-weight:700; color:var(--texto); margin:4px 0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>" + esc(p.nombre) + "</div>"
+        + "<div style='font-size:11.5px; color:" + (nAnim > 0 ? "var(--verde-marca)" : "var(--texto-suave)") + "; font-weight:600;'>"
+        + (nAnim > 0 ? icon("cow", 11) + nAnim + " cab." : "En reposo")
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    h += "<div style='text-align:center;'><button type='button' class='tema-btn' id='btn-ir-mapa-satelital-desde-past' style='font-size:12px; padding:6px 14px; font-weight:700; background:var(--verde-marca); color:#fff; border-radius:6px;'>"
+      + icon("mapPin", 14) + "Abrir Mapa Satelital GPS Completo</button></div>";
+    return h;
+  }
+
+  function renderSvgCargaAnimal(d) {
+    var potreros = (d && d.potreros) || [];
+    if (!potreros.length) return vacio("Sin datos de carga animal.");
+
+    var h = "<div style='display:flex; flex-direction:column; gap:8px;'>";
+    potreros.forEach(function (p) {
+      var cVal = p.carga_ugg_ha || 0;
+      var col = cVal <= 1.8 ? "var(--verde-marca)" : (cVal <= 2.8 ? "#f9a825" : "#ef5350");
+      h += "<div style='padding:8px 12px; background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;'>"
+        + "<div><b style='font-size:13px; color:var(--texto);'>" + esc(p.nombre) + "</b> <small style='color:var(--texto-suave);'>(" + p.animales + " cab. en " + (p.area_has ? p.area_has.toFixed(1) : "?") + " ha)</small></div>"
+        + "<b style='font-size:12.5px; color:" + col + ";'>" + cVal.toFixed(2) + " cab/ha</b>"
+        + "</div>"
+        + "</div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  function renderizarGraficoVectorial(targetEl, tipo, data, cardEl) {
+    if (!targetEl || !data) return;
+    var t = String(tipo || "").toLowerCase();
+    var html = "";
+
+    if (t === "evolucion") html = renderSvgEvolucion(data);
+    else if (t === "reproductivo_hato" || t === "reproductivo") html = renderSvgRepro(data);
+    else if (t === "ocupacion" || t === "ocupacion_potreros") html = renderSvgOcupacion(data);
+    else if (t === "aforo" || t === "aforo_potreros") html = renderSvgAforo(data);
+    else if (t === "flujo_caja" || t === "flujo") html = renderSvgFlujoCaja(data);
+    else if (t === "waterfall_inventario" || t === "waterfall") html = renderSvgWaterfall(data);
+    else if (t === "gmd_hato" || t === "gmd") html = renderSvgGmd(data);
+    else if (t === "composicion_racial" || t === "razas") html = renderSvgComposicionRacial(data);
+    else if (t === "subastas_comparativa" || t === "subastas_tendencia" || t === "subastas") html = renderSvgSubastasComparativa(data);
+    else if (t === "mapa_potreros" || t === "mapa") html = renderSvgMapaPotreros(data);
+    else if (t === "carga_animal" || t === "carga") html = renderSvgCargaAnimal(data);
+    else {
+      html = "<div style='text-align:center; padding:20px; color:var(--texto-suave); font-size:12px;'>Visualización vectorial disponible en el desplegable de abajo.</div>";
+    }
+
+    targetEl.innerHTML = html;
+    if (cardEl && data.subtitulo) {
+      var sub = cardEl.querySelector(".grafico-sub-info");
+      if (sub) sub.textContent = data.subtitulo;
+    }
+  }
+
+  function inicializarGraficos(rootEl) {
+    var root = rootEl || document;
+    var cards = root.querySelectorAll ? root.querySelectorAll(".tarjeta-grafico-ja:not([data-iniciado])") : [];
+    if (!cards || !cards.length) return;
+
+    Array.from(cards).forEach(function (card) {
+      card.setAttribute("data-iniciado", "1");
+      var tipo = card.getAttribute("data-chart-tipo");
+      var target = card.querySelector(".grafico-svg-target");
+      if (!target || !tipo) return;
+
+      var inlineStr = card.getAttribute("data-datos-inline");
+      if (inlineStr) {
+        try {
+          var inlineData = JSON.parse(inlineStr);
+          renderizarGraficoVectorial(target, tipo, inlineData, card);
+          return;
+        } catch (e) { /* fallback a fetch */ }
+      }
+
+      fetch("/api/grafico-datos/" + encodeURIComponent(tipo))
+        .then(function (r) {
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          renderizarGraficoVectorial(target, tipo, data, card);
+        })
+        .catch(function () {
+          target.innerHTML = "<div style='text-align:center; padding:18px 10px; color:var(--texto-suave); font-size:12px;'>"
+            + "<span style='font-size:16px;'>📊</span> Visualización vectorial no disponible en este momento. "
+            + "<br><small>Puedes consultar el gráfico del servidor en el desplegable de abajo.</small></div>";
+        });
+    });
   }
 
   // SVG Icon helper (estilo Lucide: trazo 2, sin relleno)
@@ -185,5 +747,21 @@
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true" focusable="false" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
   }
 
-  window.JA = { esc:esc, mostrarToast:mostrarToast, vibrarConfirmacion:vibrarConfirmacion, chipEstado:chipEstado, vacio:vacio, tabla:tabla, kpi:kpi, erroresHtml:erroresHtml, grafico:grafico, fechaCorta:fechaCorta, fmtMoneda:fmtMoneda, icon:icon };
+  window.JA = {
+    esc: esc,
+    mostrarToast: mostrarToast,
+    vibrarConfirmacion: vibrarConfirmacion,
+    chipEstado: chipEstado,
+    vacio: vacio,
+    tabla: tabla,
+    kpi: kpi,
+    erroresHtml: erroresHtml,
+    grafico: grafico,
+    fechaCorta: fechaCorta,
+    fmtMoneda: fmtMoneda,
+    icon: icon,
+    inicializarGraficos: inicializarGraficos,
+    renderizarGraficoVectorial: renderizarGraficoVectorial
+  };
 })();
+

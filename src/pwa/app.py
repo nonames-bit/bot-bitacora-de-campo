@@ -76,6 +76,7 @@ try:
         datos_reproduccion as _datos_reproduccion,
         datos_sanidad as _datos_sanidad,
         resolver_tag_flexible as _resolver_tag_flexible,
+        datos_grafico as _datos_grafico,
     )
 except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
@@ -100,6 +101,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
         datos_reproduccion as _datos_reproduccion,
         datos_sanidad as _datos_sanidad,
         resolver_tag_flexible as _resolver_tag_flexible,
+        datos_grafico as _datos_grafico,
     )
 
 logger = logging.getLogger(__name__)
@@ -3726,6 +3728,19 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         except Exception:
             cache_path = ruta  # si falla la copia, se sirve igual el original
         return send_file(os.path.abspath(cache_path), mimetype="image/png")
+
+    @app.get("/api/grafico-datos/<tipo>")
+    def api_grafico_datos(tipo):
+        """Devuelve los datos estructurados JSON de un gráfico para renderizado
+        vectorial SVG/HTML interactivo adaptado a los temas en el cliente."""
+        db_graf = _db(db_path)
+        try:
+            datos = _datos_grafico(db_graf, tipo)
+        finally:
+            db_graf.close()
+        if "error" in datos:
+            return jsonify(datos), 404
+        return jsonify(datos)
 
     @app.get("/media/<path:rel>")
     def media(rel):

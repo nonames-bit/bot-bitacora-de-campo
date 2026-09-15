@@ -645,7 +645,14 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
       - **Pirámide de Edades**: Clic directo en las barras o leyendas (ej. `47 H · 53 M`) para listar los animales de cada género y grupo etario.
     - **Filtro Estricto de Hato Activo**: Conforme a la directriz de `AGENTS.md`, todas las consultas filtran rigurosamente por `estado = 'ACTIVO'` (336 animales en total), evitando inflar el inventario con registros históricos.
     - **Verificación Visual Móvil**: Pruebas automáticas CDP en viewport móvil (390×844 DPR=2) y validación de sintaxis con hooks locales.
-- [x] Suite de pruebas con pytest: **831+ pruebas en verde** (100% pasando).
+- [x] **Gráficos Vectoriales SVG Nativos Adaptados a Temas & Modo Dual en la PWA (2026-09-15)**:
+    - **Reemplazo de Imágenes Fijas por Gráficos Vectoriales Nativos**: En lugar de depender exclusivamente de imágenes estáticas PNG renderizadas por Matplotlib en el servidor, se implementó el endpoint REST `/api/grafico-datos/<tipo>` en `src/pwa/app.py` y `src/engine/dashboard_data.py`, entregando datos estructurados JSON para que el navegador dibuje vectores SVG crisp, interactivos y ultralivianos.
+    - **Soporte Completo para los 11 Gráficos de la PWA**: `evolucion` (serie 12 meses), `reproductivo_hato` (gauges de preñez y días abiertos), `ocupacion` (permanencia y semáforo Voisin), `aforo` (kg MV/m² y promedio), `flujo_caja` (ingresos/egresos/utilidad), `waterfall_inventario` (balance paso a paso), `gmd_hato` (dispersión GMD vs edad), `composicion_racial` (distribución I/C/T/M), `subastas_comparativa` & `subastas_tendencia` (precios $/kg por plaza), `mapa_potreros` y `carga_animal`.
+    - **Adaptación Instantánea a los 4 Temas**: El renderizado vectorial en `src/pwa/static/ja-core.js` consume directamente los tokens CSS del sistema (`--superficie`, `--texto`, `--borde`, `--verde-marca`, `--acento`, etc.), adaptándose con elegancia y contraste tanto en Modo Oscuro como en Verde Campestre, Sol de Campo y Claro Editorial.
+    - **Modo Dual con Acordeón Desplegable (Matplotlib PNG)**: Cada gráfico incluye un acordeón colapsable `<details>` ("Ver gráfico original del servidor (Matplotlib PNG)") que permite alternar, auditar o descargar la imagen generada por Matplotlib sin saturar la vista.
+    - **Aislamiento de Alcance**: La generación de gráficos para reportes PDF y Telegram permanece intacta.
+    - **Pruebas y Verificación Visual**: Suite `tests/test_grafico_datos.py` (100% pasando), chequeos de sintaxis con Node y validación visual automatizada mediante CDP en viewport móvil (390×844 DPR=2).
+- [x] Suite de pruebas con pytest: **844+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

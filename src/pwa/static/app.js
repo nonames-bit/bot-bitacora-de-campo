@@ -2545,8 +2545,8 @@
       + "<div class='chip verde' style='font-size:11px;'>Alta Definición</div>"
       + "</div>"
       + "<div style='display:flex; flex-direction:column; gap:16px;'>"
-      + "<div class='grafico-wrap'><img src='/api/grafico/subastas_comparativa?t=" + tNow + "' alt='Comparativa de Subastas Ganadería JA' loading='lazy'></div>"
-      + "<div class='grafico-wrap'><img src='/api/grafico/subastas_tendencia?t=" + tNow + "' alt='Tendencia Semanal Subastas Ganadería JA' loading='lazy'></div>"
+      + grafico("subastas_comparativa", "Comparativa de Subastas Ganadería JA")
+      + grafico("subastas_tendencia", "Tendencia Semanal Subastas Ganadería JA")
       + "</div>"
       + "</div>";
   }
@@ -8973,6 +8973,9 @@
     if (!el) return;
     el.innerHTML = html;
     vincularTagsFicha(el); // tags clicables -> ficha del animal
+    if (window.JA && window.JA.inicializarGraficos) {
+      window.JA.inicializarGraficos(el);
+    }
     if (animar) {
       el.classList.remove("vista-entra");
       void el.offsetWidth; // reinicia la animación
