@@ -959,6 +959,301 @@ def datos_finanzas(db: Database, desde: Optional[str] = None, hasta: Optional[st
     return out
 
 
+def to_date_safe(v) -> Optional[date]:
+    """Convierte fecha ISO/texto a date sin lanzar (None si no puede)."""
+    if v is None:
+        return None
+    try:
+        from ..utils import to_date
+        return to_date(str(v)[:10])
+    except Exception:
+        try:
+            from src.utils import to_date
+            return to_date(str(v)[:10])
+        except Exception:
+            return None
+
+
+def calcular_estados_zootecnicos(f: dict) -> dict:
+    """Calcula con rigor zootécnico el estado fisiológico y reproductivo del animal."""
+    hoy = date.today()
+    sexo = str(f.get("sexo") or "").strip().lower()
+    es_hembra = sexo.startswith("h") or sexo.startswith("f")
+    es_macho = bool(sexo.startswith("m") or sexo in ("macho", "toro", "ternero", "novillo"))
+    edad_dias = f.get("edad_dias")
+    tag = str(f.get("tag") or "").strip()
+    notas = str(f.get("notas") or "")
+    nombre = str(f.get("nombre") or "")
+    txt_info = f"{tag} {nombre} {notas}".upper()
+
+    # 1. Estado Fisiológico / Productivo
+    cod_fisio = "ADULTO"
+    titulo_fisio = "Adulto"
+    badge_fisio = "Adulto"
+    color_fisio = "gris"
+    icono_fisio = "cow"
+    detalle_fisio = ""
+
+    es_toro = bool(
+        re.match(r"^T\d+", tag, re.IGNORECASE)
+        or re.search(r"\b(?:TORO|REPRODUCTOR|PADRON)\b", txt_info)
+    )
+
+    if es_macho:
+        if es_toro:
+            cod_fisio = "TORO"
+            titulo_fisio = "Toro Reproductor"
+            badge_fisio = "Toro Reproductor"
+            color_fisio = "azul"
+            icono_fisio = "bull"
+            detalle_fisio = "Macho reproductor activo de la finca"
+        elif edad_dias is not None and edad_dias < 365:
+            cod_fisio = "CRIA_MACHO"
+            titulo_fisio = "Cría (Ternero)"
+            badge_fisio = "Cría (Ternero)"
+            color_fisio = "verde"
+            icono_fisio = "calf"
+            detalle_fisio = f"Lactante / Levante inicial ({f.get('edad_str') or ''})"
+        elif edad_dias is not None and edad_dias < 730:
+            cod_fisio = "NOVILLO_LEVANTE"
+            titulo_fisio = "Novillo de levante"
+            badge_fisio = "Novillo levante"
+            color_fisio = "ambar"
+            icono_fisio = "cow"
+            detalle_fisio = f"En desarrollo ({f.get('edad_str') or ''})"
+        else:
+            cod_fisio = "NOVILLO"
+            titulo_fisio = "Novillo / Macho"
+            badge_fisio = "Novillo"
+            color_fisio = "gris"
+            icono_fisio = "cow"
+            detalle_fisio = f"Macho ({f.get('edad_str') or ''})"
+
+    elif es_hembra:
+        lactancia = f.get("lactancia") or {}
+        ult_parto = f.get("ultimo_parto") or {}
+        tiene_partos = bool(ult_parto and ult_parto.get("fecha")) or bool(f.get("partos"))
+        del_dias = lactancia.get("del_dias")
+
+        if edad_dias is not None and edad_dias < 365 and not tiene_partos:
+            cod_fisio = "CRIA_HEMBRA"
+            titulo_fisio = "Cría (Ternera)"
+            badge_fisio = "Cría (Ternera)"
+            color_fisio = "verde"
+            icono_fisio = "calf"
+            detalle_fisio = f"Lactante al pie ({f.get('edad_str') or ''})"
+        elif edad_dias is not None and edad_dias < 730 and not tiene_partos:
+            cod_fisio = "NOVILLA_LEVANTE"
+            titulo_fisio = "Novilla de levante"
+            badge_fisio = "Novilla levante"
+            color_fisio = "ambar"
+            icono_fisio = "cow"
+            detalle_fisio = f"En desarrollo ({f.get('edad_str') or ''})"
+        elif edad_dias is not None and edad_dias < 1095 and not tiene_partos:
+            cod_fisio = "NOVILLA_VIENTRE"
+            titulo_fisio = "Novilla de vientre"
+            badge_fisio = "Novilla vientre"
+            color_fisio = "purpura"
+            icono_fisio = "cow"
+            detalle_fisio = "Apta para primer servicio / IA"
+        else:
+            # Vaca Adulta
+            if lactancia.get("estado") == "En ordeño":
+                cod_fisio = "VACA_ORDENO"
+                titulo_fisio = "Vaca en Ordeño"
+                badge_fisio = f"En Ordeño ({del_dias} DEL)" if del_dias is not None else "En Ordeño"
+                color_fisio = "verde"
+                icono_fisio = "milk"
+                f_p = ult_parto.get("fecha")
+                detalle_fisio = f"Lactancia activa: {del_dias} Días En Leche (parto: {f_p})" if f_p else "Lactancia activa"
+            elif lactancia.get("estado") == "Seca":
+                cod_fisio = "VACA_SECA"
+                titulo_fisio = "Vaca Seca"
+                badge_fisio = "Vaca Seca"
+                color_fisio = "ambar"
+                icono_fisio = "grass"
+                f_sec = lactancia.get("fecha_secado")
+                detalle_fisio = f"Secada el {f_sec} (preparación para parto)" if f_sec else "Período seco (sin ordeño)"
+            else:
+                pot_nom = str(f.get("potrero") or "").upper()
+                if "ORDEÑO" in pot_nom or "PARIDA" in pot_nom:
+                    cod_fisio = "VACA_ORDENO"
+                    titulo_fisio = "Vaca en Ordeño"
+                    badge_fisio = "En Ordeño"
+                    color_fisio = "verde"
+                    icono_fisio = "milk"
+                    detalle_fisio = "En lote de ordeño activo"
+                else:
+                    cod_fisio = "VACA_SECA"
+                    titulo_fisio = "Vaca Seca"
+                    badge_fisio = "Vaca Seca"
+                    color_fisio = "ambar"
+                    icono_fisio = "grass"
+                    detalle_fisio = "Vaca en período seco / horra"
+
+    # 2. Estado Reproductivo (Ciclo Vigente)
+    cod_repro = "SIN_DATOS"
+    titulo_repro = "Sin datos reproductivos"
+    badge_repro = "Sin datos"
+    color_repro = "gris"
+    dias_abiertos = None
+    dias_gestacion = None
+    fep_iso = None
+    alerta_repro = None
+    detalle_repro = ""
+
+    if es_hembra:
+        ult_parto = f.get("ultimo_parto")
+        f_parto_d = to_date_safe(ult_parto["fecha"]) if ult_parto and ult_parto.get("fecha") else None
+
+        # Servicios y diagnósticos del ciclo VIGENTE (posteriores al último parto)
+        servicios_ciclo = []
+        for s in f.get("servicios") or []:
+            f_s = to_date_safe(s.get("fecha"))
+            if f_s and (not f_parto_d or f_s >= f_parto_d):
+                servicios_ciclo.append(s)
+
+        diag_ciclo = []
+        for d in f.get("diagnosticos") or []:
+            f_d = to_date_safe(d.get("fecha"))
+            if f_d and (not f_parto_d or f_d >= f_parto_d):
+                diag_ciclo.append(d)
+
+        ult_serv_ciclo = servicios_ciclo[0] if servicios_ciclo else None
+        ult_diag_ciclo = diag_ciclo[0] if diag_ciclo else None
+
+        if f_parto_d:
+            dias_abiertos = max(0, (hoy - f_parto_d).days)
+
+        # ¿Está confirmada preñada en este ciclo?
+        es_prenada = False
+        if ult_diag_ciclo and str(ult_diag_ciclo.get("resultado") or "").upper() in ("PREÑADA", "PREGNANT", "POSITIVO"):
+            es_prenada = True
+        elif ult_serv_ciclo and str(ult_serv_ciclo.get("estado") or "").upper() in ("CONFIRMADA", "PREÑADA"):
+            es_prenada = True
+
+        if es_prenada:
+            cod_repro = "PREÑADA"
+            f_serv_d = to_date_safe(ult_serv_ciclo.get("fecha")) if ult_serv_ciclo else None
+            fep_iso = str(ult_serv_ciclo["fep_calculada"])[:10] if ult_serv_ciclo and ult_serv_ciclo.get("fep_calculada") else None
+            if f_serv_d:
+                dias_gestacion = max(0, (hoy - f_serv_d).days)
+            elif ult_diag_ciclo and ult_diag_ciclo.get("dias_gestacion"):
+                dias_gestacion = int(ult_diag_ciclo["dias_gestacion"])
+
+            meses_gest = round(dias_gestacion / 30.4, 1) if dias_gestacion is not None else None
+            gest_txt = f" · {dias_gestacion} d gestación (~{meses_gest} m)" if dias_gestacion is not None else ""
+            fep_txt = f" (FEP: {fep_iso})" if fep_iso else ""
+
+            titulo_repro = f"Preñada / Gestante{fep_txt}{gest_txt}"
+            badge_repro = f"Preñada ({dias_gestacion}d)" if dias_gestacion else "Preñada"
+            color_repro = "verde"
+            detalle_repro = f"Gestación confirmada. FEP estimada: {fep_iso or 'S/D'}{gest_txt}"
+
+            if fep_iso:
+                f_fep = to_date_safe(fep_iso)
+                if f_fep:
+                    dias_para_parto = (f_fep - hoy).days
+                    if 0 < dias_para_parto <= 60 and cod_fisio == "VACA_ORDENO":
+                        alerta_repro = f"⚠️ Próxima al parto ({dias_para_parto} días restantes). Programar SECADO."
+
+        elif ult_serv_ciclo:
+            f_serv_d = to_date_safe(ult_serv_ciclo.get("fecha"))
+            dias_post_serv = (hoy - f_serv_d).days if f_serv_d else 0
+            fep_iso = str(ult_serv_ciclo["fep_calculada"])[:10] if ult_serv_ciclo.get("fep_calculada") else None
+            toro_txt = f" con {ult_serv_ciclo.get('toro_pajilla')}" if ult_serv_ciclo.get("toro_pajilla") else ""
+
+            f_diag_d = to_date_safe(ult_diag_ciclo.get("fecha")) if ult_diag_ciclo else None
+            if ult_diag_ciclo and f_diag_d and f_serv_d and f_diag_d >= f_serv_d and str(ult_diag_ciclo.get("resultado") or "").upper() in ("VACIA", "VACÍA", "NEGATIVO"):
+                cod_repro = "VACIA_PALPADA"
+                titulo_repro = f"Vacía (Palpada negativa el {f_diag_d})"
+                badge_repro = "Vacía (Palpada)"
+                color_repro = "rojo"
+                detalle_repro = f"Diagnóstico de gestación negativo ({f_diag_d}). Requiere servicio en próximo celo."
+                alerta_repro = "⚠️ Palpación negativa: observar celo para reinseminar."
+            else:
+                cod_repro = "SERVIDA_SIN_PALPAR"
+                fep_txt = f" · FEP: {fep_iso}" if fep_iso else ""
+                titulo_repro = f"Servida / Sin palpar ({dias_post_serv} días post-servicio{toro_txt}){fep_txt}"
+                badge_repro = f"Servida ({dias_post_serv}d sin palpar)"
+                color_repro = "ambar"
+                detalle_repro = f"Servicio / IA el {f_serv_d}{toro_txt}. FEP estimada: {fep_iso or 'S/D'}."
+
+                if dias_post_serv >= 60:
+                    alerta_repro = f"⚠️ Palpación pendiente ({dias_post_serv} días post-servicio, >60d)."
+                elif dias_post_serv >= 35:
+                    alerta_repro = f"⚠️ Ecografía pendiente ({dias_post_serv} días post-servicio, >35d)."
+
+        elif f_parto_d:
+            cod_repro = "VACIA_SIN_PALPAR"
+            titulo_repro = f"Vacía / Abierta ({dias_abiertos} días post-parto)"
+            badge_repro = f"Vacía ({dias_abiertos}d abiertos)"
+            color_repro = "gris"
+            detalle_repro = f"Último parto el {f_parto_d}. Lleva {dias_abiertos} días abiertos sin nuevo servicio."
+
+            if dias_abiertos > 150:
+                color_repro = "rojo"
+                alerta_repro = f"⚠️ Días abiertos críticos ({dias_abiertos} días post-parto > 150d). Revisar condición ovárica."
+            elif dias_abiertos > 90:
+                color_repro = "ambar"
+                alerta_repro = f"⚠️ Días abiertos elevados ({dias_abiertos} días > 90d). Programar servicio pronto."
+
+        elif cod_fisio == "NOVILLA_VIENTRE":
+            cod_repro = "NOVILLA_APTA"
+            titulo_repro = "Novilla apta para primer servicio"
+            badge_repro = "Apta para servicio"
+            color_repro = "purpura"
+            detalle_repro = "Edad y desarrollo adecuados para inseminación o monta."
+        elif edad_dias is not None and edad_dias >= 1095:
+            cod_repro = "VACIA_SIN_PALPAR"
+            titulo_repro = "Vaca Vacía / Sin palpar"
+            badge_repro = "Vacía (Sin palpar)"
+            color_repro = "gris"
+            detalle_repro = "Vaca adulta sin servicio ni diagnóstico de preñez reciente registrado."
+        else:
+            cod_repro = "CRECIMIENTO"
+            titulo_repro = "En crecimiento / Levante"
+            badge_repro = "En crecimiento"
+            color_repro = "gris"
+            detalle_repro = "Hembra joven en etapa de desarrollo antes de edad reproductiva."
+
+    elif es_macho:
+        if es_toro:
+            cod_repro = "TORO_REPRODUCTOR"
+            titulo_repro = "Toro reproductor activo"
+            badge_repro = "Toro Reproductor"
+            color_repro = "azul"
+            detalle_repro = "Macho padre reproductor disponible en el hato."
+        else:
+            cod_repro = "MACHO_ACTIVO"
+            titulo_repro = "Macho en desarrollo / ceba"
+            badge_repro = "Macho"
+            color_repro = "gris"
+            detalle_repro = "Macho no reproductor."
+
+    return {
+        "fisiologico": {
+            "codigo": cod_fisio,
+            "titulo": titulo_fisio,
+            "badge": badge_fisio,
+            "color": color_fisio,
+            "icono": icono_fisio,
+            "detalle": detalle_fisio,
+        },
+        "reproductivo": {
+            "codigo": cod_repro,
+            "titulo": titulo_repro,
+            "badge": badge_repro,
+            "color": color_repro,
+            "dias_abiertos": dias_abiertos,
+            "dias_gestacion": dias_gestacion,
+            "fep": fep_iso,
+            "alerta": alerta_repro,
+            "detalle": detalle_repro,
+        }
+    }
+
+
 def datos_ficha_animal(db: Database, tag: str) -> dict:
     """Ficha animal: header + historial resumido + QR payload (abre /ficha/<tag>)."""
     errores: dict[str, str] = {}
@@ -1349,40 +1644,13 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base["retiros_activos"] = retiros_activos
     base["en_retiro"] = len(retiros_activos) > 0
 
-    # 7. Resumen reproductivo
-    estado_repro = "Sin datos reproductivos"
-    dias_abiertos = None
-    if es_hembra:
-        ult_diag = base["diagnosticos"][0] if base.get("diagnosticos") else None
-        ult_serv = base.get("ultimo_servicio")
-        ult_parto = base.get("ultimo_parto")
-
-        f_parto_d = to_date_safe(ult_parto["fecha"]) if ult_parto and ult_parto.get("fecha") else None
-        if f_parto_d:
-            dias_abiertos = max(0, (hoy_date - f_parto_d).days)
-
-        if ult_diag and str(ult_diag.get("resultado") or "").upper() in ("PREÑADA", "PREGNANT", "POSITIVO"):
-            fep_str = f" (FEP: {str(ult_serv['fep_calculada'])[:10]})" if ult_serv and ult_serv.get("fep_calculada") else ""
-            estado_repro = f"🟢 Gestante / Preñada{fep_str}"
-        elif ult_serv and ult_serv.get("fep_calculada"):
-            f_serv_d = to_date_safe(ult_serv.get("fecha"))
-            if not f_parto_d or (f_serv_d and f_serv_d >= f_parto_d):
-                toro_str = f" · {ult_serv.get('toro_pajilla') or ''}".strip()
-                estado_repro = f"🟡 Inseminada / Servida{toro_str} (FEP: {str(ult_serv['fep_calculada'])[:10]})"
-            elif f_parto_d:
-                estado_repro = f"⚪ Abierta / Vacía ({dias_abiertos} días post-parto)"
-        elif f_parto_d:
-            estado_repro = f"⚪ Abierta / Vacía ({dias_abiertos} días post-parto)"
-        elif edad_dias and edad_dias >= 730:
-            estado_repro = "⚪ Novilla de vientre (apta para servicio)"
-        elif edad_dias and edad_dias < 730:
-            estado_repro = "⚪ Ternera / Novilla de levante"
-        else:
-            estado_repro = "Hembra activa"
-    elif es_macho:
-        estado_repro = "Macho reproductor" if "Reproductor" in categoria_sg else "Macho activo"
-    base["estado_repro"] = estado_repro
-    base["dias_abiertos"] = dias_abiertos
+    # 7. Resumen zootécnico (fisiológico y reproductivo con rigor)
+    estados_z = calcular_estados_zootecnicos(base)
+    base["estado_fisiologico"] = estados_z["fisiologico"]
+    base["estado_reproductivo"] = estados_z["reproductivo"]
+    base["estado_repro"] = estados_z["reproductivo"]["titulo"]
+    base["dias_abiertos"] = estados_z["reproductivo"]["dias_abiertos"]
+    base["alerta_repro"] = estados_z["reproductivo"]["alerta"]
 
     # 8. Traslados de potrero recientes
     try:
@@ -1509,16 +1777,6 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         base["errores"] = errores
     return base
 
-
-def to_date_safe(v) -> Optional[date]:
-    """Convierte fecha ISO/texto a date sin lanzar (None si no puede)."""
-    if v is None:
-        return None
-    try:
-        from ..utils import to_date
-        return to_date(str(v)[:10])
-    except Exception:
-        return None
 
 
 # --------------------------------------------------------------------------- #

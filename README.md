@@ -623,7 +623,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
       - Selector opcional de Toro / Padre (`GET /api/toros`) con reproductores activos (`T01` BRUNO, `T02` PERLA OHIO, etc.), machos activos del hato y opción para toro externo o pajuela; enlazado automáticamente al árbol genealógico del ternero (`padre_id`).
       - Autocompletado completo e instantáneo de animales activos (`#dl-tags`) y potreros (`#dl-potreros`) tanto en tecleo como al enfocar cualquier campo de captura.
       - Visualización destacada en el paso 3 ("Revise y guarde") mostrando número de cría sugerido/asignado, sexo, estado, peso y toro/padre.
-- [x] Suite de pruebas con pytest: **829+ pruebas en verde** (100% pasando).
+- [x] **Reorganización y Claridad de Estados Fisiológicos & Reproductivos en Ficha Animal (2026-09-14)**:
+    - **Cálculo Riguroso del Ciclo Actual (`src/engine/dashboard_data.py`)**: Aislamiento temporal de servicios y diagnósticos posteriores al último parto (`fecha >= ultimo_parto.fecha`), evitando que inseminaciones históricas de ciclos pasados (ej. 2017) declaren falsamente como preñada a una vaca parida recientemente.
+    - **Categorización Fisiológica & Reproductiva Inmediata**: Distinción clara en chips de cabecera (`.ficha-head`) para: Cría (Ternero/Ternera con días de nacido), Novilla de levante, Novilla de vientre, Vaca en ordeño (con DEL), Vaca seca y Toro reproductor; junto con el estado del ciclo actual: Preñada/Gestante (FEP y días de gestación), Servida / Sin palpar (días post-servicio), Vacía / Sin palpar (días abiertos y semáforo zootécnico) o Vacía palpada.
+    - **Tarjeta #1 en Pestaña General**: Ubicación prioritaria de la tarjeta **Estado Fisiológico & Reproductivo** en la primera posición de la ficha técnica con desglose en 2 columnas (Producción/Lactancia y Reproducción Actual), semáforo zootécnico de días abiertos (verde ≤90d, amarillo 91-150d, rojo >150d) y alertas veterinarias contextuales.
+    - **KPIs Dinámicos por Sexo/Rol**: Indicadores superiores adaptativos según se consulte una vaca, novilla, cría o toro reproductor.
+    - **Pruebas y Verificación Visual**: Suite automatizada `tests/test_ficha_estados_zootecnicos.py` (100% pasando) y capturas móviles verificadas en viewport 390×844 DPR=2.
+- [x] Suite de pruebas con pytest: **830+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

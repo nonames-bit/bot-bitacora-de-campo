@@ -7882,6 +7882,61 @@
       + "<video id='qr-video' style='display:none; width:100%; max-width:320px; border-radius:8px; margin-top:8px' autoplay playsinline></video>"
       + "</div>";
   }
+  function resolverEstadosFicha(f) {
+    if (f.estado_fisiologico && f.estado_reproductivo) {
+      return { fisio: f.estado_fisiologico, repro: f.estado_reproductivo };
+    }
+    var sx = String(f.sexo || "").toLowerCase();
+    var esH = sx.indexOf("h") === 0 || sx.indexOf("f") === 0;
+    var esM = sx.indexOf("m") === 0;
+    var edadD = f.edad_dias;
+    var lac = f.lactancia || {};
+    var ultP = f.ultimo_parto || {};
+    var tieneP = Boolean(ultP && ultP.fecha) || Boolean(f.partos && f.partos.length);
+    var tag = String(f.tag || "");
+    var isToro = tag.match(/^T\d+/i) || /TORO|REPRODUCTOR/i.test(tag + " " + (f.nombre || "") + " " + (f.notas || ""));
+
+    var fisio = { codigo: "ADULTO", titulo: "Adulto", badge: "Adulto", color: "gris", icono: "cow", detalle: "" };
+    var repro = { codigo: "SIN_DATOS", titulo: f.estado_repro || "Sin datos", badge: f.estado_repro || "Sin datos", color: "gris", dias_abiertos: f.dias_abiertos, alerta: null, detalle: "" };
+
+    if (esM) {
+      if (isToro) {
+        fisio = { codigo: "TORO", titulo: "Toro Reproductor", badge: "Toro Reproductor", color: "azul", icono: "bull", detalle: "Macho reproductor activo de la finca" };
+        repro = { codigo: "TORO_REPRODUCTOR", titulo: "Toro reproductor activo", badge: "Toro Reproductor", color: "azul", detalle: "Macho padre reproductor" };
+      } else if (edadD != null && edadD < 365) {
+        fisio = { codigo: "CRIA_MACHO", titulo: "Cría (Ternero)", badge: "Cría (Ternero)", color: "verde", icono: "calf", detalle: "Lactante al pie" };
+        repro = { codigo: "MACHO", titulo: "Macho en levante", badge: "Ternero", color: "gris" };
+      } else {
+        fisio = { codigo: "NOVILLO", titulo: "Novillo / Macho", badge: "Novillo", color: "gris", icono: "cow", detalle: "Macho en desarrollo" };
+        repro = { codigo: "MACHO", titulo: "Macho", badge: "Macho", color: "gris" };
+      }
+    } else if (esH) {
+      if (edadD != null && edadD < 365 && !tieneP) {
+        fisio = { codigo: "CRIA_HEMBRA", titulo: "Cría (Ternera)", badge: "Cría (Ternera)", color: "verde", icono: "calf", detalle: "Lactante al pie" };
+        repro = { codigo: "CRECIMIENTO", titulo: "En desarrollo / Crecimiento", badge: "Ternera", color: "gris" };
+      } else if (edadD != null && edadD < 730 && !tieneP) {
+        fisio = { codigo: "NOVILLA_LEVANTE", titulo: "Novilla de levante", badge: "Novilla levante", color: "ambar", icono: "cow", detalle: "En crecimiento" };
+        repro = { codigo: "CRECIMIENTO", titulo: "En levante", badge: "Novilla levante", color: "gris" };
+      } else if (edadD != null && edadD < 1095 && !tieneP) {
+        fisio = { codigo: "NOVILLA_VIENTRE", titulo: "Novilla de vientre", badge: "Novilla vientre", color: "purpura", icono: "cow", detalle: "Apta para primer servicio / IA" };
+        repro = { codigo: "NOVILLA_APTA", titulo: "Novilla apta para servicio", badge: "Apta para servicio", color: "purpura" };
+      } else {
+        if (lac.estado === "En ordeño") {
+          fisio = { codigo: "VACA_ORDENO", titulo: "Vaca en Ordeño", badge: lac.del_dias != null ? "En Ordeño (" + lac.del_dias + " DEL)" : "En Ordeño", color: "verde", icono: "milk", detalle: "Lactancia activa" };
+        } else {
+          fisio = { codigo: "VACA_SECA", titulo: "Vaca Seca", badge: "Vaca Seca", color: "ambar", icono: "grass", detalle: "Período seco / horra" };
+        }
+        var da = f.dias_abiertos;
+        if (da != null) {
+          var daCol = da > 150 ? "rojo" : (da > 90 ? "ambar" : "gris");
+          repro = { codigo: "VACIA_SIN_PALPAR", titulo: "Vacía / Abierta (" + da + " días post-parto)", badge: "Vacía (" + da + "d abiertos)", color: daCol, dias_abiertos: da };
+        } else {
+          repro = { codigo: "VACIA_SIN_PALPAR", titulo: "Vaca Vacía / Sin palpar", badge: "Vacía (Sin palpar)", color: "gris" };
+        }
+      }
+    }
+    return { fisio: fisio, repro: repro };
+  }
   function fichaHtml(f, showIdent) {
     var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
@@ -7909,23 +7964,44 @@
       estadoChip = "<span class='chip gris'>" + esc(f.estado) + "</span>";
     }
 
-    var potChip = f.potrero ? "<span class='chip gris' style='margin-left:4px;'>" + icon("grass", 13) + esc(f.potrero) + "</span>" : "";
-    var catChip = f.categoria_sg ? "<span class='chip gris' style='margin-left:4px;'>" + esc(f.categoria_sg) + "</span>" : "";
-    var hierroChip = f.hierro ? ("<span class='chip ambar' style='margin-left:4px; font-weight:600;' title='Hierro / Marca a fuego de la ganadería'>" + icon("flame", 12) + "Hierro <b>" + esc(f.hierro) + "</b></span>") : "";
-    var retiroChip = f.en_retiro ? "<span class='chip rojo' style='margin-left:4px; font-weight:bold;'>" + icon("alert", 13) + "EN RETIRO</span>" : "";
+    var z = resolverEstadosFicha(f);
+    var ef = z.fisio;
+    var er = z.repro;
+
+    var fisioChip = "";
+    if (ef && ef.badge) {
+      var fIcon = ef.icono === "milk" ? icon("milk", 12)
+                : ef.icono === "calf" ? icon("calf", 12)
+                : ef.icono === "grass" ? icon("grass", 12)
+                : icon("cow", 12);
+      fisioChip = "<span class='chip " + (ef.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;' title='" + esc(ef.detalle || ef.titulo || "") + "'>" + fIcon + "<span>" + esc(ef.badge) + "</span></span>";
+    }
+
+    var reproChip = "";
+    if (er && er.badge && er.codigo !== "TORO_REPRODUCTOR" && er.codigo !== "MACHO" && er.codigo !== "CRECIMIENTO") {
+      var rIcon = er.codigo === "PREÑADA" ? icon("sperm", 12)
+                : er.codigo === "SERVIDA_SIN_PALPAR" ? icon("hourglass", 12)
+                : er.alerta ? icon("alert", 12)
+                : icon("circleEmpty", 12);
+      reproChip = "<span class='chip " + (er.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;' title='" + esc(er.detalle || er.titulo || "") + "'>" + rIcon + "<span>" + esc(er.badge) + "</span></span>";
+    }
+
+    var potChip = f.potrero ? "<span class='chip gris' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("grass", 12) + "<span>" + esc(f.potrero) + "</span></span>" : "";
+    var hierroChip = f.hierro ? ("<span class='chip ambar' style='font-weight:600; display:inline-flex; align-items:center; gap:3px;' title='Hierro / Marca de la ganadería'>" + icon("flame", 12) + "<span>Hierro <b>" + esc(f.hierro) + "</b></span></span>") : "";
+    var retiroChip = f.en_retiro ? "<span class='chip rojo' style='font-weight:bold; display:inline-flex; align-items:center; gap:4px;'>" + icon("alert", 12) + "<span>EN RETIRO</span></span>" : "";
 
     head += "<div class='datos' style='flex:1; min-width:0;'>"
-      + "<div style='display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:4px;'>"
-      + "<b style='font-size:18px; letter-spacing:-0.02em;'>" + esc(f.tag) + (f.nombre ? " · " + esc(f.nombre) : "") + "</b>"
+      + "<div style='display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:5px;'>"
+      + "<b style='font-size:19px; letter-spacing:-0.02em;'>" + esc(f.tag) + (f.nombre ? " · " + esc(f.nombre) : "") + "</b>"
       + estadoChip + retiroChip
       + "</div>"
-      + "<div style='display:flex; flex-wrap:wrap; gap:4px; align-items:center; margin-bottom:4px;'>"
-      + potChip + catChip + hierroChip
+      + "<div style='display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:5px;'>"
+      + fisioChip + reproChip + potChip + hierroChip
       + "</div>"
       + "<span class='meta' style='font-size:12px; color:var(--texto-suave);'>"
       + esc(f.sexo || "") + " · " + esc(f.raza || "S/D")
-      + (f.hierro ? " · Hierro: <b>" + esc(f.hierro) + "</b>" : "")
       + (f.edad_str ? " · <b>" + esc(f.edad_str) + "</b>" : (f.fecha_nacimiento ? " · Nac: " + esc(fechaCorta(f.fecha_nacimiento)) : ""))
+      + (f.categoria_sg ? " · " + esc(f.categoria_sg) : "")
       + "</span>"
       + "</div>";
 
@@ -8264,7 +8340,13 @@
       h += "</ul></div>";
     }
 
-    // 2. Fila de KPIs rápidos
+    // 2. Fila de KPIs rápidos dinámicos
+    var z = resolverEstadosFicha(f);
+    var ef = z.fisio;
+    var er = z.repro;
+    var sx = String(f.sexo || "").toLowerCase();
+    var esHembra = sx.indexOf("h") === 0 || sx.indexOf("f") === 0;
+
     var ultPesoTxt = "—";
     if (f.ultimo_peso && f.ultimo_peso.peso_kg != null) {
       ultPesoTxt = f.ultimo_peso.peso_kg + " kg";
@@ -8285,12 +8367,131 @@
       potreroKpiVal = "Descartado";
     }
 
-    h += "<div class='kpis' style='margin-bottom:14px;'>"
-      + kpi(potreroKpiVal, potreroKpiLabel)
-      + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad")
-      + kpi(ultPesoTxt, "Último Pesaje")
-      + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
-      + "</div>";
+    if (esHembra && (f.edad_dias == null || f.edad_dias >= 365 || (f.partos && f.partos.length))) {
+      var reproKpiVal = er.badge ? esc(er.badge) : "Sin datos";
+      var reproKpiClase = er.color === "verde" ? "ok" : (er.color === "rojo" || er.color === "ambar" ? "alerta" : "");
+
+      var daOgestVal = "—";
+      var daOgestLabel = "Días Abiertos";
+      if (er.codigo === "PREÑADA" && er.dias_gestacion != null) {
+        daOgestVal = er.dias_gestacion + " d";
+        daOgestLabel = "Gestación";
+      } else if (er.dias_abiertos != null) {
+        daOgestVal = er.dias_abiertos + " d";
+        daOgestLabel = "Días Abiertos";
+      }
+
+      var lacKpiVal = "—";
+      if (ef.codigo === "VACA_ORDENO") {
+        lacKpiVal = (f.lactancia && f.lactancia.del_dias != null) ? (f.lactancia.del_dias + " DEL") : "En ordeño";
+      } else if (ef.codigo === "VACA_SECA") {
+        lacKpiVal = "Seca";
+      } else {
+        lacKpiVal = esc(ef.badge);
+      }
+
+      h += "<div class='kpis' style='margin-bottom:14px;'>"
+        + kpi(reproKpiVal, "Estado Repro", reproKpiClase)
+        + kpi(daOgestVal, daOgestLabel, (daOgestLabel === "Días Abiertos" && er.dias_abiertos > 90) ? "alerta" : "")
+        + kpi(lacKpiVal, "Lactancia")
+        + kpi(potreroKpiVal, potreroKpiLabel)
+        + kpi(f.en_retiro ? "EN RETIRO" : ultPesoTxt, f.en_retiro ? "Inocuidad" : "Último Pesaje", f.en_retiro ? "alerta" : "")
+        + "</div>";
+    } else {
+      var rolKpi = esc(ef.badge || f.categoria_sg || "Activo");
+      h += "<div class='kpis' style='margin-bottom:14px;'>"
+        + kpi(rolKpi, "Categoría / Estado")
+        + kpi(potreroKpiVal, potreroKpiLabel)
+        + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad")
+        + kpi(ultPesoTxt, "Último Pesaje")
+        + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
+        + "</div>";
+    }
+
+    // 3. Tarjeta Destacada: Estado Fisiológico & Reproductivo (Prioridad #1 en Ficha)
+    var fisioIcon = ef.icono === "milk" ? icon("milk", 16)
+                  : ef.icono === "calf" ? icon("calf", 16)
+                  : ef.icono === "grass" ? icon("grass", 16)
+                  : icon("cow", 16);
+    var reproIcon = er.codigo === "PREÑADA" ? icon("sperm", 16)
+                  : er.codigo === "SERVIDA_SIN_PALPAR" ? icon("hourglass", 16)
+                  : er.codigo === "TORO_REPRODUCTOR" ? icon("crown", 16)
+                  : (er.alerta ? icon("alert", 16) : icon("circleEmpty", 16));
+
+    var bordeColor = er.color === "verde" ? "var(--color-verde-txt)"
+                   : er.color === "rojo" ? "var(--color-rojo-txt)"
+                   : er.color === "ambar" ? "var(--color-ambar-txt)"
+                   : "var(--verde-marca)";
+
+    var fisioBadgeHtml = "<span class='chip " + (ef.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + fisioIcon + "<span>" + esc(ef.badge) + "</span></span>";
+    var reproBadgeHtml = er.badge ? ("<span class='chip " + (er.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + reproIcon + "<span>" + esc(er.badge) + "</span></span>") : "";
+
+    h += "<div class='card card-estado-zootecnico' style='padding:16px; margin-bottom:16px; border-left:5px solid " + bordeColor + ";'>";
+    h += "<div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>";
+    h += "<h4 style='margin:0; border:none; padding:0; font-size:15px; display:flex; align-items:center; gap:8px; color:var(--texto);'>" + icon("heartPulse", 18) + "<span>Estado Fisiológico & Reproductivo</span></h4>";
+    h += "<div style='display:flex; gap:6px; flex-wrap:wrap;'>" + fisioBadgeHtml + reproBadgeHtml + "</div>";
+    h += "</div>";
+
+    h += "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;'>";
+
+    // Columna 1: Estado Fisiológico / Producción
+    h += "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>";
+    h += "<div style='font-size:11px; text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.05em; color:var(--texto-suave); margin-bottom:4px;'>Estado Fisiológico / Producción</div>";
+    h += "<div style='font-size:15px; font-weight:700; color:var(--texto); margin-bottom:4px; display:flex; align-items:center; gap:6px;'>" + fisioIcon + "<span>" + esc(ef.titulo) + "</span></div>";
+    h += "<div style='font-size:12.5px; color:var(--texto-suave); line-height:1.4;'>" + esc(ef.detalle || "Sin observaciones fisiológicas") + "</div>";
+    if (f.lactancia && f.lactancia.fecha_parto) {
+      h += "<div style='margin-top:8px; padding-top:6px; border-top:1px solid var(--borde); font-size:12px; display:flex; flex-wrap:gap; gap:8px;'>";
+      h += "<span>Último parto: <b>" + esc(fechaCorta(f.lactancia.fecha_parto)) + "</b></span>";
+      if (f.lactancia.del_dias != null) {
+        h += "<span>· <b>" + f.lactancia.del_dias + "</b> DEL</span>";
+      }
+      if (f.lactancia.fecha_secado) {
+        h += "<span>· Secada: <b>" + esc(fechaCorta(f.lactancia.fecha_secado)) + "</b></span>";
+      }
+      h += "</div>";
+    }
+    h += "</div>";
+
+    // Columna 2: Estado Reproductivo (Ciclo Actual)
+    h += "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>";
+    h += "<div style='font-size:11px; text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.05em; color:var(--texto-suave); margin-bottom:4px;'>Estado Reproductivo (Ciclo Actual)</div>";
+    h += "<div style='font-size:15px; font-weight:700; color:var(--texto); margin-bottom:4px; display:flex; align-items:center; gap:6px;'>" + reproIcon + "<span>" + esc(er.titulo) + "</span></div>";
+    h += "<div style='font-size:12.5px; color:var(--texto-suave); line-height:1.4;'>" + esc(er.detalle || "Sin registros reproductivos vigentes") + "</div>";
+
+    if (er.dias_abiertos != null && er.codigo !== "PREÑADA") {
+      var da = er.dias_abiertos;
+      var semClase = da <= 90 ? "verde" : (da <= 150 ? "ambar" : "rojo");
+      var semTxt = da <= 90 ? "Rango óptimo / Período voluntario de espera" : (da <= 150 ? "Alerta: programar servicio o IA" : "Crítico: días abiertos excesivos");
+      h += "<div style='margin-top:10px; padding:8px 10px; border-radius:6px; background:var(--color-" + semClase + "-bg); color:var(--color-" + semClase + "-txt); font-size:12px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px;'>";
+      h += "<div>" + icon("hourglass", 14) + "<b>" + da + " días abiertos</b> · " + semTxt + "</div>";
+      h += "</div>";
+    }
+
+    if (er.codigo === "PREÑADA" && er.dias_gestacion != null) {
+      var dg = Math.min(285, Math.max(0, er.dias_gestacion));
+      var pct = Math.round((dg / 285) * 100);
+      var mesGest = (dg / 30.4).toFixed(1);
+      h += "<div style='margin-top:10px;'>";
+      h += "<div style='display:flex; justify-content:space-between; font-size:12px; margin-bottom:4px;'>";
+      h += "<span>" + icon("calendar", 13) + "<b>" + dg + " días gestación</b> (~" + mesGest + " meses)</span>";
+      h += "<span>FEP: <b>" + esc(fechaCorta(er.fep) || "S/D") + "</b></span>";
+      h += "</div>";
+      h += "<div style='height:8px; border-radius:4px; background:var(--borde); overflow:hidden;'>";
+      h += "<div style='height:100%; width:" + pct + "%; background:var(--color-verde-txt); border-radius:4px;'></div>";
+      h += "</div>";
+      h += "</div>";
+    }
+
+    h += "</div>"; // fin columna 2
+    h += "</div>"; // fin grid
+
+    if (er.alerta) {
+      h += "<div style='margin-top:12px; padding:10px 12px; border-radius:6px; background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:8px;'>";
+      h += icon("alert", 16) + "<span>" + esc(er.alerta) + "</span>";
+      h += "</div>";
+    }
+
+    h += "</div>"; // fin tarjeta estado zootecnico
 
     // 3. Tarjeta de Identificación & Genealogía (el pedigree completo vive en
     // la pestaña "Genealogía (3G)" -- sin botones duplicados hacia lo mismo)
@@ -8355,20 +8556,7 @@
     }
 
     h += "</div>";
-
-    // 4. Tarjeta Estado Reproductivo Actual
-    h += "<div class='card' style='padding:14px; margin-bottom:14px;'>"
-      + "<h4>" + icon("sperm") + "Estado Reproductivo Actual</h4>"
-      + "<div style='font-size:14px; margin:8px 0;'>" + esc(f.estado_repro || "Sin datos") + "</div>";
-    if (f.dias_abiertos != null) {
-      h += "<p class='aviso' style='margin:4px 0;'>" + icon("hourglass", 14) + "Días abiertos (post-parto): <b>" + f.dias_abiertos + " días</b></p>";
-    }
-    if (f.ultimo_servicio && f.ultimo_servicio.fep_calculada) {
-      h += "<p class='aviso' style='margin:4px 0;'>" + icon("calendar", 14) + "Fecha Estimada de Parto (FEP): <b>" + esc(fechaCorta(f.ultimo_servicio.fep_calculada)) + "</b></p>";
-    }
-    h += "</div>";
-
-    // 5. Traslados de potrero recientes
+    // 4. Traslados de potrero recientes
     if (f.traslados && f.traslados.length) {
       h += "<h4>" + icon("truck") + "Últimos movimientos de potrero</h4>"
         + tabla(f.traslados, [
@@ -9036,7 +9224,8 @@
         return;
       }
       window.__ultimaFicha = f;
-      var esParida = (f.estado_reproductivo && String(f.estado_reproductivo).toUpperCase() === "PARIDA")
+      var esParida = (f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
+        || (f.lactancia && f.lactancia.estado === "En ordeño" && f.lactancia.del_dias < 200)
         || (f.crias && f.crias.length > 0)
         || (f.categoria_sg && String(f.categoria_sg).toLowerCase().indexOf("parida") >= 0);
       actualizarVacaHeader({ esFicha: true, esParida: esParida });

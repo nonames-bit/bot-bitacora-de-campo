@@ -536,6 +536,8 @@ header {
 .chip.rojo  { background: var(--color-rojo-bg); color: var(--color-rojo-txt); }
 .chip.gris  { background: var(--color-gris-bg); color: var(--color-gris-txt); }
 .chip.azul  { background: var(--color-azul-bg); color: var(--color-azul-txt); }
+.chip.purpura { background: #F3E8FF; color: #7E22CE; }
+:root[data-theme="dark"] .chip.purpura { background: rgba(168, 85, 247, 0.2); color: #D8B4FE; }
 
 /* Botón satelital SAR (antes gradiente inline en app.js): gradiente fijo
    azul corporativo con texto blanco; override en sun para alto contraste. */
