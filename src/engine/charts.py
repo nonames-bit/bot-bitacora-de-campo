@@ -1473,40 +1473,75 @@ def _controles_leche_por_semana(db) -> dict:
 
 def generar_grafico_leche_total_hato(db, semanas: int = 12, output_dir: str = "data/reportes",
                                      hoy: Optional[date] = None, dpi: int = 130,
-                                     placeholder_si_vacio: bool = False) -> Optional[str]:
-    """Litros totales del hato por semana (suma de todos los controles
-    registrados esa semana), para ver la tendencia de producción total de
-    la finca en el tiempo."""
+                                     placeholder_si_vacio: bool = False, dias_max: int = 31) -> Optional[str]:
+    """Producción total diaria de leche del hato (tanque / recibos diarios de la finca),
+    mostrando el volumen entregado por día, el promedio del período y la tendencia.
+
+    Prioriza la era moderna (>= 2024) para graficar los litros diarios cargados por
+    recibos de leche, sin mezclar datos históricos desactualizados de 2016-2018.
+    """
     if not _MATPLOTLIB_OK:
         return None
     hoy = hoy or date.today()
 
-    por_semana = _controles_leche_por_semana(db)
-    if len(por_semana) < 2:
+    # 1. Verificamos si existen registros de la era moderna (>= 2024)
+    hay_modernos = db.query_one(
+        "SELECT 1 FROM produccion_leche WHERE fecha >= '2024-01-01' LIMIT 1"
+    )
+    filtro = "fecha >= '2024-01-01'" if hay_modernos else "1=1"
+
+    filas = db.query(f"""
+        SELECT fecha, SUM(litros) AS litros
+        FROM produccion_leche
+        WHERE litros IS NOT NULL AND litros > 0 AND {filtro}
+        GROUP BY fecha
+        ORDER BY fecha ASC
+    """)
+
+    if not filas or len(filas) < 1:
         if placeholder_si_vacio:
             return generar_grafico_placeholder(
-                titulo="Producción Total de Leche del Hato",
-                subtitulo="Se requieren al menos 2 semanas con controles de leche registrados.",
+                titulo="Producción Total Diaria de Leche",
+                subtitulo="Se requieren registros diarios de leche en la bitácora.",
                 output_dir=output_dir,
                 nombre_archivo=f"grafico_leche_total_{hoy.isoformat()}.png",
                 hoy=hoy, dpi=dpi,
             )
         return None
 
-    semanas_ordenadas = sorted(por_semana.keys())[-semanas:]
-    etiquetas = [s.strftime("%d-%b") for s in semanas_ordenadas]
-    litros = [por_semana[s]["litros"] for s in semanas_ordenadas]
+    # Tomamos los últimos dias_max días cronológicamente
+    filas_recientes = filas[-dias_max:]
+    fechas_dt = [to_date(f["fecha"]) for f in filas_recientes]
+    etiquetas = [d.strftime("%d-%b") if d else f["fecha"] for d, f in zip(fechas_dt, filas_recientes)]
+    litros = [float(f["litros"]) for f in filas_recientes]
 
-    fig, ax = plt.subplots(figsize=(9, 5), dpi=dpi)
-    ax.bar(etiquetas, litros, color=_COLOR_MARCA)
-    ax.text(len(etiquetas) - 1, litros[-1], f" {litros[-1]:.0f} L", ha="left", va="bottom",
-            fontsize=9, fontweight="bold", color=_COLOR_MARCA)
-    ax.set_ylabel("Litros totales por semana")
-    ax.tick_params(axis="x", rotation=45, labelsize=8)
-    n_vacas_total = len({v for s in por_semana.values() for v in s["vacas"]})
-    _titulo_y_subtitulo(fig, ax, "Producción Total de Leche del Hato",
-                        f"{len(semanas_ordenadas)} semanas · {n_vacas_total} vaca(s) con controles")
-    _estilo_ejes(ax, margin_x=0.02, margin_y=0.06)
+    total_litros = sum(litros)
+    promedio = total_litros / len(litros)
+    pico = max(litros)
+
+    fig, ax = plt.subplots(figsize=(10, 5), dpi=dpi)
+    x = range(len(etiquetas))
+    barras = ax.bar(x, litros, color=_COLOR_MARCA, width=0.62, edgecolor="#1B301E", linewidth=0.8, alpha=0.92, label="Litros entregados")
+    
+    # Línea de promedio diario
+    ax.axhline(promedio, color="#D97706", linestyle="--", linewidth=1.8, label=f"Promedio: {promedio:.1f} L/día")
+
+    # Etiquetas de valor encima de las barras
+    for i, (b, val) in enumerate(zip(barras, litros)):
+        es_pico = (val == pico)
+        txt_color = "#15803D" if es_pico else "#1F2937"
+        peso = "bold" if es_pico else "normal"
+        ax.text(i, val + (max(litros) * 0.015), f"{val:.0f}", ha="center", va="bottom",
+                fontsize=8, fontweight=peso, color=txt_color)
+
+    ax.set_ylabel("Litros diarios (L)", fontsize=9, fontweight="bold")
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(etiquetas, rotation=45, ha="right", fontsize=8)
+    ax.legend(loc="upper right", frameon=True, fontsize=8.5)
+
+    subtitulo = f"{len(litros)} días registrados · Total: {total_litros:,.0f} L · Promedio: {promedio:.1f} L/día · Pico: {pico:.0f} L"
+    _titulo_y_subtitulo(fig, ax, "Producción Total Diaria de Leche (Tanque / Recibos)", subtitulo)
+    _estilo_ejes(ax, margin_x=0.03, margin_y=0.10)
 
     return _guardar(fig, output_dir, f"grafico_leche_total_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
 

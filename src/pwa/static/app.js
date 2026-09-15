@@ -1140,38 +1140,185 @@
     }
   }
 
+  function fechaDiaSemana(fStr) {
+    if (!fStr) return "—";
+    try {
+      var partes = fStr.split("-");
+      if (partes.length === 3) {
+        var d = new Date(parseInt(partes[0], 10), parseInt(partes[1], 10) - 1, parseInt(partes[2], 10));
+        var dias = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+        var meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        return dias[d.getDay()] + ", " + d.getDate() + " de " + meses[d.getMonth()];
+      }
+    } catch (e) { /* fallback */ }
+    return fechaCorta(fStr);
+  }
+
+  function renderSvgGraficoLeche(serie, promDiario) {
+    if (!serie || !serie.length) return "";
+    var n = serie.length;
+    var maxVal = 0;
+    serie.forEach(function (d) { if (d.litros > maxVal) maxVal = d.litros; });
+    var yMax = Math.ceil((maxVal * 1.18) / 50) * 50;
+    if (yMax <= 0) yMax = 400;
+
+    var w = Math.max(540, n * 36);
+    var h = 230;
+    var padLeft = 45;
+    var padRight = 20;
+    var padTop = 26;
+    var padBottom = 42;
+    var chartW = w - padLeft - padRight;
+    var chartH = h - padTop - padBottom;
+
+    var slotW = chartW / n;
+    var barWidth = Math.max(14, Math.min(26, slotW * 0.65));
+
+    var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:" + (n > 10 ? (n * 32) : 340) + "px; height:auto; display:block; font-family:system-ui,-apple-system,sans-serif;'>";
+
+    var gridSteps = 4;
+    for (var g = 0; g <= gridSteps; g++) {
+      var yVal = Math.round((yMax / gridSteps) * g);
+      var yPos = padTop + chartH - (yVal / yMax) * chartH;
+      svg += "<line x1='" + padLeft + "' y1='" + yPos + "' x2='" + (w - padRight) + "' y2='" + yPos + "' stroke='var(--borde)' stroke-width='1' stroke-dasharray='" + (g === 0 ? "none" : "3,3") + "' />";
+      svg += "<text x='" + (padLeft - 6) + "' y='" + (yPos + 4) + "' fill='var(--texto-suave)' font-size='10' text-anchor='end'>" + yVal + "</text>";
+    }
+
+    if (promDiario > 0 && promDiario <= yMax) {
+      var yProm = padTop + chartH - (promDiario / yMax) * chartH;
+      svg += "<line x1='" + padLeft + "' y1='" + yProm + "' x2='" + (w - padRight) + "' y2='" + yProm + "' stroke='#D97706' stroke-width='1.8' stroke-dasharray='4,3' />";
+      svg += "<rect x='" + (w - padRight - 96) + "' y='" + (yProm - 11) + "' width='94' height='16' rx='3' fill='#D97706' />";
+      svg += "<text x='" + (w - padRight - 49) + "' y='" + (yProm + 1) + "' fill='#FFFFFF' font-size='9.5' font-weight='bold' text-anchor='middle'>Prom: " + promDiario + " L/d</text>";
+    }
+
+    serie.forEach(function (d, i) {
+      var xCenter = padLeft + (i + 0.5) * slotW;
+      var xBar = xCenter - barWidth / 2;
+      var barH = Math.max(4, (d.litros / yMax) * chartH);
+      var yBar = padTop + chartH - barH;
+      var esPico = (d.litros === maxVal);
+      var colorBarra = esPico ? "#15803D" : "var(--verde-marca)";
+
+      var diff = d.diff_promedio != null ? d.diff_promedio : Math.round((d.litros - promDiario) * 10) / 10;
+      var diffSign = diff >= 0 ? "+" : "";
+      var tooltip = esc(fechaDiaSemana(d.fecha)) + ": " + d.litros + " L (" + diffSign + diff + " L vs prom)";
+
+      svg += "<rect x='" + xBar + "' y='" + yBar + "' width='" + barWidth + "' height='" + barH + "' rx='3' fill='" + colorBarra + "' opacity='0.92'>";
+      svg += "<title>" + tooltip + "</title>";
+      svg += "</rect>";
+
+      svg += "<text x='" + xCenter + "' y='" + (yBar - 5) + "' fill='" + (esPico ? "#15803D" : "var(--texto)") + "' font-size='" + (barWidth < 18 ? "8.5" : "9.5") + "' font-weight='" + (esPico ? "bold" : "600") + "' text-anchor='middle'>" + Math.round(d.litros) + "</text>";
+
+      var labelFecha = "";
+      try {
+        var p = d.fecha.split("-");
+        labelFecha = p[2] + "/" + p[1];
+      } catch (ex) { labelFecha = d.fecha; }
+
+      svg += "<text x='" + xCenter + "' y='" + (h - padBottom + 16) + "' fill='var(--texto-suave)' font-size='9.5' font-weight='500' text-anchor='middle' transform='rotate(35 " + xCenter + " " + (h - padBottom + 16) + ")'>" + labelFecha + "</text>";
+    });
+
+    svg += "</svg></div>";
+    return svg;
+  }
+
   function renderLeche(d) {
-    var total = 0;
-    (d.serie_tanque || []).forEach(function (f) { total += Number(f.litros) || 0; });
-    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer;'>" + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
-    var h = "<h3>" + icon("milk") + "Producción de Leche (Recibos y Control)" + btnIa + "</h3>" + erroresHtml(d);
-    h += "<div class='kpis'>" + kpi(d.controles.length, "Controles") + kpi(total.toFixed(0), "L últimos 30 días");
-    var mejor = (d.ranking_vacas && d.ranking_vacas.length) ? d.ranking_vacas[0] : null;
-    if (mejor) {
-      h += kpi(esc(mejor.tag), "Mejor vaca", "ok");
+    var serie = d.serie_tanque || [];
+    var res = d.resumen || {};
+    var totalLitros = res.total_litros || 0;
+    var diasCount = res.dias || serie.length;
+    var promDiario = res.promedio_diario || (diasCount ? Math.round((totalLitros / diasCount) * 10) / 10 : 0);
+    var pico = res.pico_max || (serie.length ? serie.reduce(function (m, it) { return (it.litros > m.litros) ? it : m; }, serie[0]) : null);
+    var piso = res.piso_min || (serie.length ? serie.reduce(function (m, it) { return (it.litros < m.litros) ? it : m; }, serie[0]) : null);
+
+    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:6px 14px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+      + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
+
+    var h = "<div class='leche-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
+      + btnIa
+      + "</div>" + erroresHtml(d);
+
+    // 1. KPIs Ejecutivos de Producción
+    h += "<div class='kpis'>"
+      + kpi(totalLitros.toLocaleString("es-CO") + " L", "Total período (" + diasCount + " días)", "ok")
+      + kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok")
+      + (pico ? kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")") : "")
+      + (piso ? kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")") : "")
+      + "</div>";
+
+    // 2. Gráfico Interactivo de Producción Diaria (SVG responsivo)
+    h += "<div class='tarjeta-leche-grafico' style='background:var(--superficie); border:1px solid var(--borde); border-radius:10px; padding:16px; margin:16px 0; box-shadow:0 1px 4px var(--sombra);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+      + "<div>"
+      + "<div style='font-size:14.5px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("chartBar", 18) + "Curva de Producción Diaria de Leche (Tanque / Recibos)"
+      + "</div>"
+      + "<small style='color:var(--texto-suave); font-size:11.5px; display:block; margin-top:2px;'>Litros entregados por día según el recibo de leche o planilla de acopio</small>"
+      + "</div>"
+      + "<div style='display:flex; align-items:center; gap:12px; font-size:11.5px;'>"
+      + "<span style='display:inline-flex; align-items:center; gap:5px;'><span style='display:inline-block; width:12px; height:12px; background:var(--verde-marca); border-radius:2px;'></span> Litros/día</span>"
+      + "<span style='display:inline-flex; align-items:center; gap:5px;'><span style='display:inline-block; width:14px; height:2px; background:#D97706; border-top:2px dashed #D97706;'></span> Promedio (" + promDiario + " L)</span>"
+      + "</div>"
+      + "</div>";
+
+    if (serie.length > 0) {
+      h += renderSvgGraficoLeche(serie, promDiario);
+    } else {
+      h += "<p class='aviso' style='margin:12px 0;'>No hay registros de producción de leche cargados en este período. Escanea un recibo con el botón superior para comenzar.</p>";
     }
     h += "</div>";
 
-    h += grafico("leche_total", "Producción total de leche") + grafico("eficiencia_lechera", "Eficiencia lechera");
-    h += grafico("ranking_vacas_leche", "Ranking de producción por vaca");
-    h += "<h4>" + icon("chartBar") + "Ranking de vacas por litros (acumulado)</h4>"
-      + tabla(d.ranking_vacas, [
-        ["tag", "Vaca"], ["total_litros", "Total L", "num"], ["controles", "Controles", "num"],
-        ["ultima_fecha", "Último control", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }]
-      ], "Sin producción por vaca registrada.");
-    h += "<h4>" + icon("chartLine") + "Producción por día</h4>"
-      + tabla(d.serie_tanque, [["fecha", "Fecha"], ["litros", "Litros", "num"]], "Sin registros de producción o recibos.");
-    h += "<h4>" + icon("calendar") + "Controles individuales</h4>"
-      + tabla(d.controles, [["tag", "Vaca"], ["fecha", "Fecha"], ["litros", "L", "num"]], "Sin controles individuales.");
+    // 3. Gráfico de Respaldo / Exportación del Servidor
+    var tNow = Date.now();
+    h += "<details style='margin-bottom:18px;'>"
+      + "<summary style='cursor:pointer; font-size:12.5px; font-weight:600; color:var(--texto-suave); padding:4px 0;'>" + icon("image", 14) + " Ver gráfico generado por servidor (Matplotlib)</summary>"
+      + "<div class='grafico-wrap' style='margin-top:8px;'><img src='/api/grafico/leche_total?t=" + tNow + "' alt='Gráfico Producción Total de Leche' loading='lazy'></div>"
+      + "</details>";
 
+    // 4. Tabla Detallada Día a Día
+    h += "<h4>" + icon("calendar", 16) + "Detalle de Entregas Diarias al Acopiador</h4>";
+    if (serie.length > 0) {
+      h += "<div style='overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:8px;'>"
+        + "<table class='tabla' style='width:100%; border-collapse:collapse; font-size:12.5px;'>"
+        + "<thead><tr style='background:rgba(47,82,51,0.08);'>"
+        + "<th style='text-align:left; padding:8px 10px;'>Fecha</th>"
+        + "<th style='text-align:right; padding:8px 10px;'>Litros Diarios</th>"
+        + "<th style='text-align:center; padding:8px 10px;'>vs Promedio (" + promDiario + " L)</th>"
+        + "<th style='text-align:left; padding:8px 10px;'>Respaldo / Notas</th>"
+        + "</tr></thead><tbody>";
+
+      var serieDesc = serie.slice().reverse();
+      serieDesc.forEach(function (dia) {
+        var diff = dia.diff_promedio != null ? dia.diff_promedio : Math.round((dia.litros - promDiario) * 10) / 10;
+        var diffTxt = (diff >= 0 ? "+" : "") + diff + " L";
+        var diffChip = diff >= 0
+          ? "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + diffTxt + "</span>"
+          : "<span class='chip naranja' style='font-size:11px; font-weight:700;'>" + diffTxt + "</span>";
+
+        h += "<tr style='border-bottom:1px solid var(--borde);'>"
+          + "<td style='padding:8px 10px; font-weight:600; white-space:nowrap;'>" + esc(fechaDiaSemana(dia.fecha)) + "</td>"
+          + "<td style='text-align:right; padding:8px 10px; font-weight:700; font-size:13px; color:var(--texto);'>" + dia.litros.toLocaleString("es-CO") + " L</td>"
+          + "<td style='text-align:center; padding:8px 10px;'>" + diffChip + "</td>"
+          + "<td style='padding:8px 10px; color:var(--texto-suave); font-size:12px;'>" + esc(dia.notas || "Recibo de quincena") + "</td>"
+          + "</tr>";
+      });
+      h += "</tbody></table></div>";
+    } else {
+      h += "<p class='aviso'>Sin registros de entregas de leche en el período.</p>";
+    }
+
+    // 5. Galería de Fotos de Recibos y Planillas
     if (d.fotos_recibos && d.fotos_recibos.length) {
-      h += "<details style='margin-top:18px;'>"
-        + "<summary style='cursor:pointer; font-weight:700; padding:6px 0; display:flex; align-items:center; gap:6px;'>" + icon("camera", 16) + "Recibos y Planillas de Quincena (Fotos de Respaldo) — " + d.fotos_recibos.length + "</summary>"
-        + "<p class='aviso' style='margin:10px 0;'>Fotos de recibos o planillas manuales de leche. Toca cualquier imagen para abrirla en pantalla completa con zoom táctil y verificar las anotaciones diarias.</p>"
+      h += "<details style='margin-top:20px;' open>"
+        + "<summary style='cursor:pointer; font-weight:700; font-size:13.5px; padding:8px 0; display:flex; align-items:center; gap:6px;'>"
+        + icon("camera", 16) + "Recibos y Planillas de Quincena (Fotos de Respaldo) — " + d.fotos_recibos.length + "</summary>"
+        + "<p class='aviso' style='margin:6px 0 10px 0;'>Fotos de los recibos de leche o planillas manuales. Toca cualquier imagen para abrirla en pantalla completa con zoom táctil y verificar las anotaciones diarias.</p>"
         + "<div class='fotos-wrap' style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:10px;'>";
       d.fotos_recibos.forEach(function (f) {
         var ruta = f.ruta ? (f.ruta.startsWith("/") ? f.ruta : "/" + f.ruta) : "";
-        h += "<div class='foto-card' style='border:1px solid var(--borde-suave); border-radius:8px; overflow:hidden; background:var(--superficie); padding:6px;'>"
+        h += "<div class='foto-card' style='border:1px solid var(--borde-suave); border-radius:8px; overflow:hidden; background:var(--superficie); padding:6px; box-shadow:0 1px 3px var(--sombra);'>"
           + "<div style='aspect-ratio:4/3; overflow:hidden; border-radius:6px; background:#111; display:flex; align-items:center; justify-content:center; cursor:pointer;'>"
           + "<img src='" + esc(ruta) + "' alt='" + esc(f.caption || "Recibo de leche") + "' class='zoomable-img' style='width:100%; height:100%; object-fit:cover;'>"
           + "</div>"
@@ -1180,6 +1327,16 @@
           + "</div>";
       });
       h += "</div></details>";
+    }
+
+    // 6. Sección Histórica Archivado (Software Ganadero 2016-2018)
+    if (d.total_historico_sg && d.total_historico_sg > 0) {
+      h += "<details style='margin-top:20px; opacity:0.85;'>"
+        + "<summary style='cursor:pointer; font-size:12px; color:var(--texto-suave); padding:6px 0;'>"
+        + icon("archive", 14) + " Archivo histórico de controles individuales (" + d.total_historico_sg + " registros SG 2016-2018)"
+        + "</summary>"
+        + "<p class='aviso' style='font-size:11.5px; margin:6px 0;'>Estos registros corresponden a pesajes individuales antiguos por vaca importados de Software Ganadero (2016-2018). Se mantienen preservados en la base de datos histórica sin alterar los totales ni gráficos de la producción actual de la finca.</p>"
+        + "</details>";
     }
 
     return h;
@@ -3804,8 +3961,9 @@
         + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Inseminador: <input id='cap-inseminador' placeholder='Nombre del técnico' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "leche") {
-      h += "<label>Litros Totales (Ordeño o Quincena): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 1850' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Recibo quincena 1-15, control diario, planilla manual, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+      h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>💡 Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
+        + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Ordeño del día, control tanque, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "muerte") {
       h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Causa Presunta: <input id='cap-causa' placeholder='ej. Mordedura de serpiente, timpanismo, descarte vejez' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -4397,7 +4555,7 @@
           var sumSpan = document.getElementById("ia-suma-total");
           if (sumSpan) sumSpan.textContent = total;
           var fLitros = document.getElementById("cap-litros");
-          if (fLitros) fLitros.value = total;
+          if (fLitros) fLitros.value = "";
         }
 
         qa(".inp-ia-litros", previewIa).forEach(function (inp) {

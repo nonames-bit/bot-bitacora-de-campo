@@ -629,7 +629,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Tarjeta #1 en Pestaña General**: Ubicación prioritaria de la tarjeta **Estado Fisiológico & Reproductivo** en la primera posición de la ficha técnica con desglose en 2 columnas (Producción/Lactancia y Reproducción Actual), semáforo zootécnico de días abiertos (verde ≤90d, amarillo 91-150d, rojo >150d) y alertas veterinarias contextuales.
     - **KPIs Dinámicos por Sexo/Rol**: Indicadores superiores adaptativos según se consulte una vaca, novilla, cría o toro reproductor.
     - **Pruebas y Verificación Visual**: Suite automatizada `tests/test_ficha_estados_zootecnicos.py` (100% pasando) y capturas móviles verificadas en viewport 390×844 DPR=2.
-- [x] Suite de pruebas con pytest: **830+ pruebas en verde** (100% pasando).
+- [x] **Producción Total Diaria de Leche por Recibos & Curva Diaria (`v=leche`, 2026-09-14)**:
+    - **Alineación con el Flujo Real de Finca (Recibos / Tanque)**: La producción se carga a partir de las fotos y digitalización con IA de los recibos de quincena, registrando el total diario entregado por la finca (~300-350 L/día).
+    - **Aislamiento de Históricos de Software Ganadero (2016-2018)**: Filtro estricto en `datos_leche()` y `charts.py` para la era activa (`>= 2024`), evitando que 456 registros viejos de pesajes individuales por vaca distorsionen la serie diaria ni los totales actuales.
+    - **Depuración de Duplicados & Corrección de Captura**: Eliminación del registro accidental de suma acumulada (fila 473 de 5,092 L) y protección en `app.js` (`bindTablaReciboIa`) para no volcar la suma quincenal en el campo de un solo día.
+    - **Gráfico Interactivo de Producción Diaria (SVG responsivo)**: Curva de barras con litros por día, línea de promedio diario destacada (318.2 L/d), picos y pisos identificados, y tooltips vectoriales adaptados a móvil (390×844) y escritorio.
+    - **KPIs Ejecutivos & Tabla Detallada**: Total período (5,092 L en 16 días), promedio diario (318.2 L/d), pico más alto (368 L el 24-Ago), piso más bajo (276 L el 26-Ago) y desglose día a día con variación vs promedio (+/- L) y foto de respaldo.
+- [x] Suite de pruebas con pytest: **831+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

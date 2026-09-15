@@ -824,39 +824,97 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
 
 
 def datos_leche(db: Database) -> dict:
-    """Leche: serie del tanque (produccion_leche) + últimos controles.
+    """Leche: producción total diaria de la finca (tanque / recibos de quincena) +
+    controles zootécnicos.
 
-    WS-X4: agrega ``ranking_vacas`` (top vacas por litros acumulados, con su
-    último control) para KPIs de leche por animal en el dashboard.
+    Diseñado para el flujo real de finca donde la producción diaria se carga a partir
+    de la digitalización o fotos de los recibos de leche (producción total del hato),
+    sin mezclar controles individuales históricos obsoletos (2016-2018).
     """
     errores: dict[str, str] = {}
+    # 1. Producción diaria del hato (Tanque / Recibos)
+    # Si existen registros de la era moderna (>= 2024), aislamos estrictamente el ciclo productivo
+    # activo para no mezclar controles individuales de 2016-2018 en la serie diaria.
     try:
-        serie = _filas_dict(db.query(
-            "SELECT fecha, SUM(litros) litros FROM produccion_leche "
-            "GROUP BY fecha ORDER BY fecha DESC LIMIT 30"))
-        serie = list(reversed(serie))
+        hay_modernos = db.query_one(
+            "SELECT 1 FROM produccion_leche WHERE fecha >= '2024-01-01' LIMIT 1"
+        )
+        filtro_activo = "fecha >= '2024-01-01'" if hay_modernos else "1=1"
+
+        filas_serie = db.query(f"""
+            SELECT fecha, SUM(litros) AS litros, 
+                   COUNT(id) AS n_registros,
+                   MAX(notas) AS notas
+            FROM produccion_leche
+            WHERE litros IS NOT NULL AND litros > 0 AND {filtro_activo}
+            GROUP BY fecha
+            ORDER BY fecha ASC
+        """)
+        
+        serie = []
+        for r in filas_serie:
+            try:
+                l = round(float(r["litros"]), 1)
+            except (TypeError, ValueError):
+                continue
+            serie.append({
+                "fecha": r["fecha"],
+                "litros": l,
+                "notas": r["notas"] or None,
+            })
     except Exception as e:
         logger.error("seccion serie_tanque fallo", exc_info=True)
         errores["serie_tanque"] = str(e)
         serie = []
+
+    # 2. Métricas ejecutivas y KPIs de producción diaria
+    total_litros = round(sum(r["litros"] for r in serie), 1)
+    dias_count = len(serie)
+    promedio_diario = round(total_litros / dias_count, 1) if dias_count else 0.0
+    pico_max = max(serie, key=lambda r: r["litros"]) if serie else None
+    piso_min = min(serie, key=lambda r: r["litros"]) if serie else None
+
+    # Variación de cada día respecto al promedio para visualización instantánea
+    for r in serie:
+        diff = round(r["litros"] - promedio_diario, 1)
+        pct = round((diff / promedio_diario) * 100, 1) if promedio_diario > 0 else 0.0
+        r["diff_promedio"] = diff
+        r["pct_promedio"] = pct
+
+    resumen = {
+        "total_litros": total_litros,
+        "dias": dias_count,
+        "promedio_diario": promedio_diario,
+        "pico_max": pico_max,
+        "piso_min": piso_min,
+        "fecha_inicio": serie[0]["fecha"] if serie else None,
+        "fecha_fin": serie[-1]["fecha"] if serie else None,
+        "periodo_notas": serie[0].get("notas") if (serie and serie[0].get("notas")) else None,
+    }
+
+    # 3. Controles individuales y ranking (solo si hay datos modernos con tag)
     try:
-        controles = _filas_dict(db.query(
+        controles_modernos = _filas_dict(db.query(
             """SELECT a.tag, l.fecha, l.litros FROM produccion_leche l
-               LEFT JOIN animales a ON a.id_animal = l.animal_id
-               ORDER BY l.fecha DESC LIMIT 20"""))
+               JOIN animales a ON a.id_animal = l.animal_id
+               WHERE l.animal_id IS NOT NULL AND l.fecha >= '2024-01-01'
+               ORDER BY l.fecha DESC LIMIT 20"""
+        ))
     except Exception as e:
         logger.error("seccion controles fallo", exc_info=True)
         errores["controles"] = str(e)
-        controles = []
+        controles_modernos = []
+
     try:
         ranking = _filas_dict(db.query(
             """SELECT a.tag, COUNT(l.id) AS controles, SUM(l.litros) AS total_litros,
                       MAX(l.fecha) AS ultima_fecha
                FROM produccion_leche l JOIN animales a ON a.id_animal = l.animal_id
-               WHERE a.estado = 'ACTIVO' AND l.litros IS NOT NULL
+               WHERE a.estado = 'ACTIVO' AND l.litros IS NOT NULL AND l.fecha >= '2024-01-01'
                GROUP BY a.id_animal, a.tag
                HAVING SUM(l.litros) > 0
-               ORDER BY total_litros DESC LIMIT 8"""))
+               ORDER BY total_litros DESC LIMIT 8"""
+        ))
         for r in ranking:
             try:
                 r["total_litros"] = round(float(r["total_litros"]), 1)
@@ -866,22 +924,36 @@ def datos_leche(db: Database) -> dict:
         logger.error("seccion ranking_vacas fallo", exc_info=True)
         errores["ranking_vacas"] = str(e)
         ranking = []
+
+    # 4. Fotos de recibos y planillas de quincena
     try:
-        # El caption de un recibo de leche siempre lo pone _guardar_foto_recibo_leche()
-        # (pwa/app.py) como "Recibo Quincenal: <periodo>". El filtro anterior
-        # ('%Recibo%') también atrapaba fotos de Finanzas ("Factura/Recibo: <concepto>"),
-        # mezclando facturas de gastos ajenas a la leche en esta sección.
         fotos_recibos = _filas_dict(db.query(
             """SELECT id, ruta, fecha, caption, notas
                FROM fotos
-               WHERE caption LIKE 'Recibo Quincenal%'
+               WHERE caption LIKE 'Recibo Quincenal%' OR caption LIKE '%Recibo%Leche%'
                ORDER BY fecha DESC, id DESC LIMIT 12"""
         ))
     except Exception:
         logger.error("seccion fotos_recibos fallo", exc_info=True)
         fotos_recibos = []
-    out: dict[str, Any] = {"serie_tanque": serie, "controles": controles,
-                           "ranking_vacas": ranking, "fotos_recibos": fotos_recibos}
+
+    # 5. Conteo histórico informativo de SG 2016-2018
+    try:
+        hist_row = db.query_one(
+            "SELECT COUNT(*) AS c FROM produccion_leche WHERE fecha < '2024-01-01'"
+        )
+        total_historico = int(hist_row["c"]) if hist_row else 0
+    except Exception:
+        total_historico = 0
+
+    out: dict[str, Any] = {
+        "serie_tanque": serie,
+        "resumen": resumen,
+        "controles": controles_modernos,
+        "ranking_vacas": ranking,
+        "fotos_recibos": fotos_recibos,
+        "total_historico_sg": total_historico,
+    }
     if errores:
         out["errores"] = errores
     return out
