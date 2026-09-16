@@ -720,12 +720,15 @@ tbody tr:nth-child(even) {
 
 /* Tablas Compactas de Inventario (Estructura del Hato y Categorías de Edad) */
 .tabla-responsive-auto {
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--borde);
   border-radius: 8px;
   margin: 10px 0;
   background: var(--superficie);
+  box-sizing: border-box;
 }
 .tabla-inventario-compacta {
   width: 100%;
@@ -734,12 +737,13 @@ tbody tr:nth-child(even) {
 }
 .tabla-inventario-compacta th,
 .tabla-inventario-compacta td {
-  padding: 6px 4px;
+  padding: 8px 6px;
   font-size: 12px;
   white-space: normal;
   word-break: normal;
   overflow-wrap: break-word;
   vertical-align: middle;
+  box-sizing: border-box;
 }
 .tabla-inventario-compacta .col-cat { width: 38%; }
 .tabla-inventario-compacta .col-cab { width: 17%; text-align: center; }
@@ -749,17 +753,32 @@ tbody tr:nth-child(even) {
 .tabla-inventario-compacta .col-act { width: 16%; text-align: center; }
 
 @media (max-width: 640px) {
+  .tabla-responsive-auto {
+    overflow-x: hidden; /* Encaja al 100% del viewport móvil sin forzar barra horizontal */
+  }
+  .tabla-inventario-compacta {
+    table-layout: fixed;
+    width: 100%;
+  }
   .tabla-inventario-compacta th,
   .tabla-inventario-compacta td {
-    padding: 5px 2px;
-    font-size: 11px;
+    padding: 7px 4px;
+    font-size: 11.5px;
+    line-height: 1.25;
   }
-  .tabla-inventario-compacta .col-cat { width: 37%; font-weight: 600; }
-  .tabla-inventario-compacta .col-cab { width: 17%; }
-  .tabla-inventario-compacta .col-pct { width: 14%; }
+  .tabla-inventario-compacta .col-cat { width: 42%; font-weight: 600; }
+  .tabla-inventario-compacta .col-cab { width: 22%; text-align: center; }
+  .tabla-inventario-compacta .col-pct { width: 18%; text-align: right; }
   .tabla-inventario-compacta .col-ugg,
-  .tabla-inventario-compacta .col-acum { width: 15%; }
-  .tabla-inventario-compacta .col-act { width: 17%; }
+  .tabla-inventario-compacta .col-acum { width: 18%; text-align: right; }
+  /* En móvil se oculta la columna Acción redundante para no comprimir las columnas de datos */
+  .tabla-inventario-compacta .col-act {
+    display: none !important;
+  }
+  .tabla-inventario-compacta .chip {
+    padding: 2px 6px;
+    font-size: 10.5px;
+  }
 }
 
 /* Inputs, Filtros y Botones */
@@ -3546,19 +3565,19 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   z-index: 99;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   align-items: center;
 }
 @media (max-width: 640px) {
   .fab-stack-global {
-    bottom: calc(122px + env(safe-area-inset-bottom, 0px));
-    right: 14px;
-    gap: 8px;
+    bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+    right: 12px;
+    gap: 7px;
   }
 }
 .fab-btn {
   border-radius: 50%;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -3566,33 +3585,44 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
   outline: none;
   border: none;
+  padding: 0;
 }
 .fab-btn:active { transform: scale(0.92); }
-.fab-btn:hover { filter: brightness(1.08); box-shadow: 0 5px 16px rgba(0, 0, 0, 0.3); }
+.fab-btn:hover { filter: brightness(1.08); box-shadow: 0 5px 14px rgba(0, 0, 0, 0.28); }
 
 .fab-registrar {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   background: var(--verde-marca);
   color: #fff;
 }
 .fab-buscar {
-  width: 44px;
-  height: 44px;
+  width: 38px;
+  height: 38px;
   background: var(--superficie);
   color: var(--verde-marca);
-  border: 2px solid var(--verde-marca);
+  border: 1.5px solid var(--verde-marca);
 }
+.fab-btn .svg-icon,
 .fab-buscar .svg-icon,
 .fab-registrar .svg-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px !important;
+  height: 18px !important;
   stroke-width: 2.6;
+  margin: 0 !important;
+  padding: 0 !important;
+  display: block !important;
 }
 @media (max-width: 640px) {
   .fab-registrar, .fab-buscar {
-    width: 42px;
-    height: 42px;
+    width: 36px;
+    height: 36px;
+  }
+  .fab-btn .svg-icon,
+  .fab-buscar .svg-icon,
+  .fab-registrar .svg-icon {
+    width: 17px !important;
+    height: 17px !important;
   }
 }
 :root[data-theme="dark"] .fab-buscar {

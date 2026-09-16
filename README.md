@@ -653,9 +653,9 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Aislamiento de Alcance**: La generación de gráficos para reportes PDF y Telegram permanece intacta.
     - **Pruebas y Verificación Visual**: Suite `tests/test_grafico_datos.py` (100% pasando), chequeos de sintaxis con Node y validación visual automatizada mediante CDP en viewport móvil (390×844 DPR=2).
 - [x] **Optimización Móvil de Inventario, Gráficos y Búsqueda Rápida**:
-    - **Fechas Rotadas y Leyendas en Evolución**: Fechas inclinadas a -36° en el gráfico de evolución para evitar colisiones y superposiciones en pantallas estrechas; leyenda explícita "Nacimientos" (en lugar de "Nac").
-    - **Tablas de Inventario 100% Responsivas**: Columnas compactas con anchos porcentuales para "Estructura del hato" y "Distribución por Categorías de Edad", eliminando la necesidad de scroll horizontal en smartphones.
-    - **Stack FAB Flotante con Búsqueda Inmediata**: Botón (+) optimizado a 42px y nuevo botón de lupa (🔍) con modal para abrir directamente la ficha técnica de cualquier animal por tag, arete o nombre.
+    - **Fechas Rotadas y Leyendas en Evolución**: Fechas inclinadas a -45° con año corto (ej. `Sep '25`) en el gráfico de evolución para eliminar definitivamente solapamientos y colisiones en pantallas estrechas; leyenda explícita "Nacimientos (crías)" (aclarando qué es "Nac").
+    - **Tablas de Inventario 100% Responsivas**: En pantallas móviles (≤640px) se oculta la columna redundante *Acción* (el nombre y conteo ya abren la lista con un toque), logrando que las 4 columnas ocupen el 100% exacto del viewport sin desborde ni barra horizontal.
+    - **Stack FAB Flotante con Búsqueda Inmediata**: Botón (+) más discreto y compacto (38px desktop / 36px móvil) junto a botón de lupa (🔍) para buscar y abrir al instante la ficha técnica de cualquier animal por tag o nombre, habilitado tanto en el tablero como en la ficha técnica.
 - [x] Suite de pruebas con pytest: **844+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
@@ -666,6 +666,9 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
  - [ ] **B) Verificar CSP en producción (`scripts/nginx-bitacora.conf`)**: ejecutar en el VPS: `curl -I https://ganaderiaja.duckdns.org/login | grep script-src`. Si `script-src 'self'` sin `unsafe-inline`, el botón "Instalar App" en login NO funciona. El fix ya existe en `/static/login.js?v=85` (extraído en Bloque 2); solo requiere deploy y verificación.
 - [x] **Motor Geoespacial Real para Fase 6.2 + 8.2** ([Ver Plan en docs/PLAN_GEO_SATELITAL_6.2_8.2.md](docs/PLAN_GEO_SATELITAL_6.2_8.2.md)): área real + polígonos georreferenciados (WGS84) de los 20 potreros desde QGIS (Fases A+B), **NDVI real vía Google Earth Engine** (Fase C), **lluvia satelital CHIRPS** (Fase D), y **radar SAR Sentinel-1 todo clima** (Fase E). Fusión multisensor automatizada en cron cada 3 días.
 - [x] **Mapa Satelital Interactivo & Web Push en PWA**: Visualización interactiva Leaflet con operarios en vivo, GeoJSON de potreros y notificaciones push nativas de alertas sanitarias/reproductivas.
+- [x] **Inventario y Pasturas unificados: solo 20 potreros reales (2026-09-16)** 🐄🌿: fix PWA listaba potreros inexistentes e Inventario ≠ Pasturas; `potreros` tiene 57 filas pero solo 20 reales/físicos con `geom_wkt_4326` (A01-A04, B01-B02, C01-C14) — los 37 restantes son códigos LEGACY del import DBF de SG (`01`-`23`, `20`, D01, L1-L9, G01-G04) que se conservan solo porque `traslados` históricos los referencian y jamás listan inventario presente.
+  Además Inventario contaba el `potrero_id` estático mientras Pasturas usaba el último traslado (un trasladado aparecía en dos potreros); fuente única en `src/db/database.py` (`SQL_POTRERO_REAL`, `potreros_reales_where()`, `ULT_TRASLADO_CTE`, `POTRERO_ACTUAL_EXPR` = último traslado o `potrero_id`, `es_potrero_real()`) aplicada a Inventario (`_inventario_por_potrero_real()`), Tablero, Pasturas, Mapa y bot Telegram.
+  Regla Fundamental de Inventario: siempre `estado='ACTIVO'`, nunca `COALESCE(estado,…)`. Verificado contra `data/bitacora.db`: 330 animales en los 20 potreros + 6 "Sin potrero" = 336 activos, Inventario y Pasturas coinciden exacto. Tests nuevos en `tests/test_potreros_reales_inventario.py`; suite 721 en verde y `ruff check src tests` limpio.
 
 ---
 

@@ -128,15 +128,15 @@
     var yMaxBarras = Math.ceil(maxVal * 1.2) || 10;
     var yMaxNivel = Math.ceil(maxNivel * 1.15) || 400;
 
-    var w = Math.max(540, n * 45);
-    var h = 265;
-    var padL = 40, padR = 45, padT = 28, padB = 58;
+    var w = Math.max(520, n * 44);
+    var h = 250;
+    var padL = 38, padR = 44, padT = 26, padB = 48;
     var chW = w - padL - padR;
     var chH = h - padT - padB;
     var slotW = chW / n;
 
     var svg = "<div style='width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;'>";
-    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:360px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
+    svg += "<svg viewBox='0 0 " + w + " " + h + "' style='width:100%; min-width:480px; height:auto; display:block; font-family:var(--font-base,sans-serif);'>";
 
     // Grid horizontal
     for (var g = 0; g <= 4; g++) {
@@ -144,17 +144,17 @@
       var valB = Math.round((yMaxBarras / 4) * g);
       var valN = Math.round((yMaxNivel / 4) * g);
       svg += "<line x1='" + padL + "' y1='" + yP + "' x2='" + (w - padR) + "' y2='" + yP + "' stroke='var(--borde)' stroke-width='1' stroke-dasharray='" + (g === 0 ? "none" : "3,3") + "' />";
-      svg += "<text x='" + (padL - 6) + "' y='" + (yP + 3.5) + "' fill='var(--texto-suave)' font-size='9.5' text-anchor='end'>" + valB + "</text>";
-      svg += "<text x='" + (w - padR + 6) + "' y='" + (yP + 3.5) + "' fill='#d97706' font-size='9.5' text-anchor='start'>" + valN + "</text>";
+      svg += "<text x='" + (padL - 6) + "' y='" + (yP + 3.5) + "' fill='var(--texto-suave)' font-size='9' text-anchor='end'>" + valB + "</text>";
+      svg += "<text x='" + (w - padR + 6) + "' y='" + (yP + 3.5) + "' fill='#d97706' font-size='9' text-anchor='start'>" + valN + "</text>";
     }
 
-    // Leyenda superior (con 'Nacimientos' completo y explicación)
-    svg += "<g transform='translate(" + padL + ", 12)' font-size='9.5' font-weight='600'>"
-      + "<rect x='0' y='-8' width='9' height='9' rx='2' fill='var(--verde-marca)' /><text x='13' y='0' fill='var(--texto)'>Nacimientos<title>Nacimientos: crías nacidas en el mes registradas en la finca</title></text>"
-      + "<rect x='96' y='-8' width='9' height='9' rx='2' fill='#66bb6a' /><text x='109' y='0' fill='var(--texto)'>Compras</text>"
-      + "<rect x='170' y='-8' width='9' height='9' rx='2' fill='#8d6e63' /><text x='183' y='0' fill='var(--texto)'>Ventas</text>"
-      + "<rect x='238' y='-8' width='9' height='9' rx='2' fill='#ef5350' /><text x='251' y='0' fill='var(--texto)'>Muertes</text>"
-      + "<circle cx='312' cy='-3.5' r='3.5' fill='#d97706' /><line x1='304' y1='-3.5' x2='320' y2='-3.5' stroke='#d97706' stroke-width='2' /><text x='326' y='0' fill='#d97706'>Inventario</text>"
+    // Leyenda superior (con 'Nacimientos (crías)' explícito para total claridad)
+    svg += "<g transform='translate(" + padL + ", 12)' font-size='9' font-weight='600'>"
+      + "<rect x='0' y='-8' width='9' height='9' rx='2' fill='var(--verde-marca)' /><text x='13' y='0' fill='var(--texto)'>Nacimientos (crías)<title>Nacimientos: crías nacidas registradas en la finca durante el mes</title></text>"
+      + "<rect x='114' y='-8' width='9' height='9' rx='2' fill='#66bb6a' /><text x='127' y='0' fill='var(--texto)'>Compras</text>"
+      + "<rect x='184' y='-8' width='9' height='9' rx='2' fill='#8d6e63' /><text x='197' y='0' fill='var(--texto)'>Ventas</text>"
+      + "<rect x='248' y='-8' width='9' height='9' rx='2' fill='#ef5350' /><text x='261' y='0' fill='var(--texto)'>Muertes</text>"
+      + "<circle cx='318' cy='-3.5' r='3.5' fill='#d97706' /><line x1='310' y1='-3.5' x2='326' y2='-3.5' stroke='#d97706' stroke-width='2' /><text x='332' y='0' fill='#d97706'>Inventario</text>"
       + "</g>";
 
     // Puntos para la línea de inventario
@@ -186,9 +186,14 @@
       var yNiv = padT + chH - ((s.inventario || 0) / yMaxNivel) * chH;
       puntosNivel.push({ x: xCenter, y: yNiv, val: s.inventario, mes: s.mes });
 
-      // Etiqueta eje X (rotada -36° con anclaje al final para perfecta legibilidad)
-      var yLbl = padT + chH + 11;
-      svg += "<g transform='translate(" + xCenter + "," + yLbl + ") rotate(-36)'><text x='0' y='0' fill='var(--texto-suave)' font-size='8.5' font-weight='500' text-anchor='end'>" + esc(s.mes) + "</text></g>";
+      // Etiqueta eje X compacta (rotada -45° con año corto ej. "Sep '25" para eliminar solapamientos)
+      var lblCorto = s.mes || "";
+      var partesMes = String(s.mes || "").trim().split(/\s+/);
+      if (partesMes.length >= 2) {
+        lblCorto = partesMes[0] + " '" + partesMes[1].slice(-2);
+      }
+      var yLbl = padT + chH + 8;
+      svg += "<g transform='translate(" + (xCenter - 1) + "," + yLbl + ") rotate(-45)'><text x='0' y='0' fill='var(--texto-suave)' font-size='8' font-weight='500' text-anchor='end'>" + esc(lblCorto) + "<title>" + esc(s.mes) + "</title></text></g>";
     });
 
     // Dibujar línea de inventario

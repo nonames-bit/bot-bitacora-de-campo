@@ -5,7 +5,7 @@ import html
 import re
 from typing import Optional
 
-from ...db.database import SQL_POTRERO_REAL
+from ...db.database import SQL_POTRERO_REAL, es_potrero_real
 from ...utils import normalizar, to_date
 from .helpers import (
     REPOSO_LISTO_DIAS,
@@ -371,7 +371,9 @@ class PasturasQueryMixin:
 
     def _animales_en_potrero(self, nombre_potrero: str, categorias_filtro: list[str] | None = None) -> str:
         p_row = self._buscar_potrero(nombre_potrero)
-        if not p_row:
+        # Un potrero legacy resuelto por nombre se trata como inexistente:
+        # el inventario presente solo lista potreros reales.
+        if not p_row or not es_potrero_real(self.db, p_row):
             # Inventario presente: solo potreros reales (los legacy nunca se listan).
             potreros = self.db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
             disponibles = [

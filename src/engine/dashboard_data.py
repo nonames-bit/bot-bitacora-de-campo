@@ -62,13 +62,18 @@ def _inventario_por_potrero_real(db: Database) -> list[dict]:
         out = _filas_dict(filas)
         # Activos sin potrero vigente: vigente NULL o apunta a potrero
         # legacy/inexistente (los legacy nunca se listan como inventario).
+        # Una sola consulta (sin N+1 por animal) con el mismo criterio.
         n_sin_val = 0
         try:
-            reales_ids = {r["id"] for r in db.query(f"SELECT id FROM potreros WHERE {SQL_POTRERO_REAL}")}
-            for a in db.query("SELECT id_animal FROM animales WHERE estado = 'ACTIVO'"):
-                vig = db.potrero_vigente_de_animal(a["id_animal"])
-                if vig is None or vig not in reales_ids:
-                    n_sin_val += 1
+            cond_sin = potreros_reales_where("p")
+            fila_sin = db.query_one(
+                f"WITH {ULT_TRASLADO_CTE} "
+                "SELECT COUNT(*) n FROM animales a "
+                "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+                f"LEFT JOIN potreros p ON p.id = {POTRERO_ACTUAL_EXPR} AND {cond_sin} "
+                "WHERE a.estado = 'ACTIVO' AND p.id IS NULL"
+            )
+            n_sin_val = int(fila_sin["n"]) if fila_sin else 0
         except Exception:
             logger.error("seccion por_potrero sin_potrero fallo", exc_info=True)
             n_sin_val = 0
@@ -700,14 +705,14 @@ def datos_pasturas(db: Database) -> dict:
     satelite_resumen = {}
     try:
         filas_sat = _filas_dict(db.query(
-            """SELECT p.id, p.nombre, p.area_has, n.fecha, n.ndvi_promedio,
+            f"""SELECT p.id, p.nombre, p.area_has, n.fecha, n.ndvi_promedio,
                       n.biomasa_estimada_kg_ha, n.aforo_estimado_kg_m2, n.fuente, n.cobertura_nubes_pct
-               FROM potreros p
-               JOIN monitoreo_satelital_ndvi n ON n.id = (
-                   SELECT id FROM monitoreo_satelital_ndvi
-                   WHERE potrero_id = p.id ORDER BY id DESC LIMIT 1
-               )
-               WHERE p.geom_wkt_4326 IS NOT NULL"""
+                FROM potreros p
+                JOIN monitoreo_satelital_ndvi n ON n.id = (
+                    SELECT id FROM monitoreo_satelital_ndvi
+                    WHERE potrero_id = p.id ORDER BY id DESC LIMIT 1
+                )
+                WHERE {potreros_reales_where("p")}"""
         ))
         if filas_sat:
             total_sar = sum(1 for f in filas_sat if "SENTINEL-1" in (f.get("fuente") or "").upper() or "SAR" in (f.get("fuente") or "").upper())
@@ -796,14 +801,17 @@ def datos_pasturas(db: Database) -> dict:
     }
     # Mismo criterio que Inventario: activos cuyo vigente es NULL o legacy
     # no pertenecen a ningún potrero real → "Sin potrero".
+    # Una sola consulta (sin N+1 por animal) con el mismo criterio.
     try:
-        _reales_ids = {int(p["id"]) for p in potreros}
-        _n_sin = 0
-        for _a in db.query("SELECT id_animal FROM animales WHERE estado = 'ACTIVO'"):
-            _vig = db.potrero_vigente_de_animal(_a["id_animal"])
-            if _vig is None or int(_vig) not in _reales_ids:
-                _n_sin += 1
-        out["sin_potrero"] = _n_sin
+        cond_sin_past = potreros_reales_where("p")
+        fila_sin_past = db.query_one(
+            f"WITH {ULT_TRASLADO_CTE} "
+            "SELECT COUNT(*) n FROM animales a "
+            "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+            f"LEFT JOIN potreros p ON p.id = {POTRERO_ACTUAL_EXPR} AND {cond_sin_past} "
+            "WHERE a.estado = 'ACTIVO' AND p.id IS NULL"
+        )
+        out["sin_potrero"] = int(fila_sin_past["n"]) if fila_sin_past else 0
     except Exception:
         logger.error("seccion sin_potrero fallo", exc_info=True)
         out["sin_potrero"] = 0

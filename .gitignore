@@ -70,3 +70,6 @@ docs/*.Zip
 
 # Capturas de referencia masivas (no son necesarias para el código ni la doc)
 docs/fotos del software Ganadero SG/fotos app ganadero/
+
+# Herramientas locales de agentes
+.opencode/

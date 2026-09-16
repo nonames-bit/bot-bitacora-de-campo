@@ -92,3 +92,44 @@ def test_legacy_nunca_aparece_ni_con_traslado(db):
     assert all("LEGACY" not in f["display"] for f in filas_sg)
     assert sum(f["total"] for f in filas_sg) == 1
     assert contar_animales_sin_potrero(db) == 1
+
+
+def test_legacy_por_nombre_no_lista_animales(db):
+    from datetime import date
+
+    from src.engine.query_engine import QueryEngine
+
+    _mk_potrero(db, "REAL-A", real=True)
+    _mk_potrero(db, "LEGACY-07", real=False)
+    db.registrar_animal("LA1", sexo="Hembra", estado="ACTIVO", potrero="LEGACY-07")
+    db.registrar_animal("RA1", sexo="Hembra", estado="ACTIVO", potrero="REAL-A")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    # Vía lenguaje natural: el legacy se trata como inexistente.
+    resp = qe.responder("que vacas hay en el potrero legacy-07")
+    assert "no existe" in resp
+    assert "LA1" not in resp
+    disponibles = resp.split("Potreros disponibles:")[-1]
+    assert "REAL-A" in disponibles
+    assert "LEGACY" not in disponibles
+    # Vía método directo: misma rama de "no existe".
+    directo = qe._animales_en_potrero("LEGACY-07")
+    assert "no existe" in directo
+    assert "LA1" not in directo
+
+
+def test_sin_potrero_cuadra_con_total_activos(db):
+    p1 = _mk_potrero(db, "REAL-A", real=True)
+    leg = _mk_potrero(db, "LEGACY-01", real=False)
+    db.registrar_animal("C0", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("C1", sexo="Hembra", estado="ACTIVO", potrero=leg)
+    db.registrar_animal("C2", sexo="Hembra", estado="ACTIVO")  # sin potrero
+    # C0 queda con vigente legacy (traslado): también cae a Sin potrero.
+    db.registrar_traslado("C0", fecha="2026-09-03", potrero_origen=p1, potrero_destino=leg)
+    db.registrar_animal("CX", sexo="Hembra", estado="MUERTO", potrero=p1)
+
+    total = db.query_one("SELECT COUNT(*) n FROM animales WHERE estado = 'ACTIVO'")["n"]
+    inv = dd._por_potrero(db)
+    assert sum(f["n"] for f in inv) == total
+    past = dd.datos_pasturas(db)
+    assert sum(p["total_animales"] for p in past["potreros"]) + past["sin_potrero"] == total

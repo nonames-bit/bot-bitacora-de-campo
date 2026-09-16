@@ -9,7 +9,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.db.database import Database
 from src.server import push_sender
 
 

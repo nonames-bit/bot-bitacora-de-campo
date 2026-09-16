@@ -2874,7 +2874,7 @@
       h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
     }
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
-    h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;'>Distrib.</th><th class='col-acum' style='text-align:right;'>Acum.</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
+    h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;' title='Distribución porcentual'>% Dist.</th><th class='col-acum' style='text-align:right;' title='Porcentaje acumulado'>% Acum.</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
     (d.filas || []).forEach(function (f) {
       h += "<tr>"
         + "<td class='col-cat'><a href='#' class='link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"

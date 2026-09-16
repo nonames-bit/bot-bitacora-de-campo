@@ -50,6 +50,28 @@ def potreros_reales_where(alias: str | None = None) -> str:
     return f"({col} IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
 
 
+def es_potrero_real(db: "Database", fila_potrero) -> bool:
+    """Replica a nivel de fila la semántica de ``SQL_POTRERO_REAL``: real si
+    ``geom_wkt_4326`` no es NULL, o si en la BD no existe ningún potrero con
+    geometría (fallback de entornos limpios/tests sin polígonos cargados)."""
+    if fila_potrero is None:
+        return False
+    try:
+        geom = fila_potrero["geom_wkt_4326"]
+    except Exception:
+        try:
+            geom = fila_potrero.get("geom_wkt_4326")  # type: ignore[union-attr]
+        except Exception:
+            return False
+    if geom is not None:
+        return True
+    try:
+        hay_geo = db.query_one("SELECT 1 AS x FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+    except Exception:
+        return True
+    return hay_geo is None
+
+
 class Database:
     """Envoltorio de sqlite3 con helpers de resolución tag → id y CRUD."""
 

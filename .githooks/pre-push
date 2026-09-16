@@ -7,9 +7,19 @@
 # lo notara hasta que el Tablero de produccion quedo en blanco).
 set -e
 
+NODE_CMD="node"
+if ! command -v node >/dev/null 2>&1; then
+  for p in "/mnt/c/Program Files/nodejs/node.exe" "/c/Program Files/nodejs/node.exe" "C:/Program Files/nodejs/node.exe"; do
+    if [ -x "$p" ] || [ -f "$p" ]; then
+      NODE_CMD="$p"
+      break
+    fi
+  done
+fi
+
 echo "[pre-push] Validando sintaxis JS de la PWA..."
 for f in src/pwa/static/*.js; do
-  if ! node --check "$f" 2>&1; then
+  if ! "$NODE_CMD" --check "$f" 2>&1; then
     echo "[pre-push] ABORTADO: sintaxis invalida en $f"
     echo "[pre-push] Revisa el archivo antes de pushear. Para saltarte esto (no recomendado): git push --no-verify"
     exit 1
@@ -17,7 +27,16 @@ for f in src/pwa/static/*.js; do
 done
 
 echo "[pre-push] Validando sintaxis Python..."
-if ! python -m compileall -q src/; then
+PYTHON_CMD="python"
+if ! command -v python >/dev/null 2>&1; then
+  for p in python3 py "/mnt/c/Users/Owner/AppData/Local/Programs/Python/Python313/python.exe" "/c/Users/Owner/AppData/Local/Programs/Python/Python313/python.exe"; do
+    if command -v "$p" >/dev/null 2>&1 || [ -x "$p" ] || [ -f "$p" ]; then
+      PYTHON_CMD="$p"
+      break
+    fi
+  done
+fi
+if ! "$PYTHON_CMD" -m compileall -q src/; then
   echo "[pre-push] ABORTADO: sintaxis invalida en Python (ver arriba)."
   exit 1
 fi

@@ -524,12 +524,12 @@ def generar_grafico_evolucion_rebano(db, meses: int = 12, output_dir: str = "dat
     x = range(len(etiquetas))
     fig, ax = plt.subplots(figsize=(9, 5), dpi=dpi)
     ancho = 0.2
-    ax.bar([i - 1.5 * ancho for i in x], nacimientos, ancho, label="Nacimientos", color=_COLOR_VERDE)
+    ax.bar([i - 1.5 * ancho for i in x], nacimientos, ancho, label="Nacimientos (crías)", color=_COLOR_VERDE)
     ax.bar([i - 0.5 * ancho for i in x], compras, ancho, label="Compras/Entradas", color=_COLOR_MARCA)
     ax.bar([i + 0.5 * ancho for i in x], ventas, ancho, label="Ventas/Salidas", color=_COLOR_TIERRA)
     ax.bar([i + 1.5 * ancho for i in x], muertes_m, ancho, label="Muertes", color=_COLOR_ROJO)
     ax.set_xticks(list(x))
-    ax.set_xticklabels(etiquetas, fontsize=8)
+    ax.set_xticklabels(etiquetas, fontsize=7.5)
     ax.set_ylabel("Animales por mes")
     _estilo_ejes(ax, margin_x=0.02)
 
