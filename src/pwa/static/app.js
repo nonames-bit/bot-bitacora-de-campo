@@ -2859,29 +2859,29 @@
       h += vacio("Sin animales activos para clasificar.");
     } else {
       h += barraApiladaCategorias(eh.filas);
-      h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th style='text-align:center;'>Cabezas</th><th>%</th><th>UGG (est.)</th><th style='text-align:center;'>Acción</th></tr>";
+      h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;'>%</th><th class='col-ugg' style='text-align:right;'>UGG</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
       eh.filas.forEach(function (f) {
         h += "<tr>"
-          + "<td><a href='#' class='link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
-          + "<td style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700;'>" + esc(f.n) + "</span></td>"
-          + "<td>" + esc(f.pct) + "%</td>"
-          + "<td>" + esc(f.ugg) + "</td>"
-          + "<td style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:11px; padding:2px 8px; border-radius:4px;'>Listar</button></td>"
+          + "<td class='col-cat'><a href='#' class='link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
+          + "<td class='col-cab' style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700; padding:2px 5px; font-size:11px;'>" + esc(f.n) + "</span></td>"
+          + "<td class='col-pct' style='text-align:right; font-weight:500;'>" + esc(f.pct) + "%</td>"
+          + "<td class='col-ugg' style='text-align:right; font-weight:500;'>" + esc(f.ugg) + "</td>"
+          + "<td class='col-act' style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='estructura' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:10.5px; padding:2px 6px; border-radius:4px;'>Ver</button></td>"
           + "</tr>";
       });
-      h += "<tr style='font-weight:700;'><td>Total</td><td style='text-align:center;'>" + esc(eh.total) + "</td><td>100%</td><td>" + esc(eh.total_ugg) + "</td><td></td></tr>";
+      h += "<tr style='font-weight:700;'><td class='col-cat'>Total</td><td class='col-cab' style='text-align:center;'>" + esc(eh.total) + "</td><td class='col-pct' style='text-align:right;'>100%</td><td class='col-ugg' style='text-align:right;'>" + esc(eh.total_ugg) + "</td><td class='col-act'></td></tr>";
       h += "</table></div>";
       h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
     }
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
-    h += "<div class='tabla-scroll'><table><tr><th>Categoría</th><th style='text-align:center;'>Nro</th><th>Distrib.</th><th>Acum.</th><th style='text-align:center;'>Acción</th></tr>";
+    h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;'>Distrib.</th><th class='col-acum' style='text-align:right;'>Acum.</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
     (d.filas || []).forEach(function (f) {
       h += "<tr>"
-        + "<td><a href='#' class='link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
-        + "<td style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700;'>" + esc(f.n) + "</span></td>"
-        + "<td>" + esc(f.pct) + "%</td>"
-        + "<td>" + esc(f.acum) + "%</td>"
-        + "<td style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:11px; padding:2px 8px; border-radius:4px;'>Listar</button></td>"
+        + "<td class='col-cat'><a href='#' class='link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales'>" + esc(f.categoria) + "</a></td>"
+        + "<td class='col-cab' style='text-align:center;'><span class='chip link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='cursor:pointer; font-weight:700; padding:2px 5px; font-size:11px;'>" + esc(f.n) + "</span></td>"
+        + "<td class='col-pct' style='text-align:right; font-weight:500;'>" + esc(f.pct) + "%</td>"
+        + "<td class='col-acum' style='text-align:right; font-weight:500;'>" + esc(f.acum) + "%</td>"
+        + "<td class='col-act' style='text-align:center;'><button type='button' class='tema-btn link-grupo-inventario' data-grupo-tipo='bracket' data-grupo-valor='" + esc(f.categoria) + "' style='font-size:10.5px; padding:2px 6px; border-radius:4px;'>Ver</button></td>"
         + "</tr>";
     });
     h += "</table></div>";
@@ -10085,39 +10085,100 @@
   }
 
   function actualizarFabGlobal() {
-    var fab = document.getElementById("fab-global-registrar");
-    if (!fab) return;
-    // Ocultar FAB en captura (ya estamos en el formulario) y en manga (trabajo intensivo de lote)
-    if (actual === "captura" || actual === "manga") {
-      fab.style.display = "none";
-    } else {
-      fab.style.display = "flex";
+    var stack = document.getElementById("fab-stack-global");
+    var fabReg = document.getElementById("fab-global-registrar");
+    var fabBus = document.getElementById("fab-global-buscar");
+    if (!stack && !fabReg) return;
+
+    if (fabReg) {
+      fabReg.style.display = (actual === "captura") ? "none" : "flex";
+    }
+    if (fabBus) {
+      fabBus.style.display = "flex";
+    }
+    if (stack) {
+      stack.style.display = (actual === "manga") ? "none" : "flex";
     }
   }
 
   function setupFabGlobal() {
-    var fab = document.getElementById("fab-global-registrar");
-    if (!fab) return;
-    fab.addEventListener("click", function (e) {
-      e.preventDefault();
-      vibrarConfirmacion();
-      var tagFab = "";
-      if (actual === "ficha") {
-        tagFab = (window.__ultimaFicha && window.__ultimaFicha.tag) || (q("#f-tag") && q("#f-tag").value.trim()) || "";
-      } else {
-        var inpTag = document.getElementById("f-tag");
-        if (inpTag && inpTag.value.trim()) {
-          tagFab = inpTag.value.trim();
+    var fabReg = document.getElementById("fab-global-registrar");
+    if (fabReg) {
+      fabReg.addEventListener("click", function (e) {
+        e.preventDefault();
+        vibrarConfirmacion();
+        var tagFab = "";
+        if (actual === "ficha") {
+          tagFab = (window.__ultimaFicha && window.__ultimaFicha.tag) || (q("#f-tag") && q("#f-tag").value.trim()) || "";
+        } else {
+          var inpTag = document.getElementById("f-tag");
+          if (inpTag && inpTag.value.trim()) {
+            tagFab = inpTag.value.trim();
+          }
         }
+        if (tagFab) {
+          try { localStorage.setItem("bitacora_ultimo_tag", tagFab); } catch (eFabTag) { /* noop */ }
+          window.__capTagPendiente = tagFab;
+        }
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eFabScroll) { window.scrollTo(0, 0); }
+      });
+    }
+
+    var fabBuscar = document.getElementById("fab-global-buscar");
+    var modalBuscar = document.getElementById("modal-buscar-ficha-rapida");
+    var inputTagRapido = document.getElementById("input-tag-buscar-rapido");
+    var formBuscarRapido = document.getElementById("form-buscar-ficha-rapida");
+    var feedbackBuscar = document.getElementById("buscar-ficha-feedback");
+    var btnCerrarBuscar = document.getElementById("btn-cerrar-modal-buscar-ficha");
+    var btnCancelarBuscar = document.getElementById("btn-cancelar-buscar-ficha");
+
+    function cerrarModalBuscar() {
+      if (modalBuscar) modalBuscar.style.display = "none";
+      if (feedbackBuscar) feedbackBuscar.textContent = "";
+    }
+
+    function abrirModalBuscar() {
+      if (!modalBuscar) return;
+      vibrarConfirmacion();
+      modalBuscar.style.display = "flex";
+      if (inputTagRapido) {
+        var tagSugerido = (window.__ultimaFicha && window.__ultimaFicha.tag) || (q("#f-tag") && q("#f-tag").value.trim()) || "";
+        inputTagRapido.value = tagSugerido;
+        setTimeout(function () {
+          inputTagRapido.focus();
+          inputTagRapido.select();
+        }, 150);
       }
-      if (tagFab) {
-        try { localStorage.setItem("bitacora_ultimo_tag", tagFab); } catch (eFabTag) { /* noop */ }
-        window.__capTagPendiente = tagFab;
-      }
-      irAVista("captura");
-      cargar(true);
-      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eFabScroll) { window.scrollTo(0, 0); }
-    });
+    }
+
+    if (fabBuscar) {
+      fabBuscar.addEventListener("click", function (e) {
+        e.preventDefault();
+        abrirModalBuscar();
+      });
+    }
+    if (btnCerrarBuscar) btnCerrarBuscar.addEventListener("click", cerrarModalBuscar);
+    if (btnCancelarBuscar) btnCancelarBuscar.addEventListener("click", cerrarModalBuscar);
+    if (modalBuscar) {
+      modalBuscar.addEventListener("click", function (e) {
+        if (e.target === modalBuscar) cerrarModalBuscar();
+      });
+    }
+    if (formBuscarRapido) {
+      formBuscarRapido.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var tag = (inputTagRapido && inputTagRapido.value.trim()) || "";
+        if (!tag) {
+          if (feedbackBuscar) feedbackBuscar.textContent = "Por favor escribe un número de arete o nombre.";
+          return;
+        }
+        cerrarModalBuscar();
+        vibrarConfirmacion();
+        abrirFichaDesdeTag(tag);
+      });
+    }
   }
 
   qa("#nav-principal button").forEach(function (b) {

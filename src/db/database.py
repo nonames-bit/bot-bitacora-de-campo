@@ -15,6 +15,37 @@ from .models import SCHEMA_SQL, TIPOS_EVENTO_PARTO, TIPOS_EVENTO_SIN_CRIA
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# Fuente única de verdad: "potrero real" y "potrero vigente del animal".
+# Un potrero real es físico y actual (tiene polígono WGS84); los demás son
+# códigos LEGACY del import DBF que se conservan solo por los traslados
+# históricos que los referencian y nunca deben listarse como inventario
+# presente. El potrero vigente de un animal es su último traslado (por
+# fecha, desempate por id) o, si no tiene, su potrero_id estático.
+# ---------------------------------------------------------------------------
+SQL_POTRERO_REAL = "geom_wkt_4326 IS NOT NULL"
+SIN_POTRERO_LABEL = "Sin potrero"
+ULT_TRASLADO_CTE = (
+    "ult_traslado AS ("
+    "SELECT animal_id, potrero_destino, fecha, "
+    "ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) AS rn "
+    "FROM traslados)"
+)
+# Expresión del potrero vigente cuando ya hay JOIN con ult_traslado (rn = 1).
+POTRERO_ACTUAL_EXPR = "COALESCE(ut.potrero_destino, a.potrero_id)"
+# Subconsulta del potrero vigente sin CTE (para filtros puntuales por animal).
+POTRERO_VIGENTE_SUBQUERY = (
+    "COALESCE((SELECT potrero_destino FROM traslados "
+    "WHERE animal_id = a.id_animal ORDER BY fecha DESC, id DESC LIMIT 1), "
+    "a.potrero_id)"
+)
+
+
+def potreros_reales_where(alias: str | None = None) -> str:
+    """Condición SQL de potrero real, con o sin alias de tabla."""
+    return f"{alias}.geom_wkt_4326 IS NOT NULL" if alias else SQL_POTRERO_REAL
+
+
 class Database:
     """Envoltorio de sqlite3 con helpers de resolución tag → id y CRUD."""
 
@@ -937,12 +968,28 @@ class Database:
         return dict(fila) if fila else None
 
     def animales_activos_en_potrero(self, potrero_id: int) -> list[str]:
-        """Tags de los animales ACTIVOS cuyo potrero actual es `potrero_id`."""
+        """Tags de los animales ACTIVOS cuyo potrero vigente es `potrero_id`
+        (último traslado por fecha/id, o potrero_id si no tiene traslados)."""
         filas = self.query(
-            "SELECT tag FROM animales WHERE potrero_id = ? AND estado = 'ACTIVO' AND tag IS NOT NULL",
+            "SELECT a.tag FROM animales a "
+            f"WHERE a.estado = 'ACTIVO' AND a.tag IS NOT NULL AND {POTRERO_VIGENTE_SUBQUERY} = ?",
             (potrero_id,),
         )
         return [f["tag"] for f in filas]
+
+    def potreros_reales(self) -> list[sqlite3.Row]:
+        """Filas de potreros físicos/actuales (geom WGS84, excluye legacy DBF)."""
+        return self.query(
+            f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL} ORDER BY nombre"
+        )
+
+    def potrero_vigente_de_animal(self, animal_id: int) -> Optional[int]:
+        """Potrero vigente de un animal (último traslado o potrero_id)."""
+        fila = self.query_one(
+            f"SELECT {POTRERO_VIGENTE_SUBQUERY} AS pot FROM animales a WHERE a.id_animal = ?",
+            (animal_id,),
+        )
+        return fila["pot"] if fila else None
 
     def registrar_pesaje(self, animal_tag, fecha=None, peso_kg=None,
                          gmd_calculada=None, evento=None, registrado_por=None) -> int:

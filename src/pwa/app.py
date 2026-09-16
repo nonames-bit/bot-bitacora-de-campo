@@ -3014,12 +3014,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         db_t = _db(db_path)
         if not tags and potrero:
             try:
-                filas_p = db_t.query(
-                    "SELECT a.tag FROM animales a JOIN potreros p ON a.potrero_id = p.id "
-                    "WHERE (p.nombre = ? OR p.codigo = ?) AND a.estado = 'ACTIVO'",
-                    (potrero, potrero),
-                )
-                tags = [f["tag"] for f in filas_p]
+                # Potrero vigente (último traslado): misma fuente que Inventario.
+                pid_p = db_t.potrero_id(potrero)
+                tags = db_t.animales_activos_en_potrero(pid_p) if pid_p is not None else []
             except Exception as e:
                 logger.warning("Fallo al buscar animales de potrero %s: %s", potrero, e)
 

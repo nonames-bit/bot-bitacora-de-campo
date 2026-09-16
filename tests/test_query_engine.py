@@ -7,6 +7,11 @@ from src.engine.query_engine import QueryEngine
 
 HOY = date(2026, 9, 1)
 
+# Los listados de inventario presente solo incluyen potreros reales (con
+# polígono WGS84); los tests que verifican esos listados deben crear sus
+# potreros con geometría o quedarían (correctamente) excluidos.
+_WKT_TEST = "POLYGON((-74.07 3.39, -74.06 3.39, -74.06 3.40, -74.07 3.40, -74.07 3.39))"
+
 
 @pytest.fixture
 def qe(db):
@@ -18,8 +23,8 @@ def qe(db):
                              fecha_fin_retiro_carne="2026-09-03")
     db.registrar_pesaje(animal_tag="12", fecha="2026-01-01", peso_kg=350.0)
     db.registrar_pesaje(animal_tag="12", fecha="2026-03-11", peso_kg=420.0)
-    db.registrar_potrero(nombre="Norte", dias_reposo=30, aforo_kg_m2=0.5)
-    db.registrar_potrero(nombre="Bajo", dias_reposo=5)
+    db.registrar_potrero(nombre="Norte", dias_reposo=30, aforo_kg_m2=0.5, geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="Bajo", dias_reposo=5, geom_wkt_4326=_WKT_TEST)
     return QueryEngine(db, hoy=HOY)
 
 
@@ -256,14 +261,15 @@ def test_fallback_ayuda_y_sugerencias(qe):
 
 
 def test_inventario_potreros_agrupado_y_ordenado(db):
-    # Registrar potreros duplicados / variantes de caso
-    db.registrar_potrero(nombre="LECHERAS", codigo="01")
-    db.registrar_potrero(nombre="lecheras", codigo="02")
-    db.registrar_potrero(nombre="OLEGARIO II", codigo="03")
-    db.registrar_potrero(nombre="Olegario II", codigo="04")
-    db.registrar_potrero(nombre="PLAN VERSALLES", codigo="05")
-    db.registrar_potrero(nombre="POTRERO VACIO 1", codigo="06")
-    db.registrar_potrero(nombre="POTRERO VACIO 2", codigo="07")
+    # Registrar potreros duplicados / variantes de caso (reales: con geom,
+    # o el inventario presente los excluiría por ser legacy del import DBF).
+    db.registrar_potrero(nombre="LECHERAS", codigo="01", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="lecheras", codigo="02", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="OLEGARIO II", codigo="03", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="Olegario II", codigo="04", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="PLAN VERSALLES", codigo="05", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="POTRERO VACIO 1", codigo="06", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="POTRERO VACIO 2", codigo="07", geom_wkt_4326=_WKT_TEST)
 
     # Asignar animales:
     # LECHERAS (01): 3 animales, lecheras (02): 2 animales -> Total LECHERAS = 5
@@ -307,9 +313,10 @@ def test_inventario_potreros_vacios_y_sin_potreros(db):
     # Sin potreros registrados
     assert "No hay potreros registrados" in qe.responder("inventario potreros")
 
-    # Registrar potreros sin animales
-    db.registrar_potrero(nombre="Norte", codigo="01")
-    db.registrar_potrero(nombre="Sur", codigo="02")
+    # Registrar potreros sin animales (reales: con geom, o el inventario
+    # presente los excluiría por ser legacy del import DBF).
+    db.registrar_potrero(nombre="Norte", codigo="01", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="Sur", codigo="02", geom_wkt_4326=_WKT_TEST)
 
     # Consulta inventario normal cuando todos están vacíos
     resp_todos_vacios = qe.responder("inventario potreros")
@@ -696,10 +703,11 @@ def test_resumen_inventario_sg_brackets_completos(db):
 def test_inventario_potreros_ocupados_porcentajes_y_filtro_historico(db):
     hoy = date(2026, 9, 1)
 
-    db.registrar_potrero(nombre="POTRERO ALTO", codigo="01")
-    db.registrar_potrero(nombre="POTRERO BAJO", codigo="02")
-    db.registrar_potrero(nombre="POTRERO VACIO", codigo="03")
-    # Potrero histórico con reposo excesivo (no debe aparecer)
+    db.registrar_potrero(nombre="POTRERO ALTO", codigo="01", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="POTRERO BAJO", codigo="02", geom_wkt_4326=_WKT_TEST)
+    db.registrar_potrero(nombre="POTRERO VACIO", codigo="03", geom_wkt_4326=_WKT_TEST)
+    # Potrero histórico con reposo excesivo (no debe aparecer; además es
+    # legacy sin geom, igual que los códigos DBF de producción).
     db.registrar_potrero(nombre="JARA", codigo="99", dias_reposo=3232)
 
     # 15 animales activos en POTRERO ALTO (75.00%)
@@ -798,9 +806,10 @@ def test_existencias_por_potrero_sg(db):
         formatear_tabla_potreros_sg,
         QueryEngine,
     )
-    # Registrar potreros
-    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
-    p2 = db.registrar_potrero("OLEGARIO I", "02")
+    # Registrar potreros (reales: con geom, o el inventario presente los
+    # excluiría por ser legacy del import DBF).
+    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01", geom_wkt_4326=_WKT_TEST)
+    p2 = db.registrar_potrero("OLEGARIO I", "02", geom_wkt_4326=_WKT_TEST)
 
     # Registrar animales en potrero 1
     db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1, fecha_nacimiento="2020-01-01")
@@ -877,8 +886,8 @@ def test_dias_ocupacion_y_rotacion(db):
         formatear_ocupacion_potreros,
         QueryEngine,
     )
-    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01")
-    p2 = db.registrar_potrero("BAJO", "02", dias_reposo=35)
+    p1 = db.registrar_potrero("ORDENO SANTA MARTHA", "01", geom_wkt_4326=_WKT_TEST)
+    p2 = db.registrar_potrero("BAJO", "02", dias_reposo=35, geom_wkt_4326=_WKT_TEST)
 
     db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", potrero=p1)
     db.registrar_traslado("V1", fecha="2026-08-26", potrero_destino=p1)
@@ -1230,8 +1239,10 @@ def test_inventario_por_raza(db):
 
 def test_potrero_con_mas_animales(db):
     from src.engine.query_engine import QueryEngine
-    p1 = db.registrar_potrero("OLEGARIO I", "01")
-    p2 = db.registrar_potrero("VERSALLES", "02")
+    # Potreros reales (con geom): el top de potreros solo considera inventario
+    # presente y excluye los legacy sin geometría del import DBF.
+    p1 = db.registrar_potrero("OLEGARIO I", "01", geom_wkt_4326=_WKT_TEST)
+    p2 = db.registrar_potrero("VERSALLES", "02", geom_wkt_4326=_WKT_TEST)
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
     db.registrar_animal("48", sexo="Hembra", estado="ACTIVO", potrero=p1)
     db.registrar_animal("49", sexo="Hembra", estado="ACTIVO", potrero=p2)

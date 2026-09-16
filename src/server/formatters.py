@@ -1148,8 +1148,9 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
             sobreocupados.append(f"{p['display']} ({dias_ocup}d)")
 
     # Potreros en reposo óptimo
+    # Potreros en reposo óptimo (solo reales; los legacy nunca se listan).
     nombres_ocup = {p["display"] for p in filas_potreros}
-    todos_pot = db.query("SELECT nombre, codigo, dias_reposo FROM potreros")
+    todos_pot = db.query("SELECT nombre, codigo, dias_reposo FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
     listos_reposo = []
     for p in todos_pot:
         raw_nom = (p["nombre"] or p["codigo"] or "").strip().upper()

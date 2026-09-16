@@ -176,7 +176,8 @@ class PasturasQueryMixin:
         return f"🌿 El potrero con más animales es <b>{top['display']}</b>, con {top['total']} animal(es)."
 
     def _potreros_listos(self) -> str:
-        potreros = self.db.query("SELECT * FROM potreros")
+        # Solo potreros reales (los legacy nunca se listan como presente).
+        potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
         listos = []
         for p in potreros:
             # 1ª Ley de Voisin (reposo): exige reposo suficiente Y oferta forrajera.
@@ -197,7 +198,8 @@ class PasturasQueryMixin:
             sin_potrero = contar_animales_sin_potrero(self.db)
             return formatear_tabla_potreros_sg(filas_sg, sin_potrero=sin_potrero)
 
-        potreros = self.db.query("SELECT * FROM potreros")
+        # Inventario presente: solo potreros reales (los legacy nunca se listan).
+        potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
         if not potreros:
             return "No hay potreros registrados."
 
@@ -304,6 +306,8 @@ class PasturasQueryMixin:
     def _buscar_potrero(self, nombre_potrero: str):
         if not nombre_potrero:
             return None
+        # Búsqueda puntual: SÍ resuelve legacy por nombre/código (trazabilidad
+        # histórica); solo los listados de inventario presente los excluyen.
         potreros = self.db.query("SELECT * FROM potreros")
         target_norm = normalizar(nombre_potrero)
         target_clean = re.sub(r"^potreros?\s+", "", target_norm).strip()
@@ -367,7 +371,8 @@ class PasturasQueryMixin:
     def _animales_en_potrero(self, nombre_potrero: str, categorias_filtro: list[str] | None = None) -> str:
         p_row = self._buscar_potrero(nombre_potrero)
         if not p_row:
-            potreros = self.db.query("SELECT * FROM potreros")
+            # Inventario presente: solo potreros reales (los legacy nunca se listan).
+            potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
             disponibles = [
                 p["nombre"] or p["codigo"] or str(p["id"])
                 for p in potreros

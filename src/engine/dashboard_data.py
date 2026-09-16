@@ -19,13 +19,63 @@ import re
 from typing import Any, Optional
 
 try:
-    from ..db.database import Database
+    from ..db.database import (
+        POTRERO_ACTUAL_EXPR,
+        POTRERO_VIGENTE_SUBQUERY,
+        SIN_POTRERO_LABEL,
+        ULT_TRASLADO_CTE,
+        Database,
+        potreros_reales_where,
+    )
 except ImportError:  # ejecución directa
-    from src.db.database import Database  # type: ignore
+    from src.db.database import (  # type: ignore
+        POTRERO_ACTUAL_EXPR,
+        POTRERO_VIGENTE_SUBQUERY,
+        SIN_POTRERO_LABEL,
+        ULT_TRASLADO_CTE,
+        Database,
+        potreros_reales_where,
+    )
 
 logger = logging.getLogger(__name__)
 
 MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
+
+
+def _inventario_por_potrero_real(db: Database) -> list[dict]:
+    """Inventario presente: solo potreros reales (geom WGS84), solo ACTIVOS,
+    por potrero vigente (último traslado). Añade "Sin potrero" solo si hay
+    activos sin potrero vigente (NULL o legacy). Misma base que Pasturas."""
+    try:
+        cond_real = potreros_reales_where("p")
+        filas = db.query(
+            f"WITH {ULT_TRASLADO_CTE} "
+            "SELECT p.id pid, COALESCE(p.nombre, p.codigo) potrero, COUNT(*) n "
+            "FROM animales a "
+            "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+            f"JOIN potreros p ON p.id = {POTRERO_ACTUAL_EXPR} AND {cond_real} "
+            "WHERE a.estado = 'ACTIVO' "
+            "GROUP BY p.id ORDER BY n DESC, potrero ASC"
+        )
+        out = _filas_dict(filas)
+        # Activos sin potrero vigente: vigente NULL o apunta a potrero
+        # legacy/inexistente (los legacy nunca se listan como inventario).
+        n_sin_val = 0
+        try:
+            reales_ids = {r["id"] for r in db.query("SELECT id FROM potreros WHERE geom_wkt_4326 IS NOT NULL")}
+            for a in db.query("SELECT id_animal FROM animales WHERE estado = 'ACTIVO'"):
+                vig = db.potrero_vigente_de_animal(a["id_animal"])
+                if vig is None or vig not in reales_ids:
+                    n_sin_val += 1
+        except Exception:
+            logger.error("seccion por_potrero sin_potrero fallo", exc_info=True)
+            n_sin_val = 0
+        if n_sin_val > 0:
+            out.append({"potrero": SIN_POTRERO_LABEL, "n": n_sin_val})
+        return out
+    except Exception:
+        logger.error("seccion por_potrero fallo", exc_info=True)
+        return []
 
 
 def _filas_dict(filas) -> list[dict]:
@@ -59,8 +109,9 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
             errores["potrero_filtro"] = str(e)
             pid = None
         if pid is not None:
-            filtro_pot = " AND (a.potrero_id = ? OR a.id_animal IN (SELECT animal_id FROM traslados WHERE potrero_destino = ?))"
-            params = (pid, pid)
+            # Filtro por potrero vigente (último traslado o potrero_id).
+            filtro_pot = f" AND ({POTRERO_VIGENTE_SUBQUERY} = ?)"
+            params = (pid,)
     base = f"FROM animales a WHERE a.estado = 'ACTIVO'{filtro_pot}"
     try:
         n = db.query_one(f"SELECT COUNT(*) n {base}", params)
@@ -116,11 +167,8 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         errores["retiros_activos"] = str(e)
         retiros = 0
     try:
-        por_potrero = _filas_dict(db.query(
-            "SELECT COALESCE(p.nombre, p.codigo, 'Sin potrero') potrero, COUNT(*) n "
-            "FROM animales a LEFT JOIN potreros p ON p.id = a.potrero_id "
-            "WHERE a.estado = 'ACTIVO' GROUP BY potrero ORDER BY n DESC LIMIT 20"
-        ))
+        # Inventario presente: solo potreros reales, potrero vigente (traslados).
+        por_potrero = _inventario_por_potrero_real(db)
     except Exception as e:
         logger.error("seccion por_potrero fallo", exc_info=True)
         errores["por_potrero"] = str(e)
@@ -744,6 +792,19 @@ def datos_pasturas(db: Database) -> dict:
         "pronostico": pronostico,
         "spi_sequia": spi_sequia,
     }
+    # Mismo criterio que Inventario: activos cuyo vigente es NULL o legacy
+    # no pertenecen a ningún potrero real → "Sin potrero".
+    try:
+        _reales_ids = {int(p["id"]) for p in potreros}
+        _n_sin = 0
+        for _a in db.query("SELECT id_animal FROM animales WHERE estado = 'ACTIVO'"):
+            _vig = db.potrero_vigente_de_animal(_a["id_animal"])
+            if _vig is None or int(_vig) not in _reales_ids:
+                _n_sin += 1
+        out["sin_potrero"] = _n_sin
+    except Exception:
+        logger.error("seccion sin_potrero fallo", exc_info=True)
+        out["sin_potrero"] = 0
     if errores:
         out["errores"] = errores
     return out
@@ -2454,18 +2515,9 @@ def _gmd_recientes(db: Database, limite: int = 15) -> list[dict]:
 
 
 def _por_potrero(db: Database) -> list[dict]:
-    """Cabezas ACTIVAS agrupadas por potrero (mismo criterio que el Tablero:
-    incluye "Sin potrero" y potreros legacy si de verdad tienen animales
-    activos ahí -- es el estado real de la base, no un listado de opciones)."""
-    try:
-        return _filas_dict(db.query(
-            "SELECT COALESCE(p.nombre, p.codigo, 'Sin potrero') potrero, COUNT(*) n "
-            "FROM animales a LEFT JOIN potreros p ON p.id = a.potrero_id "
-            "WHERE a.estado = 'ACTIVO' GROUP BY potrero ORDER BY n DESC LIMIT 20"
-        ))
-    except Exception:
-        logger.error("seccion por_potrero fallo", exc_info=True)
-        return []
+    """Cabezas ACTIVAS por potrero vigente, solo potreros reales (geom WGS84);
+    añade "Sin potrero" solo si hay activos sin potrero vigente."""
+    return _inventario_por_potrero_real(db)
 
 
 def datos_inventario(db: Database) -> dict:

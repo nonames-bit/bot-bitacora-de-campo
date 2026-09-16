@@ -128,9 +128,9 @@
     var yMaxBarras = Math.ceil(maxVal * 1.2) || 10;
     var yMaxNivel = Math.ceil(maxNivel * 1.15) || 400;
 
-    var w = Math.max(540, n * 44);
-    var h = 250;
-    var padL = 40, padR = 45, padT = 28, padB = 46;
+    var w = Math.max(540, n * 45);
+    var h = 265;
+    var padL = 40, padR = 45, padT = 28, padB = 58;
     var chW = w - padL - padR;
     var chH = h - padT - padB;
     var slotW = chW / n;
@@ -148,13 +148,13 @@
       svg += "<text x='" + (w - padR + 6) + "' y='" + (yP + 3.5) + "' fill='#d97706' font-size='9.5' text-anchor='start'>" + valN + "</text>";
     }
 
-    // Leyenda superior
-    svg += "<g transform='translate(" + padL + ", 12)' font-size='10' font-weight='600'>"
-      + "<rect x='0' y='-8' width='10' height='10' rx='2' fill='var(--verde-marca)' /><text x='14' y='0' fill='var(--texto)'>Nac</text>"
-      + "<rect x='52' y='-8' width='10' height='10' rx='2' fill='#66bb6a' /><text x='66' y='0' fill='var(--texto)'>Compras</text>"
-      + "<rect x='130' y='-8' width='10' height='10' rx='2' fill='#8d6e63' /><text x='144' y='0' fill='var(--texto)'>Ventas</text>"
-      + "<rect x='200' y='-8' width='10' height='10' rx='2' fill='#ef5350' /><text x='214' y='0' fill='var(--texto)'>Muertes</text>"
-      + "<circle cx='280' cy='-3' r='4' fill='#d97706' /><line x1='272' y1='-3' x2='288' y2='-3' stroke='#d97706' stroke-width='2' /><text x='294' y='0' fill='#d97706'>Inventario</text>"
+    // Leyenda superior (con 'Nacimientos' completo y explicación)
+    svg += "<g transform='translate(" + padL + ", 12)' font-size='9.5' font-weight='600'>"
+      + "<rect x='0' y='-8' width='9' height='9' rx='2' fill='var(--verde-marca)' /><text x='13' y='0' fill='var(--texto)'>Nacimientos<title>Nacimientos: crías nacidas en el mes registradas en la finca</title></text>"
+      + "<rect x='96' y='-8' width='9' height='9' rx='2' fill='#66bb6a' /><text x='109' y='0' fill='var(--texto)'>Compras</text>"
+      + "<rect x='170' y='-8' width='9' height='9' rx='2' fill='#8d6e63' /><text x='183' y='0' fill='var(--texto)'>Ventas</text>"
+      + "<rect x='238' y='-8' width='9' height='9' rx='2' fill='#ef5350' /><text x='251' y='0' fill='var(--texto)'>Muertes</text>"
+      + "<circle cx='312' cy='-3.5' r='3.5' fill='#d97706' /><line x1='304' y1='-3.5' x2='320' y2='-3.5' stroke='#d97706' stroke-width='2' /><text x='326' y='0' fill='#d97706'>Inventario</text>"
       + "</g>";
 
     // Puntos para la línea de inventario
@@ -186,8 +186,9 @@
       var yNiv = padT + chH - ((s.inventario || 0) / yMaxNivel) * chH;
       puntosNivel.push({ x: xCenter, y: yNiv, val: s.inventario, mes: s.mes });
 
-      // Etiqueta eje X
-      svg += "<text x='" + xCenter + "' y='" + (h - padB + 16) + "' fill='var(--texto-suave)' font-size='9.5' font-weight='500' text-anchor='middle'>" + esc(s.mes) + "</text>";
+      // Etiqueta eje X (rotada -36° con anclaje al final para perfecta legibilidad)
+      var yLbl = padT + chH + 11;
+      svg += "<g transform='translate(" + xCenter + "," + yLbl + ") rotate(-36)'><text x='0' y='0' fill='var(--texto-suave)' font-size='8.5' font-weight='500' text-anchor='end'>" + esc(s.mes) + "</text></g>";
     });
 
     // Dibujar línea de inventario

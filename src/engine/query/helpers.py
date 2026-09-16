@@ -330,9 +330,12 @@ def generar_resumen_inventario_sg(db: Database, hoy: date | None = None) -> str:
 
 
 def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -> list[dict]:
-    """Calcula las existencias por potrero desglosadas por las 9 categorías zootécnicas de Software Ganadero (SG)."""
+    """Calcula las existencias por potrero desglosadas por las 9 categorías zootécnicas de Software Ganadero (SG).
+
+    Inventario presente: solo potreros reales (geom WGS84, excluye legacy
+    DBF); solo animales ACTIVOS por potrero vigente (último traslado)."""
     hoy = hoy or date.today()
-    potreros = db.query("SELECT * FROM potreros")
+    potreros = db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
     if not potreros:
         return []
 
@@ -511,12 +514,13 @@ def calcular_estructura_hato_sg(db: Database, hoy: Optional[date] = None) -> dic
 
 
 def contar_animales_sin_potrero(db: Database) -> int:
-    """Cuenta animales ACTIVOS cuyo potrero no se puede resolver (ni traslado ni
-    potrero_id apuntan a un potrero existente). Explica por qué el total de la
-    tabla de 'Existencias por Potrero' puede ser menor que el total general de
-    activos: esos animales sí cuentan en el inventario, pero no aparecen en
-    ninguna fila de la tabla porque no tienen potrero asignado."""
-    potreros_validos = {p["id"] for p in db.query("SELECT id FROM potreros")}
+    """Cuenta animales ACTIVOS sin potrero vigente resoluble a un potrero
+    real (ni traslado ni potrero_id apuntan a un potrero con geom WGS84).
+    Explica por qué el total de la tabla de 'Existencias por Potrero' puede
+    ser menor que el total general de activos: esos animales sí cuentan en
+    el inventario, pero no aparecen en ninguna fila de la tabla porque no
+    tienen potrero asignado (los legacy nunca se listan como presente)."""
+    potreros_validos = {p["id"] for p in db.query("SELECT id FROM potreros WHERE geom_wkt_4326 IS NOT NULL")}
     animales = db.query("SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'")
     n = 0
     for a in animales:
@@ -595,9 +599,9 @@ def formatear_tabla_potreros_sg(filas_potreros: list[dict], sin_potrero: int = 0
 
 
 def formatear_ocupacion_potreros(db: Database, hoy: Optional[date] = None) -> str:
-    """Calcula y formatea los días de ocupación y rotación Voisin para todos los potreros."""
+    """Calcula y formatea los días de ocupación y rotación Voisin para todos los potreros (solo reales)."""
     hoy = hoy or date.today()
-    potreros = db.query("SELECT * FROM potreros")
+    potreros = db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
     if not potreros:
         return "No hay potreros registrados en la bitácora."
 

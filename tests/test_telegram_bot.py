@@ -809,7 +809,9 @@ def test_existencias_potreros_nota_animales_sin_potrero(db):
     """Un animal ACTIVO sin potrero resoluble debe explicarse en la tabla, no
     desaparecer en silencio haciendo que el total no cuadre con el general."""
     from src.engine.query_engine import QueryEngine
-    p1 = db.registrar_potrero("Norte")
+    # Potrero real (con geom): los listados de inventario presente excluyen
+    # los potreros legacy sin geometría del import DBF.
+    p1 = db.registrar_potrero("Norte", geom_wkt_4326="POLYGON((0 0,1 0,1 1,0 0))")
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", potrero=p1)
     db.registrar_animal("SINPOT", sexo="Hembra", estado="ACTIVO")  # sin potrero
     qe = QueryEngine(db, hoy=date(2026, 9, 1))

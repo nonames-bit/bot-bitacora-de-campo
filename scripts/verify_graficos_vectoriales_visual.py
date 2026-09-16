@@ -97,8 +97,17 @@ async def main():
 
     try:
         v_url = f"http://localhost:{CDP_PORT}/json/list"
-        with urllib.request.urlopen(v_url) as r:
-            targets = json.loads(r.read().decode())
+        targets = None
+        for _ in range(15):
+            try:
+                with urllib.request.urlopen(v_url, timeout=2) as r:
+                    targets = json.loads(r.read().decode())
+                if targets:
+                    break
+            except Exception:
+                time.sleep(0.5)
+        if not targets:
+            raise RuntimeError("No se pudo conectar al navegador Edge vía CDP")
         
         target = next(t for t in targets if t.get("type") == "page")
         ws_url = target["webSocketDebuggerUrl"]
@@ -118,8 +127,8 @@ async def main():
             await cdp_call(ws, "Page.enable")
             await cdp_call(ws, "Runtime.enable")
 
-            # 1. Tablero: Evolución
-            print("1. Abriendo Tablero y scrolleando a gráfico de Evolución...")
+            # 1. Tablero: Evolución con fechas rotadas y FAB stack
+            print("1. Abriendo Tablero y verificando gráfico de Evolución (fechas rotadas, leyenda 'Nacimientos' y FABs)...")
             await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=tablero"})
             await asyncio.sleep(4.0)
 
@@ -128,94 +137,87 @@ async def main():
                 (function() {
                     var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='evolucion']");
                     if (el) {
-                        el.scrollIntoView({ block: "center" });
+                        window.scrollTo(0, el.offsetTop - 60);
                     }
                 })()
                 """
             })
             await asyncio.sleep(1.5)
-            await capture_screen(ws, "29_mobile_tablero_grafico_evolucion_vectorial.png")
+            await capture_screen(ws, "34_mobile_tablero_evolucion_fechas_rotadas_y_fab.png")
 
-            # 2. Reproducción: Gráfico Reproductivo con Acordeón Matplotlib abierto
-            print("2. Abriendo Reproducción y desplegando acordeón Matplotlib...")
-            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=repro"})
-            await asyncio.sleep(4.0)
-
+            # 2. Clic en botón FAB Lupita (🔍) para abrir Modal de Búsqueda Rápida de Ficha
+            print("2. Probando botón flotante de búsqueda (FAB Lupita 🔍)...")
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
                 (function() {
-                    var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='reproductivo_hato']");
-                    if (el) {
-                        el.scrollIntoView({ block: "center" });
-                        var details = el.querySelector("details");
-                        if (details) details.open = true;
-                    }
+                    var btn = document.getElementById("fab-global-buscar");
+                    if (btn) btn.click();
                 })()
                 """
             })
-            await asyncio.sleep(1.8)
-            await capture_screen(ws, "30_mobile_repro_grafico_dual_toggle.png")
+            await asyncio.sleep(1.2)
+            await capture_screen(ws, "35_mobile_modal_buscar_ficha_lupita.png")
 
-            # 3. Pasturas: Aforo
-            print("3. Abriendo Pasturas y verificando Aforo vectorial...")
-            await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=pasturas"})
-            await asyncio.sleep(4.0)
-
+            # Cerrar modal
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
                 (function() {
-                    var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='aforo']");
-                    if (el) el.scrollIntoView({ block: "center" });
+                    var btn = document.getElementById("btn-cerrar-modal-buscar-ficha") || document.getElementById("btn-cancelar-buscar-ficha");
+                    if (btn) btn.click();
                 })()
                 """
             })
-            await asyncio.sleep(1.5)
-            await capture_screen(ws, "31_mobile_pasturas_grafico_aforo_vectorial.png")
+            await asyncio.sleep(0.5)
 
-            # 3b. Ocupación en Pasturas
-            print("3b. Scrolleando a gráfico de Ocupación en Pasturas...")
-            await cdp_call(ws, "Runtime.evaluate", {
-                "expression": """
-                (function() {
-                    var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='ocupacion']");
-                    if (el) el.scrollIntoView({ block: "center" });
-                })()
-                """
-            })
-            await asyncio.sleep(1.5)
-            await capture_screen(ws, "31b_mobile_pasturas_grafico_ocupacion_vectorial.png")
-
-            # 4. Inventario: Composición racial
-            print("4. Abriendo Inventario y verificando Composición racial vectorial...")
+            # 3. Inventario: Estructura del Hato compacta (sin scrollbar horizontal ni columnas cortadas)
+            print("3. Abriendo Inventario y verificando Estructura del hato compacta...")
             await cdp_call(ws, "Page.navigate", {"url": f"http://127.0.0.1:{PORT}/?v=inventario"})
-            await asyncio.sleep(4.0)
+            for _ in range(25):
+                res = await cdp_call(ws, "Runtime.evaluate", {
+                    "expression": "document.querySelectorAll('.tabla-inventario-compacta').length"
+                })
+                count = res.get("result", {}).get("value", 0)
+                if count >= 2:
+                    break
+                await asyncio.sleep(0.5)
 
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
                 (function() {
-                    var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='composicion_racial']");
-                    if (el) el.scrollIntoView({ block: "center" });
+                    var tables = document.querySelectorAll('.tabla-inventario-compacta');
+                    if (tables.length > 0) {
+                        var h4 = tables[0].closest('div').previousElementSibling;
+                        if (h4 && h4.tagName === 'H4') {
+                            h4.scrollIntoView({ block: 'start' });
+                        } else {
+                            tables[0].scrollIntoView({ block: 'center' });
+                        }
+                    }
                 })()
                 """
             })
-            await asyncio.sleep(1.5)
-            await capture_screen(ws, "32_mobile_inventario_grafico_composicion_racial.png")
+            await asyncio.sleep(1.0)
+            await capture_screen(ws, "36_mobile_inventario_estructura_compacta_sin_scroll.png")
 
-            # 5. Modo Oscuro: Cambiar tema a dark y verificar adaptación de colores
-            print("5. Cambiando tema a dark (Modo Oscuro) y verificando adaptación...")
+            # 4. Inventario: Distribución por Categorías de Edad compacta
+            print("4. Verificando Distribución por Categorías de Edad compacta...")
             await cdp_call(ws, "Runtime.evaluate", {
                 "expression": """
                 (function() {
-                    document.documentElement.setAttribute('data-theme', 'dark');
-                    localStorage.setItem('ja_theme', 'dark');
-                    window.dispatchEvent(new Event('themechange'));
-                    var el = document.querySelector(".tarjeta-grafico-ja[data-chart-tipo='composicion_racial']");
-                    if (el) el.scrollIntoView({ block: "center" });
+                    var tables = document.querySelectorAll('.tabla-inventario-compacta');
+                    if (tables.length > 1) {
+                        var prev = tables[1].closest('div').previousElementSibling;
+                        if (prev && prev.tagName === 'H4') {
+                            prev.scrollIntoView({ block: 'start' });
+                        } else {
+                            tables[1].scrollIntoView({ block: 'center' });
+                        }
+                    }
                 })()
                 """
             })
-            await asyncio.sleep(1.5)
-            await capture_screen(ws, "33_mobile_inventario_grafico_modo_oscuro.png")
+            await asyncio.sleep(1.0)
+            await capture_screen(ws, "37_mobile_inventario_distribucion_edad_compacta.png")
 
             print("¡Todas las capturas de gráficos vectoriales completadas exitosamente!")
 

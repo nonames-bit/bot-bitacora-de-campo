@@ -652,6 +652,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Modo Dual con Acordeón Desplegable (Matplotlib PNG)**: Cada gráfico incluye un acordeón colapsable `<details>` ("Ver gráfico original del servidor (Matplotlib PNG)") que permite alternar, auditar o descargar la imagen generada por Matplotlib sin saturar la vista.
     - **Aislamiento de Alcance**: La generación de gráficos para reportes PDF y Telegram permanece intacta.
     - **Pruebas y Verificación Visual**: Suite `tests/test_grafico_datos.py` (100% pasando), chequeos de sintaxis con Node y validación visual automatizada mediante CDP en viewport móvil (390×844 DPR=2).
+- [x] **Optimización Móvil de Inventario, Gráficos y Búsqueda Rápida**:
+    - **Fechas Rotadas y Leyendas en Evolución**: Fechas inclinadas a -36° en el gráfico de evolución para evitar colisiones y superposiciones en pantallas estrechas; leyenda explícita "Nacimientos" (en lugar de "Nac").
+    - **Tablas de Inventario 100% Responsivas**: Columnas compactas con anchos porcentuales para "Estructura del hato" y "Distribución por Categorías de Edad", eliminando la necesidad de scroll horizontal en smartphones.
+    - **Stack FAB Flotante con Búsqueda Inmediata**: Botón (+) optimizado a 42px y nuevo botón de lupa (🔍) con modal para abrir directamente la ficha técnica de cualquier animal por tag, arete o nombre.
 - [x] Suite de pruebas con pytest: **844+ pruebas en verde** (100% pasando).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
