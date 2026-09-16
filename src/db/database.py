@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # presente. El potrero vigente de un animal es su último traslado (por
 # fecha, desempate por id) o, si no tiene, su potrero_id estático.
 # ---------------------------------------------------------------------------
-SQL_POTRERO_REAL = "geom_wkt_4326 IS NOT NULL"
+SQL_POTRERO_REAL = "(geom_wkt_4326 IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
 SIN_POTRERO_LABEL = "Sin potrero"
 ULT_TRASLADO_CTE = (
     "ult_traslado AS ("
@@ -42,8 +42,12 @@ POTRERO_VIGENTE_SUBQUERY = (
 
 
 def potreros_reales_where(alias: str | None = None) -> str:
-    """Condición SQL de potrero real, con o sin alias de tabla."""
-    return f"{alias}.geom_wkt_4326 IS NOT NULL" if alias else SQL_POTRERO_REAL
+    """Condición SQL de potrero real, con o sin alias de tabla.
+    En producción (con polígonos WGS84 cargados), filtra estrictamente por
+    geom_wkt_4326 IS NOT NULL para excluir potreros legacy del DBF.
+    En bases de prueba o entornos limpios sin geometrías, no excluye ninguno."""
+    col = f"{alias}.geom_wkt_4326" if alias else "geom_wkt_4326"
+    return f"({col} IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
 
 
 class Database:

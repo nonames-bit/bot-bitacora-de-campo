@@ -23,6 +23,7 @@ try:
         POTRERO_ACTUAL_EXPR,
         POTRERO_VIGENTE_SUBQUERY,
         SIN_POTRERO_LABEL,
+        SQL_POTRERO_REAL,
         ULT_TRASLADO_CTE,
         Database,
         potreros_reales_where,
@@ -32,6 +33,7 @@ except ImportError:  # ejecución directa
         POTRERO_ACTUAL_EXPR,
         POTRERO_VIGENTE_SUBQUERY,
         SIN_POTRERO_LABEL,
+        SQL_POTRERO_REAL,
         ULT_TRASLADO_CTE,
         Database,
         potreros_reales_where,
@@ -62,7 +64,7 @@ def _inventario_por_potrero_real(db: Database) -> list[dict]:
         # legacy/inexistente (los legacy nunca se listan como inventario).
         n_sin_val = 0
         try:
-            reales_ids = {r["id"] for r in db.query("SELECT id FROM potreros WHERE geom_wkt_4326 IS NOT NULL")}
+            reales_ids = {r["id"] for r in db.query(f"SELECT id FROM potreros WHERE {SQL_POTRERO_REAL}")}
             for a in db.query("SELECT id_animal FROM animales WHERE estado = 'ACTIVO'"):
                 vig = db.potrero_vigente_de_animal(a["id_animal"])
                 if vig is None or vig not in reales_ids:
@@ -580,7 +582,7 @@ def datos_pasturas(db: Database) -> dict:
         potreros = _filas_dict(db.query(
             "SELECT id, nombre, codigo, area_has, dias_ocupacion, dias_reposo, "
             "fecha_entrada, fecha_salida FROM potreros "
-            "WHERE geom_wkt_4326 IS NOT NULL ORDER BY nombre"))
+            f"WHERE {SQL_POTRERO_REAL} ORDER BY nombre"))
     except Exception as e:
         logger.error("seccion potreros fallo", exc_info=True)
         errores["potreros"] = str(e)
@@ -2315,7 +2317,7 @@ def datos_buscar(db: Database, q: str, limite: int = 8) -> dict:
         # alimentar los datalists de la PWA (#dl-potreros y #dl-tags).
         try:
             filas_p = db.query(
-                "SELECT nombre, codigo FROM potreros WHERE geom_wkt_4326 IS NOT NULL "
+                f"SELECT nombre, codigo FROM potreros WHERE {SQL_POTRERO_REAL} "
                 "ORDER BY nombre LIMIT 200"
             )
             out["potreros"] = _filas_dict(filas_p)
@@ -2351,8 +2353,8 @@ def datos_buscar(db: Database, q: str, limite: int = 8) -> dict:
     try:
         like = f"%{texto}%"
         filas_p = db.query(
-            """SELECT nombre, codigo FROM potreros
-               WHERE geom_wkt_4326 IS NOT NULL
+            f"""SELECT nombre, codigo FROM potreros
+               WHERE {SQL_POTRERO_REAL}
                  AND (UPPER(COALESCE(nombre,'')) LIKE UPPER(?)
                   OR UPPER(COALESCE(codigo,'')) LIKE UPPER(?))
                ORDER BY nombre LIMIT ?""",

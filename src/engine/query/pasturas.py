@@ -5,6 +5,7 @@ import html
 import re
 from typing import Optional
 
+from ...db.database import SQL_POTRERO_REAL
 from ...utils import normalizar, to_date
 from .helpers import (
     REPOSO_LISTO_DIAS,
@@ -177,7 +178,7 @@ class PasturasQueryMixin:
 
     def _potreros_listos(self) -> str:
         # Solo potreros reales (los legacy nunca se listan como presente).
-        potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+        potreros = self.db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
         listos = []
         for p in potreros:
             # 1ª Ley de Voisin (reposo): exige reposo suficiente Y oferta forrajera.
@@ -199,7 +200,7 @@ class PasturasQueryMixin:
             return formatear_tabla_potreros_sg(filas_sg, sin_potrero=sin_potrero)
 
         # Inventario presente: solo potreros reales (los legacy nunca se listan).
-        potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+        potreros = self.db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
         if not potreros:
             return "No hay potreros registrados."
 
@@ -372,7 +373,7 @@ class PasturasQueryMixin:
         p_row = self._buscar_potrero(nombre_potrero)
         if not p_row:
             # Inventario presente: solo potreros reales (los legacy nunca se listan).
-            potreros = self.db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+            potreros = self.db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
             disponibles = [
                 p["nombre"] or p["codigo"] or str(p["id"])
                 for p in potreros

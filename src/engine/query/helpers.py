@@ -9,7 +9,7 @@ import re
 from datetime import date
 from typing import Optional
 
-from ...db.database import Database
+from ...db.database import Database, SQL_POTRERO_REAL
 from ...utils import normalizar, to_date
 
 REPOSO_LISTO_DIAS = 21
@@ -335,7 +335,7 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
     Inventario presente: solo potreros reales (geom WGS84, excluye legacy
     DBF); solo animales ACTIVOS por potrero vigente (último traslado)."""
     hoy = hoy or date.today()
-    potreros = db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+    potreros = db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
     if not potreros:
         return []
 
@@ -520,7 +520,7 @@ def contar_animales_sin_potrero(db: Database) -> int:
     ser menor que el total general de activos: esos animales sí cuentan en
     el inventario, pero no aparecen en ninguna fila de la tabla porque no
     tienen potrero asignado (los legacy nunca se listan como presente)."""
-    potreros_validos = {p["id"] for p in db.query("SELECT id FROM potreros WHERE geom_wkt_4326 IS NOT NULL")}
+    potreros_validos = {p["id"] for p in db.query(f"SELECT id FROM potreros WHERE {SQL_POTRERO_REAL}")}
     animales = db.query("SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'")
     n = 0
     for a in animales:
@@ -601,7 +601,7 @@ def formatear_tabla_potreros_sg(filas_potreros: list[dict], sin_potrero: int = 0
 def formatear_ocupacion_potreros(db: Database, hoy: Optional[date] = None) -> str:
     """Calcula y formatea los días de ocupación y rotación Voisin para todos los potreros (solo reales)."""
     hoy = hoy or date.today()
-    potreros = db.query("SELECT * FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+    potreros = db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
     if not potreros:
         return "No hay potreros registrados en la bitácora."
 

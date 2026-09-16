@@ -11,7 +11,7 @@ import sys
 from datetime import date
 from typing import Optional
 
-from ..db.database import Database
+from ..db.database import Database, SQL_POTRERO_REAL
 from ..engine.query_engine import (
     QueryEngine,
     calcular_brackets_inventario_sg,
@@ -1150,7 +1150,7 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     # Potreros en reposo óptimo
     # Potreros en reposo óptimo (solo reales; los legacy nunca se listan).
     nombres_ocup = {p["display"] for p in filas_potreros}
-    todos_pot = db.query("SELECT nombre, codigo, dias_reposo FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
+    todos_pot = db.query(f"SELECT nombre, codigo, dias_reposo FROM potreros WHERE {SQL_POTRERO_REAL}")
     listos_reposo = []
     for p in todos_pot:
         raw_nom = (p["nombre"] or p["codigo"] or "").strip().upper()
