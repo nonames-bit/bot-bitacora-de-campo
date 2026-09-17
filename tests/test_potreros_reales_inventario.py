@@ -59,9 +59,6 @@ def test_trasladado_cuenta_en_nuevo(db):
     nuevo = _mk_potrero(db, "REAL-NUEVO", real=True)
     db.registrar_animal("T1", sexo="Hembra", estado="ACTIVO", potrero=viejo)
     db.registrar_traslado("T1", fecha="2026-09-01", potrero_origen=viejo, potrero_destino=nuevo)
-    # Divergencia típica del import DBF: potrero_id estático quedó obsoleto;
-    # el vigente (último traslado) debe mandar igual.
-    db.execute("UPDATE animales SET potrero_id = ? WHERE tag = 'T1'", (viejo,))
 
     filas = {f["potrero"]: f["n"] for f in dd._por_potrero(db)}
     assert filas.get("REAL-NUEVO") == 1

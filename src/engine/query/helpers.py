@@ -367,10 +367,10 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
     for a in animales:
         aid = a["id_animal"]
         ult = db.query_one(
-            "SELECT potrero_destino, fecha, lote FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1",
+            "SELECT potrero_destino, fecha, lote FROM traslados WHERE animal_id=? AND potrero_destino IS NOT NULL ORDER BY fecha DESC, id DESC LIMIT 1",
             (aid,),
         )
-        pid = ult["potrero_destino"] if (ult and ult["potrero_destino"] is not None) else a["potrero_id"]
+        pid = a["potrero_id"] if a["potrero_id"] is not None else (ult["potrero_destino"] if ult else None)
         fecha_ingreso = ult["fecha"] if ult else None
 
         if pid is not None and pid in potreros_by_id:
@@ -526,10 +526,10 @@ def contar_animales_sin_potrero(db: Database) -> int:
     for a in animales:
         aid = a["id_animal"]
         ult = db.query_one(
-            "SELECT potrero_destino FROM traslados WHERE animal_id=? ORDER BY fecha DESC, id DESC LIMIT 1",
+            "SELECT potrero_destino FROM traslados WHERE animal_id=? AND potrero_destino IS NOT NULL ORDER BY fecha DESC, id DESC LIMIT 1",
             (aid,),
         )
-        pid = ult["potrero_destino"] if (ult and ult["potrero_destino"] is not None) else a["potrero_id"]
+        pid = a["potrero_id"] if a["potrero_id"] is not None else (ult["potrero_destino"] if ult else None)
         if pid is None or pid not in potreros_validos:
             n += 1
     return n

@@ -605,15 +605,15 @@ def datos_pasturas(db: Database) -> dict:
             WITH ult_traslado AS (
                 SELECT animal_id, potrero_destino, fecha,
                        ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
-                FROM traslados
+                FROM traslados WHERE potrero_destino IS NOT NULL
             )
-            SELECT COALESCE(ut.potrero_destino, a.potrero_id) as pot_id,
+            SELECT COALESCE(a.potrero_id, ut.potrero_destino) as pot_id,
                    COUNT(*) as total_animales,
                    MAX(ut.fecha) as ult_fecha_ingreso
             FROM animales a
             LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
-            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) IS NOT NULL
-            GROUP BY COALESCE(ut.potrero_destino, a.potrero_id)
+            WHERE a.estado = 'ACTIVO' AND COALESCE(a.potrero_id, ut.potrero_destino) IS NOT NULL
+            GROUP BY COALESCE(a.potrero_id, ut.potrero_destino)
         """
         for f in db.query(sql_anim):
             info_por_pot[f["pot_id"]] = dict(f)
@@ -869,14 +869,14 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
             WITH ult_traslado AS (
                 SELECT animal_id, potrero_destino, fecha,
                        ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
-                FROM traslados
+                FROM traslados WHERE potrero_destino IS NOT NULL
             )
             SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
-                   COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
+                   COALESCE(a.potrero_id, ut.potrero_destino) as pot_actual,
                    ut.fecha as fecha_ingreso
             FROM animales a
             LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
-            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) IS NULL
+            WHERE a.estado = 'ACTIVO' AND COALESCE(a.potrero_id, ut.potrero_destino) IS NULL
             ORDER BY a.tag ASC
         """
         filas = db.query(sql)
@@ -885,14 +885,14 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
             WITH ult_traslado AS (
                 SELECT animal_id, potrero_destino, fecha,
                        ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
-                FROM traslados
+                FROM traslados WHERE potrero_destino IS NOT NULL
             )
             SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.notas,
-                   COALESCE(ut.potrero_destino, a.potrero_id) as pot_actual,
+                   COALESCE(a.potrero_id, ut.potrero_destino) as pot_actual,
                    ut.fecha as fecha_ingreso
             FROM animales a
             LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
-            WHERE a.estado = 'ACTIVO' AND COALESCE(ut.potrero_destino, a.potrero_id) = ?
+            WHERE a.estado = 'ACTIVO' AND COALESCE(a.potrero_id, ut.potrero_destino) = ?
             ORDER BY a.tag ASC
         """
         filas = db.query(sql, (pot_id,))
@@ -1048,14 +1048,14 @@ def animales_por_grupo_inventario(
             GROUP BY vaca_id
         )
         SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento, a.madre_id, a.notas,
-               COALESCE(ut.potrero_destino, a.potrero_id) as pot_id,
+               COALESCE(a.potrero_id, ut.potrero_destino) as pot_id,
                p.nombre as potrero_nombre,
                ut.fecha as fecha_traslado,
                up.ult_parto_fecha
         FROM animales a
         LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
         LEFT JOIN ult_parto up ON up.vaca_id = a.id_animal
-        LEFT JOIN potreros p ON p.id = COALESCE(ut.potrero_destino, a.potrero_id)
+        LEFT JOIN potreros p ON p.id = COALESCE(a.potrero_id, ut.potrero_destino)
         WHERE a.estado = 'ACTIVO'
         ORDER BY a.tag ASC
     """

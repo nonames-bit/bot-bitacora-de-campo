@@ -29,15 +29,18 @@ ULT_TRASLADO_CTE = (
     "ult_traslado AS ("
     "SELECT animal_id, potrero_destino, fecha, "
     "ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) AS rn "
-    "FROM traslados)"
+    "FROM traslados WHERE potrero_destino IS NOT NULL)"
 )
-# Expresión del potrero vigente cuando ya hay JOIN con ult_traslado (rn = 1).
-POTRERO_ACTUAL_EXPR = "COALESCE(ut.potrero_destino, a.potrero_id)"
+# Expresión del potrero actual de un animal:
+# a.potrero_id es la ubicación maestra actual (proveniente de SG hoja.dbf y de los traslados
+# registrados en la PWA). Si a.potrero_id es NULL, se recurre a ut.potrero_destino.
+POTRERO_ACTUAL_EXPR = "COALESCE(a.potrero_id, ut.potrero_destino)"
 # Subconsulta del potrero vigente sin CTE (para filtros puntuales por animal).
 POTRERO_VIGENTE_SUBQUERY = (
-    "COALESCE((SELECT potrero_destino FROM traslados "
-    "WHERE animal_id = a.id_animal ORDER BY fecha DESC, id DESC LIMIT 1), "
-    "a.potrero_id)"
+    "COALESCE(a.potrero_id, "
+    "(SELECT potrero_destino FROM traslados "
+    "WHERE animal_id = a.id_animal AND potrero_destino IS NOT NULL "
+    "ORDER BY fecha DESC, id DESC LIMIT 1))"
 )
 
 
