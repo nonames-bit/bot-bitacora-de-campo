@@ -130,3 +130,53 @@ def test_sin_potrero_cuadra_con_total_activos(db):
     assert sum(f["n"] for f in inv) == total
     past = dd.datos_pasturas(db)
     assert sum(p["total_animales"] for p in past["potreros"]) + past["sin_potrero"] == total
+
+
+def test_mapa_potreros_grafico_solo_reales(db):
+    """El gráfico 'mapa_potreros' de la PWA no debe listar códigos legacy
+    (sin geom_wkt_4326) como si fueran potreros actuales: era el único lugar
+    que mostraba los 57 en vez de los 20 reales."""
+    p_real = _mk_potrero(db, "REAL-A", real=True)
+    _mk_potrero(db, "LEGACY-01", real=False)
+    _mk_potrero(db, "21", real=False)
+    db.registrar_animal("G1", sexo="Hembra", estado="ACTIVO", potrero=p_real)
+    db.registrar_animal("G2", sexo="Macho", estado="VENDIDO", potrero=p_real)
+
+    d = dd.datos_grafico(db, "mapa_potreros")
+    assert d["tipo"] == "mapa_potreros"
+    nombres = [p["nombre"] for p in d["potreros"]]
+    assert nombres == ["REAL-A"]
+    assert d["potreros"][0]["animales"] == 1
+    assert d["potreros"][0]["semaforo"] == "🟢"
+    assert "1 potreros reales" in d["subtitulo"]
+    assert "0 en reposo" in d["subtitulo"]
+
+
+def test_mapa_potreros_grafico_cuenta_por_traslado(db):
+    """El conteo del gráfico usa el potrero vigente (último traslado), igual
+    que datos_pasturas, no el potrero_id estático."""
+    viejo = _mk_potrero(db, "REAL-VIEJO", real=True)
+    nuevo = _mk_potrero(db, "REAL-NUEVO", real=True)
+    db.registrar_animal("T1", sexo="Hembra", estado="ACTIVO", potrero=viejo)
+    db.registrar_traslado("T1", fecha="2026-09-01", potrero_origen=viejo, potrero_destino=nuevo)
+
+    d = dd.datos_grafico(db, "mapa_potreros")
+    por_nombre = {p["nombre"]: p["animales"] for p in d["potreros"]}
+    assert por_nombre["REAL-NUEVO"] == 1
+    assert por_nombre["REAL-VIEJO"] == 0
+    # Los ocupados se ordenan antes que los que están en reposo.
+    assert d["potreros"][0]["nombre"] == "REAL-NUEVO"
+
+
+def test_mapa_potreros_grafico_carga_y_estado_rotacion(db):
+    """Cada tarjeta trae carga (cab/ha) y estado de rotación Voisin."""
+    p1 = _mk_potrero(db, "REAL-A", real=True)
+    db.execute("UPDATE potreros SET area_has = 10.0 WHERE id = ?", (p1,))
+    db.registrar_animal("H1", sexo="Hembra", estado="ACTIVO", potrero=p1)
+    db.registrar_animal("H2", sexo="Hembra", estado="ACTIVO", potrero=p1)
+
+    d = dd.datos_grafico(db, "mapa_potreros")
+    p = d["potreros"][0]
+    assert p["carga_cab_ha"] == 0.2
+    assert p["estado_rotacion"]
+    assert p["dias_ocupacion"] is not None or p["estado_rotacion"] == "Pastoreo activo"

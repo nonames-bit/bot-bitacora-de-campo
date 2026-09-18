@@ -574,29 +574,21 @@ def datos_sanidad(db: Database) -> dict:
     return out
 
 
-def datos_pasturas(db: Database) -> dict:
-    """Pasturas: ocupación Voisin (semáforo), reposo y último NDVI."""
-    errores: dict[str, str] = {}
-    try:
-        # Solo potreros con geometría real (Fase B del plan geoespacial)
-        # — mismo criterio que Database.resumen_ndvi_finca(): los
-        # códigos legacy (numéricos/L/G) no son potreros reales/actuales
-        # de la finca (confirmado por el usuario contra el reporte
-        # nativo de Software Ganadero SG) y no deben listarse como si
-        # fueran potreros activos.
-        potreros = _filas_dict(db.query(
-            "SELECT id, nombre, codigo, area_has, dias_ocupacion, dias_reposo, "
-            "fecha_entrada, fecha_salida FROM potreros "
-            f"WHERE {SQL_POTRERO_REAL} ORDER BY nombre"))
-    except Exception as e:
-        logger.error("seccion potreros fallo", exc_info=True)
-        errores["potreros"] = str(e)
-        potreros = []
+def _enriquecer_rotacion_potreros(
+    db: Database, potreros: list[dict], hoy_date: Optional[date] = None
+) -> list[dict]:
+    """Anota potreros reales con ocupación/reposo Voisin y conteo de activos.
+
+    Compartido por ``datos_pasturas`` y el gráfico ``mapa_potreros`` para que
+    ambos reporten exactamente el mismo universo y los mismos días de rotación
+    (el conteo usa el potrero vigente por último traslado, no el ``potrero_id``
+    estático). Muta y devuelve la lista recibida.
+    """
+    hoy_date = hoy_date or date.today()
+    from ..utils import to_date
+
     for p in potreros:
         p["total_animales"] = 0
-
-    hoy_date = date.today()
-    from ..utils import to_date
 
     # Conteo dinámico de animales activos y fecha de ingreso más reciente por potrero
     info_por_pot: dict[int, dict] = {}
@@ -689,6 +681,28 @@ def datos_pasturas(db: Database) -> dict:
             else:
                 p["semaforo"] = "🌱"
                 p["estado_rotacion"] = "En reposo"
+    return potreros
+
+
+def datos_pasturas(db: Database) -> dict:
+    """Pasturas: ocupación Voisin (semáforo), reposo y último NDVI."""
+    errores: dict[str, str] = {}
+    try:
+        # Solo potreros con geometría real (Fase B del plan geoespacial)
+        # — mismo criterio que Database.resumen_ndvi_finca(): los
+        # códigos legacy (numéricos/L/G) no son potreros reales/actuales
+        # de la finca (confirmado por el usuario contra el reporte
+        # nativo de Software Ganadero SG) y no deben listarse como si
+        # fueran potreros activos.
+        potreros = _filas_dict(db.query(
+            "SELECT id, nombre, codigo, area_has, dias_ocupacion, dias_reposo, "
+            "fecha_entrada, fecha_salida FROM potreros "
+            f"WHERE {SQL_POTRERO_REAL} ORDER BY nombre"))
+    except Exception as e:
+        logger.error("seccion potreros fallo", exc_info=True)
+        errores["potreros"] = str(e)
+        potreros = []
+    _enriquecer_rotacion_potreros(db, potreros)
     try:
         ndvi = _filas_dict(db.query(
             """SELECT p.nombre potrero, n.fecha, n.ndvi_promedio, n.biomasa_estimada_kg_ha,
@@ -3314,30 +3328,53 @@ def datos_grafico(db: Database, tipo: str, hoy: Optional[date] = None, **kwargs)
         }
 
     if tipo in ("mapa_potreros", "mapa"):
-        potreros = db.query(
-            "SELECT id, nombre, codigo, area_has FROM potreros ORDER BY nombre"
-        )
+        # Solo potreros reales/actuales (con geometría WGS84). Los códigos
+        # legacy del DBF se conservan por los traslados históricos que los
+        # referencian, pero NO son potreros presentes y no deben listarse
+        # (mismo criterio que datos_pasturas, el mapa satelital y el PNG).
+        potreros = _filas_dict(db.query(
+            "SELECT id, nombre, codigo, area_has, tipo_pasto, dias_ocupacion, "
+            "dias_reposo, fecha_entrada, fecha_salida FROM potreros "
+            f"WHERE {SQL_POTRERO_REAL} ORDER BY nombre"))
+        potreros = _enriquecer_rotacion_potreros(db, potreros, hoy)
+
         items = []
-        for p in (potreros or []):
+        for p in potreros:
             nom = p["nombre"] or p["codigo"] or str(p["id"])
-            cnt = db.query_one(
-                "SELECT COUNT(*) n FROM animales WHERE estado='ACTIVO' AND potrero_id = ?",
-                (p["id"],),
-            )
-            n = int(cnt["n"]) if cnt else 0
+            n = int(p.get("total_animales") or 0)
+            area = p.get("area_has")
+            carga = round(n / float(area), 2) if n and area and float(area) > 0 else None
             items.append({
                 "id": p["id"],
                 "nombre": nom,
-                "area_has": p["area_has"],
+                "area_has": area,
+                "tipo_pasto": p.get("tipo_pasto"),
                 "animales": n,
+                "carga_cab_ha": carga,
                 "estado": "Ocupado" if n > 0 else "Reposo",
-                "semaforo": "🟢" if n > 0 else "🌱",
+                "estado_rotacion": p.get("estado_rotacion"),
+                "dias_ocupacion": p.get("dias_ocupacion"),
+                "dias_reposo": p.get("dias_reposo"),
+                "semaforo": p.get("semaforo") or ("🟢" if n > 0 else "🌱"),
             })
+
+        # Ocupados primero (más días = más urgente rotar), luego en reposo
+        # (más días = más cerca de estar listo para pastoreo).
+        def _orden(x):
+            ocupado = x["animales"] > 0
+            dias = x["dias_ocupacion"] if ocupado else x["dias_reposo"]
+            return (0 if ocupado else 1, -(dias if dias is not None else -1))
+
+        items.sort(key=_orden)
+        ocupados = sum(1 for x in items if x["animales"] > 0)
         return {
             "ok": True,
             "tipo": "mapa_potreros",
             "titulo": "Mapa y Estado de Potreros",
-            "subtitulo": f"{len(items)} potreros registrados en la finca",
+            "subtitulo": (
+                f"{len(items)} potreros reales · {ocupados} ocupados · "
+                f"{len(items) - ocupados} en reposo"
+            ),
             "potreros": items,
         }
 

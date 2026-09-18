@@ -704,7 +704,7 @@
         + "</div></div>";
     }
 
-    h += grafico("mapa_potreros", "Mapa de potreros") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
+    h += grafico("mapa_potreros", "Rotación de potreros (Voisin)") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
     h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
     if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
     else {
@@ -7884,17 +7884,19 @@
   function actualizarContadorSync() {
     obtenerColaOffline().then(function (lista) {
       var badge = document.getElementById("sync-count");
-      if (!badge) return;
       var n = lista.length;
-      if (n > 0) {
-        badge.textContent = n > 99 ? "99+" : String(n);
-        badge.style.display = "";
-        badge.classList.add("on");
-      } else {
-        badge.textContent = "0";
-        badge.style.display = "none";
-        badge.classList.remove("on");
+      if (badge) {
+        if (n > 0) {
+          badge.textContent = n > 99 ? "99+" : String(n);
+          badge.style.display = "";
+          badge.classList.add("on");
+        } else {
+          badge.textContent = "0";
+          badge.style.display = "none";
+          badge.classList.remove("on");
+        }
       }
+      actualizarMenuEstadoSync(n);
     });
   }
 
@@ -7908,6 +7910,11 @@
         if (mostrarAviso) alert("Sin conexión a internet. Los " + lista.length + " eventos se sincronizarán al recuperar la señal.");
         return;
       }
+      var btnSync = document.getElementById("btn-sync");
+      if (btnSync) btnSync.classList.add("girando");
+      var menuBtnSync = document.getElementById("menu-btn-sync");
+      if (menuBtnSync) menuBtnSync.classList.add("girando");
+
       fetch("/api/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -7916,6 +7923,9 @@
         if (!r.ok) throw new Error("HTTP " + r.status);
         return r.json();
       }).then(function (res) {
+        if (btnSync) btnSync.classList.remove("girando");
+        if (menuBtnSync) menuBtnSync.classList.remove("girando");
+
         // Solo se borran de la cola local los eventos que el servidor
         // confirmó explícitamente (ids_ok, correlacionado por id_local) --
         // antes se borraba TODA la cola con un simple HTTP 200, aunque un
@@ -7981,6 +7991,25 @@
         + "<span style='margin-left:4px; font-weight:600;'>" + esc(u.nombre) + "</span>"
         + "<span class='chip " + nv.chip + "' style='font-size:10px; padding:1px 6px; margin-left:5px; line-height:1.2;'>" + nv.badge + "</span>";
       badge.style.display = "inline-flex";
+    }
+
+    // Actualizar datos del perfil en el menú desplegable de usuario
+    var mNombre = document.getElementById("menu-usuario-nombre");
+    var mRol = document.getElementById("menu-usuario-rol");
+    var mAvatar = document.getElementById("menu-avatar-wrap");
+    if (u && u.nombre) {
+      if (mNombre) mNombre.textContent = u.nombre;
+      if (mRol) {
+        var rolTexto = (u.rol || "INVITADO").toUpperCase();
+        var rolNv = rolToNivel(rolTexto);
+        mRol.className = "chip " + rolNv.chip;
+        mRol.textContent = rolNv.badge + " · " + rolTexto;
+      }
+      if (mAvatar) {
+        var rolAv = (u.rol || "INVITADO").toUpperCase();
+        var avKeyModal = u.avatar || defaultAvatar(rolAv);
+        mAvatar.innerHTML = renderAvatarBadge(avKeyModal, rolAv, 38, false);
+      }
     }
 
     var rol = (u.rol || "").toUpperCase();
@@ -9133,6 +9162,7 @@
       if (acc === "exportar-inventario") { if (window.__exportarInventario) window.__exportarInventario(); }
       else if (acc === "exportar-retiros") { if (window.__exportarRetiros) window.__exportarRetiros(); }
       else if (acc === "reload") { location.reload(); }
+      else if (acc === "ir-mapa-satelital") { e.preventDefault(); irAVista("mapa"); cargar(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
       else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }
       else if (acc === "rectificar-tag") {
@@ -9901,6 +9931,7 @@
           if (nA > 0) { camp.textContent = nA > 99 ? "99+" : String(nA); camp.classList.add("on"); }
           else { camp.textContent = ""; camp.classList.remove("on"); }
         }
+        actualizarMenuAvisos(nA);
         var prev = window.__agendaPrev || -1;
         if (prev >= 0 && nA > prev && nA > 0 && document.hidden
             && "Notification" in window && Notification.permission === "granted") {
@@ -10152,6 +10183,7 @@
         }, 150);
       }
     }
+    window.abrirModalBuscarFichaRapida = abrirModalBuscar;
 
     if (fabBuscar) {
       fabBuscar.addEventListener("click", function (e) {
@@ -10219,6 +10251,10 @@
     }
     actual = v;
     actualizarFabGlobal();
+    var navEl = document.getElementById("nav-principal");
+    if (navEl) navEl.classList.remove("nav-hidden");
+    var chatDockEl = document.getElementById("chat-dock");
+    if (chatDockEl) chatDockEl.classList.remove("nav-hidden");
     if (v !== "ficha") {
       actualizarVacaHeader({ esFicha: false });
     }
@@ -10316,6 +10352,8 @@
         }
         var hStr = ahora.toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
         reloj.innerHTML = "<span class='reloj-fecha'>" + esc(fStr) + "</span> <span class='reloj-sep'>·</span> <span class='reloj-hora'>" + esc(hStr) + "</span>";
+        var menuHora = document.getElementById("menu-usuario-hora");
+        if (menuHora) menuHora.textContent = fStr + " · " + hStr;
       } catch (e) { /* noop */ }
     }
     actualizarVacaHeader();
@@ -10334,6 +10372,18 @@
 
   /* ---------- Selección de Tema (4 Modos) ---------- */
   var selectTema = document.getElementById("select-tema");
+
+  function sincronizarMenuTemas(modo) {
+    var chips = qa("#menu-temas-grid .tema-chip-btn");
+    chips.forEach(function (btn) {
+      if (btn.getAttribute("data-tema") === (modo || "green")) {
+        btn.classList.add("activo");
+      } else {
+        btn.classList.remove("activo");
+      }
+    });
+  }
+
   function aplicarTema(modo) {
     if (modo === "dark") document.documentElement.setAttribute("data-theme", "dark");
     else if (modo === "light") document.documentElement.setAttribute("data-theme", "light");
@@ -10341,6 +10391,7 @@
     else document.documentElement.setAttribute("data-theme", "green");
     try { localStorage.setItem("pwa_tema", modo || "green"); } catch (e) { /* noop */ }
     if (selectTema) selectTema.value = modo || "green";
+    sincronizarMenuTemas(modo || "green");
     actualizarVacaHeader();
     actualizarClimaHeader();
   }
@@ -10351,6 +10402,260 @@
   if (selectTema) {
     selectTema.addEventListener("change", function () {
       aplicarTema(selectTema.value);
+    });
+  }
+
+  /* ---------- Menú Desplegable de Usuario y Control Rápido ---------- */
+  function actualizarDotGlobal() {
+    var dot = document.getElementById("header-menu-dot");
+    if (!dot) return;
+    var camp = document.getElementById("notif-dot");
+    var nA = camp && camp.textContent ? parseInt(camp.textContent, 10) || 0 : 0;
+    var syncCount = document.getElementById("sync-count");
+    var nS = syncCount && syncCount.textContent ? parseInt(syncCount.textContent, 10) || 0 : 0;
+    if (nA > 0 || nS > 0 || navigator.onLine === false) {
+      dot.style.display = "block";
+    } else {
+      dot.style.display = "none";
+    }
+  }
+
+  function actualizarMenuEstadoSync(pendientes) {
+    var txt = document.getElementById("menu-sync-estado");
+    if (pendientes === undefined) {
+      var syncCount = document.getElementById("sync-count");
+      pendientes = syncCount && syncCount.textContent ? parseInt(syncCount.textContent, 10) || 0 : 0;
+    }
+    if (txt) {
+      if (pendientes > 0) {
+        txt.textContent = pendientes + " evento(s) pendientes de sincronizar";
+        txt.style.color = "var(--color-ambar-txt)";
+      } else if (navigator.onLine === false) {
+        txt.textContent = "Sin conexión (modo local activo)";
+        txt.style.color = "var(--color-rojo-txt)";
+      } else {
+        txt.textContent = "Al día con el servidor";
+        txt.style.color = "var(--texto-suave)";
+      }
+    }
+    actualizarDotGlobal();
+  }
+
+  function actualizarMenuAvisos(nA) {
+    var sub = document.getElementById("menu-notif-sub");
+    var badge = document.getElementById("menu-notif-dot");
+    if (nA === undefined) {
+      var camp = document.getElementById("notif-dot");
+      nA = camp && camp.textContent ? parseInt(camp.textContent, 10) || 0 : 0;
+    }
+    if (sub) {
+      if (nA > 0) sub.textContent = nA + " aviso(s) pendientes";
+      else sub.textContent = "Sin avisos";
+    }
+    if (badge) {
+      if (nA > 0) {
+        badge.textContent = nA > 99 ? "99+" : String(nA);
+        badge.style.display = "inline-block";
+        badge.classList.add("on");
+      } else {
+        badge.textContent = "";
+        badge.style.display = "none";
+        badge.classList.remove("on");
+      }
+    }
+    actualizarDotGlobal();
+  }
+
+  function setupMenuUsuario() {
+    var modal = document.getElementById("modal-menu-usuario");
+    var btnMarca = document.getElementById("marca-header-btn");
+    var btnCerrar = document.getElementById("btn-cerrar-menu-usuario");
+    if (!modal || !btnMarca) return;
+
+    function abrirMenu() {
+      modal.style.display = "flex";
+      var actualTema = temaInicial();
+      sincronizarMenuTemas(actualTema);
+      // Sincronizar estado de instalación
+      var topBtnInstalar = document.getElementById("btn-instalar-app");
+      var menuBtnInstalar = document.getElementById("menu-btn-instalar");
+      var gridAccesos = modal.querySelector(".menu-grid-accesos");
+      if (topBtnInstalar && topBtnInstalar.style.display !== "none") {
+        if (menuBtnInstalar) menuBtnInstalar.style.display = "flex";
+        if (gridAccesos) gridAccesos.classList.add("has-instalar");
+      } else {
+        if (menuBtnInstalar) menuBtnInstalar.style.display = "none";
+        if (gridAccesos) gridAccesos.classList.remove("has-instalar");
+      }
+      actualizarMenuEstadoSync();
+      actualizarMenuAvisos();
+    }
+
+    function cerrarMenu() {
+      modal.style.display = "none";
+    }
+
+    window.abrirMenuUsuario = abrirMenu;
+    window.cerrarMenuUsuario = cerrarMenu;
+
+    btnMarca.addEventListener("click", function (e) {
+      e.preventDefault();
+      abrirMenu();
+    });
+    btnMarca.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        abrirMenu();
+      }
+    });
+
+    if (btnCerrar) {
+      btnCerrar.addEventListener("click", function () {
+        cerrarMenu();
+      });
+    }
+
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) cerrarMenu();
+    });
+
+    // Acción buscar ficha rápida desde menú
+    var menuBtnBuscar = document.getElementById("menu-btn-buscar-ficha");
+    if (menuBtnBuscar) {
+      menuBtnBuscar.addEventListener("click", function () {
+        cerrarMenu();
+        if (typeof window.abrirModalBuscarFichaRapida === "function") {
+          window.abrirModalBuscarFichaRapida();
+        } else {
+          var modalBuscar = document.getElementById("modal-buscar-ficha-rapida");
+          if (modalBuscar) modalBuscar.style.display = "flex";
+        }
+      });
+    }
+
+    // Acción sincronizar desde menú
+    var menuBtnSync = document.getElementById("menu-btn-sync");
+    if (menuBtnSync) {
+      menuBtnSync.addEventListener("click", function () {
+        sincronizarColaOffline(true);
+      });
+    }
+
+    // Acción avisos/notificaciones desde menú
+    var menuBtnNotif = document.getElementById("menu-btn-notif");
+    if (menuBtnNotif) {
+      menuBtnNotif.addEventListener("click", function () {
+        cerrarMenu();
+        abrirPanelCampana();
+      });
+    }
+
+    // Acción ayuda desde menú
+    var menuBtnAyuda = document.getElementById("menu-btn-ayuda");
+    if (menuBtnAyuda) {
+      menuBtnAyuda.addEventListener("click", function () {
+        cerrarMenu();
+        var btnAyuda = document.getElementById("btn-ayuda");
+        if (btnAyuda) btnAyuda.click();
+      });
+    }
+
+    // Acción instalar desde menú
+    var menuBtnInstalar = document.getElementById("menu-btn-instalar");
+    if (menuBtnInstalar) {
+      menuBtnInstalar.addEventListener("click", function () {
+        cerrarMenu();
+        var topBtnInstalar = document.getElementById("btn-instalar-app");
+        if (topBtnInstalar) topBtnInstalar.click();
+      });
+    }
+
+    // Chips de temas en el menú
+    qa("#menu-temas-grid .tema-chip-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tema = btn.getAttribute("data-tema");
+        if (tema) {
+          aplicarTema(tema);
+          sincronizarMenuTemas(tema);
+        }
+      });
+    });
+  }
+
+  /* ---------- Auto-ocultar Barra de Navegación Inferior al Hacer Scroll en Móvil ---------- */
+  function setupScrollAutoHideNav() {
+    var nav = document.getElementById("nav-principal");
+    var chatDock = document.getElementById("chat-dock");
+    if (!nav) return;
+
+    var lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    var ticking = false;
+
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(function () {
+        ticking = false;
+        // Solo aplica en pantallas móviles donde la barra es fija abajo
+        if (window.innerWidth > 640) {
+          nav.classList.remove("nav-hidden");
+          if (chatDock) chatDock.classList.remove("nav-hidden");
+          return;
+        }
+
+        var currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+        var diff = currentScrollY - lastScrollY;
+
+        // Si estamos cerca de la cabecera (top), siempre visible
+        if (currentScrollY <= 45) {
+          nav.classList.remove("nav-hidden");
+          if (chatDock) chatDock.classList.remove("nav-hidden");
+          lastScrollY = currentScrollY;
+          return;
+        }
+
+        // Si llegamos al final de la página, mostrar barra para que no quede inaccesible
+        var docHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+        if (window.innerHeight + currentScrollY >= docHeight - 35) {
+          nav.classList.remove("nav-hidden");
+          if (chatDock) chatDock.classList.remove("nav-hidden");
+          lastScrollY = currentScrollY;
+          return;
+        }
+
+        // Umbral de scroll para evitar temblores o rebotes elásticos
+        if (Math.abs(diff) < 8) return;
+
+        if (diff > 0 && currentScrollY > 60) {
+          // Scroll hacia abajo -> ocultar barra y bajar botón de chat
+          nav.classList.add("nav-hidden");
+          if (chatDock) chatDock.classList.add("nav-hidden");
+        } else if (diff < 0) {
+          // Scroll hacia arriba -> mostrar barra y reposicionar chat
+          nav.classList.remove("nav-hidden");
+          if (chatDock) chatDock.classList.remove("nav-hidden");
+        }
+
+        lastScrollY = currentScrollY;
+      });
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+
+    // Si el usuario toca cerca del borde inferior de la pantalla, revelar la barra de inmediato
+    window.addEventListener("touchstart", function (e) {
+      if (e.touches && e.touches[0] && e.touches[0].clientY > window.innerHeight - 50) {
+        nav.classList.remove("nav-hidden");
+        if (chatDock) chatDock.classList.remove("nav-hidden");
+      }
+    }, { passive: true });
+
+    // Cuando cambie la orientación o tamaño de pantalla
+    window.addEventListener("resize", function () {
+      if (window.innerWidth > 640) {
+        nav.classList.remove("nav-hidden");
+        if (chatDock) chatDock.classList.remove("nav-hidden");
+      }
     });
   }
 
@@ -10810,6 +11115,8 @@
   setupLightboxVisor();
   setupInstalacionApp();
   setupVacaHeaderInteractivo();
+  setupMenuUsuario();
+  setupScrollAutoHideNav();
   window.mostrarModalRectificarTag = mostrarModalRectificarTag;
 
   if (fb) {

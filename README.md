@@ -388,6 +388,18 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Droplet de producción redimensionado de 1 GB a 2 GB de RAM (quedaba con ~130 MB libres bajo carga normal).
 
 ### ⏳ En Progreso / Calibración Continua
+- [x] **Header Móvil Compacto, Menú Desplegable al tocar el Logo y Auto-Ocultado de la Barra Inferior (2026-09-17)**:
+  - **Ahorro de ~60px verticales en pantalla móvil**: El encabezado pasa de 2 filas a 1 sola fila fija de 48px sin desbordes ni wraps, dejando visibles inmediatamente los KPIs del hato (336 activos, 268 hembras, 64 machos, partos, etc.) y los botones de acción sin necesidad de scroll.
+  - **Disparador táctil en el logo / marca (`#marca-header-btn`)**: Logo con micro-indicador de avisos pendientes (`#header-menu-dot` animado con pulso sutil si hay eventos offline en cola o alertas de agenda), nombre GANADERÍA JA, hora compacta y flecha indicadora accesible con tap y teclado.
+  - **Menú Flotante / Bottom Sheet Glassmorphism (`#modal-menu-usuario`)**:
+    - Perfil con avatar de usuario, nombre y badge de nivel de acceso (ej. `L1 · OWNER`).
+    - Tarjeta interactiva de **Sincronización de Campo** (estado "Al día con el servidor" o "X pendientes" y botón para forzar sincronización de cola offline).
+    - Botones de acceso rápido: **Avisos** (campana con contador), **Ayuda** (manuales y guías) e **Instalar App** (PWA).
+    - **Selector Visual de Temas**: 4 opciones con previsualización táctil y cambio reactivo en tiempo real (*Verde Campestre*, *Sol de Campo*, *Claro Editorial*, *Modo Oscuro*).
+    - Botón de **Cerrar Sesión** con limpieza de caché del Service Worker.
+  - **Barra de Navegación Inferior con Auto-Ocultado Inteligente**: Al hacer scroll hacia abajo, la barra `#nav-principal` se desliza automáticamente fuera de pantalla y la burbuja de chat baja al borde inferior, maximizando el espacio de lectura. Al deslizar hacia arriba, al llegar al fondo o al tocar cerca de la base, la barra reaparece al instante con animaciones suaves.
+  - **Eliminación de Redundancia del Botón Flotante (+)**: Ocultamiento de la torre flotante `.fab-stack-global` en móvil, eliminando la duplicidad con el botón Captura. En la barra inferior se resalta como `+ Captura` para registro rápido a un solo toque, y se integra búsqueda directa de aretes en el menú rápido del logo y en el Tablero.
+  - **Verificación visual móvil (390×844 DPR=2)**: Probado y validado en navegador autónomo, cumpliendo con la regla de calidad de AGENTS.md y chequeo estricto de sintaxis `node --check` para JS.
 - [x] **Mejoras UX PWA — Fecha en cabecera, hora en chat y listado interactivo de animales por potrero (2026-09-12)**:
   - **Fecha compacta en cabecera**: Indicador tipo pill con día de la semana, fecha y hora (`Sáb, 12 de sept · 11:55 p. m.`) en `#reloj-hora` para dashboard y ficha técnica, adaptado a viewport móvil sin desbordes.
   - **Hora en mensajes de chat (Asistente IA y Equipo)**: Inclusión de marca de tiempo (`chat-msg-hora`) en cada burbuja de mensaje (usuario, bot, notas de voz y chat de equipo).
@@ -671,6 +683,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Se corrigió `POTRERO_ACTUAL_EXPR` y `POTRERO_VIGENTE_SUBQUERY` para usar `COALESCE(a.potrero_id, ut.potrero_destino)` en vez de sobreescribir la ficha con traslados históricos obsoletos de `traslado.dbf` (los cuales ubicaban erróneamente 14 animales en Olegario I y 3 en Plan Versalles cuando en SG ambos potreros están en 0).
     - Unificación en `datos_pasturas()`, `_inventario_por_potrero_real()`, `animales_de_potrero()`, `calcular_existencias_potreros_sg()`, Mapa Satelital y bot Telegram.
     - **Conteo verificado**: Ordeno Santa Martha (56), Corral Santamartha (46), Paritorio (2), Olegario II (35), Corral Versalles (3), Carretera Versalles (18), Casa Abajo Versalles (103), Coquera (20), Ramon Casa (23), Ramon Carretera I (27) = **333 activos exactos**, 100% idéntico a Software Ganadero. Tests en verde.
+- [x] **Gráfico "Mapa de potreros" corregido: solo potreros reales y tablero de rotación Voisin (2026-09-17)** 🗺️🌿:
+    - **Bug**: `datos_grafico("mapa_potreros")` (`src/engine/dashboard_data.py`) consultaba `SELECT id, nombre, codigo, area_has FROM potreros ORDER BY nombre` **sin filtro**, así que pintaba los **57** potreros de la base (20 reales + 37 códigos legacy del DBF sin geometría, todos "En reposo" y duplicando nombres como Coquera, Carretera Versalles, Lecheras u Olegario II). Era el único lugar de la PWA que no aplicaba `SQL_POTRERO_REAL`, contradiciendo a la tabla de Ocupación, el Mapa Satelital y el PNG de Matplotlib, que sí muestran 20.
+    - **Fix backend**: ahora filtra con `SQL_POTRERO_REAL`, cuenta animales activos por **potrero vigente (último traslado)** en vez de `animales.potrero_id`, y reutiliza el helper nuevo `_enriquecer_rotacion_potreros()` (extraído de `datos_pasturas()`, misma lógica Voisin) para que ambos reporten idéntico universo y días.
+    - **Tarjeta útil**: el gráfico pasó de tarjetas planas a un **tablero de rotación**: semáforo Voisin (🟢 óptimo/listo, 🟡 rotar pronto, 🔴 sobreocupado, 🌱 en reposo), ha, cabezas, días de ocupación/reposo y carga en cab/ha, ordenado por urgencia de rotación (ocupados primero, más días arriba). Subtítulo real: "20 potreros reales · 10 ocupados · 10 en reposo".
+    - **Botón muerto arreglado**: "Abrir Mapa Satelital GPS Completo" (`src/pwa/static/ja-core.js`) se emitía con `id='btn-ir-mapa-satelital-desde-past'` pero **no tenía ningún handler**; ahora usa `data-accion="ir-mapa-satelital"` y el listener delegado de `app.js` navega a `v=mapa` con `irAVista("mapa") + cargar()`.
+    - **Verificación**: 4 tests nuevos en `tests/test_potreros_reales_inventario.py` (excluye legacy, cuenta por traslado, carga/estado de rotación, orden) + capturas con Edge headless en móvil 390×844 DPR2 y escritorio 1366×900: 20 tarjetas, cero nombres legacy, sin desbordes, y el botón montando Leaflet; `node --check` y `ruff` en verde.
 
 ---
 

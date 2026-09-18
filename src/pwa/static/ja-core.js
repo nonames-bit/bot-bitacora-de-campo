@@ -540,26 +540,42 @@
 
   function renderSvgMapaPotreros(d) {
     var potreros = (d && d.potreros) || [];
-    if (!potreros.length) return vacio("Sin potreros registrados.");
+    if (!potreros.length) return vacio("Sin potreros reales registrados.");
 
-    var h = "<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:8px; margin-bottom:12px;'>";
+    var colorEstado = { "🟢": "var(--verde-marca)", "🟡": "#e0a400", "🔴": "#d64545", "🌱": "var(--texto-suave)" };
+    var h = "<div style='font-size:11px; color:var(--texto-suave); margin-bottom:8px;'>"
+      + "🟢 óptimo / listo · 🟡 rotar pronto · 🔴 sobreocupado · 🌱 en reposo · ordenado por urgencia de rotación</div>";
+    h += "<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px; margin-bottom:12px;'>";
     potreros.forEach(function (p) {
       var nAnim = Number(p.animales) || 0;
       var sem = p.semaforo || (nAnim > 0 ? "🟢" : "🌱");
       var haTxt = p.area_has != null ? Number(p.area_has).toFixed(1) + " ha" : "—";
-      h += "<div style='background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-radius:8px; padding:8px 10px;'>"
+      var borde = colorEstado[sem] || "var(--borde)";
+      var linea1, linea2 = "";
+      if (nAnim > 0) {
+        linea1 = icon("cow", 11) + nAnim + " cab.";
+        var partes = [];
+        if (p.dias_ocupacion != null) partes.push(p.dias_ocupacion + " d");
+        if (p.carga_cab_ha != null) partes.push(p.carga_cab_ha + " cab/ha");
+        linea2 = partes.join(" · ");
+      } else {
+        linea1 = p.dias_reposo != null ? "Reposo " + p.dias_reposo + " d" : "En reposo";
+      }
+      var titulo = p.estado_rotacion ? " title='" + esc(p.estado_rotacion) + "'" : "";
+      h += "<div style='background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-left:3px solid " + borde + "; border-radius:8px; padding:8px 10px;'" + titulo + ">"
         + "<div style='display:flex; justify-content:space-between; align-items:center;'>"
         + "<span style='font-size:14px;'>" + sem + "</span>"
         + "<span style='font-size:11px; color:var(--texto-suave);'>" + haTxt + "</span>"
         + "</div>"
         + "<div style='font-size:12px; font-weight:700; color:var(--texto); margin:4px 0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>" + esc(p.nombre) + "</div>"
-        + "<div style='font-size:11.5px; color:" + (nAnim > 0 ? "var(--verde-marca)" : "var(--texto-suave)") + "; font-weight:600;'>"
-        + (nAnim > 0 ? icon("cow", 11) + nAnim + " cab." : "En reposo")
+        + "<div style='font-size:11.5px; color:" + borde + "; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>"
+        + linea1
         + "</div>"
+        + (linea2 ? "<div style='font-size:10.5px; color:var(--texto-suave); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'>" + esc(linea2) + "</div>" : "")
         + "</div>";
     });
     h += "</div>";
-    h += "<div style='text-align:center;'><button type='button' class='tema-btn' id='btn-ir-mapa-satelital-desde-past' style='font-size:12px; padding:6px 14px; font-weight:700; background:var(--verde-marca); color:#fff; border-radius:6px;'>"
+    h += "<div style='text-align:center;'><button type='button' class='tema-btn' id='btn-ir-mapa-satelital-desde-past' data-accion='ir-mapa-satelital' style='font-size:12px; padding:6px 14px; font-weight:700; background:var(--verde-marca); color:#fff; border-radius:6px;'>"
       + icon("mapPin", 14) + "Abrir Mapa Satelital GPS Completo</button></div>";
     return h;
   }
