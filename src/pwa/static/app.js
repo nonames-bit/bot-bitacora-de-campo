@@ -54,7 +54,9 @@
     var tema = document.documentElement.getAttribute("data-theme");
     var esNoche = esNocheHora || (tema === "dark");
 
-    if (opts.esFicha && opts.esParida) {
+    if (opts.esFicha && opts.esToro) {
+      nuevoEstado = "toro";
+    } else if (opts.esFicha && opts.esParida) {
       nuevoEstado = "cria";
     } else if (opts.esFicha) {
       nuevoEstado = esNoche ? "noche" : "dia";
@@ -68,7 +70,11 @@
     _vacaEstadoActual = nuevoEstado;
 
     var vParam = window.__PWA_V__ ? ("?v=" + encodeURIComponent(window.__PWA_V__)) : "";
-    if (nuevoEstado === "cria") {
+    if (nuevoEstado === "toro") {
+      img.src = "/static/toro_reproductor.gif" + vParam;
+      img.alt = "Toro reproductor en el potrero";
+      img.title = "Toro reproductor / Padrote · Toca para ver estado rápido";
+    } else if (nuevoEstado === "cria") {
       img.src = "/static/vaca_con_cria.gif" + vParam;
       img.alt = "Vaca con su cría en el potrero";
       img.title = "Vaca parida con cría al pie · Toca para ver estado rápido";
@@ -177,7 +183,10 @@
     }
 
     var frases = [];
-    if (_vacaEstadoActual === "cria") {
+    if (_vacaEstadoActual === "toro") {
+      frases.push("🐂 ¡Toro reproductor de alta genética y vigor en el lote!");
+      frases.push("⚡ Padrote activo transmitiendo ganancia de peso y rusticidad.");
+    } else if (_vacaEstadoActual === "cria") {
       frases.push("🍼 ¡Amor maternal! Cría al pie con excelente vitalidad.");
       frases.push("🐮 Vaca madre en óptima nutrición y lactancia.");
     } else if (_vacaEstadoActual === "noche") {
@@ -8203,6 +8212,19 @@
     return { fisio: fisio, repro: repro };
   }
   function fichaHtml(f, showIdent) {
+    var catSg = String(f.categoria_sg || "").toUpperCase();
+    var sx = String(f.sexo || "").toUpperCase();
+    var esToro = (sx === "M" || sx === "MACHO") && (
+      String(f.tag || "").match(/^T\d+/i)
+      || /TORO|REPRODUCTOR|PADROTE|CEBA/i.test(catSg + " " + (f.nombre || "") + " " + (f.notas || "") + " " + (f.tag || ""))
+      || (f.estado_reproductivo && String(f.estado_reproductivo.codigo || "").indexOf("TORO") >= 0)
+      || (f.edad_dias == null || f.edad_dias >= 365)
+    );
+    var esParida = !esToro && ((f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
+      || (f.lactancia && f.lactancia.estado === "En ordeño" && f.lactancia.del_dias < 200)
+      || (f.crias && f.crias.length > 0)
+      || (catSg.indexOf("PARIDA") >= 0));
+
     var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
       head += "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; flex-shrink:0; border-radius:8px; overflow:hidden;'>"
@@ -8210,7 +8232,10 @@
         + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
         + "</div>";
     } else {
-      head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0;'>" + icon("cow", 32) + "</div>";
+      var defaultAnim = esToro ? "/static/toro_reproductor.gif" : (esParida ? "/static/vaca_con_cria.gif" : "/static/vaca_comiendo.gif");
+      head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden;' title='" + (esToro ? "Toro reproductor" : "Bovino") + "'>"
+        + "<img src='" + defaultAnim + "' alt='Ilustración' style='width:60px; height:32px; object-fit:contain; display:block;'>"
+        + "</div>";
     }
     var estadoChip = "";
     var stUpper = String(f.estado || "").toUpperCase();
@@ -9505,11 +9530,19 @@
         return;
       }
       window.__ultimaFicha = f;
-      var esParida = (f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
+      var catSg = String(f.categoria_sg || "").toUpperCase();
+      var sx = String(f.sexo || "").toUpperCase();
+      var esToro = (sx === "M" || sx === "MACHO") && (
+        String(f.tag || "").match(/^T\d+/i)
+        || /TORO|REPRODUCTOR|PADROTE|CEBA/i.test(catSg + " " + (f.nombre || "") + " " + (f.notas || "") + " " + (f.tag || ""))
+        || (f.estado_reproductivo && String(f.estado_reproductivo.codigo || "").indexOf("TORO") >= 0)
+        || (f.edad_dias == null || f.edad_dias >= 365)
+      );
+      var esParida = !esToro && ((f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
         || (f.lactancia && f.lactancia.estado === "En ordeño" && f.lactancia.del_dias < 200)
         || (f.crias && f.crias.length > 0)
-        || (f.categoria_sg && String(f.categoria_sg).toLowerCase().indexOf("parida") >= 0);
-      actualizarVacaHeader({ esFicha: true, esParida: esParida });
+        || (catSg.indexOf("PARIDA") >= 0));
+      actualizarVacaHeader({ esFicha: true, esParida: esParida, esToro: esToro });
       montarVista(target, fichaHtml(f, !!showIdent), animar);
       bindTabs(f);
       if (showIdent) bindIdent();

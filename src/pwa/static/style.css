@@ -3615,9 +3615,11 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
     display: flex !important;
     flex-direction: column;
     align-items: center;
-    /* La burbuja del chat vive en bottom 66px + 52px de alto en móvil. */
+    /* La burbuja del chat vive en bottom 66px + 52px de alto en móvil.
+       `right` centra la lupita con la burbuja: 14px + 52/2 = 40px desde el
+       borde derecho, menos la mitad de los 26px de la lupita = 27px. */
     bottom: calc(128px + env(safe-area-inset-bottom, 0px));
-    right: calc(19px + env(safe-area-inset-right, 0px));
+    right: calc(27px + env(safe-area-inset-right, 0px));
   }
   /* Con la barra inferior auto-oculta, la burbuja baja a 16px (52px de alto),
      así que la lupita la sigue para conservar el mismo hueco de 10px. */
@@ -3667,8 +3669,11 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   color: #fff;
 }
 .fab-buscar {
-  width: 38px;
-  height: 38px;
+  width: 23px;
+  height: 23px;
+  /* El `min-height: 36px` global de `button` deformaba la lupita en óvalo. */
+  min-width: 0;
+  min-height: 0;
   background: var(--superficie);
   color: var(--verde-marca);
   border: 1.5px solid var(--verde-marca);
@@ -3676,23 +3681,30 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .fab-btn .svg-icon,
 .fab-buscar .svg-icon,
 .fab-registrar .svg-icon {
-  width: 18px !important;
-  height: 18px !important;
+  width: 11px !important;
+  height: 11px !important;
   stroke-width: 2.6;
   margin: 0 !important;
   padding: 0 !important;
   display: block !important;
 }
 @media (max-width: 640px) {
-  .fab-registrar, .fab-buscar {
+  .fab-registrar {
     width: 44px;
     height: 44px;
+  }
+  /* Lupita al 60% de su tamaño anterior (44px -> 26px) para que no estorbe
+     en pantallas de campo; el hueco de 10px sobre la burbuja del chat se
+     mantiene porque `bottom` se mide desde el borde inferior del FAB. */
+  .fab-buscar {
+    width: 26px;
+    height: 26px;
   }
   .fab-btn .svg-icon,
   .fab-buscar .svg-icon,
   .fab-registrar .svg-icon {
-    width: 20px !important;
-    height: 20px !important;
+    width: 12px !important;
+    height: 12px !important;
   }
 }
 :root[data-theme="dark"] .fab-buscar {
