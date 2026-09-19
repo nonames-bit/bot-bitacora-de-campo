@@ -197,15 +197,17 @@ header {
   background: var(--header-bg);
   color: var(--header-txt);
   border-bottom: 1px solid var(--borde);
-  padding: 12px 20px;
-  padding-top: calc(12px + env(safe-area-inset-top, 0px));
+  padding: 8px 20px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
   padding-left: calc(20px + env(safe-area-inset-left, 0px));
   padding-right: calc(20px + env(safe-area-inset-right, 0px));
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  height: 56px;
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -1248,7 +1250,12 @@ button:active {
     padding: 8px 0;
     font-size: 12.5px;
     text-align: right;
+    /* El `td { white-space: nowrap }` global impedía que el detalle largo
+       (ej. "CORRAL VERSALLES → …") envolviera y se salía de la tarjeta. */
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
+  .tabla-eventos td > * { min-width: 0; }
   .tabla-eventos td:last-child { border-bottom: none; }
   .tabla-eventos td::before {
     content: attr(data-label);
@@ -3588,20 +3595,54 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .cap-paso.act { display:block; }
 .cap-paso-num { font-size:12px; font-weight:700; color:var(--texto-suave); margin-bottom:4px; }
 .cap-guardar-sticky { position:sticky; bottom:0; left:0; right:0; background:var(--fondo); padding:12px 16px; border-top:1px solid var(--borde); z-index:50; box-shadow:0 -2px 8px rgba(0,0,0,0.08); }
-/* Botones Flotantes Globales (FAB): (+) Registrar y (🔍) Buscar Ficha */
+/* Botón flotante único de "Buscar Ficha" (🔍), apilado ENCIMA de la burbuja del
+   chat como acceso rápido. El (+) queda fuera (la barra inferior ya ofrece
+   "Captura") y el tamaño es compacto para no tapar gráficos ni datos. */
+/* Botón flotante único de "Buscar Ficha" (🔍) exclusivo para móvil:
+   se ubica ENCIMA de la burbuja del chat como acceso directo rápido.
+   En tablet y computador (>=641px) se oculta completamente porque la navegación
+   lateral ya cuenta con acceso directo a Ficha y Búsqueda sin tapar tablas ni gráficos. */
 .fab-stack-global {
-  position: fixed;
-  bottom: 84px;
-  right: 20px;
-  z-index: 99;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
+  display: none !important;
+}
+.fab-stack-global .fab-registrar {
+  display: none !important;
 }
 @media (max-width: 640px) {
   .fab-stack-global {
-    display: none !important;
+    position: fixed;
+    z-index: 99;
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
+    /* La burbuja del chat vive en bottom 66px + 52px de alto en móvil. */
+    bottom: calc(128px + env(safe-area-inset-bottom, 0px));
+    right: calc(19px + env(safe-area-inset-right, 0px));
+  }
+  /* Con la barra inferior auto-oculta, la burbuja baja a 16px (52px de alto),
+     así que la lupita la sigue para conservar el mismo hueco de 10px. */
+  body:has(#chat-dock.colapsado.nav-hidden) .fab-stack-global {
+    bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* Grilla equilibrada para los tipos de evento en Captura Rápida */
+.cap-tipos-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+@media (min-width: 641px) {
+  .cap-tipos-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+}
+@media (min-width: 1024px) {
+  .cap-tipos-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
   }
 }
 .fab-btn {
@@ -3644,14 +3685,14 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 }
 @media (max-width: 640px) {
   .fab-registrar, .fab-buscar {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
   }
   .fab-btn .svg-icon,
   .fab-buscar .svg-icon,
   .fab-registrar .svg-icon {
-    width: 17px !important;
-    height: 17px !important;
+    width: 20px !important;
+    height: 20px !important;
   }
 }
 :root[data-theme="dark"] .fab-buscar {
@@ -3717,6 +3758,56 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   }
   #nav-principal .nav-btn-mas { display: none !important; }
   main { margin-left: 230px; max-width: calc(1120px + 230px); }
+}
+
+/* Tablet e intermedias (641px - 1150px): Header siempre en 1 fila sin partirse */
+@media (min-width: 641px) and (max-width: 1150px) {
+  header {
+    flex-wrap: nowrap !important;
+    height: 56px !important;
+    min-height: 56px !important;
+    gap: 8px !important;
+    padding: 8px 14px !important;
+  }
+  header .acciones {
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+  }
+  header .btn-instalar,
+  header #select-tema {
+    display: none !important;
+  }
+  header .header-pasto {
+    margin: 0 auto !important;
+    flex-shrink: 1 !important;
+  }
+}
+
+/* Tablet Portrait (641px - 880px): Sidebar compacta para ganar 62px de ancho en datos */
+@media (min-width: 641px) and (max-width: 880px) {
+  #nav-principal {
+    width: 180px !important;
+    padding: 10px 8px 20px !important;
+    gap: 10px !important;
+  }
+  #nav-principal .nav-grupo-titulo {
+    font-size: 9px !important;
+    padding: 2px 6px 3px !important;
+  }
+  #nav-principal .nav-grupo button {
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    gap: 6px !important;
+    min-height: 36px !important;
+  }
+  #nav-principal .nav-grupo button .svg-icon {
+    width: 13px !important;
+    height: 13px !important;
+  }
+  main {
+    margin-left: 180px !important;
+    padding: 14px !important;
+  }
 }
 
 /* Móvil: los wrappers son transparentes (display:contents), sin títulos ni

@@ -1,4 +1,4 @@
-﻿{
+{
   "$schema": "https://opencode.ai/config.json",
   "provider": {
     "cheaper-inference": {
@@ -8,70 +8,198 @@
         "baseURL": "https://api.cheaperinference.com/v1"
       },
       "models": {
-        "gpt-5.6-luna": { "name": "GPT-5.6 Luna" },
-        "deepseek-v4-flash": { "name": "DeepSeek V4 Flash" },
-        "deepseek-v4-flash-0731": { "name": "DeepSeek V4 Flash 0731" },
-        "deepseek-v4.1-flash": { "name": "DeepSeek V4.1 Flash" },
-        "deepseek-v4-1-flash": { "name": "DeepSeek V4.1 Flash" },
-        "glm-5.3-flash": { "name": "GLM-5.3 Flash" },
-        "gpt-5.6-sol": { "name": "GPT-5.6 Sol" },
-        "glm-5.3": { "name": "GLM-5.3" },
-        "claude-sonnet-5": { "name": "Claude Sonnet 5" },
-        "deepseek-v4-pro-0813": { "name": "DeepSeek V4 Pro 0813" },
-        "deepseek-v4-pro": { "name": "DeepSeek V4 Pro" },
-        "glm-5.2": { "name": "GLM-5.2" },
-        "gpt-5.6-terra": { "name": "GPT-5.6 Terra" },
-        "claude-opus-5": { "name": "Claude Opus 5" },
-        "gpt-5-mini": { "name": "GPT-5 Mini" },
-        "claude-sonnet-4.6": { "name": "Claude Sonnet 4.6" },
-        "gemini-3.7-flash": { "name": "Gemini 3.7 Flash" },
-        "grok-4.5": { "name": "Grok 4.5" },
-        "kimi-k3": { "name": "Kimi K3" },
-        "qwen-3-8-max": { "name": "Qwen3 8 Max" },
-        "glm-5": { "name": "GLM-5" },
-        "claude-fable-5": { "name": "Claude Fable 5" },
-        "claude-opus-4.8": { "name": "Claude Opus 4.8" },
-        "claude-opus-4.6": { "name": "Claude Opus 4.6" },
-        "claude-opus-4.7": { "name": "Claude Opus 4.7" },
-        "glm-5.1": { "name": "GLM-5.1" },
-        "gemini-2.5-flash": { "name": "Gemini 2.5 Flash" },
-        "gemini-3.1-pro-preview": { "name": "Gemini 3.1 Pro Preview" },
-        "nano-banana-2": { "name": "Nano Banana 2" },
-        "gemini-3.1-flash-lite": { "name": "Gemini 3.1 Flash Lite" },
-        "gemini-3.1-pro": { "name": "Gemini 3.1 Pro" },
-        "minimax-m2.7": { "name": "Minimax M2.7" },
-        "gemini-3-5-flash": { "name": "Gemini 3.5 Flash" },
-        "claude-haiku-4.5": { "name": "Claude Haiku 4.5" },
-        "qwen3-5-35b-a3b": { "name": "Qwen3 5 35B A3B" },
-        "gpt-5-nano": { "name": "GPT-5 Nano" },
-        "claude-opus-5-fast": { "name": "Claude Opus 5 Fast" },
-        "gpt-5.5": { "name": "GPT-5.5" },
-        "gpt-5.4": { "name": "GPT-5.4" },
-        "glm-4.5": { "name": "GLM-4.5" },
-        "gpt-oss-120b": { "name": "GPT-OSS 120B" },
-        "claude-opus-4.5": { "name": "Claude Opus 4.5" },
-        "gpt-5.2-codex": { "name": "GPT-5.2 Codex" },
-        "gpt-5.4-nano": { "name": "GPT-5.4 Nano" },
-        "nano-banana": { "name": "Nano Banana" },
-        "claude-sonnet-4.5": { "name": "Claude Sonnet 4.5" },
-        "gemini-3.5-flash-lite": { "name": "Gemini 3.5 Flash Lite" },
-        "gpt-5.4-mini": { "name": "GPT-5.4 Mini" },
-        "muse-spark-1.2": { "name": "Muse Spark 1.2" },
-        "gemini-3-flash-preview": { "name": "Gemini 3 Flash Preview" },
-        "nano-banana-pro": { "name": "Nano Banana Pro" },
-        "aion-labs.aion-2-0": { "name": "Aion 2.0" },
-        "grok-imagine": { "name": "Grok Imagine" },
-        "gpt-4.1-nano": { "name": "GPT-4.1 Nano" },
-        "gemini-3.6-flash": { "name": "Gemini 3.6 Flash" },
-        "gpt-5.5-pro": { "name": "GPT-5.5 Pro" },
-        "glm-4.6": { "name": "GLM-4.6" },
-        "qwen3-6-35b-a3b": { "name": "Qwen3 6 35B A3B" },
-        "glm-4.7": { "name": "GLM-4.7" },
-        "glm-4.5-air": { "name": "GLM-4.5 Air" },
-        "qwen3.6-27b": { "name": "Qwen3.6 27B" },
-        "gpt-image-2": { "name": "GPT Image 2" },
-        "claude-opus-4-8-fast": { "name": "Claude Opus 4.8 Fast" },
-        "seedance-2.0": { "name": "Seedance 2.0" }
+        "gpt-5.6-luna": {
+          "name": "GPT-5.6 Luna"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "deepseek-v4-flash-0731": {
+          "name": "DeepSeek V4 Flash 0731"
+        },
+        "deepseek-v4.1-flash": {
+          "name": "DeepSeek V4.1 Flash"
+        },
+        "deepseek-v4-1-flash": {
+          "name": "DeepSeek V4.1 Flash"
+        },
+        "glm-5.3-flash": {
+          "name": "GLM-5.3 Flash"
+        },
+        "gpt-5.6-sol": {
+          "name": "GPT-5.6 Sol"
+        },
+        "glm-5.3": {
+          "name": "GLM-5.3"
+        },
+        "claude-sonnet-5": {
+          "name": "Claude Sonnet 5"
+        },
+        "deepseek-v4-pro-0813": {
+          "name": "DeepSeek V4 Pro 0813"
+        },
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "glm-5.2": {
+          "name": "GLM-5.2"
+        },
+        "gpt-5.6-terra": {
+          "name": "GPT-5.6 Terra"
+        },
+        "claude-opus-5": {
+          "name": "Claude Opus 5"
+        },
+        "gpt-5-mini": {
+          "name": "GPT-5 Mini"
+        },
+        "claude-sonnet-4.6": {
+          "name": "Claude Sonnet 4.6"
+        },
+        "gemini-3.7-flash": {
+          "name": "Gemini 3.7 Flash"
+        },
+        "grok-4.5": {
+          "name": "Grok 4.5"
+        },
+        "kimi-k3": {
+          "name": "Kimi K3"
+        },
+        "qwen-3-8-max": {
+          "name": "Qwen3 8 Max"
+        },
+        "glm-5": {
+          "name": "GLM-5"
+        },
+        "claude-fable-5": {
+          "name": "Claude Fable 5"
+        },
+        "claude-opus-4.8": {
+          "name": "Claude Opus 4.8"
+        },
+        "claude-opus-4.6": {
+          "name": "Claude Opus 4.6"
+        },
+        "claude-opus-4.7": {
+          "name": "Claude Opus 4.7"
+        },
+        "glm-5.1": {
+          "name": "GLM-5.1"
+        },
+        "gemini-2.5-flash": {
+          "name": "Gemini 2.5 Flash"
+        },
+        "gemini-3.1-pro-preview": {
+          "name": "Gemini 3.1 Pro Preview"
+        },
+        "nano-banana-2": {
+          "name": "Nano Banana 2"
+        },
+        "gemini-3.1-flash-lite": {
+          "name": "Gemini 3.1 Flash Lite"
+        },
+        "gemini-3.1-pro": {
+          "name": "Gemini 3.1 Pro"
+        },
+        "minimax-m2.7": {
+          "name": "Minimax M2.7"
+        },
+        "gemini-3-5-flash": {
+          "name": "Gemini 3.5 Flash"
+        },
+        "claude-haiku-4.5": {
+          "name": "Claude Haiku 4.5"
+        },
+        "qwen3-5-35b-a3b": {
+          "name": "Qwen3 5 35B A3B"
+        },
+        "gpt-5-nano": {
+          "name": "GPT-5 Nano"
+        },
+        "claude-opus-5-fast": {
+          "name": "Claude Opus 5 Fast"
+        },
+        "gpt-5.5": {
+          "name": "GPT-5.5"
+        },
+        "gpt-5.4": {
+          "name": "GPT-5.4"
+        },
+        "glm-4.5": {
+          "name": "GLM-4.5"
+        },
+        "gpt-oss-120b": {
+          "name": "GPT-OSS 120B"
+        },
+        "claude-opus-4.5": {
+          "name": "Claude Opus 4.5"
+        },
+        "gpt-5.2-codex": {
+          "name": "GPT-5.2 Codex"
+        },
+        "gpt-5.4-nano": {
+          "name": "GPT-5.4 Nano"
+        },
+        "nano-banana": {
+          "name": "Nano Banana"
+        },
+        "claude-sonnet-4.5": {
+          "name": "Claude Sonnet 4.5"
+        },
+        "gemini-3.5-flash-lite": {
+          "name": "Gemini 3.5 Flash Lite"
+        },
+        "gpt-5.4-mini": {
+          "name": "GPT-5.4 Mini"
+        },
+        "muse-spark-1.2": {
+          "name": "Muse Spark 1.2"
+        },
+        "gemini-3-flash-preview": {
+          "name": "Gemini 3 Flash Preview"
+        },
+        "nano-banana-pro": {
+          "name": "Nano Banana Pro"
+        },
+        "aion-labs.aion-2-0": {
+          "name": "Aion 2.0"
+        },
+        "grok-imagine": {
+          "name": "Grok Imagine"
+        },
+        "gpt-4.1-nano": {
+          "name": "GPT-4.1 Nano"
+        },
+        "gemini-3.6-flash": {
+          "name": "Gemini 3.6 Flash"
+        },
+        "gpt-5.5-pro": {
+          "name": "GPT-5.5 Pro"
+        },
+        "glm-4.6": {
+          "name": "GLM-4.6"
+        },
+        "qwen3-6-35b-a3b": {
+          "name": "Qwen3 6 35B A3B"
+        },
+        "glm-4.7": {
+          "name": "GLM-4.7"
+        },
+        "glm-4.5-air": {
+          "name": "GLM-4.5 Air"
+        },
+        "qwen3.6-27b": {
+          "name": "Qwen3.6 27B"
+        },
+        "gpt-image-2": {
+          "name": "GPT Image 2"
+        },
+        "claude-opus-4-8-fast": {
+          "name": "Claude Opus 4.8 Fast"
+        },
+        "seedance-2.0": {
+          "name": "Seedance 2.0"
+        }
       }
     }
   },
@@ -89,15 +217,24 @@
       "model": "cheaper-inference/deepseek-v4-flash"
     }
   },
+  "snapshot": false,
   "mcp": {
     "archivos": {
       "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-filesystem", "."],
+      "command": [
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
       "enabled": true
     },
     "qgis": {
       "type": "local",
-      "command": ["uvx", "qgis-mcp-server"],
+      "command": [
+        "uvx",
+        "qgis-mcp-server"
+      ],
       "enabled": true
     }
   }

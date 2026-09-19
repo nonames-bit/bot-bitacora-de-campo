@@ -1215,7 +1215,7 @@
     var w = Math.max(540, n * 36);
     var h = 230;
     var padLeft = 45;
-    var padRight = 20;
+    var padRight = 92;
     var padTop = 26;
     var padBottom = 42;
     var chartW = w - padLeft - padRight;
@@ -1238,8 +1238,10 @@
     if (promDiario > 0 && promDiario <= yMax) {
       var yProm = padTop + chartH - (promDiario / yMax) * chartH;
       svg += "<line x1='" + padLeft + "' y1='" + yProm + "' x2='" + (w - padRight) + "' y2='" + yProm + "' stroke='#D97706' stroke-width='1.8' stroke-dasharray='4,3' />";
-      svg += "<rect x='" + (w - padRight - 96) + "' y='" + (yProm - 11) + "' width='94' height='16' rx='3' fill='#D97706' />";
-      svg += "<text x='" + (w - padRight - 49) + "' y='" + (yProm + 1) + "' fill='#FFFFFF' font-size='9.5' font-weight='bold' text-anchor='middle'>Prom: " + promDiario + " L/d</text>";
+      // Etiqueta del promedio en el margen derecho, FUERA del área de barras:
+      // antes se dibujaba encima de las últimas columnas y tapaba sus valores.
+      svg += "<rect x='" + (w - padRight + 5) + "' y='" + (yProm - 9) + "' width='84' height='17' rx='3' fill='#D97706' />";
+      svg += "<text x='" + (w - padRight + 47) + "' y='" + (yProm + 3) + "' fill='#FFFFFF' font-size='9' font-weight='bold' text-anchor='middle'>Prom " + promDiario + " L/d</text>";
     }
 
     serie.forEach(function (d, i) {
@@ -3877,7 +3879,7 @@
       + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
       + "</button>"
       + "</div>";
-    h += "<p class='aviso'>Registra eventos directamente en el potrero. Si vas a procesar o pesar varios animales seguidos en la manga, usa el botón de <b>Manga Corral</b> arriba.</p>";
+    h += "<p class='aviso' style='margin:4px 0 10px; font-size:12.5px;'>Para procesar o pesar varios animales seguidos en lote, usa <b>Manga Corral</b>.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
@@ -3891,10 +3893,10 @@
       + "<form id='form-captura' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div class='cap-paso cap-paso-1 act'>"
       + "<div class='cap-paso-num'>1/3: ¿Qué evento desea registrar?</div>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;'>";
+      + "<div class='cap-tipos-grid'>";
     tipos.forEach(function (t) {
       var act = t.id === _tipoCapturaActual ? "act" : "";
-      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "' style='font-size:15px; padding:12px 16px;'>" + icon(t.ico, 16) + t.nom + "</button>";
+      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "'>" + icon(t.ico, 16) + "<span>" + t.nom + "</span></button>";
     });
     h += "</div>"
       + "<button type='button' id='btn-cap-sig1' class='btn-guardar-manga'>Siguiente →</button>"
@@ -8112,7 +8114,26 @@
   ];
   // HTML del panel "identificar por foto del arete" (solo en el dashboard,
   // no en la página /ficha/<tag> que llega desde el QR ya identificado).
-  function identPanelHtml() {
+  function identPanelHtml(colapsable) {
+    if (colapsable) {
+      return "<details class='card ident-box' style='margin-top:10px; margin-bottom:12px; padding:10px 14px;'>"
+        + "<summary style='cursor:pointer; font-weight:600; font-size:13px; color:var(--texto-suave); user-select:none; display:flex; align-items:center; justify-content:space-between; outline:none;'>"
+        + "<span>" + icon("camera", 15) + " 📷 Identificar otro animal por foto o QR</span>"
+        + "<span style='font-size:11px; opacity:0.75;'>▼ desplegar</span>"
+        + "</summary>"
+        + "<div style='margin-top:10px;'>"
+        + "<p class='aviso' style='margin:4px 0 8px; font-size:12px;'>Tome la foto del arete con el celular o pegue un código RFID/arete y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
+        + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
+        + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1; min-width:0; max-width:100%; box-sizing:border-box;'>"
+        + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
+        + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
+        + "</div>"
+        + "<span id='ident-estado' class='aviso'></span>"
+        + "<div id='ident-resultado'></div>"
+        + "<video id='qr-video' style='display:none; width:100%; max-width:320px; border-radius:8px; margin-top:8px' autoplay playsinline></video>"
+        + "</div>"
+        + "</details>";
+    }
     return "<div class='card ident-box' style='margin-bottom:10px'>"
       + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
       + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
@@ -8265,7 +8286,7 @@
 
     head += "</div>";
 
-    var html = (showIdent ? identPanelHtml() : "") + head + erroresHtml(f);
+    var html = head + erroresHtml(f) + (showIdent ? identPanelHtml(true) : "");
     html += "<div id='ficha-tabs' role='tablist'><div class='mini'>"
       + TABS.map(function (t, i) { return "<button role='tab' aria-selected='" + (i === 0 ? "true" : "false") + "' data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
       + "</div></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
@@ -9719,9 +9740,7 @@
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
-      if (actual === "ficha") {
-        barraFiltros.style.display = "";
-      } else if (actual === "tablero" || actual === "inventario") {
+      if (actual === "tablero") {
         var hayFiltro = (q("#f-potrero") && q("#f-potrero").value.trim()) || (q("#f-tag") && q("#f-tag").value.trim());
         if (window.innerWidth <= 640 && !hayFiltro && !barraFiltros.__forzadoVisible) {
           barraFiltros.style.display = "none";
