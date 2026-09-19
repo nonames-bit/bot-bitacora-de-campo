@@ -1283,6 +1283,8 @@
     var promDiario = res.promedio_diario || (diasCount ? Math.round((totalLitros / diasCount) * 10) / 10 : 0);
     var pico = res.pico_max || (serie.length ? serie.reduce(function (m, it) { return (it.litros > m.litros) ? it : m; }, serie[0]) : null);
     var piso = res.piso_min || (serie.length ? serie.reduce(function (m, it) { return (it.litros < m.litros) ? it : m; }, serie[0]) : null);
+    var ord = d.resumen_ordeno || {};
+    var litrosPorVaca = res.litros_por_vaca_dia;
 
     var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:6px 14px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
       + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
@@ -1298,6 +1300,19 @@
       + kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok")
       + (pico ? kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")") : "")
       + (piso ? kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")") : "")
+      + (litrosPorVaca != null ? kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Promedio litros/vaca/día") : "")
+      + "</div>";
+
+    // 1b. Vacas en ordeño vs realmente ordeñándose -- el "litros/vaca/día"
+    // de arriba se calcula dividiendo entre "ordenandose" (en ordeño menos
+    // las que están en pausa), no entre el total en ordeño.
+    h += "<div class='card' style='padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;'>"
+      + "<div style='display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600;'>" + icon("cowCalf", 16) + "Vacas en ordeño</div>"
+      + "<div style='display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px;'>"
+      + "<span>En ordeño: <b>" + (ord.en_ordeno || 0) + "</b></span>"
+      + "<span style='color:var(--verde-marca); font-weight:700;'>Ordeñándose: " + (ord.ordenandose || 0) + "</span>"
+      + (ord.en_pausa ? "<span class='chip naranja' style='font-size:11px; font-weight:700;'>" + ord.en_pausa + " en pausa</span>" : "")
+      + "</div>"
       + "</div>";
 
     // 2. Gráfico Interactivo de Producción Diaria (SVG responsivo)
@@ -8486,6 +8501,20 @@
           ? esc(lac.estado) + " (secada el " + esc(lac.fecha_secado) + ")"
           : esc(lac.estado) + (lac.estado === "Seca" ? " (estimado por días, sin secado registrado)" : "");
         h3 += "<p class='aviso'>" + icon("milk", 14) + txtEstado + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
+        if (lac.estado === "En ordeño") {
+          if (lac.en_pausa) {
+            h3 += "<div class='card' style='padding:10px 14px; margin:8px 0; border-left:3px solid var(--color-naranja-txt, #D97706);'>"
+              + "<p style='margin:0 0 8px; font-size:13px;'>⏸ <b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
+              + (lac.pausa_fecha_inicio ? " (desde " + esc(fechaCorta(lac.pausa_fecha_inicio)) + ")" : "")
+              + " — no se cuenta en el promedio litros/vaca/día.</p>"
+              + "<button type='button' class='tema-btn' data-accion='reanudar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>▶ Reanudar ordeño</button>"
+              + "</div>";
+          } else {
+            h3 += "<div style='margin:8px 0;'>"
+              + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>⏸ Pausar ordeño (no se está ordeñando)</button>"
+              + "</div>";
+          }
+        }
       } else {
         h3 += vacio("Sin lactancia activa (sin parto registrado o es macho).");
       }
@@ -9138,6 +9167,51 @@
   }
   window.ejecutarEliminacionEvento = ejecutarEliminacionEvento;
 
+  function ejecutarPausaOrdeno(tag) {
+    if (!tag) return;
+    var motivo = window.prompt("Motivo de la pausa (ej. Ternero flaco, se suelta con la vaca):", "Ternero suelto con la vaca") || "";
+    mostrarToast("Guardando pausa de ordeño...", "ambar");
+    fetch("/api/animal/" + encodeURIComponent(tag) + "/pausa-ordeno", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo: motivo })
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.data.ok) {
+          alert("Error al pausar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
+          return;
+        }
+        mostrarToast("✓ Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
+        vibrarConfirmacion();
+        abrirFichaDesdeTag(tag);
+      })
+      .catch(function (err) { alert("Error de conexión: " + err.message); });
+  }
+  window.ejecutarPausaOrdeno = ejecutarPausaOrdeno;
+
+  function ejecutarReanudarOrdeno(tag) {
+    if (!tag) return;
+    mostrarToast("Reanudando ordeño...", "ambar");
+    fetch("/api/animal/" + encodeURIComponent(tag) + "/reanudar-ordeno", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    })
+      .then(function (r) { return r.json().then(function (data) { return { ok: r.ok, data: data }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.data.ok) {
+          alert("Error al reanudar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
+          return;
+        }
+        mostrarToast("✓ Ordeño reanudado.", "verde");
+        vibrarConfirmacion();
+        abrirFichaDesdeTag(tag);
+      })
+      .catch(function (err) { alert("Error de conexión: " + err.message); });
+  }
+  window.ejecutarReanudarOrdeno = ejecutarReanudarOrdeno;
+
   // Delegado global de clics para HTML inyectado dinámicamente (innerHTML):
   // el CSP de producción (script-src 'self', sin unsafe-inline) bloquea
   // atributos onclick='' inline -- por eso todo lo que se genera con
@@ -9201,6 +9275,14 @@
         var idEv = elAcc.getAttribute("data-id");
         var descEv = elAcc.getAttribute("data-desc") || (tipoEv + " #" + idEv);
         ejecutarEliminacionEvento(tipoEv, idEv, descEv);
+      }
+      else if (acc === "pausar-ordeno") {
+        e.preventDefault();
+        ejecutarPausaOrdeno(elAcc.getAttribute("data-tag"));
+      }
+      else if (acc === "reanudar-ordeno") {
+        e.preventDefault();
+        ejecutarReanudarOrdeno(elAcc.getAttribute("data-tag"));
       }
     }
   });

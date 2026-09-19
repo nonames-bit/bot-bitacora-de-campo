@@ -1800,6 +1800,51 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.post("/api/animal/<tag>/pausa-ordeno")
+    def api_animal_pausa_ordeno(tag):
+        """Marca que la vaca <tag> dejó de ordeñarse TEMPORALMENTE (ej. se
+        soltó el ternero con la vaca porque nació flaco), sin secarla -- ver
+        Database.registrar_pausa_ordeno. Afecta el promedio litros/vaca/día
+        del recibo de quincena (Leche), no el estado de lactancia."""
+        datos = request.get_json(silent=True) or {}
+        db_a = _db(db_path)
+        try:
+            if db_a.animal_id(tag) is None:
+                return jsonify({"ok": False, "error": f"No existe ningún animal con el tag '{tag}'."}), 404
+            db_a.registrar_pausa_ordeno(
+                tag, fecha_inicio=datos.get("fecha"), motivo=_campo_texto(datos, "motivo"),
+                notas=_campo_texto(datos, "notas"), registrado_por=session.get("user_id"),
+            )
+            return jsonify({"ok": True})
+        except Exception as e:
+            logger.exception("Error al pausar ordeño de %s: %s", tag, e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
+    @app.post("/api/animal/<tag>/reanudar-ordeno")
+    def api_animal_reanudar_ordeno(tag):
+        """Cierra la pausa de ordeño abierta de la vaca <tag> -- vuelve a
+        contarse como vaca que se está ordeñando de verdad."""
+        datos = request.get_json(silent=True) or {}
+        db_a = _db(db_path)
+        try:
+            if db_a.animal_id(tag) is None:
+                return jsonify({"ok": False, "error": f"No existe ningún animal con el tag '{tag}'."}), 404
+            db_a.reanudar_ordeno(tag, fecha_fin=datos.get("fecha"), registrado_por=session.get("user_id"))
+            return jsonify({"ok": True})
+        except Exception as e:
+            logger.exception("Error al reanudar ordeño de %s: %s", tag, e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
     @app.post("/api/animal/rectificar-tag")
     def api_animal_rectificar_tag():
         """Proceso especial para rectificar o corregir el número/chapeta de un animal

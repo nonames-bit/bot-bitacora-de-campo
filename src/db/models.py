@@ -148,6 +148,23 @@ CREATE TABLE IF NOT EXISTS secados (
     registrado_por INTEGER
 );
 
+-- Pausa temporal de ordeño de una vaca que sigue en etapa de lactancia
+-- (ej. se suelta el ternero con la vaca por unos días porque nació flaco),
+-- SIN secarla -- distinto de `secados` (fin real de la lactancia). Mientras
+-- fecha_fin es NULL la pausa está abierta (la vaca no se está ordeñando);
+-- se usa para no contarla en el promedio de litros/vaca/día del recibo de
+-- quincena (ver Database.resumen_ordeno).
+CREATE TABLE IF NOT EXISTS pausas_ordeno (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER NOT NULL,
+    fecha_inicio TEXT,
+    fecha_fin TEXT,
+    motivo TEXT,
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS pesajes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER,
@@ -320,6 +337,7 @@ CREATE INDEX IF NOT EXISTS idx_tratamientos_animal_fecha ON tratamientos(animal_
 CREATE INDEX IF NOT EXISTS idx_traslados_animal_fecha ON traslados(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_destetes_animal_fecha ON destetes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_secados_animal_fecha ON secados(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_pausas_ordeno_animal ON pausas_ordeno(animal_id, fecha_fin);
 CREATE INDEX IF NOT EXISTS idx_pesajes_animal_fecha ON pesajes(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_movimientos_animal_fecha ON movimientos(animal_id, fecha);
 CREATE INDEX IF NOT EXISTS idx_fotos_animal_tag ON fotos(animal_id, tag);
@@ -519,7 +537,7 @@ CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_creado ON mensajes_equipo(creado_
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "destetes", "secados", "pesajes", "movimientos", "condicion_corporal",
+    "tratamientos", "traslados", "destetes", "secados", "pausas_ordeno", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "aforos_ronda", "monitoreo_satelital_ndvi",
@@ -634,6 +652,15 @@ class Secado:
     fecha: Optional[str] = None
     potrero_destino: Optional[int] = None
     cond_corporal: Optional[float] = None
+    motivo: Optional[str] = None
+    notas: Optional[str] = None
+
+
+@dataclass
+class PausaOrdeno:
+    animal_id: Optional[int] = None
+    fecha_inicio: Optional[str] = None
+    fecha_fin: Optional[str] = None
     motivo: Optional[str] = None
     notas: Optional[str] = None
 
