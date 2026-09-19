@@ -28,9 +28,22 @@
   var icon = window.JA.icon;
 
   /* ---------- Vaquita Interactiva y Animaciones del Header ---------- */
-  var _vacaEstadoActual = null; // 'dia', 'noche', 'cria'
+  var _vacaEstadoActual = null; // 'dia', 'noche', 'cria', 'toro'
   var _vacaBubbleTimer = null;
   var _vacaFraseIdx = 0;
+  var _vacaContexto = { esFicha: false, esParida: false, esToro: false };
+
+  function esAnimalToro(f) {
+    if (!f) return false;
+    var catSg = String(f.categoria_sg || "").toUpperCase();
+    var sx = String(f.sexo || "").toUpperCase();
+    return (sx === "M" || sx === "MACHO") && (
+      String(f.tag || "").match(/^T\d+/i)
+      || /TORO|REPRODUCTOR|PADROTE|CEBA/i.test(catSg + " " + (f.nombre || "") + " " + (f.notas || "") + " " + (f.tag || ""))
+      || (f.estado_reproductivo && String(f.estado_reproductivo.codigo || "").indexOf("TORO") >= 0)
+      || (f.edad_dias == null || f.edad_dias >= 365)
+    );
+  }
 
   function obtenerHoraColombia() {
     try {
@@ -44,21 +57,53 @@
   }
 
   function actualizarVacaHeader(opts) {
-    opts = opts || {};
+    if (opts) {
+      if (opts.esFicha !== undefined) {
+        _vacaContexto.esFicha = Boolean(opts.esFicha);
+        if (!_vacaContexto.esFicha) {
+          _vacaContexto.esToro = false;
+          _vacaContexto.esParida = false;
+        }
+      }
+      if (opts.esParida !== undefined) _vacaContexto.esParida = Boolean(opts.esParida);
+      if (opts.esToro !== undefined) _vacaContexto.esToro = Boolean(opts.esToro);
+    } else {
+      // Llamada periódica sin parámetros (tick de reloj o cambio de tema).
+      // Si estamos en la vista de ficha o la ficha está montada en el DOM, preservamos el contexto del animal activo
+      var estaEnFicha = (typeof actual !== "undefined" && actual === "ficha")
+        || Boolean(document.body && document.body.getAttribute("data-tag"))
+        || Boolean(document.getElementById("ficha") && window.__ultimaFicha && (document.getElementById("ficha").offsetParent !== null || document.getElementById("ficha").innerHTML.indexOf("ficha-head") !== -1));
+
+      if (estaEnFicha && window.__ultimaFicha) {
+        _vacaContexto.esFicha = true;
+        _vacaContexto.esToro = esAnimalToro(window.__ultimaFicha);
+        _vacaContexto.esParida = !_vacaContexto.esToro && Boolean(
+          (window.__ultimaFicha.estado_fisiologico && window.__ultimaFicha.estado_fisiologico.codigo === "VACA_ORDENO")
+          || (window.__ultimaFicha.lactancia && window.__ultimaFicha.lactancia.estado === "En ordeño" && window.__ultimaFicha.lactancia.del_dias < 200)
+          || (window.__ultimaFicha.crias && window.__ultimaFicha.crias.length > 0)
+          || (window.__ultimaFicha.categoria_sg && String(window.__ultimaFicha.categoria_sg).toLowerCase().indexOf("parida") >= 0)
+        );
+      } else if (!estaEnFicha) {
+        _vacaContexto.esFicha = false;
+        _vacaContexto.esParida = false;
+        _vacaContexto.esToro = false;
+      }
+    }
+
     var img = document.getElementById("header-vaca-img");
     if (!img) return;
 
-    var nuevoEstado = "dia";
     var col = obtenerHoraColombia();
     var esNocheHora = (col.hora > 18 || (col.hora === 18 && col.min >= 30) || col.hora < 5 || (col.hora === 5 && col.min < 30));
     var tema = document.documentElement.getAttribute("data-theme");
     var esNoche = esNocheHora || (tema === "dark");
 
-    if (opts.esFicha && opts.esToro) {
+    var nuevoEstado = "dia";
+    if (_vacaContexto.esFicha && _vacaContexto.esToro) {
       nuevoEstado = "toro";
-    } else if (opts.esFicha && opts.esParida) {
+    } else if (_vacaContexto.esFicha && _vacaContexto.esParida) {
       nuevoEstado = "cria";
-    } else if (opts.esFicha) {
+    } else if (_vacaContexto.esFicha) {
       nuevoEstado = esNoche ? "noche" : "dia";
     } else if (esNoche) {
       nuevoEstado = "noche";
@@ -8213,13 +8258,7 @@
   }
   function fichaHtml(f, showIdent) {
     var catSg = String(f.categoria_sg || "").toUpperCase();
-    var sx = String(f.sexo || "").toUpperCase();
-    var esToro = (sx === "M" || sx === "MACHO") && (
-      String(f.tag || "").match(/^T\d+/i)
-      || /TORO|REPRODUCTOR|PADROTE|CEBA/i.test(catSg + " " + (f.nombre || "") + " " + (f.notas || "") + " " + (f.tag || ""))
-      || (f.estado_reproductivo && String(f.estado_reproductivo.codigo || "").indexOf("TORO") >= 0)
-      || (f.edad_dias == null || f.edad_dias >= 365)
-    );
+    var esToro = esAnimalToro(f);
     var esParida = !esToro && ((f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
       || (f.lactancia && f.lactancia.estado === "En ordeño" && f.lactancia.del_dias < 200)
       || (f.crias && f.crias.length > 0)
@@ -9531,13 +9570,7 @@
       }
       window.__ultimaFicha = f;
       var catSg = String(f.categoria_sg || "").toUpperCase();
-      var sx = String(f.sexo || "").toUpperCase();
-      var esToro = (sx === "M" || sx === "MACHO") && (
-        String(f.tag || "").match(/^T\d+/i)
-        || /TORO|REPRODUCTOR|PADROTE|CEBA/i.test(catSg + " " + (f.nombre || "") + " " + (f.notas || "") + " " + (f.tag || ""))
-        || (f.estado_reproductivo && String(f.estado_reproductivo.codigo || "").indexOf("TORO") >= 0)
-        || (f.edad_dias == null || f.edad_dias >= 365)
-      );
+      var esToro = esAnimalToro(f);
       var esParida = !esToro && ((f.estado_fisiologico && f.estado_fisiologico.codigo === "VACA_ORDENO")
         || (f.lactancia && f.lactancia.estado === "En ordeño" && f.lactancia.del_dias < 200)
         || (f.crias && f.crias.length > 0)
