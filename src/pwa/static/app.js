@@ -275,6 +275,8 @@
       }
     });
   }
+  window.actualizarClimaHeader = actualizarClimaHeader;
+  window.actualizarLluviaHeader = actualizarLluviaHeader;
 
   function tocarVaquitaHeader() {
     if (navigator.vibrate) {
