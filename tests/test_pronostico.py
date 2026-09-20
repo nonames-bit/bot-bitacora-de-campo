@@ -64,6 +64,44 @@ def test_parsear_respuesta_open_meteo():
     assert d0["lluvia_mm"] == 0.0
     assert d0["prob_lluvia_pct"] == 10.0
     assert pron["dias"][2]["prob_lluvia_pct"] is None
+    assert pron.get("current") is None
+
+
+def test_parsear_respuesta_open_meteo_con_current():
+    payload = _json_open_meteo_realista()
+    # Caso 1: Lluvia activa por código WMO 61 (lluvia moderada)
+    payload["current"] = {
+        "time": "2026-09-01T14:00",
+        "temperature_2m": 24.5,
+        "relative_humidity_2m": 88,
+        "precipitation": 0.5,
+        "rain": 0.5,
+        "showers": 0.0,
+        "weather_code": 61,
+    }
+    pron = _parsear_respuesta_open_meteo(payload, lat=4.5, lon=-74.0)
+    assert pron["current"] is not None
+    assert pron["current"]["temp_c"] == 24.5
+    assert pron["current"]["esta_lloviendo"] is True
+    assert pron["current"]["weather_code"] == 61
+
+    # Caso 2: Nublado seco (WMO 3, precipitación 0) -> NO está lloviendo
+    payload["current"] = {
+        "time": "2026-09-01T15:00",
+        "temperature_2m": 26.0,
+        "relative_humidity_2m": 65,
+        "precipitation": 0.0,
+        "rain": 0.0,
+        "showers": 0.0,
+        "weather_code": 3,
+    }
+    pron_seco = _parsear_respuesta_open_meteo(payload, lat=4.5, lon=-74.0)
+    assert pron_seco["current"]["esta_lloviendo"] is False
+
+    # Caso 3: Despejado / Soleado (WMO 0) -> NO está lloviendo
+    payload["current"]["weather_code"] = 0
+    pron_sol = _parsear_respuesta_open_meteo(payload, lat=4.5, lon=-74.0)
+    assert pron_sol["current"]["esta_lloviendo"] is False
 
 
 def test_obtener_pronostico_nunca_lanza_sin_red(monkeypatch):

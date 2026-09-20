@@ -17,10 +17,11 @@ from typing import Optional
 
 logger = logging.getLogger("bitacora.pronostico")
 
-# URL base de Open-Meteo (sin API key).
+# URL base de Open-Meteo (sin API key, incluye telemetría en tiempo real y diaria).
 OPEN_METEO_URL = (
     "https://api.open-meteo.com/v1/forecast"
     "?latitude={lat}&longitude={lon}"
+    "&current=temperature_2m,relative_humidity_2m,precipitation,rain,showers,weather_code"
     "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max"
     "&timezone=auto&forecast_days={dias}"
 )
@@ -76,11 +77,12 @@ def _parsear_respuesta_open_meteo(payload: dict, lat: float = 0.0, lon: float = 
 
     Estructura real de Open-Meteo: ``daily.time[]``, ``daily.temperature_2m_max[]``,
     ``daily.temperature_2m_min[]``, ``daily.precipitation_sum[]``,
-    ``daily.precipitation_probability_max[]`` (esta última puede venir null).
+    ``daily.precipitation_probability_max[]`` (esta última puede venir null),
+    y ``current`` con condiciones meteorológicas en tiempo real.
     """
     daily = payload.get("daily") if isinstance(payload, dict) else None
     if not isinstance(daily, dict):
-        return {"lat": lat, "lon": lon, "dias": []}
+        return {"lat": lat, "lon": lon, "dias": [], "current": None}
     times = daily.get("time") or []
     tmax = daily.get("temperature_2m_max") or []
     tmin = daily.get("temperature_2m_min") or []
@@ -107,7 +109,28 @@ def _parsear_respuesta_open_meteo(payload: dict, lat: float = 0.0, lon: float = 
                 "prob_lluvia_pct": p,
             }
         )
-    return {"lat": lat, "lon": lon, "dias": dias}
+
+    current_raw = payload.get("current") if isinstance(payload, dict) else None
+    current = None
+    if isinstance(current_raw, dict):
+        wcode = current_raw.get("weather_code")
+        precip = _a_float(current_raw.get("precipitation"))
+        rain = _a_float(current_raw.get("rain"))
+        showers = _a_float(current_raw.get("showers"))
+        # Códigos WMO de precipitación activa:
+        # 51,53,55: llovizna; 61,63,65: lluvia; 66,67: lluvia helada; 80,81,82: chubascos; 95,96,99: tormenta
+        wmo_lluvia = wcode in {51, 53, 55, 61, 63, 65, 66, 67, 80, 81, 82, 95, 96, 99}
+        esta_lloviendo = bool((precip > 0.1 or rain > 0.1 or showers > 0.1) or wmo_lluvia)
+        current = {
+            "time": current_raw.get("time"),
+            "temp_c": _a_float(current_raw.get("temperature_2m")),
+            "humedad_pct": current_raw.get("relative_humidity_2m"),
+            "lluvia_mm": precip,
+            "weather_code": wcode,
+            "esta_lloviendo": esta_lloviendo,
+        }
+
+    return {"lat": lat, "lon": lon, "dias": dias, "current": current}
 
 
 def coordenadas_finca(db) -> Optional[tuple[float, float]]:

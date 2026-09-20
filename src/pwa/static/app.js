@@ -143,6 +143,9 @@
     if (!dClima && window.__datosUltimoTablero && window.__datosUltimoTablero.clima_hoy) {
       dClima = window.__datosUltimoTablero.clima_hoy;
     }
+    if (!dClima && window.__datosUltimoPasturas && window.__datosUltimoPasturas.pronostico) {
+      dClima = window.__datosUltimoPasturas.pronostico;
+    }
     if (!dClima && window.__datosUltimoPasturas && window.__datosUltimoPasturas.pronostico && window.__datosUltimoPasturas.pronostico.dias) {
       dClima = window.__datosUltimoPasturas.pronostico.dias[0];
     }
@@ -152,15 +155,81 @@
     var tema = document.documentElement.getAttribute("data-theme");
     var esNoche = esNocheHora || (tema === "dark");
 
-    var lluviaMm = 0;
-    var probLluvia = 0;
+    // Detección de lluvia en tiempo real:
+    // IMPORTANTE: NO basarse en lluvia_mm diaria acumulada ni en prob_lluvia máxima de 24h,
+    // ya que en el trópico de Mesetas (Meta) casi cualquier día tiene pronóstico acumulado >= 1.5mm,
+    // lo que causaba que la cortina de lluvia animada permaneciera activa 24/7.
+    // Solo debe llover sobre las vacas si está lloviendo EN ESTE MOMENTO (telemetría actual).
+    var estaLloviendo = false;
+    var tieneTelemetriaActual = false;
+    var wcode = null;
+
     if (dClima) {
-      lluviaMm = Number(dClima.lluvia_mm) || 0;
-      probLluvia = Number(dClima.prob_lluvia_pct) || 0;
+      if (typeof dClima.esta_lloviendo === "boolean") {
+        estaLloviendo = dClima.esta_lloviendo;
+        tieneTelemetriaActual = true;
+      }
+      if (dClima.current) {
+        if (typeof dClima.current.esta_lloviendo === "boolean") {
+          estaLloviendo = dClima.current.esta_lloviendo;
+          tieneTelemetriaActual = true;
+        }
+        if (dClima.current.weather_code !== undefined && dClima.current.weather_code !== null) {
+          wcode = Number(dClima.current.weather_code);
+        }
+      }
+      if (wcode === null && dClima.weather_code !== undefined && dClima.weather_code !== null) {
+        wcode = Number(dClima.weather_code);
+      }
     }
 
-    var hayLluvia = (lluviaMm >= 1.5 || probLluvia >= 65);
-    var hayNubes = (lluviaMm >= 0.3 || probLluvia >= 30);
+    if (!tieneTelemetriaActual) {
+      var dTabClima = window.__datosUltimoTablero && window.__datosUltimoTablero.clima_hoy;
+      if (dTabClima) {
+        if (typeof dTabClima.esta_lloviendo === "boolean") {
+          estaLloviendo = dTabClima.esta_lloviendo;
+          tieneTelemetriaActual = true;
+        } else if (dTabClima.current && typeof dTabClima.current.esta_lloviendo === "boolean") {
+          estaLloviendo = dTabClima.current.esta_lloviendo;
+          tieneTelemetriaActual = true;
+        }
+        if (wcode === null && dTabClima.current && dTabClima.current.weather_code !== undefined && dTabClima.current.weather_code !== null) {
+          wcode = Number(dTabClima.current.weather_code);
+        }
+      }
+    }
+
+    if (!tieneTelemetriaActual) {
+      var dPastPron = window.__datosUltimoPasturas && window.__datosUltimoPasturas.pronostico;
+      if (dPastPron) {
+        if (typeof dPastPron.esta_lloviendo === "boolean") {
+          estaLloviendo = dPastPron.esta_lloviendo;
+          tieneTelemetriaActual = true;
+        } else if (dPastPron.current && typeof dPastPron.current.esta_lloviendo === "boolean") {
+          estaLloviendo = dPastPron.current.esta_lloviendo;
+          tieneTelemetriaActual = true;
+        }
+        if (wcode === null && dPastPron.current && dPastPron.current.weather_code !== undefined && dPastPron.current.weather_code !== null) {
+          wcode = Number(dPastPron.current.weather_code);
+        }
+      }
+    }
+
+    var hayLluvia = estaLloviendo;
+
+    // Nubes: según código meteorológico WMO en tiempo real si está disponible:
+    // WMO 0, 1: despejado / sol radiante
+    // WMO 2: parcialmente nublado
+    // WMO 3, 45, 48: muy nublado / niebla
+    // WMO >= 51: precipitación
+    var hayNubes = false;
+    if (wcode !== null && !isNaN(wcode)) {
+      hayNubes = (wcode >= 2);
+    } else if (dClima) {
+      var probLluvia = Number(dClima.prob_lluvia_pct) || 0;
+      var lluviaMm = Number(dClima.lluvia_mm) || 0;
+      hayNubes = (probLluvia >= 65 || lluviaMm >= 8.0);
+    }
 
     var solEl = document.getElementById("header-clima-sol");
     var lunaEl = document.getElementById("header-clima-luna");
@@ -195,8 +264,19 @@
   }
 
   function actualizarLluviaHeader(hayLluvia) {
-    actualizarClimaHeader(hayLluvia ? { lluvia_mm: 4.0, prob_lluvia_pct: 80 } : { lluvia_mm: 0, prob_lluvia_pct: 0 });
+    actualizarClimaHeader({
+      lluvia_mm: hayLluvia ? 5.0 : 0,
+      prob_lluvia_pct: hayLluvia ? 90 : 0,
+      esta_lloviendo: Boolean(hayLluvia),
+      current: {
+        esta_lloviendo: Boolean(hayLluvia),
+        lluvia_mm: hayLluvia ? 5.0 : 0,
+        weather_code: hayLluvia ? 61 : 0
+      }
+    });
   }
+  window.actualizarClimaHeader = actualizarClimaHeader;
+  window.actualizarLluviaHeader = actualizarLluviaHeader;
 
   function tocarVaquitaHeader() {
     if (navigator.vibrate) {
@@ -646,8 +726,8 @@
   var potrerosRondaCache = [];
   function renderPasturas(d) {
     window.__datosUltimoPasturas = d;
-    if (d && d.pronostico && d.pronostico.dias && d.pronostico.dias.length) {
-      actualizarClimaHeader(d.pronostico.dias[0]);
+    if (d && d.pronostico) {
+      actualizarClimaHeader(d.pronostico);
     } else {
       actualizarClimaHeader();
     }
