@@ -377,17 +377,21 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
 
     try:
         from .pronostico import obtener_pronostico_para_despacho
-        _pron_hoy = obtener_pronostico_para_despacho(db)
+        _pron_hoy = obtener_pronostico_para_despacho(db, cache_ttl_horas=0.5)
         _dia_hoy = _pron_hoy["dias"][0] if _pron_hoy and _pron_hoy.get("dias") else None
         clima_hoy = None
         if _dia_hoy:
             _f = _dia_hoy.get("fecha")
+            _curr = (_pron_hoy.get("current") or {}) if isinstance(_pron_hoy, dict) else {}
             clima_hoy = {
                 "fecha": _f.isoformat() if hasattr(_f, "isoformat") else str(_f),
                 "temp_max_c": _dia_hoy.get("temp_max_c"),
                 "temp_min_c": _dia_hoy.get("temp_min_c"),
                 "lluvia_mm": _dia_hoy.get("lluvia_mm"),
                 "prob_lluvia_pct": _dia_hoy.get("prob_lluvia_pct"),
+                "current": _curr,
+                "esta_lloviendo": bool(_curr.get("esta_lloviendo", False)),
+                "lluvia_actual_mm": _curr.get("lluvia_mm", 0.0),
             }
     except Exception as e:
         logger.error("seccion clima_hoy fallo", exc_info=True)
@@ -774,8 +778,9 @@ def datos_pasturas(db: Database) -> dict:
         aforos = []
     try:
         from .pronostico import obtener_pronostico_para_despacho, interpretar_pronostico
-        _pron = obtener_pronostico_para_despacho(db)
+        _pron = obtener_pronostico_para_despacho(db, cache_ttl_horas=0.5)
         if _pron:
+            _curr_past = _pron.get("current") if isinstance(_pron, dict) else None
             pronostico = {
                 "dias": [
                     {
@@ -787,6 +792,8 @@ def datos_pasturas(db: Database) -> dict:
                     }
                     for d in _pron.get("dias", [])
                 ],
+                "current": _curr_past,
+                "esta_lloviendo": bool(_curr_past.get("esta_lloviendo", False)) if isinstance(_curr_past, dict) else False,
                 "recomendaciones": interpretar_pronostico(_pron),
                 "desactualizado_horas": _pron.get("desactualizado_horas"),
             }
