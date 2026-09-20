@@ -8437,6 +8437,8 @@
       ? "<button type='button' class='tema-btn btn-rectificar-tag' data-accion='rectificar-tag' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); font-weight:600;' title='Proceso especial: rectificar chapeta mal leída en campo'>" + icon("tag", 14) + "Rectificar Chapeta</button>"
       : "";
     head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
+      + "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Buscar otra ficha de animal (Ctrl+K)'>"
+      + icon("search", 14) + "Buscar otro</button>"
       + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
       + btnEditar
@@ -9400,6 +9402,12 @@
       var acc = elAcc.getAttribute("data-accion");
       if (acc === "exportar-inventario") { if (window.__exportarInventario) window.__exportarInventario(); }
       else if (acc === "exportar-retiros") { if (window.__exportarRetiros) window.__exportarRetiros(); }
+      else if (acc === "buscar-otro-animal") {
+        e.preventDefault();
+        if (typeof window.abrirModalBuscarFichaRapida === "function") {
+          window.abrirModalBuscarFichaRapida();
+        }
+      }
       else if (acc === "reload") { location.reload(); }
       else if (acc === "ir-mapa-satelital") { e.preventDefault(); irAVista("mapa"); cargar(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
@@ -9722,12 +9730,16 @@
       if (!f.existe) {
         var rolNf = window.__usuarioActual && window.__usuarioActual.rol;
         var btnCrearNf = (rolNf === "OWNER" || rolNf === "ADMIN")
-          ? "<button type='button' class='tema-btn' data-accion='crear-animal' data-tag-nuevo='" + esc(tag) + "' style='margin-top:10px; padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center;'>" + icon("plus", 15) + "Crear animal " + esc(tag) + "</button>"
+          ? "<button type='button' class='tema-btn' data-accion='crear-animal' data-tag-nuevo='" + esc(tag) + "' style='padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("plus", 15) + "Crear animal " + esc(tag) + "</button>"
           : "";
+        var btnBuscarOtro = "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='padding:8px 14px; font-weight:600; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("search", 14) + "Buscar otro animal</button>";
         if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
           + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
           + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>"
-          + btnCrearNf, animar);
+          + "<div style='display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;'>"
+          + btnCrearNf
+          + btnBuscarOtro
+          + "</div>", animar);
         return;
       }
       window.__ultimaFicha = f;
@@ -9749,8 +9761,10 @@
       }
     }, target);
   }
-  // Devuelve el candidato escrito en el campo #f-tag si aplica (para RFID).
+  // Devuelve el candidato escrito en el campo #f-tag o #input-tag-ficha-vista si aplica (para RFID).
   function obtenerTextoIdent() {
+    var inpVista = document.getElementById("input-tag-ficha-vista");
+    if (inpVista && inpVista.value.trim()) return inpVista.value.trim();
     var t = (q("#f-tag") && q("#f-tag").value || "").trim();
     return t || null;
   }
@@ -9968,6 +9982,90 @@
         }
       }).catch(function () { /* best-effort */ });
   }
+
+  function renderFichaBuscador() {
+    var ultimoTag = (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+    var chipsSugeridos = "";
+    if (ultimoTag) {
+      chipsSugeridos += "<button type='button' class='chip verde btn-chip-tag' data-tag='" + esc(ultimoTag) + "' style='font-size:12px; cursor:pointer;'>" + icon("refresh", 13) + "Último visto: <b>" + esc(ultimoTag) + "</b></button>";
+    }
+    chipsSugeridos += "<button type='button' class='chip azul btn-chip-tag' data-tag='183-4' style='font-size:12px; cursor:pointer;'>" + icon("cow", 13) + "Toro 183-4</button>";
+    chipsSugeridos += "<button type='button' class='chip azul btn-chip-tag' data-tag='JA-01' style='font-size:12px; cursor:pointer;'>" + icon("cow", 13) + "Toro JA-01</button>";
+
+    var h = "<div class='ficha-buscador-wrap' style='max-width:760px; margin:0 auto;'>"
+      + "<div class='card ficha-buscador-card' style='padding:20px; margin-bottom:16px;'>"
+      + "<h3 style='margin:0 0 8px 0; display:flex; align-items:center; gap:8px; font-size:18px; color:var(--verde-marca);'>"
+      + icon("cow", 22) + "Buscar Ficha de Animal</h3>"
+      + "<p style='margin:0 0 16px 0; font-size:13.5px; color:var(--texto-suave);'>"
+      + "Ingresa el número de arete, RFID, tatuaje o nombre para ver genealogía, pesajes, eventos reproductivos y sanitarios."
+      + "</p>"
+      + "<form id='form-buscar-ficha-vista' style='display:flex; flex-direction:column; gap:12px;'>"
+      + "<label style='font-size:13px; font-weight:600; color:var(--texto); display:flex; flex-direction:column; gap:6px;'>"
+      + "Arete, RFID o nombre del animal:"
+      + "<div class='ficha-buscador-input-wrap'>"
+      + "<input type='text' id='input-tag-ficha-vista' list='dl-tags' placeholder='ej. 47, JA176, N069, PATRICIA, TORO...' autocomplete='off' autofocus style='padding:12px 14px; border-radius:8px; border:1.5px solid var(--borde-fuerte); font-size:15px; font-weight:600; color:var(--texto); background:var(--fondo); outline:none; box-sizing:border-box;'>"
+      + "<button type='submit' class='tema-btn btn-buscar-ficha-submit' style='background:var(--verde-marca); color:#fff; font-weight:700; padding:12px 18px; border:none; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-size:14px; white-space:nowrap;'>"
+      + icon("search", 15) + "Buscar Ficha</button>"
+      + "</div>"
+      + "</label>"
+      + "<div id='ficha-vista-feedback' style='font-size:12.5px; color:var(--color-rojo-txt); min-height:18px;'></div>"
+      + "</form>"
+      + (chipsSugeridos ? "<div style='margin-top:8px; display:flex; flex-wrap:wrap; align-items:center; gap:8px;'><span style='font-size:12px; font-weight:600; color:var(--texto-suave);'>Sugerencias rápidas:</span>" + chipsSugeridos + "</div>" : "")
+      + "</div>"
+      + "<div class='card' style='padding:16px; margin-bottom:16px;'>"
+      + "<h4 style='margin:0 0 8px 0; display:flex; align-items:center; gap:8px; font-size:15px;'>"
+      + icon("camera", 16) + "O identificar mediante Foto / Arete OCR</h4>"
+      + "<p style='margin:0 0 12px 0; font-size:13px; color:var(--texto-suave);'>"
+      + "Si tienes una foto del arete tomada en campo o un lector QR, puedes subirla aquí para lectura inteligente."
+      + "</p>"
+      + identPanelHtml()
+      + "</div>"
+      + "</div>";
+
+    return h;
+  }
+
+  function bindFichaBuscador() {
+    var form = document.getElementById("form-buscar-ficha-vista");
+    var inp = document.getElementById("input-tag-ficha-vista");
+    var feedback = document.getElementById("ficha-vista-feedback");
+    try { cargarListasAutocompletar(); } catch (eDl) {}
+
+    if (form && inp) {
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var tag = (inp.value || "").trim();
+        if (!tag) {
+          if (feedback) feedback.textContent = "Por favor escribe un arete, RFID o nombre.";
+          inp.focus();
+          return;
+        }
+        if (feedback) feedback.textContent = "";
+        abrirFichaDesdeTag(tag);
+      });
+      inp.addEventListener("input", onInputSugerir);
+    }
+
+    qa(".btn-chip-tag").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = b.getAttribute("data-tag");
+        if (t) {
+          if (inp) inp.value = t;
+          abrirFichaDesdeTag(t);
+        }
+      });
+    });
+
+    bindIdent();
+
+    setTimeout(function () {
+      if (inp) {
+        inp.focus();
+        inp.select();
+      }
+    }, 100);
+  }
+
   function cargar(animar) {
     if (animar === undefined) animar = true;
     actualizarFabGlobal();
@@ -9989,8 +10087,10 @@
     if (actual === "ficha") {
       var t = (q("#f-tag") && q("#f-tag").value || "").trim();
       if (!t) {
-        if (vista) montarVista(vista, "<h3>" + icon("cow") + "Identificar / Ficha animal</h3><p class='aviso'>Escribe un arete, RFID o nombre (ej. 47, N069, JA26) y pulsa Cargar — o usa el panel de foto de abajo.</p>" + identPanelHtml(), animar);
-        if (vista) bindIdent();
+        if (vista) {
+          montarVista(vista, renderFichaBuscador(), animar);
+          bindFichaBuscador();
+        }
         return;
       }
       abrirFicha(t, vista, true, animar);
@@ -10417,6 +10517,7 @@
     var feedbackBuscar = document.getElementById("buscar-ficha-feedback");
     var btnCerrarBuscar = document.getElementById("btn-cerrar-modal-buscar-ficha");
     var btnCancelarBuscar = document.getElementById("btn-cancelar-buscar-ficha");
+    var btnHeaderBuscar = document.getElementById("btn-header-buscar-animal");
 
     function cerrarModalBuscar() {
       if (modalBuscar) modalBuscar.style.display = "none";
@@ -10427,6 +10528,7 @@
       if (!modalBuscar) return;
       vibrarConfirmacion();
       modalBuscar.style.display = "flex";
+      try { cargarListasAutocompletar(); } catch (eDl) {}
       if (inputTagRapido) {
         var tagSugerido = (window.__ultimaFicha && window.__ultimaFicha.tag) || (q("#f-tag") && q("#f-tag").value.trim()) || "";
         inputTagRapido.value = tagSugerido;
@@ -10440,6 +10542,12 @@
 
     if (fabBuscar) {
       fabBuscar.addEventListener("click", function (e) {
+        e.preventDefault();
+        abrirModalBuscar();
+      });
+    }
+    if (btnHeaderBuscar) {
+      btnHeaderBuscar.addEventListener("click", function (e) {
         e.preventDefault();
         abrirModalBuscar();
       });
@@ -10464,6 +10572,22 @@
         abrirFichaDesdeTag(tag);
       });
     }
+
+    // Atajo global Ctrl+K o / para buscar animal rápidamente desde cualquier pantalla
+    if (!window.__tecladoBuscarRegistrado) {
+      window.__tecladoBuscarRegistrado = true;
+      document.addEventListener("keydown", function (e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+          e.preventDefault();
+          abrirModalBuscar();
+        } else if (e.key === "/" && !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement && document.activeElement.tagName)) {
+          e.preventDefault();
+          abrirModalBuscar();
+        } else if (e.key === "Escape" && modalBuscar && modalBuscar.style.display === "flex") {
+          cerrarModalBuscar();
+        }
+      });
+    }
   }
 
   qa("#nav-principal button").forEach(function (b) {
@@ -10474,6 +10598,10 @@
       }
       var v = b.getAttribute("data-v");
       if (!v) return;
+      if (v === "ficha" && actual === "ficha") {
+        var inpFicha = q("#f-tag");
+        if (inpFicha) inpFicha.value = "";
+      }
       irAVista(v);
       cargar();
       if (VISTAS_BADGE.indexOf(actual) !== -1) {

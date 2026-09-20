@@ -335,6 +335,56 @@ header .tema-btn:hover {
   background: rgba(255, 255, 255, 0.2);
 }
 
+/* Botón directo de búsqueda de animal en header */
+.btn-buscar-header {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 12px !important;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.16) !important;
+  color: var(--header-txt) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  border-radius: 6px;
+  min-height: 38px;
+  transition: all 0.15s ease;
+}
+.btn-buscar-header:hover {
+  background: rgba(255, 255, 255, 0.28) !important;
+  border-color: rgba(255, 255, 255, 0.75) !important;
+}
+@media (max-width: 640px) {
+  .btn-buscar-header .btn-txt-desktop {
+    display: none;
+  }
+  .btn-buscar-header {
+    padding: 0 8px !important;
+    min-height: 34px;
+  }
+}
+
+.ficha-buscador-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+.ficha-buscador-input-wrap input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.ficha-buscador-input-wrap .btn-buscar-ficha-submit {
+  flex: 0 0 auto;
+}
+@media (max-width: 640px) {
+  .ficha-buscador-input-wrap .btn-buscar-ficha-submit {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 /* Banner de estado de red */
 #barra-red {
   display: none;
