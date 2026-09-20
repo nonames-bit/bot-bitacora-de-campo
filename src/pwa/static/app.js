@@ -1365,7 +1365,7 @@
       + "<div style='display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px;'>"
       + "<span>En ordeño: <b>" + (ord.en_ordeno || 0) + "</b></span>"
       + "<span style='color:var(--verde-marca); font-weight:700;'>Ordeñándose: " + (ord.ordenandose || 0) + "</span>"
-      + (ord.en_pausa ? "<span class='chip naranja' style='font-size:11px; font-weight:700;'>" + ord.en_pausa + " en pausa</span>" : "")
+      + (ord.en_pausa ? "<span class='chip ambar' style='font-size:11px; font-weight:700;'>" + ord.en_pausa + " en pausa</span>" : "")
       + "</div>"
       + "</div>";
 
@@ -1416,7 +1416,7 @@
         var diffTxt = (diff >= 0 ? "+" : "") + diff + " L";
         var diffChip = diff >= 0
           ? "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + diffTxt + "</span>"
-          : "<span class='chip naranja' style='font-size:11px; font-weight:700;'>" + diffTxt + "</span>";
+          : "<span class='chip ambar' style='font-size:11px; font-weight:700;'>" + diffTxt + "</span>";
 
         h += "<tr style='border-bottom:1px solid var(--borde);'>"
           + "<td style='padding:8px 10px; font-weight:600; white-space:nowrap;'>" + esc(fechaDiaSemana(dia.fecha)) + "</td>"
@@ -8567,7 +8567,7 @@
         h3 += "<p class='aviso'>" + icon("milk", 14) + txtEstado + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
         if (lac.estado === "En ordeño") {
           if (lac.en_pausa) {
-            h3 += "<div class='card' style='padding:10px 14px; margin:8px 0; border-left:3px solid var(--color-naranja-txt, #D97706);'>"
+            h3 += "<div class='card' style='padding:10px 14px; margin:8px 0; border-left:3px solid var(--color-ambar-txt, #D97706);'>"
               + "<p style='margin:0 0 8px; font-size:13px;'>⏸ <b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
               + (lac.pausa_fecha_inicio ? " (desde " + esc(fechaCorta(lac.pausa_fecha_inicio)) + ")" : "")
               + " — no se cuenta en el promedio litros/vaca/día.</p>"
@@ -9135,7 +9135,7 @@
   // (ej. NM_67965) -- sin esto, ~6% del hato activo no era clicable.
   var _TAG_RE = /^([A-Za-z]{0,4}\d{1,6}(-\d{1,3})?|[A-Za-z]{1,4}-\d{1,6}(-\d{1,3})?|\d{1,4}-\d{1,3}(-\d{1,3})?|[A-Za-z]{1,4}_\d{1,8})$/;
   var _CAB_NO_CLICK = /potrero|fecha|categor[ií]a|raza|c[óo]digo|banda|toro|bracket|peso/i;
-  function abrirFichaDesdeTag(tag) {
+  function abrirFichaDesdeTag(tag, tabId) {
     if (!tag) return;
     tag = String(tag).trim();
     if (!tag) return;
@@ -9145,7 +9145,7 @@
       // Si estamos en la página standalone /ficha/<tag> (usa #ficha, no #vista)
       var destinoStandalone = vista || document.getElementById("ficha");
       if (typeof abrirFicha === "function" && destinoStandalone) {
-        abrirFicha(tag, destinoStandalone, false, true);
+        abrirFicha(tag, destinoStandalone, false, true, tabId);
         try { window.history.pushState(null, "", "/ficha/" + encodeURIComponent(tag)); } catch (e) {}
         try {
           document.title = "Ficha " + tag + " · Bitácora JA";
@@ -9167,7 +9167,7 @@
     if (barraFiltros) barraFiltros.style.display = "";
 
     if (typeof abrirFicha === "function" && vista) {
-      abrirFicha(tag, vista, true, true);
+      abrirFicha(tag, vista, true, true, tabId);
     } else {
       cargar(true);
     }
@@ -9248,7 +9248,7 @@
         }
         mostrarToast("✓ Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
         vibrarConfirmacion();
-        abrirFichaDesdeTag(tag);
+        abrirFichaDesdeTag(tag, "leche");
       })
       .catch(function (err) { alert("Error de conexión: " + err.message); });
   }
@@ -9270,7 +9270,7 @@
         }
         mostrarToast("✓ Ordeño reanudado.", "verde");
         vibrarConfirmacion();
-        abrirFichaDesdeTag(tag);
+        abrirFichaDesdeTag(tag, "leche");
       })
       .catch(function (err) { alert("Error de conexión: " + err.message); });
   }
@@ -9635,7 +9635,7 @@
       });
     });
   }
-  function abrirFicha(tag, target, showIdent, animar) {
+  function abrirFicha(tag, target, showIdent, animar, tabId) {
     if (animar === undefined) animar = true;
     if (animar) skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {
@@ -9661,6 +9661,12 @@
       montarVista(target, fichaHtml(f, !!showIdent), animar);
       bindTabs(f);
       if (showIdent) bindIdent();
+      // Reabre la ficha en la pestaña pedida. Lo usa pausar/reanudar ordeño
+      // (viven en la pestaña Leche): sin esto el re-render vuelve a "General"
+      // y el usuario no ve la confirmación ni el botón de reanudar.
+      if (tabId) {
+        try { window.abrirTabFicha(tabId); } catch (e) {}
+      }
     }, target);
   }
   // Devuelve el candidato escrito en el campo #f-tag si aplica (para RFID).
