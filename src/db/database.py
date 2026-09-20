@@ -977,6 +977,93 @@ class Database:
                                               notas="Al secado", registrado_por=registrado_por)
         return sid
 
+    def registrar_pausa_ordeno(self, vaca_tag, fecha_inicio=None, motivo=None,
+                               notas=None, registrado_por=None) -> Optional[int]:
+        """Marca que una vaca en ordeño dejó de ordeñarse TEMPORALMENTE (ej.
+        se soltó el ternero con la vaca porque nació flaco), sin secarla --
+        distinto de un secado real (ver `registrar_secado`). Si ya tiene una
+        pausa abierta, no crea una segunda."""
+        vaca_id = self.resolve_animal(vaca_tag)
+        if vaca_id is None:
+            return None
+        abierta = self.pausa_ordeno_abierta(vaca_id)
+        if abierta:
+            return abierta["id"]
+        f = iso(fecha_inicio) or date.today().isoformat()
+        return self.insert("pausas_ordeno", dict(
+            animal_id=vaca_id, fecha_inicio=f, motivo=motivo, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+
+    def reanudar_ordeno(self, vaca_tag, fecha_fin=None, registrado_por=None) -> bool:
+        """Cierra la pausa de ordeño abierta de una vaca -- vuelve a
+        contarse como vaca que se está ordeñando de verdad."""
+        vaca_id = self.resolve_animal(vaca_tag)
+        if vaca_id is None:
+            return False
+        f = iso(fecha_fin) or date.today().isoformat()
+        cur = self.execute(
+            "UPDATE pausas_ordeno SET fecha_fin = ? WHERE animal_id = ? AND fecha_fin IS NULL",
+            (f, vaca_id),
+        )
+        return cur.rowcount > 0
+
+    def pausa_ordeno_abierta(self, vaca_tag_or_id) -> Optional[sqlite3.Row]:
+        """Pausa de ordeño actualmente abierta de una vaca, o None."""
+        vaca_id = self.resolve_animal(vaca_tag_or_id)
+        if vaca_id is None:
+            return None
+        return self.query_one(
+            "SELECT id, fecha_inicio, motivo, notas FROM pausas_ordeno "
+            "WHERE animal_id = ? AND fecha_fin IS NULL "
+            "ORDER BY fecha_inicio DESC, id DESC LIMIT 1",
+            (vaca_id,),
+        )
+
+    def resumen_ordeno(self) -> dict:
+        """Cuenta, sobre el hato ACTIVO, cuántas vacas están en etapa de
+        ordeño (paridas, <300 días desde el último parto y sin secado
+        confirmado -- mismo criterio que la ficha individual, ver
+        `dashboard_data.datos_ficha`) vs cuántas de esas se están ordeñando
+        de verdad (restando las que tienen una pausa abierta). Este último
+        número es el que debe dividir los litros vendidos para sacar el
+        promedio de litros/vaca/día."""
+        hembras = self.query(
+            "SELECT id_animal FROM animales WHERE estado = 'ACTIVO' "
+            "AND (LOWER(sexo) LIKE 'h%' OR LOWER(sexo) LIKE 'f%')"
+        )
+        en_ordeno_ids: list[int] = []
+        for r in hembras:
+            aid = r["id_animal"]
+            parto = self.ultimo_parto(aid)
+            if not parto or not parto["fecha"]:
+                continue
+            f_parto = to_date(parto["fecha"])
+            if not f_parto:
+                continue
+            del_dias = (date.today() - f_parto).days
+            if del_dias < 0 or del_dias >= 300:
+                continue
+            secado_row = self.query_one(
+                "SELECT id FROM secados WHERE animal_id = ? AND fecha >= ? LIMIT 1",
+                (aid, parto["fecha"]),
+            )
+            if secado_row:
+                continue
+            en_ordeno_ids.append(aid)
+
+        if not en_ordeno_ids:
+            return {"en_ordeno": 0, "en_pausa": 0, "ordenandose": 0}
+
+        marcas = ",".join("?" * len(en_ordeno_ids))
+        en_pausa = self.query_one(
+            f"SELECT COUNT(*) AS n FROM pausas_ordeno "
+            f"WHERE fecha_fin IS NULL AND animal_id IN ({marcas})",
+            tuple(en_ordeno_ids),
+        )["n"]
+        en_ordeno = len(en_ordeno_ids)
+        return {"en_ordeno": en_ordeno, "en_pausa": en_pausa, "ordenandose": en_ordeno - en_pausa}
+
     def cria_activa_de_madre(self, madre_tag) -> Optional[dict]:
         """Busca la cría ACTIVA más reciente de una vaca que aún no fue
         destetada (sin fila en `destetes`). La usa Captura > Destete para

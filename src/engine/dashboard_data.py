@@ -1357,6 +1357,20 @@ def datos_leche(db: Database) -> dict:
         r["diff_promedio"] = diff
         r["pct_promedio"] = pct
 
+    # 1b. Vacas en ordeño vs realmente ordeñándose (para litros/vaca/día) --
+    # el recibo de quincena solo trae el total de finca, así que el
+    # "por vaca" es un promedio: litros del día ÷ vacas que se ordeñaron
+    # ese día, no un pesaje individual real (ver Database.resumen_ordeno).
+    try:
+        resumen_ordeno = db.resumen_ordeno()
+    except Exception as e:
+        logger.error("seccion resumen_ordeno fallo", exc_info=True)
+        errores["resumen_ordeno"] = str(e)
+        resumen_ordeno = {"en_ordeno": 0, "en_pausa": 0, "ordenandose": 0}
+
+    ordenandose = resumen_ordeno.get("ordenandose") or 0
+    litros_por_vaca_dia = round(promedio_diario / ordenandose, 1) if ordenandose > 0 else None
+
     resumen = {
         "total_litros": total_litros,
         "dias": dias_count,
@@ -1366,6 +1380,7 @@ def datos_leche(db: Database) -> dict:
         "fecha_inicio": serie[0]["fecha"] if serie else None,
         "fecha_fin": serie[-1]["fecha"] if serie else None,
         "periodo_notas": serie[0].get("notas") if (serie and serie[0].get("notas")) else None,
+        "litros_por_vaca_dia": litros_por_vaca_dia,
     }
 
     # 3. Controles individuales y ranking (solo si hay datos modernos con tag)
@@ -1425,6 +1440,7 @@ def datos_leche(db: Database) -> dict:
     out: dict[str, Any] = {
         "serie_tanque": serie,
         "resumen": resumen,
+        "resumen_ordeno": resumen_ordeno,
         "controles": controles_modernos,
         "ranking_vacas": ranking,
         "fotos_recibos": fotos_recibos,
@@ -1923,6 +1939,12 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                         "estado_confirmado": False,
                         "fecha_parto": fecha_parto_iso,
                     }
+                    if lactancia["estado"] == "En ordeño":
+                        pausa = db.pausa_ordeno_abierta(aid)
+                        lactancia["en_pausa"] = bool(pausa)
+                        if pausa:
+                            lactancia["pausa_fecha_inicio"] = pausa["fecha_inicio"]
+                            lactancia["pausa_motivo"] = pausa["motivo"]
     except Exception as e:
         logger.error("seccion lactancia fallo", exc_info=True)
         errores["lactancia"] = str(e)

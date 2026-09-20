@@ -2,6 +2,8 @@
 Pruebas automatizadas para los endpoints de datos vectoriales de gráficos:
 GET /api/grafico-datos/<tipo>
 """
+import json
+
 import pytest
 from src.pwa.app import crear_app
 from src.db.database import Database
@@ -24,9 +26,19 @@ def pwa_client(tmp_path):
     db.registrar_animal("TAG-3", sexo="Hembra", estado="VENDIDO", raza="C", potrero="Potrero 1")  # No activo
     db.close()
 
+    # `src/server/users.json` está en .gitignore (PINs reales): en CI no existe,
+    # el guard `_requerir_login` no podía resolver el rol del user_id de la
+    # sesión y limpiaba la sesión -> 401 en todos los endpoints de gráficos.
+    # Se usa un users.json temporal propio del test para no depender del real.
+    users_file = tmp_path / "users.json"
+    users_file.write_text(
+        json.dumps([{"user_id": 1, "nombre": "Test Owner", "rol": "OWNER"}]),
+        encoding="utf-8",
+    )
+
     app = crear_app(
         db_path=db_file,
-        users_file="src/server/users.json",
+        users_file=str(users_file),
         password="test-password"
     )
     app.config["TESTING"] = True
