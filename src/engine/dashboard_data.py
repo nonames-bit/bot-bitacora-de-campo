@@ -2172,6 +2172,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                 categoria_sg = "Machos >2 años"
         else:
             categoria_sg = "Macho"
+    base["categoria"] = categoria_sg
     base["categoria_sg"] = categoria_sg
 
     # 5. Desempeño ponderal

@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 DBF_REQUERIDOS = [
     "hoja.dbf", "partos.dbf", "celos.dbf", "iamn.dbf",
     "pesos.dbf", "potrero.dbf", "traslado.dbf", "causas.dbf",
-    "tactos.dbf", "leche.dbf", "destete.dbf",
+    "tactos.dbf", "leche.dbf", "destete.dbf", "condcorp.dbf",
+    "semen.dbf", "termos.dbf",
 ]
 
 # Marcas de campo de Visual FoxPro.
@@ -855,6 +856,85 @@ def import_leche(db: Database, records) -> dict:
     return {"nuevos": nuevos, "duplicados": duplicados}
 
 
+def import_condcorp(db: Database, records) -> dict:
+    """Siembra evaluaciones de condición corporal deduplicando por
+    animal_id + fecha + valor."""
+    nuevos = 0
+    duplicados = 0
+    for r in records:
+        tag = (r.get("CODANI") or "").strip()
+        if not tag:
+            continue
+        fec = iso(r.get("FECHA"))
+        if not fec:
+            continue
+        val = r.get("CONDCORP")
+        try:
+            val_float = float(val) if val is not None else None
+        except (ValueError, TypeError):
+            val_float = None
+        if val_float is None or val_float <= 0:
+            continue
+
+        aid = _get_or_create_animal(db, tag)
+        if aid is None:
+            continue
+
+        existe = db.query_one(
+            "SELECT 1 FROM condicion_corporal WHERE animal_id = ? AND fecha = ? AND valor = ? LIMIT 1",
+            (aid, fec, val_float),
+        )
+        if existe:
+            duplicados += 1
+            continue
+
+        db.registrar_condicion_corporal(animal_tag=tag, fecha=r.get("FECHA"), valor=val_float, notas="Histórico SG (condcorp.dbf)")
+        nuevos += 1
+    return {"nuevos": nuevos, "duplicados": duplicados}
+
+
+def import_semen(db: Database, records) -> dict:
+    """Siembra inventario de pajuelas/toros desde semen.dbf."""
+    nuevos = 0
+    actualizados = 0
+    for r in records:
+        cod_ref = (r.get("REF") or "").strip()
+        nombre_toro = (r.get("NOMSEM") or "").strip()
+        if not cod_ref and not nombre_toro:
+            continue
+        codigo_final = cod_ref or nombre_toro
+        cod_raza = (str(r.get("COD1") or "")).strip()
+        saldo_raw = r.get("EXT") or 0
+        try:
+            cantidad = max(0, int(float(saldo_raw)))
+        except (ValueError, TypeError):
+            cantidad = 0
+        try:
+            costo = float(r.get("VALOR") or 0.0)
+        except (ValueError, TypeError):
+            costo = 0.0
+
+        fecha_ingreso = iso(r.get("FECHA"))
+        procedencia = (r.get("COMEN") or "").strip() or nombre_toro
+
+        existente = db.query_one("SELECT 1 FROM pajuelas_inventario WHERE codigo_toro = ? LIMIT 1", (codigo_final,))
+        db.registrar_pajuela_inventario(
+            codigo_toro=codigo_final,
+            raza=f"Raza {cod_raza}" if cod_raza else None,
+            procedencia=procedencia,
+            canastilla="SG-CANASTA",
+            cantidad=cantidad,
+            costo=costo,
+            fecha_ingreso=fecha_ingreso,
+        )
+        if existente:
+            actualizados += 1
+        else:
+            nuevos += 1
+    return {"nuevos": nuevos, "actualizados": actualizados}
+
+
+
 def import_traslados(db: Database, records) -> dict:
     """Siembra traslados deduplicando por animal_id + fecha (+ potrero_destino)."""
     nuevos = 0
@@ -1114,6 +1194,10 @@ def import_dbfs(
         conteos["traslados"] = import_traslados(db, lectores["traslado.dbf"].records())
     if "destete.dbf" in lectores:
         conteos["destetes"] = import_destetes(db, lectores["destete.dbf"].records())
+    if "condcorp.dbf" in lectores:
+        conteos["condicion_corporal"] = import_condcorp(db, lectores["condcorp.dbf"].records())
+    if "semen.dbf" in lectores:
+        conteos["pajuelas_inventario"] = import_semen(db, lectores["semen.dbf"].records())
 
     # Fotos si vienen en fotos_data o en dbf_data ("Fotos.Zip" o "fotos.zip")
     fotos_source = fotos_data

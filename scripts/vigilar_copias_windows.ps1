@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Vigilante automatico para la carpeta de copias de Software Ganadero en Windows.
+    [DEPRECADO] Vigilante automatico de copias de Software Ganadero.
 .DESCRIPTION
-    Monitorea la carpeta local donde Software Ganadero genera los backups (.Zip) por fecha.
-    Al detectar un archivo nuevo o modificado (comparando fecha de modificacion, tamano y hash MD5),
-    lo envia automaticamente via SCP al servidor VPS (DigitalOcean) y ejecuta el script de importacion
-    remota sin intervencion manual.
+    AVISO: Este script ha sido DEPRECADO a partir de septiembre 2026.
+    Ganadería JA ahora opera de forma autónoma e independiente de Software Ganadero.
+    La tarea programada local ha sido eliminada (ver scripts/desinstalar_tarea_programada.ps1).
+    Para comparar datos puntuales entre SG y Bitácora JA, use 'scripts/comparar_backup_sg.py'.
+    Este archivo se conserva únicamente como referencia histórica.
 .PARAMETER CopiasDir
     Ruta de la carpeta donde SG exporta las copias (por defecto C:\Copias).
 .PARAMETER VpsHost

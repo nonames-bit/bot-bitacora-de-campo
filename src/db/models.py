@@ -349,6 +349,8 @@ CREATE INDEX IF NOT EXISTS idx_pajuelas_toro ON pajuelas_inventario(codigo_toro)
 CREATE INDEX IF NOT EXISTS idx_termo_recarga ON termo_nitrogeno(fecha_recarga);
 CREATE INDEX IF NOT EXISTS idx_pluviometria_fecha ON pluviometria(fecha);
 CREATE INDEX IF NOT EXISTS idx_aforos_potrero_fecha ON aforos_historico(potrero_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_produccion_leche_animal_fecha ON produccion_leche(animal_id, fecha);
+CREATE INDEX IF NOT EXISTS idx_condicion_corporal_animal_fecha ON condicion_corporal(animal_id, fecha);
 -- Ronda Voisin de campo (D2): 10-15 puntos de aforo (g/kg MV por m²) por
 -- potrero con su evaluación calculada (promedio, MS/ha, días, semáforo).
 CREATE TABLE IF NOT EXISTS aforos_ronda (

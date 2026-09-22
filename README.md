@@ -718,6 +718,16 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - **Atajos de Teclado Globales (`Ctrl+K` y `/`)**: Permiten invocar instantáneamente el modal de búsqueda rápida sin tocar el ratón.
     - **Acción "Buscar otro" en Ficha**: Botón accesible en la cabecera zootécnica de cada animal (`.ficha-head-acciones`) y en la pantalla de "Sin registro", facilitando saltar a otro animal sin recargar ni perder contexto.
     - **Validación Visual Responsiva**: Probado en móvil (390×844 DPR=2) y escritorio (1366×768), asegurando que los botones y campos se adapten al 100% de ancho sin desbordes. Suite de pruebas con 864 tests pasando y sintaxis validada.
+- [x] **Emancipación de Software Ganadero (SG) y Consolidación de Históricos Zootécnicos (2026-09-22)** 🚀🐄:
+    - **Desinstalación del Vigilante Local en Windows**: Se eliminó y detuvo permanentemente la tarea programada `BitacoraVigilanteCopiasSG` y los procesos residuales de sincronización continua mediante `scripts/desinstalar_tarea_programada.ps1`. `scripts/vigilar_copias_windows.ps1` fue marcado formalmente como deprecado.
+    - **Extracción e Importación Histórica Zootécnica Profunda (`src/importers/extractor_historico_sg.py`)**: Se analizaron e importaron de forma idempotente y de alto rendimiento todas las tablas zootécnicas históricas de SG nunca antes aprovechadas:
+        - **6,713 pesajes de leche** individuales consolidados en `produccion_leche`.
+        - **702 diagnósticos de gestación / tactos** en `diagnosticos_gestacion`.
+        - **712 evaluaciones de condición corporal** (escala 1-5) en `condicion_corporal`.
+        - **101 registros de inventario de pajuelas y toros** en `pajuelas_inventario`.
+        - Registro del termo de nitrógeno líquido en `termo_nitrogeno`.
+    - **Herramienta de Auditoría y Comparación Bajo Demanda (`scripts/comparar_backup_sg.py`)**: Permite contrastar en segundos cualquier archivo `.Zip` de Software Ganadero con la base nativa SQLite de Bitácora JA, generando balances de hato activo (`estado = 'ACTIVO'`), discrepancias de ventas/bajas, animales nacidos en campo no registrados en SG, diferencias de potrero y exportación automática a Excel estructurado (`--excel reportes/comparacion_sg_bitacora.xlsx`).
+    - **Desacoplamiento de Categorías**: Categorización zootécnica autónoma de primera clase (`base["categoria"]`) en el motor de analítica, garantizando independencia total respecto a SG. Suite de pruebas con 3 tests nuevos en `tests/test_emancipacion_sg.py` en verde.
 
 ---
 

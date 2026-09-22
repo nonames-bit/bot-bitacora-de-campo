@@ -150,6 +150,10 @@ class Database:
                 ]:
                     if col_name not in cols_r:
                         self.conn.execute(f"ALTER TABLE recordatorios_programados ADD COLUMN {col_name} {col_type}")
+            if "produccion_leche" in tablas:
+                self.conn.execute("CREATE INDEX IF NOT EXISTS idx_produccion_leche_animal_fecha ON produccion_leche(animal_id, fecha)")
+            if "condicion_corporal" in tablas:
+                self.conn.execute("CREATE INDEX IF NOT EXISTS idx_condicion_corporal_animal_fecha ON condicion_corporal(animal_id, fecha)")
         except Exception:
             pass
 
@@ -1673,6 +1677,81 @@ class Database:
         return self.query(
             "SELECT * FROM produccion_leche WHERE animal_id = ? ORDER BY fecha", (aid,)
         )
+
+    # ------------------------------------------------------------------ #
+    # Condición Corporal (escala 1.0 - 5.0)
+    # ------------------------------------------------------------------ #
+    def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
+                                     notas=None) -> int:
+        aid = self.resolve_animal(animal_tag, crear=True)
+        f = iso(fecha)
+        try:
+            val_float = float(valor) if valor is not None else None
+        except (ValueError, TypeError):
+            val_float = None
+        existente = self.query_one(
+            "SELECT id FROM condicion_corporal WHERE animal_id = ? AND fecha = ? AND valor = ? LIMIT 1",
+            (aid, f, val_float),
+        )
+        if existente:
+            return existente["id"]
+        return self.insert("condicion_corporal", dict(
+            animal_id=aid, fecha=f, valor=val_float, notas=notas,
+        ))
+
+    def ultima_condicion_corporal(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        if aid is None:
+            return None
+        return self.query_one(
+            "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
+        )
+
+    def historial_condicion_corporal(self, animal_tag_or_id) -> list[sqlite3.Row]:
+        aid = self.resolve_animal(animal_tag_or_id)
+        if aid is None:
+            return []
+        return self.query(
+            "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha", (aid,)
+        )
+
+    # ------------------------------------------------------------------ #
+    # Inventario de Pajuelas / Semen y Termo
+    # ------------------------------------------------------------------ #
+    def registrar_pajuela_inventario(self, codigo_toro: str, raza: Optional[str] = None,
+                                     procedencia: Optional[str] = None, canastilla: Optional[str] = None,
+                                     cantidad: int = 0, costo: float = 0.0,
+                                     fecha_ingreso: Optional[str] = None) -> int:
+        cod = codigo_toro.strip()
+        existente = self.query_one(
+            "SELECT id FROM pajuelas_inventario WHERE codigo_toro = ? LIMIT 1",
+            (cod,),
+        )
+        if existente:
+            self.conn.execute(
+                """
+                UPDATE pajuelas_inventario
+                SET raza = COALESCE(?, raza),
+                    procedencia = COALESCE(?, procedencia),
+                    canastilla = COALESCE(?, canastilla),
+                    cantidad = ?,
+                    costo = ?,
+                    fecha_ingreso = COALESCE(?, fecha_ingreso)
+                WHERE id = ?
+                """,
+                (raza, procedencia, canastilla, cantidad, costo, iso(fecha_ingreso), existente["id"]),
+            )
+            return existente["id"]
+        return self.insert("pajuelas_inventario", dict(
+            codigo_toro=cod, raza=raza, procedencia=procedencia,
+            canastilla=canastilla, cantidad=cantidad, costo=costo,
+            fecha_ingreso=iso(fecha_ingreso), creado_en=self._ahora(),
+        ))
+
+    def listar_pajuelas_inventario(self, solo_con_saldo: bool = False) -> list[sqlite3.Row]:
+        if solo_con_saldo:
+            return self.query("SELECT * FROM pajuelas_inventario WHERE cantidad > 0 ORDER BY codigo_toro")
+        return self.query("SELECT * FROM pajuelas_inventario ORDER BY codigo_toro")
 
     def registrar_consulta_animal(self, animal_tag_or_id, hoy=None) -> None:
         """Marca ``animal_tag_or_id`` como consultado ahora (para el panel de
