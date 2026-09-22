@@ -18,6 +18,11 @@ echo "== Instalando dependencias (por si cambiaron) =="
 echo "== Corriendo suite de pruebas antes de reiniciar =="
 .venv/bin/python -m pytest -q
 
+echo "== Verificando datos históricos zootécnicos profundos =="
+if [ -f "docs/Datos20260823.Zip" ]; then
+    .venv/bin/python -m src.importers.extractor_historico_sg docs/Datos20260823.Zip data/bitacora.db || true
+fi
+
 echo "== Reiniciando servicios (Bot Telegram + Dashboard PWA) =="
 systemctl restart bitacora-bot bitacora-pwa
 sleep 2
