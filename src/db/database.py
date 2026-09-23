@@ -1488,7 +1488,7 @@ class Database:
         Restaura estados derivados si aplica (ej. muerte -> ACTIVO, traslado -> potrero anterior).
         """
         t = (tipo or "").strip().lower()
-        if t in ("parto", "gemelar", "aborto", "reabsorcion", "momificacion", "maceracion", "muerte_fetal"):
+        if t in ("parto", "partos", "gemelar", "aborto", "reabsorcion", "momificacion", "maceracion", "muerte_fetal"):
             fila = self.query_one("SELECT * FROM partos WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Parto #{eid} no encontrado."}
@@ -1518,7 +1518,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "parto", "id": eid, "mensaje": f"Parto #{eid} eliminado correctamente."}
 
-        elif t == "pesaje":
+        elif t in ("pesaje", "pesajes"):
             fila = self.query_one("SELECT * FROM pesajes WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Pesaje #{eid} no encontrado."}
@@ -1526,7 +1526,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "pesaje", "id": eid, "mensaje": f"Pesaje #{eid} eliminado correctamente."}
 
-        elif t == "tratamiento":
+        elif t in ("tratamiento", "tratamientos"):
             fila = self.query_one("SELECT * FROM tratamientos WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Tratamiento #{eid} no encontrado."}
@@ -1534,7 +1534,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "tratamiento", "id": eid, "mensaje": f"Tratamiento #{eid} eliminado correctamente."}
 
-        elif t == "traslado":
+        elif t in ("traslado", "traslados"):
             fila = self.query_one("SELECT * FROM traslados WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Traslado #{eid} no encontrado."}
@@ -1547,9 +1547,9 @@ class Database:
                 nuevo_pot = ult["potrero_destino"] if ult else orig_id
                 self.conn.execute("UPDATE animales SET potrero_id = ? WHERE id_animal = ?", (nuevo_pot, aid))
             self.conn.commit()
-            return {"ok": True, "tipo": "traslado", "id": eid, "mensaje": f"Traslado #{eid} eliminado correctamente."}
+            return {"ok": True, "tipo": "traslado", "id": eid, "mensaje": f"Traslado #{eid} eliminado y potrero restaurado."}
 
-        elif t == "servicio":
+        elif t in ("servicio", "servicios"):
             fila = self.query_one("SELECT * FROM servicios WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Servicio #{eid} no encontrado."}
@@ -1566,7 +1566,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "servicio", "id": eid, "mensaje": f"Servicio #{eid} eliminado correctamente."}
 
-        elif t == "celo":
+        elif t in ("celo", "celos"):
             fila = self.query_one("SELECT * FROM celos WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Celo #{eid} no encontrado."}
@@ -1574,7 +1574,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "celo", "id": eid, "mensaje": f"Celo #{eid} eliminado correctamente."}
 
-        elif t == "muerte":
+        elif t in ("muerte", "muertes"):
             fila = self.query_one("SELECT * FROM muertes WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Muerte #{eid} no encontrada."}
@@ -1596,7 +1596,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "movimiento", "id": eid, "mensaje": f"Movimiento #{eid} eliminado y animal restaurado a ACTIVO."}
 
-        elif t == "destete":
+        elif t in ("destete", "destetes"):
             fila = self.query_one("SELECT * FROM destetes WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Destete #{eid} no encontrado."}
@@ -1604,7 +1604,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "destete", "id": eid, "mensaje": f"Destete #{eid} eliminado correctamente."}
 
-        elif t == "secado":
+        elif t in ("secado", "secados"):
             fila = self.query_one("SELECT * FROM secados WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Secado #{eid} no encontrado."}
@@ -1612,7 +1612,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "secado", "id": eid, "mensaje": f"Secado #{eid} eliminado correctamente."}
 
-        elif t in ("diagnostico", "diagnosticos_gestacion"):
+        elif t in ("diagnostico", "diagnosticos", "diagnosticos_gestacion"):
             fila = self.query_one("SELECT * FROM diagnosticos_gestacion WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Diagnóstico #{eid} no encontrado."}
@@ -1620,7 +1620,7 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "diagnostico", "id": eid, "mensaje": f"Diagnóstico #{eid} eliminado correctamente."}
 
-        elif t in ("tarea", "recordatorio", "recordatorios_programados"):
+        elif t in ("tarea", "tareas", "recordatorio", "recordatorios", "recordatorios_programados"):
             fila = self.query_one("SELECT * FROM recordatorios_programados WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Tarea/Recordatorio #{eid} no encontrado."}
@@ -1636,13 +1636,37 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "leche", "id": eid, "mensaje": f"Control de leche #{eid} eliminado correctamente."}
 
-        elif t in ("gasto", "ingreso", "finanza", "gastos"):
+        elif t in ("gasto", "gastos", "ingreso", "ingresos", "finanza", "finanzas"):
             fila = self.query_one("SELECT * FROM gastos WHERE id = ?", (eid,))
             if not fila:
                 return {"ok": False, "error": f"Registro financiero #{eid} no encontrado."}
             self.conn.execute("DELETE FROM gastos WHERE id = ?", (eid,))
             self.conn.commit()
             return {"ok": True, "tipo": "gasto", "id": eid, "mensaje": f"Registro financiero #{eid} eliminado correctamente."}
+
+        elif t in ("condicion_corporal", "condicion"):
+            fila = self.query_one("SELECT * FROM condicion_corporal WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Condición corporal #{eid} no encontrada."}
+            self.conn.execute("DELETE FROM condicion_corporal WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "condicion_corporal", "id": eid, "mensaje": f"Condición corporal #{eid} eliminada correctamente."}
+
+        elif t in ("pluviometria", "lluvia"):
+            fila = self.query_one("SELECT * FROM pluviometria WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Registro pluviométrico #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM pluviometria WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "pluviometria", "id": eid, "mensaje": f"Registro pluviométrico #{eid} eliminado correctamente."}
+
+        elif t in ("aforo", "aforos", "aforos_historico"):
+            fila = self.query_one("SELECT * FROM aforos_historico WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Aforo #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM aforos_historico WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "aforo", "id": eid, "mensaje": f"Aforo #{eid} eliminado correctamente."}
 
         else:
             return {"ok": False, "error": f"Tipo de evento no soportado para eliminación: '{tipo}'."}
@@ -3025,10 +3049,15 @@ class Database:
 
     def eliminar_registro(self, tabla: str, id_registro: int) -> bool:
         """Elimina una fila puntual de una tabla de eventos por id (comando
-        /deshacer). Restringido a TABLAS_EVENTOS por allow-list: nunca borra
-        de animales/potreros u otras tablas por esta vía."""
+        /deshacer). Restringido a TABLAS_EVENTOS por allow-list. Reutiliza
+        eliminar_evento para revertir estados colaterales (muerte -> ACTIVO,
+        traslado -> potrero anterior, etc.)."""
         if tabla not in self.TABLAS_EVENTOS:
             raise ValueError(f"Tabla no permitida para /deshacer: {tabla}")
+        res = self.eliminar_evento(tipo=tabla, eid=id_registro)
+        if res.get("ok"):
+            return True
+        # Si no fue manejado por ramas específicas, fallback de borrado seguro en la tabla
         cur = self.conn.execute(f"DELETE FROM {tabla} WHERE id = ?", (id_registro,))
         self.conn.commit()
         return cur.rowcount > 0

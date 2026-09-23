@@ -2062,14 +2062,14 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.post("/api/eventos/eliminar")
     def api_eliminar_evento():
-        """Elimina un evento registrado en la base de datos.
-        Restringido estrictamente al rol OWNER.
+        """Elimina un evento registrado en la base de datos con reversión inteligente de estados.
+        Restringido a roles OWNER y ADMIN.
         """
         rol = _rol_actual()
-        if rol != "OWNER":
+        if rol not in ("OWNER", "ADMIN"):
             return jsonify({
                 "ok": False,
-                "error": "Acceso restringido: solo el propietario (OWNER) puede eliminar eventos del sistema.",
+                "error": "Acceso restringido: solo el propietario (OWNER) o administrador pueden eliminar eventos del sistema.",
             }), 403
 
         datos = request.get_json(silent=True) or request.form or {}
@@ -2091,11 +2091,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
             # Notificar al canal de auditoría / equipo
             try:
-                nombre_autor = session.get("nombre") or session.get("username") or "Propietario"
-                texto_aviso = f"🗑️ Evento de {tipo.upper()} #{eid} eliminado del sistema por {nombre_autor} (OWNER)."
+                nombre_autor = session.get("nombre") or session.get("username") or "Administrador"
+                texto_aviso = f"🗑️ Evento de {tipo.upper()} #{eid} eliminado del sistema por {nombre_autor} ({rol})."
                 db_r.conn.execute(
                     "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
-                    (uid, nombre_autor, "OWNER", texto_aviso, db_r._ahora()),
+                    (uid, nombre_autor, rol, texto_aviso, db_r._ahora()),
                 )
                 db_r.conn.commit()
             except Exception:
@@ -2105,6 +2105,41 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         except Exception as e:
             logger.exception("Error al eliminar evento %s #%s: %s", tipo, eid, e)
             return jsonify({"ok": False, "error": f"Error interno al eliminar evento: {str(e)}"}), 500
+        finally:
+            try:
+                db_r.close()
+            except Exception:
+                pass
+
+    @app.get("/api/eventos/recientes")
+    def api_eventos_recientes():
+        """Lista los últimos eventos de campo registrados con datos para deshacer."""
+        rol = _rol_actual()
+        limite = request.args.get("limite", 30, type=int)
+        limite = max(5, min(100, limite))
+        db_r = _db(db_path)
+        try:
+            filas = db_r.ultimos_registros(limite=limite)
+            eventos = []
+            for f in filas:
+                eventos.append({
+                    "id": f["id"],
+                    "tabla": f["tabla"],
+                    "tag": f["tag"],
+                    "fecha": f["fecha"],
+                    "resumen": f["resumen"],
+                    "creado_en": f["creado_en"],
+                    "registrado_por": f["registrado_por"],
+                })
+            return jsonify({
+                "ok": True,
+                "eventos": eventos,
+                "puede_deshacer": rol in ("OWNER", "ADMIN"),
+                "rol": rol,
+            })
+        except Exception as e:
+            logger.exception("Error al listar eventos recientes: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
         finally:
             try:
                 db_r.close()

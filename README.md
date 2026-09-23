@@ -728,6 +728,24 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - Registro del termo de nitrógeno líquido en `termo_nitrogeno`.
     - **Herramienta de Auditoría y Comparación Bajo Demanda (`scripts/comparar_backup_sg.py`)**: Permite contrastar en segundos cualquier archivo `.Zip` de Software Ganadero con la base nativa SQLite de Bitácora JA, generando balances de hato activo (`estado = 'ACTIVO'`), discrepancias de ventas/bajas, animales nacidos en campo no registrados en SG, diferencias de potrero y exportación automática a Excel estructurado (`--excel reportes/comparacion_sg_bitacora.xlsx`).
     - **Desacoplamiento de Categorías**: Categorización zootécnica autónoma de primera clase (`base["categoria"]`) en el motor de analítica, garantizando independencia total respecto a SG. Suite de pruebas con 3 tests nuevos en `tests/test_emancipacion_sg.py` en verde.
+- [x] **Módulo de Reversión Inteligente (Deshacer) y Métricas Zootécnicas Avanzadas de Software Ganadero en PWA (2026-09-22)** 🔄📊:
+    - **Reversión Inteligente en Cascada (`src/db/database.py`)**:
+        - `eliminar_evento()` unificado con tolerancia a nombres singulares/plurales y soporte para `condicion_corporal`, `pluviometria`, `aforos_historico`.
+        - Restauración inteligente automática: si se borra una muerte/venta/descarte, el animal vuelve a `estado = 'ACTIVO'`; si se borra un traslado, retorna a su `potrero_origen`; si se borra un parto o servicio, limpia alertas y crías asociadas sin eventos posteriores.
+        - Delegación total de `eliminar_registro()` a `eliminar_evento()`, dotando también al comando `/deshacer` de Telegram de reversión inteligente.
+    - **Control de Acceso y API de Eventos Recientes (`src/pwa/app.py`)**:
+        - Endpoint `POST /api/eventos/eliminar` habilitado para roles `OWNER` y `ADMIN`.
+        - Endpoint `GET /api/eventos/recientes` que entrega los últimos 35 eventos con metadatos descriptivos y bandera de permisos para deshacer.
+    - **Interfaz Visual en PWA (`src/pwa/templates/index.html` y `src/pwa/static/app.js`)**:
+        - Modal responsivo `#modal-ultimos-eventos` con diseño táctil, botón rojo de confirmación y advertencia clara de reversión inteligente. Accesible desde el menú de usuario y desde "Más Módulos".
+        - Botón de papelera en la Ficha del Animal disponible para `OWNER` y `ADMIN`.
+    - **Métricas Zootécnicas Oficiales de Software Ganadero**:
+        - **Índice de Fertilidad (I.F.) Oficial SG**: $I.F. = \frac{\text{Preñadas} + \text{Descanso } \le 120\text{d}}{\text{Vientres } \ge 3.0\text{a}} \times 100$ con semáforo zootécnico (🟢 $\ge 75\%$, 🟡 $60-74\%$, 🔴 $< 60\%$) y desglose completo.
+        - **Distribución de Días Abiertos (DA)**: 9 intervalos zootécnicos idénticos a SG (`0-90`, `91-120`, ..., `>300`) con barras proporcionales.
+        - **Intervalo Entre Partos (IEP)**: 6 tramos de frecuencia (`<365`, `365-395`, ..., `>485`).
+        - **Días En Leche (DEL) & Curva de Lactancia**: Promedio DEL del lote y vacas por etapa (Pico, Meseta, Descenso, Prolongada) en la pestaña Leche.
+    - **Auditoría de Referencia**: Documento técnico `docs/sg_reportes_referencia/ANALISIS_FOTOS_SG.md` analizando las 11 fotos de Software Ganadero suministradas por el usuario.
+    - **Validación Visual**: Emulación y capturas automatizadas en móvil (390×844 DPR=2) y escritorio (1280×800) mediante Edge Headless + CDP guardadas en `docs/screenshots_sg/`. Suite de pruebas pasando con 20 tests en `test_eliminar_eventos.py` y `test_reproductive_engine.py`.
 
 ---
 

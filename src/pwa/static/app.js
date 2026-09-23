@@ -625,6 +625,32 @@
   }
   function renderRepro(d) {
     var h = "<h3>" + icon("sperm") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+
+    // 1. Tarjeta Destacada: Índice de Fertilidad Oficial (Software Ganadero)
+    var ifInfo = d.indice_fertilidad || {};
+    if (ifInfo.indice_pct != null) {
+      var semColor = ifInfo.indice_pct >= 75 ? "var(--verde-marca)" : (ifInfo.indice_pct >= 60 ? "#D97706" : "#DC2626");
+      h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid " + semColor + "; background:var(--superficie); box-shadow:0 2px 6px var(--sombra);'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;'>"
+        + "<div>"
+        + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad Oficial (Software Ganadero)</div>"
+        + "<div style='font-size:28px; font-weight:800; color:" + semColor + "; line-height:1.2; margin:4px 0;'>"
+        + (ifInfo.semaforo || "🟢") + " " + ifInfo.indice_pct + "%"
+        + "</div>"
+        + "<div style='font-size:13px; font-weight:600; color:var(--texto);'>" + esc(ifInfo.diagnostico || "Eficiencia reproductiva") + "</div>"
+        + "</div>"
+        + "<div style='display:flex; gap:12px; flex-wrap:wrap; font-size:12.5px; background:rgba(0,0,0,0.03); padding:10px 14px; border-radius:8px;'>"
+        + "<div><span style='color:var(--texto-suave); display:block; font-size:11px;'>Preñadas</span><b>" + (ifInfo.prenadas || 0) + "</b></div>"
+        + "<div><span style='color:var(--texto-suave); display:block; font-size:11px;'>En descanso (&le;120d)</span><b>" + (ifInfo.en_descanso || 0) + "</b></div>"
+        + "<div><span style='color:var(--texto-suave); display:block; font-size:11px;'>Vientres aptos</span><b>" + (ifInfo.total_vientres || 0) + "</b></div>"
+        + "</div>"
+        + "</div>"
+        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:10px; border-top:1px dashed var(--borde-suave); padding-top:6px;'>"
+        + "Fórmula oficial: ((Preñadas + Vacas &le; 120 días postparto) / Vientres con edad &ge; 3 años o paridas) &times; 100"
+        + "</div>"
+        + "</div>";
+    }
+
     var k = d.kpis || {};
     h += "<h4>" + icon("chartBar") + "Indicadores del hato</h4>";
     h += "<div class='kpis'>"
@@ -634,6 +660,48 @@
       + kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok")
       + kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto")
       + "</div>";
+
+    // 2. Distribución de Días Abiertos (DA) por tramos (Software Ganadero)
+    if (d.distribucion_dias_abiertos && d.distribucion_dias_abiertos.length) {
+      h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie);'>"
+        + "<div style='font-size:14px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;'>"
+        + icon("chartBar", 16) + "Distribución de Frecuencias [Días Abiertos]"
+        + "</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Desglose de vacas abiertas según tramos de días postparto (referencia SG)</div>"
+        + "<div style='display:flex; flex-direction:column; gap:6px;'>";
+      d.distribucion_dias_abiertos.forEach(function (tr) {
+        var barColor = (tr.tramo === "0-90" || tr.tramo === "91-120") ? "var(--verde-marca)" : (tr.tramo === "121-150" || tr.tramo === "151-180" ? "#D97706" : "#DC2626");
+        h += "<div style='display:flex; align-items:center; gap:8px; font-size:12px;'>"
+          + "<span style='width:65px; font-weight:600; white-space:nowrap; text-align:right;'>" + tr.tramo + " d</span>"
+          + "<div style='flex:1; background:rgba(0,0,0,0.06); height:16px; border-radius:4px; overflow:hidden;'>"
+          + "<div style='width:" + Math.max(tr.pct, tr.cantidad > 0 ? 3 : 0) + "%; background:" + barColor + "; height:100%; border-radius:4px; transition:width 0.3s;'></div>"
+          + "</div>"
+          + "<span style='width:75px; font-weight:700; color:var(--texto);'>" + tr.cantidad + " (" + tr.pct + "%)</span>"
+          + "</div>";
+      });
+      h += "</div></div>";
+    }
+
+    // 3. Distribución de Intervalo Entre Partos (IEP) por tramos
+    if (d.distribucion_iep && d.distribucion_iep.length) {
+      h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie);'>"
+        + "<div style='font-size:14px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;'>"
+        + icon("calendar", 16) + "Intervalo Entre Partos (IEP) por Tramos"
+        + "</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Frecuencias de partos consecutivos en el hato</div>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;'>";
+      d.distribucion_iep.forEach(function (tr) {
+        var cBg = tr.tramo === "<365" || tr.tramo === "365-395" ? "rgba(16,185,129,0.12)" : (tr.tramo === "396-425" || tr.tramo === "426-455" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.12)");
+        var cBdr = tr.tramo === "<365" || tr.tramo === "365-395" ? "var(--verde-marca)" : (tr.tramo === "396-425" || tr.tramo === "426-455" ? "#D97706" : "#DC2626");
+        h += "<div style='border:1px solid " + cBdr + "; background:" + cBg + "; padding:10px; border-radius:8px; text-align:center;'>"
+          + "<div style='font-size:12px; font-weight:600;'>" + tr.tramo + " días</div>"
+          + "<div style='font-size:18px; font-weight:800; margin:2px 0;'>" + tr.cantidad + "</div>"
+          + "<div style='font-size:11px; color:var(--texto-suave);'>" + tr.pct + "%</div>"
+          + "</div>";
+      });
+      h += "</div></div>";
+    }
+
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -1486,6 +1554,27 @@
       + (ord.en_pausa ? "<span class='chip ambar' style='font-size:11px; font-weight:700;'>" + ord.en_pausa + " en pausa</span>" : "")
       + "</div>"
       + "</div>";
+
+    // 1c. Análisis de DEL (Días En Leche) y Etapas de Lactancia (Software Ganadero)
+    var delInfo = d.analisis_del || {};
+    if (delInfo.total_vacas > 0) {
+      h += "<div class='card' style='padding:14px 16px; margin-bottom:16px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+        + "<div>"
+        + "<div style='font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("milk", 16) + "Días En Leche (DEL) &amp; Curva de Lactancia</div>"
+        + "<small style='color:var(--texto-suave); font-size:11.5px;'>Promedio del lote activo: <b>" + delInfo.promedio_del + " días</b> (" + delInfo.total_vacas + " vacas evaluadas)</small>"
+        + "</div>"
+        + "</div>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;'>";
+      (delInfo.etapas || []).forEach(function (et) {
+        h += "<div style='background:rgba(0,0,0,0.03); border:1px solid var(--borde-suave); border-radius:8px; padding:10px; text-align:center;'>"
+          + "<div style='font-size:11.5px; font-weight:600; color:var(--texto-suave);'>" + esc(et.etapa) + "</div>"
+          + "<div style='font-size:18px; font-weight:800; color:var(--texto); margin:2px 0;'>" + et.cantidad + "</div>"
+          + "<div style='font-size:11px; font-weight:600; color:var(--verde-marca);'>" + et.pct + "%</div>"
+          + "</div>";
+      });
+      h += "</div></div>";
+    }
 
     // 2. Gráfico Interactivo de Producción Diaria (SVG responsivo)
     h += "<div class='tarjeta-leche-grafico' style='background:var(--superficie); border:1px solid var(--borde); border-radius:10px; padding:16px; margin:16px 0; box-shadow:0 1px 4px var(--sombra);'>"
@@ -9302,30 +9391,30 @@
     var btn = nav.querySelector("button[data-tab='" + tabId + "']");
     if (btn) btn.click();
   };
-  // Helper para renderizar botón de eliminación de eventos (solo rol OWNER)
+  // Helper para renderizar botón de eliminación de eventos (roles OWNER y ADMIN)
   function renderBtnEliminar(tipo, id, desc) {
-    var esOwner = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
-    if (!esOwner || !id) return "";
-    return "<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='" + esc(tipo) + "' data-id='" + esc(id) + "' data-desc='" + esc(desc || "") + "' title='Eliminar registro permanentemente (solo OWNER)' aria-label='Eliminar'>" + icon("trash", 13) + "</button>";
+    var puede = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER" || window.__usuarioActual.rol === "ADMIN");
+    if (!puede || !id) return "";
+    return "<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='" + esc(tipo) + "' data-id='" + esc(id) + "' data-desc='" + esc(desc || "") + "' title='Deshacer / Eliminar registro' aria-label='Eliminar'>" + icon("trash", 13) + "</button>";
   }
   window.renderBtnEliminar = renderBtnEliminar;
 
   function ejecutarEliminacionEvento(tipo, id, desc) {
-    var esOwner = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER");
-    if (!esOwner) {
-      alert("Acceso restringido: solo el propietario (OWNER) puede eliminar eventos registrados.");
+    var puede = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER" || window.__usuarioActual.rol === "ADMIN");
+    if (!puede) {
+      alert("Acceso restringido: solo el propietario (OWNER) o administrador pueden eliminar eventos registrados.");
       return;
     }
     if (!tipo || !id) {
       alert("Error: tipo o ID de evento no especificado.");
       return;
     }
-    var msg = "¿Seguro que deseas ELIMINAR permanentemente este registro del sistema?\n\n"
+    var msg = "¿Seguro que deseas DESHACER / ELIMINAR permanentemente este registro del sistema?\n\n"
       + "• " + (desc || (tipo.toUpperCase() + " #" + id)) + "\n\n"
-      + "⚠️ Esta acción es irreversible y revertirá estados o alertas derivadas si aplica (solo autorizada para el OWNER).\n\n¿Continuar?";
+      + "⚠️ Esta acción revertirá de forma inteligente estados o potreros derivados si aplica (ej. el animal vuelve a ACTIVO tras una muerte o salida).\n\n¿Continuar?";
     if (!window.confirm(msg)) return;
 
-    mostrarToast("Eliminando evento...", "ambar");
+    mostrarToast("Deshaciendo evento...", "ambar");
     fetch("/api/eventos/eliminar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -9339,8 +9428,12 @@
         alert("Error al eliminar evento: " + ((res.data && res.data.error) || ("HTTP " + res.status)));
         return;
       }
-      mostrarToast("✓ " + (res.data.mensaje || "Evento eliminado correctamente"), "verde");
+      mostrarToast("✓ " + (res.data.mensaje || "Registro eliminado correctamente"), "verde");
       vibrarConfirmacion();
+      var modalUlt = document.getElementById("modal-ultimos-eventos");
+      if (modalUlt && modalUlt.style.display !== "none") {
+        mostrarModalUltimosEventos();
+      }
       if (window.__ultimaFicha && window.__ultimaFicha.tag) {
         abrirFichaDesdeTag(window.__ultimaFicha.tag);
       }
@@ -9352,6 +9445,72 @@
     });
   }
   window.ejecutarEliminacionEvento = ejecutarEliminacionEvento;
+
+  function mostrarModalUltimosEventos() {
+    var modal = document.getElementById("modal-ultimos-eventos");
+    var lista = document.getElementById("ultimos-eventos-lista");
+    var btnCerrar = document.getElementById("btn-cerrar-modal-ultimos-eventos");
+    if (!modal || !lista) return;
+
+    modal.style.display = "flex";
+    lista.innerHTML = "<div style='text-align:center; padding:24px; color:var(--texto-suave);'>Cargando eventos recientes de la finca...</div>";
+
+    if (btnCerrar && !btnCerrar._bound) {
+      btnCerrar._bound = true;
+      btnCerrar.addEventListener("click", function () { modal.style.display = "none"; });
+      modal.addEventListener("click", function (e) { if (e.target === modal) modal.style.display = "none"; });
+    }
+
+    fetch("/api/eventos/recientes?limite=35")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.ok || !d.eventos || !d.eventos.length) {
+          lista.innerHTML = "<div style='text-align:center; padding:24px; color:var(--texto-suave);'>No hay eventos de campo recientes.</div>";
+          return;
+        }
+
+        var html = "";
+        d.eventos.forEach(function (ev) {
+          var tagTxt = ev.tag ? ("#" + esc(ev.tag)) : "Sin arete";
+          var fechaTxt = esc(fechaCorta(ev.fecha));
+          var creadoTxt = ev.creado_en ? esc(ev.creado_en.replace("T", " ").slice(0, 16)) : "";
+          var resumenTxt = esc(ev.resumen || ev.tabla);
+          var quienTxt = ev.registrado_por ? ("por " + esc(ev.registrado_por)) : "";
+
+          html += "<div class='card' style='padding:12px 14px; margin:0; display:flex; justify-content:space-between; align-items:center; gap:12px; background:var(--superficie); border:1px solid var(--borde-suave); border-radius:10px; box-shadow:0 1px 3px var(--sombra);'>"
+            + "<div style='flex:1; min-width:0;'>"
+            + "<div style='display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;'>"
+            + "<span class='chip' style='font-size:11px; font-weight:700; text-transform:uppercase; background:rgba(47,82,51,0.08); color:var(--verde-marca);'>" + esc(ev.tabla) + "</span>"
+            + (ev.tag ? "<a href='#' class='tag-link' onclick='event.preventDefault(); document.getElementById(\"modal-ultimos-eventos\").style.display=\"none\"; abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-weight:700; color:var(--verde-marca); text-decoration:none; font-size:13px;'>" + tagTxt + "</a>" : "")
+            + "<span style='font-size:11.5px; color:var(--texto-suave);'>📅 " + fechaTxt + "</span>"
+            + "</div>"
+            + "<div style='font-size:13px; font-weight:600; color:var(--texto); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;'>" + resumenTxt + "</div>"
+            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:3px;'>🕒 " + creadoTxt + " " + quienTxt + "</div>"
+            + "</div>";
+
+          if (d.puede_deshacer) {
+            html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
+              + "🗑️ Deshacer</button>";
+          }
+          html += "</div>";
+        });
+        lista.innerHTML = html;
+
+        // Asignar manejador de evento Deshacer en cada tarjeta
+        lista.querySelectorAll(".btn-deshacer-accion").forEach(function (b) {
+          b.addEventListener("click", function () {
+            var t = this.getAttribute("data-tipo");
+            var id = this.getAttribute("data-id");
+            var desc = this.getAttribute("data-desc");
+            ejecutarEliminacionEvento(t, id, desc);
+          });
+        });
+      })
+      .catch(function (err) {
+        lista.innerHTML = "<div style='color:var(--rojo-alerta); padding:16px;'>Error al cargar eventos: " + esc(err.message) + "</div>";
+      });
+  }
+  window.mostrarModalUltimosEventos = mostrarModalUltimosEventos;
 
   function ejecutarPausaOrdeno(tag) {
     if (!tag) return;

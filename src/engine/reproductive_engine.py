@@ -174,3 +174,114 @@ class ReproductiveEngine:
     @staticmethod
     def programar_inseminacion(fecha_celo, am_pm=None) -> dict:
         return programar_inseminacion(fecha_celo, am_pm)
+
+    @staticmethod
+    def indice_fertilidad(total_prenadas: int, vacas_descanso: int, total_vientres: int) -> dict:
+        return calcular_indice_fertilidad(total_prenadas, vacas_descanso, total_vientres)
+
+    @staticmethod
+    def categorizar_dias_abiertos(da: int | None) -> str:
+        return tramo_dias_abiertos(da)
+
+    @staticmethod
+    def categorizar_iep(iep: int | None) -> str:
+        return tramo_iep(iep)
+
+    @staticmethod
+    def categorizar_del(del_dias: int | None) -> str:
+        return tramo_del(del_dias)
+
+
+def calcular_indice_fertilidad(
+    total_prenadas: int,
+    vacas_descanso_postparto: int,
+    total_vientres_aptos: int,
+) -> dict:
+    """Calcula el Índice de Fertilidad (I.F.) oficial según la metodología de Software Ganadero:
+    I.F. = ((Hembras Preñadas + Vacas <= 120 días postparto) / Vientres Aptos) * 100
+    """
+    p = max(0, int(total_prenadas or 0))
+    d = max(0, int(vacas_descanso_postparto or 0))
+    v = max(0, int(total_vientres_aptos or 0))
+    numerador = p + d
+    pct = round((numerador / v) * 100, 2) if v > 0 else 0.0
+    # Evaluación semafórica zootécnica
+    if pct >= 75.0:
+        semaforo = "🟢"
+        diagnostico = "Excelente eficiencia reproductiva"
+    elif pct >= 60.0:
+        semaforo = "🟡"
+        diagnostico = "Eficiencia aceptable / seguimiento"
+    else:
+        semaforo = "🔴"
+        diagnostico = "Alerta reproductiva (bajo porcentaje preñado/descanso)"
+
+    return {
+        "indice_pct": pct,
+        "prenadas": p,
+        "en_descanso": d,
+        "numerador_util": numerador,
+        "total_vientres": v,
+        "semaforo": semaforo,
+        "diagnostico": diagnostico,
+    }
+
+
+def tramo_dias_abiertos(da: int | None) -> str:
+    """Clasifica los Días Abiertos según los brackets de Software Ganadero."""
+    if da is None:
+        return "Sin dato"
+    d = int(da)
+    if d <= 90:
+        return "0-90"
+    elif d <= 120:
+        return "91-120"
+    elif d <= 150:
+        return "121-150"
+    elif d <= 180:
+        return "151-180"
+    elif d <= 210:
+        return "181-210"
+    elif d <= 240:
+        return "211-240"
+    elif d <= 270:
+        return "241-270"
+    elif d <= 300:
+        return "271-300"
+    else:
+        return ">300"
+
+
+def tramo_iep(iep: int | None) -> str:
+    """Clasifica el Intervalo Entre Partos según los brackets de Software Ganadero."""
+    if iep is None:
+        return "Sin dato"
+    i = int(iep)
+    if i < 365:
+        return "<365"
+    elif i <= 395:
+        return "365-395"
+    elif i <= 425:
+        return "396-425"
+    elif i <= 455:
+        return "426-455"
+    elif i <= 485:
+        return "456-485"
+    else:
+        return ">485"
+
+
+def tramo_del(del_dias: int | None) -> str:
+    """Clasifica los Días En Leche (DEL) según las etapas de la curva de lactancia de Software Ganadero."""
+    if del_dias is None:
+        return "Sin dato"
+    d = int(del_dias)
+    if d <= 100:
+        return "0-100 (Pico)"
+    elif d <= 200:
+        return "101-200 (Meseta)"
+    elif d <= 340:
+        return "201-340 (Descenso)"
+    else:
+        return ">340 (Prolongada)"
+
