@@ -144,14 +144,19 @@ def test_api_eliminar_evento_control_acceso_rbac():
     r2 = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid})
     assert r2.status_code == 403
 
-    # 3. Con rol ADMIN -> 403 (solo OWNER autorizado)
+    # 3. Con rol ADMIN -> 200 OK (ADMIN también tiene permiso)
     with client.session_transaction() as sess:
         sess["autenticado"] = True
         sess["user_id"] = 3
         sess["username"] = "admin"
         sess["rol"] = "ADMIN"
-    r3 = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid})
-    assert r3.status_code == 403
+    # Registrar otro pesaje para borrar con admin
+    d_admin = Database(db_path)
+    pid_admin = d_admin.registrar_pesaje("TAG_X", "2026-09-14", 390.0)
+    d_admin.close()
+    r3 = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid_admin})
+    assert r3.status_code == 200
+    assert r3.get_json()["ok"] is True
 
     # 4. Con rol OWNER -> 200 OK y eliminado
     with client.session_transaction() as sess:
@@ -167,7 +172,15 @@ def test_api_eliminar_evento_control_acceso_rbac():
     # Verificar que el pesaje ya no existe
     d_check = Database(db_path)
     assert d_check.query_one("SELECT id FROM pesajes WHERE id = ?", (pid,)) is None
+    assert d_check.query_one("SELECT id FROM pesajes WHERE id = ?", (pid_admin,)) is None
     d_check.close()
+
+    # 5. Probar GET /api/eventos/recientes
+    r_recientes = client.get("/api/eventos/recientes?limite=10")
+    assert r_recientes.status_code == 200
+    rec_data = r_recientes.get_json()
+    assert rec_data["ok"] is True
+    assert isinstance(rec_data["eventos"], list)
 
     for p in (db_path, users_path):
         try:

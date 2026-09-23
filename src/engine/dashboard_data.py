@@ -28,6 +28,12 @@ try:
         Database,
         potreros_reales_where,
     )
+    from .reproductive_engine import (
+        calcular_indice_fertilidad,
+        tramo_dias_abiertos,
+        tramo_iep,
+        tramo_del,
+    )
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -37,6 +43,12 @@ except ImportError:  # ejecución directa
         ULT_TRASLADO_CTE,
         Database,
         potreros_reales_where,
+    )
+    from src.engine.reproductive_engine import (  # type: ignore
+        calcular_indice_fertilidad,
+        tramo_dias_abiertos,
+        tramo_iep,
+        tramo_del,
     )
 
 logger = logging.getLogger(__name__)
@@ -538,6 +550,107 @@ def datos_reproduccion(db: Database) -> dict:
         errores["edad_1er_parto"] = str(e)
         edad_1p = None
 
+    # Métricas avanzadas Software Ganadero: I.F. y Distribución de Días Abiertos
+    indice_fert = None
+    dist_da = []
+    try:
+        sql_vientres = """
+            SELECT a.id_animal, a.tag, a.fecha_nacimiento,
+                   (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS ult_parto,
+                   (SELECT dg.resultado FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_res,
+                   (SELECT MAX(s.fecha) FROM servicios s WHERE s.vaca_id = a.id_animal) AS ult_serv_fecha,
+                   (SELECT MAX(c.fecha) FROM celos c WHERE c.vaca_id = a.id_animal) AS ult_celo_fecha
+            FROM animales a
+            WHERE a.estado = 'ACTIVO' AND (a.sexo IS NULL OR LOWER(SUBSTR(a.sexo, 1, 1)) = 'h')
+        """
+        vientres_filas = db.query(sql_vientres)
+        total_prenadas = 0
+        vacas_descanso = 0
+        total_vientres = 0
+
+        tramos_da_order = ["0-90", "91-120", "121-150", "151-180", "181-210", "211-240", "241-270", "271-300", ">300"]
+        conteo_da = {t: 0 for t in tramos_da_order}
+        total_vacas_abiertas = 0
+
+        for r in vientres_filas:
+            fnac = r["fecha_nacimiento"]
+            ult_p = r["ult_parto"]
+            edad_dias = None
+            if fnac and len(str(fnac)) >= 10:
+                try:
+                    edad_dias = (hoy - date.fromisoformat(str(fnac)[:10])).days
+                except Exception:
+                    edad_dias = None
+
+            # Es vientre apto si ya parió o si tiene edad >= 3 años (1095 días)
+            es_apta = bool(ult_p) or (edad_dias is not None and edad_dias >= 1095)
+            if not es_apta:
+                continue
+
+            total_vientres += 1
+
+            # Evaluar preñez
+            res_diag = str(r["ult_diag_res"] or "").upper()
+            esta_prenada = "PREÑADA" in res_diag or "POSITIV" in res_diag
+
+            if esta_prenada:
+                total_prenadas += 1
+            else:
+                if ult_p and len(str(ult_p)) >= 10:
+                    try:
+                        dias_p = (hoy - date.fromisoformat(str(ult_p)[:10])).days
+                    except Exception:
+                        dias_p = None
+                    if dias_p is not None and dias_p >= 0:
+                        if dias_p <= 120:
+                            vacas_descanso += 1
+                        tr = tramo_dias_abiertos(dias_p)
+                        if tr in conteo_da:
+                            conteo_da[tr] += 1
+                            total_vacas_abiertas += 1
+
+        indice_fert = calcular_indice_fertilidad(total_prenadas, vacas_descanso, total_vientres)
+        for t in tramos_da_order:
+            cnt = conteo_da[t]
+            pct = round((cnt / total_vacas_abiertas) * 100, 1) if total_vacas_abiertas > 0 else 0.0
+            dist_da.append({"tramo": t, "cantidad": cnt, "pct": pct})
+    except Exception as e:
+        logger.error("seccion indice_fertilidad_sg fallo", exc_info=True)
+        errores["indice_fertilidad_sg"] = str(e)
+
+    # Distribución de IEP por tramos (Software Ganadero)
+    dist_iep = []
+    try:
+        sql_iep_pares = """
+            WITH partos_ord AS (
+                SELECT vaca_id, fecha,
+                       LAG(fecha) OVER (PARTITION BY vaca_id ORDER BY fecha) as prev_fecha
+                FROM partos
+                WHERE vaca_id IS NOT NULL AND (tipo_evento IS NULL OR tipo_evento NOT IN ('ABORTO', 'REABSORCION'))
+            )
+            SELECT (julianday(fecha) - julianday(prev_fecha)) as iep_dias
+            FROM partos_ord
+            WHERE prev_fecha IS NOT NULL
+        """
+        iep_filas = db.query(sql_iep_pares)
+        tramos_iep_order = ["<365", "365-395", "396-425", "426-455", "456-485", ">485"]
+        conteo_iep = {t: 0 for t in tramos_iep_order}
+        total_obs_iep = 0
+        for f in iep_filas:
+            dias = f["iep_dias"]
+            if dias and dias > 0:
+                tr = tramo_iep(int(dias))
+                if tr in conteo_iep:
+                    conteo_iep[tr] += 1
+                    total_obs_iep += 1
+        for t in tramos_iep_order:
+            cnt = conteo_iep[t]
+            pct = round((cnt / total_obs_iep) * 100, 1) if total_obs_iep > 0 else 0.0
+            dist_iep.append({"tramo": t, "cantidad": cnt, "pct": pct})
+    except Exception as e:
+        logger.error("seccion dist_iep fallo", exc_info=True)
+        errores["dist_iep"] = str(e)
+
     kpis = {
         "iep_promedio_dias": iep["iep_promedio_dias"] if iep else None,
         "dias_abiertos_promedio": dias_ab["dias_abiertos_promedio"] if dias_ab else None,
@@ -545,6 +658,7 @@ def datos_reproduccion(db: Database) -> dict:
         "servicios_por_concepcion": conc["servicios_por_concepcion"] if conc else None,
         "tasa_concepcion": conc["tasa_concepcion"] if conc else None,
         "edad_primer_parto_meses": edad_1p["edad_primer_parto_meses"] if edad_1p else None,
+        "indice_fertilidad_pct": indice_fert["indice_pct"] if indice_fert else None,
     }
 
     out: dict[str, Any] = {
@@ -554,6 +668,9 @@ def datos_reproduccion(db: Database) -> dict:
         "eco_palp_pendientes": pendientes,
         "condicion_corporal_critica": cc_critica,
         "kpis": kpis,
+        "indice_fertilidad": indice_fert,
+        "distribucion_dias_abiertos": dist_da,
+        "distribucion_iep": dist_iep,
     }
     if errores:
         out["errores"] = errores
@@ -1468,6 +1585,54 @@ def datos_leche(db: Database) -> dict:
     except Exception:
         total_historico = 0
 
+    # 6. Análisis DEL (Días En Leche) y etapas de lactancia (Software Ganadero)
+    del_resumen = {"promedio_del": 0, "total_vacas": 0, "etapas": []}
+    try:
+        sql_del = """
+            SELECT a.id_animal, a.tag,
+                   (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) as ult_parto
+            FROM animales a
+            WHERE a.estado = 'ACTIVO' AND (a.sexo IS NULL OR LOWER(SUBSTR(a.sexo, 1, 1)) = 'h')
+              AND (
+                  a.id_animal IN (SELECT DISTINCT animal_id FROM produccion_leche WHERE fecha >= '2024-01-01')
+                  OR a.id_animal IN (SELECT DISTINCT vaca_id FROM partos WHERE fecha >= date('now', '-450 days'))
+              )
+        """
+        vacas_lact = db.query(sql_del)
+        tramos_del_order = ["0-100 (Pico)", "101-200 (Meseta)", "201-340 (Descenso)", ">340 (Prolongada)"]
+        conteo_del = {t: 0 for t in tramos_del_order}
+        dias_del_total = 0
+        n_del = 0
+        hoy_del = date.today()
+        for vl in vacas_lact:
+            up = vl["ult_parto"]
+            if up and len(str(up)) >= 10:
+                try:
+                    d_del = (hoy_del - date.fromisoformat(str(up)[:10])).days
+                except Exception:
+                    d_del = None
+                if d_del is not None and d_del >= 0:
+                    dias_del_total += d_del
+                    n_del += 1
+                    tr = tramo_del(d_del)
+                    if tr in conteo_del:
+                        conteo_del[tr] += 1
+
+        etapas = []
+        for t in tramos_del_order:
+            cnt = conteo_del[t]
+            pct = round((cnt / n_del) * 100, 1) if n_del > 0 else 0.0
+            etapas.append({"etapa": t, "cantidad": cnt, "pct": pct})
+
+        del_resumen = {
+            "promedio_del": round(dias_del_total / n_del, 1) if n_del > 0 else 0,
+            "total_vacas": n_del,
+            "etapas": etapas,
+        }
+    except Exception as e:
+        logger.error("seccion analisis_del fallo", exc_info=True)
+        errores["analisis_del"] = str(e)
+
     out: dict[str, Any] = {
         "serie_tanque": serie,
         "resumen": resumen,
@@ -1476,6 +1641,7 @@ def datos_leche(db: Database) -> dict:
         "ranking_vacas": ranking,
         "fotos_recibos": fotos_recibos,
         "total_historico_sg": total_historico,
+        "analisis_del": del_resumen,
     }
     if errores:
         out["errores"] = errores

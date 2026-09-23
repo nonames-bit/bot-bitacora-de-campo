@@ -61,3 +61,49 @@ def test_programar_inseminacion_sin_franja():
     prog = programar_inseminacion(date(2026, 8, 15), None)
     assert prog["fecha"] == date(2026, 8, 15)
     assert prog["franja"] == "tarde"
+
+
+def test_indice_fertilidad():
+    # Caso 1: 50 preñadas + 10 descanso / 80 vientres = 60 / 80 = 75.0%
+    res1 = ReproductiveEngine.indice_fertilidad(50, 10, 80)
+    assert res1["indice_pct"] == 75.0
+    assert res1["semaforo"] == "🟢"
+    assert res1["numerador_util"] == 60
+
+    # Caso 2: 40 preñadas + 8 descanso / 80 vientres = 48 / 80 = 60.0%
+    res2 = ReproductiveEngine.indice_fertilidad(40, 8, 80)
+    assert res2["indice_pct"] == 60.0
+    assert res2["semaforo"] == "🟡"
+
+    # Caso 3: 30 preñadas + 5 descanso / 80 vientres = 35 / 80 = 43.75%
+    res3 = ReproductiveEngine.indice_fertilidad(30, 5, 80)
+    assert res3["indice_pct"] == 43.75
+    assert res3["semaforo"] == "🔴"
+
+    # Caso borde: 0 vientres
+    res0 = ReproductiveEngine.indice_fertilidad(0, 0, 0)
+    assert res0["indice_pct"] == 0.0
+
+
+def test_tramos_zootecnicos():
+    # Días abiertos
+    assert ReproductiveEngine.categorizar_dias_abiertos(75) == "0-90"
+    assert ReproductiveEngine.categorizar_dias_abiertos(110) == "91-120"
+    assert ReproductiveEngine.categorizar_dias_abiertos(145) == "121-150"
+    assert ReproductiveEngine.categorizar_dias_abiertos(350) == ">300"
+    assert ReproductiveEngine.categorizar_dias_abiertos(None) == "Sin dato"
+
+    # IEP
+    assert ReproductiveEngine.categorizar_iep(350) == "<365"
+    assert ReproductiveEngine.categorizar_iep(380) == "365-395"
+    assert ReproductiveEngine.categorizar_iep(410) == "396-425"
+    assert ReproductiveEngine.categorizar_iep(500) == ">485"
+    assert ReproductiveEngine.categorizar_iep(None) == "Sin dato"
+
+    # DEL (Días En Leche)
+    assert ReproductiveEngine.categorizar_del(60) == "0-100 (Pico)"
+    assert ReproductiveEngine.categorizar_del(150) == "101-200 (Meseta)"
+    assert ReproductiveEngine.categorizar_del(250) == "201-340 (Descenso)"
+    assert ReproductiveEngine.categorizar_del(380) == ">340 (Prolongada)"
+    assert ReproductiveEngine.categorizar_del(None) == "Sin dato"
+
