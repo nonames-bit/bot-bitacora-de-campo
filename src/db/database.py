@@ -1408,30 +1408,6 @@ class Database:
             "flujo_mensual": self.flujo_caja_mensual(desde, hasta),
         }
 
-    def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
-                                     notas=None, registrado_por=None) -> int:
-        animal_id = self.resolve_animal(animal_tag, crear=True)
-        f = iso(fecha)
-        # Mismo animal + misma fecha + mismo valor: nota reenviada, no dos
-        # evaluaciones reales idénticas el mismo día.
-        existente = self._id_si_ya_existe("condicion_corporal", {
-            "animal_id": animal_id, "fecha": f, "valor": valor,
-        })
-        if existente:
-            return existente
-        return self.insert("condicion_corporal", dict(
-            animal_id=animal_id, fecha=f, valor=valor, notas=notas,
-            creado_en=self._ahora(), registrado_por=registrado_por,
-        ))
-
-    def ultima_condicion_corporal(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
-        aid = self.resolve_animal(animal_tag_or_id)
-        if aid is None:
-            return None
-        return self.query_one(
-            "SELECT * FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC LIMIT 1", (aid,)
-        )
-
     def registrar_recordatorio(self, mensaje: str, fecha_programada=None, hora=None,
                                creado_por=None, asignado_a=None, asignado_a_id=None,
                                tipo_objetivo=None, animal_tag=None, potrero_nombre=None,
@@ -1639,6 +1615,18 @@ class Database:
             self.conn.commit()
             return {"ok": True, "tipo": "gasto", "id": eid, "mensaje": f"Registro financiero #{eid} eliminado correctamente."}
 
+        elif t in ("pausa_ordeno", "reanudar_ordeno"):
+            # Pausa / reanudación temporal de ordeño (tiempo de no ordeñarse,
+            # distinto del secado definitivo). Al eliminarla, la vaca vuelve a
+            # contarse como ordeñándose (pierde el "en pausa" abierto).
+            fila = self.query_one("SELECT * FROM pausas_ordeno WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Pausa de ordeño #{eid} no encontrada."}
+            self.conn.execute("DELETE FROM pausas_ordeno WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "pausa_ordeno", "id": eid,
+                    "mensaje": f"Pausa de ordeño #{eid} eliminada (la vaca vuelve a ser ordeñándose)."}
+
         else:
             return {"ok": False, "error": f"Tipo de evento no soportado para eliminación: '{tipo}'."}
 
@@ -1682,7 +1670,7 @@ class Database:
     # Condición Corporal (escala 1.0 - 5.0)
     # ------------------------------------------------------------------ #
     def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
-                                     notas=None) -> int:
+                                     notas=None, registrado_por=None) -> int:
         aid = self.resolve_animal(animal_tag, crear=True)
         f = iso(fecha)
         try:
@@ -1697,6 +1685,7 @@ class Database:
             return existente["id"]
         return self.insert("condicion_corporal", dict(
             animal_id=aid, fecha=f, valor=val_float, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
         ))
 
     def ultima_condicion_corporal(self, animal_tag_or_id) -> Optional[sqlite3.Row]:

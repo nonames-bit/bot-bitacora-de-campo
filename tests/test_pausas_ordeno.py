@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from src.db.database import Database  # noqa: E402
 from src.engine.dashboard_data import datos_leche  # noqa: E402
+from src.engine.dashboard_data import conteos_tablero  # noqa: E402
 
 # Recibo de quincena de 16 días (mismo seed que test_produccion_leche_recibos):
 # total 5.092 L -> promedio diario 318,2 L/día.
@@ -118,3 +119,56 @@ def test_litros_por_vaca_dia_divide_entre_vacas_ordenandose(tmp_path):
         assert not (res.get("errores") or {}).get("resumen_ordeno")
     finally:
         db.close()
+
+
+def test_muerte_de_cria_mantiene_a_la_vaca_en_produccion(db):
+    # Vaca en ordeño con una cría a la que se le registra la muerte.
+    _vaca_en_ordeno(db, "M01")
+    db.registrar_parto(vaca_tag="M01",
+                       fecha=(date.today() - timedelta(days=30)).isoformat(),
+                       sexo_cria="Hembra", id_cria_tag="M01-C")
+    db.registrar_muerte("M01-C", fecha=date.today().isoformat())
+    assert db.get_animal("M01-C")["estado"] == "MUERTO"
+    # Perder la cría NO la saca de producción: el criterio de "en etapa de
+    # ordeño" solo depende del último parto y del secado, no de tener cría viva.
+    assert db.resumen_ordeno() == {"en_ordeno": 1, "en_pausa": 0, "ordenandose": 1}
+
+
+def test_destete_de_cria_no_secara_la_madre(db):
+    _vaca_en_ordeno(db, "D01")
+    db.registrar_parto(vaca_tag="D01",
+                       fecha=(date.today() - timedelta(days=30)).isoformat(),
+                       sexo_cria="Macho", id_cria_tag="D01-C")
+    db.registrar_destete("D01-C", fecha=date.today().isoformat())
+    # Destetar/apartar la cría es independiente del secado: la madre sigue
+    # contada como ordeñándose (no se crea ninguna fila en `secados`).
+    assert db.query_one("SELECT COUNT(*) AS n FROM secados")["n"] == 0
+    assert db.resumen_ordeno() == {"en_ordeno": 1, "en_pausa": 0, "ordenandose": 1}
+
+
+def test_pausa_y_reanudar_salen_en_eventos_recientes(db):
+    _vaca_en_ordeno(db, "E01")
+    db.registrar_pausa_ordeno("E01", motivo="Ternero flaco")
+    evs = conteos_tablero(db)["eventos_recientes"]
+    pa = [e for e in evs if e["tipo"] == "PAUSA_ORDENO"]
+    assert pa, "pausar una vaca debe salir en el feed de eventos del Tablero"
+    assert pa[0]["tag"] == "E01"
+    assert "Pausa de ordeño" in pa[0]["descripcion"]
+
+    db.reanudar_ordeno("E01")
+    evs = conteos_tablero(db)["eventos_recientes"]
+    re = [e for e in evs if e["tipo"] == "REANUDAR_ORDENO"]
+    assert re, "reanudar una vaca debe salir en el feed de eventos"
+    assert re[0]["tag"] == "E01"
+
+
+def test_eliminar_pausa_restaura_ordenandose(db):
+    _vaca_en_ordeno(db, "X01")
+    pid = db.registrar_pausa_ordeno("X01", motivo="Ternero flaco")
+    assert db.resumen_ordeno() == {"en_ordeno": 1, "en_pausa": 1, "ordenandose": 0}
+
+    res = db.eliminar_evento("pausa_ordeno", pid, user_id=1)
+    assert res["ok"]
+    # Al borrar la pausa, la vaca vuelve a ser ordeñándose.
+    assert db.resumen_ordeno() == {"en_ordeno": 1, "en_pausa": 0, "ordenandose": 1}
+    assert db.query_one("SELECT COUNT(*) AS n FROM pausas_ordeno")["n"] == 0

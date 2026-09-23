@@ -573,6 +573,10 @@
           chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("destete", 13) + " Destete</span>";
         } else if (tipo === "SECADO") {
           chipHtml = "<span class='chip azul' style='font-weight:700;'>" + icon("milk", 13) + " Secado</span>";
+        } else if (tipo === "PAUSA_ORDENO") {
+          chipHtml = "<span class='chip ambar' style='font-weight:700;'>" + icon("milk", 13) + " Pausa ordeño</span>";
+        } else if (tipo === "REANUDAR_ORDENO") {
+          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("milk", 13) + " Reanudó ordeño</span>";
         } else if (tipo === "PESAJE") {
           chipHtml = "<span class='chip gris' style='font-weight:700;'>" + icon("scale", 13) + " Pesaje</span>";
         } else if (tipo === "TRATAMIENTO") {
@@ -1479,11 +1483,11 @@
     // de arriba se calcula dividiendo entre "ordenandose" (en ordeño menos
     // las que están en pausa), no entre el total en ordeño.
     h += "<div class='card' style='padding:14px 16px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;'>"
-      + "<div style='display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600;'>" + icon("cowCalf", 16) + "Vacas en ordeño</div>"
-      + "<div style='display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px;'>"
-      + "<span>En ordeño: <b>" + (ord.en_ordeno || 0) + "</b></span>"
+      + "<div style='display:flex; align-items:center; gap:8px; font-size:13.5px; font-weight:600;'>" + icon("cowCalf", 16) + "Vacas paridas</div>"
+      + "<div style='display:flex; gap:16px; flex-wrap:wrap; align-items:center; font-size:12.5px;'>"
+      + "<span><b>" + (ord.en_ordeno || 0) + "</b> paridas</span>"
       + "<span style='color:var(--verde-marca); font-weight:700;'>Ordeñándose: " + (ord.ordenandose || 0) + "</span>"
-      + (ord.en_pausa ? "<span class='chip ambar' style='font-size:11px; font-weight:700;'>" + ord.en_pausa + " en pausa</span>" : "")
+      + "<span style='color:var(--color-ambar-txt, #D97706); font-weight:700;'>En pausa: " + (ord.en_pausa || 0) + "</span>"
       + "</div>"
       + "</div>";
 

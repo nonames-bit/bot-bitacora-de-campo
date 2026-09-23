@@ -364,11 +364,42 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
                        COALESCE(s.estado, '') AS notas, s.id AS id
                 FROM servicios s
                 JOIN animales a ON a.id_animal = s.vaca_id
+            """
+        # Feed adicional (opcional): pausas temporales de ordeño. Solo se
+        # agregan si la tabla ya existe (las bases viejas aún no la crearon),
+        # para no tumbar el feed completo del Tablero por una tabla faltante.
+        _sql_pausas = """
+                UNION ALL
+
+                SELECT 'PAUSA_ORDENO' AS tipo, po.fecha_inicio AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       '' AS detalle_label,
+                       'Pausa de ordeño' ||
+                       CASE WHEN po.motivo IS NOT NULL AND TRIM(po.motivo) != '' THEN ' · ' || TRIM(po.motivo) ELSE '' END AS descripcion,
+                       COALESCE(po.notas, '') AS notas, po.id AS id
+                FROM pausas_ordeno po
+                JOIN animales a ON a.id_animal = po.animal_id
+
+                UNION ALL
+
+                SELECT 'REANUDAR_ORDENO' AS tipo, po.fecha_fin AS fecha, a.tag AS tag, a.nombre AS nombre,
+                       '' AS detalle_tag,
+                       '' AS detalle_label,
+                       'Reanudación de ordeño' AS descripcion,
+                       '' AS notas, po.id AS id
+                FROM pausas_ordeno po
+                JOIN animales a ON a.id_animal = po.animal_id
+                WHERE po.fecha_fin IS NOT NULL
+            """
+        _sql_fin = """
             )
             WHERE fecha IS NOT NULL AND TRIM(fecha) != ''
             ORDER BY fecha DESC, id DESC
             LIMIT 35
         """
+        if db.query_one("SELECT 1 AS x FROM sqlite_master WHERE type = 'table' AND name = 'pausas_ordeno'") is not None:
+            query_eventos += _sql_pausas
+        query_eventos += _sql_fin
         eventos_recientes = _filas_dict(db.query(query_eventos))
     except Exception as e:
         logger.error("seccion eventos_recientes fallo", exc_info=True)
