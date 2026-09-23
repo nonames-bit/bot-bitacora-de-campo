@@ -284,6 +284,7 @@ def generar_pdf(
     ruta_salida: Optional[str] = None,
     hoy: Optional[date] = None,
     periodo: Optional[str] = None,
+    seccion: Optional[str] = None,
 ) -> str:
     """Genera un PDF con el reporte de campo y devuelve su ruta.
 
@@ -381,12 +382,42 @@ def generar_pdf(
 
     logo_path = buscar_logo_path()
 
+    sec_clean = str(seccion or "").strip().lower()
+    if sec_clean in ("leche", "produccion"):
+        titulo_doc = "GANADERÍA JA · Informe de Producción Lechera"
+        sub1_doc = f"MÓDULO DE LECHE  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"TANQUE DIARIO  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+    elif sec_clean in ("finanzas", "caja"):
+        titulo_doc = "GANADERÍA JA · Informe Financiero y Flujo de Caja"
+        sub1_doc = f"MÓDULO FINANCIERO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"INGRESOS Y EGRESOS  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+    elif sec_clean in ("pasturas", "potreros"):
+        titulo_doc = "GANADERÍA JA · Informe de Potreros y Pasturas (Voisin)"
+        sub1_doc = f"PASTURAS Y ROTACIÓN  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"OCUPACIÓN Y REPOSO  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+    elif sec_clean in ("sanidad", "tratamientos"):
+        titulo_doc = "GANADERÍA JA · Informe Sanitario y Tratamientos"
+        sub1_doc = f"CONTROL VETERINARIO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"HISTORIAL CLÍNICO Y RETIROS  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+    elif sec_clean in ("repro", "reproduccion"):
+        titulo_doc = "GANADERÍA JA · Informe Reproductivo del Hato"
+        sub1_doc = f"REPRODUCCIÓN Y GENÉTICA  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"SERVICIOS, TACTOS Y PAJUELAS  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+    elif sec_clean in ("inventario", "hato"):
+        titulo_doc = "GANADERÍA JA · Informe de Inventario de Ganado"
+        sub1_doc = f"CENSO GANADERO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"HATO ACTIVO  |  Corte a la fecha: {fecha_hoy.isoformat()}"
+    else:
+        titulo_doc = "GANADERÍA JA · Informe Zootécnico de Campo"
+        sub1_doc = f"BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}"
+        sub2_doc = f"HATO ACTIVO  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}"
+
     # Encabezado ejecutivo: franja verde sólida en flujo principal de página 1.
     story = [
         tabla_encabezado_franja(
-            "GANADERÍA JA · Informe Zootécnico de Campo",
-            f"BITÁCORA DE CAMPO  |  SISTEMA OFICIAL GANADERÍA JA · Generado: {fecha_hoy.isoformat()}",
-            f"HATO ACTIVO  |  Período evaluado: {datos['periodo']['desde']} al {datos['periodo']['hasta']}",
+            titulo_doc,
+            sub1_doc,
+            sub2_doc,
             ancho_total=ANCHO_UTIL,
             logo_path=logo_path,
         ),

@@ -498,7 +498,8 @@ def datos_reproduccion(db: Database) -> dict:
         celos = []
     try:
         diags = _filas_dict(db.query(
-            """SELECT a.tag, d.fecha, d.resultado, d.dias_gestacion FROM diagnosticos_gestacion d
+            """SELECT a.tag, d.fecha, d.resultado, d.dias_gestacion, d.metodo, d.hallazgo, d.detalle, d.toro_pajuela, d.responsable
+               FROM diagnosticos_gestacion d
                JOIN animales a ON a.id_animal = d.vaca_id
                WHERE a.estado = 'ACTIVO' ORDER BY d.fecha DESC LIMIT 20"""))
     except Exception as e:
@@ -661,6 +662,24 @@ def datos_reproduccion(db: Database) -> dict:
         "indice_fertilidad_pct": indice_fert["indice_pct"] if indice_fert else None,
     }
 
+    perdidas = None
+    try:
+        perdidas = db.metricas_perdidas_reproductivas()
+    except Exception as e:
+        logger.error("seccion perdidas_reproductivas fallo", exc_info=True)
+        errores["perdidas_reproductivas"] = str(e)
+
+    pajuelas_data = []
+    termo_data = None
+    alertas_paj = []
+    try:
+        pajuelas_data = _filas_dict(db.listar_pajuelas())
+        termo_data = db.ultimo_estado_termo(hoy)
+        alertas_paj = _filas_dict(db.alertas_stock_pajuelas(3))
+    except Exception as e:
+        logger.error("seccion pajuelas/termo fallo", exc_info=True)
+        errores["pajuelas_termo"] = str(e)
+
     out: dict[str, Any] = {
         "fep_30d": fep,
         "celos_recientes": celos,
@@ -671,6 +690,10 @@ def datos_reproduccion(db: Database) -> dict:
         "indice_fertilidad": indice_fert,
         "distribucion_dias_abiertos": dist_da,
         "distribucion_iep": dist_iep,
+        "perdidas": perdidas,
+        "pajuelas": pajuelas_data,
+        "termo": termo_data,
+        "alertas_pajuelas": alertas_paj,
     }
     if errores:
         out["errores"] = errores
@@ -2099,7 +2122,8 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         base["servicios"] = []
     try:
         base["diagnosticos"] = _filas_dict(db.query(
-            """SELECT id, fecha, resultado, dias_gestacion FROM diagnosticos_gestacion
+            """SELECT id, fecha, resultado, dias_gestacion, metodo, hallazgo, detalle, toro_pajuela, responsable
+               FROM diagnosticos_gestacion
                WHERE vaca_id = ? ORDER BY fecha DESC, id DESC LIMIT 10""", (aid,)))
     except Exception as e:
         logger.error("seccion diagnosticos fallo", exc_info=True)

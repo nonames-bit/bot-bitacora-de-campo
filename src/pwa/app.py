@@ -888,6 +888,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             user_auth = None
 
         if user_auth:
+            # Rotación de sesión: no arrastrar claves de una sesión previa
+            # (ej. telegram_id de otro usuario en un equipo compartido).
+            session.clear()
             session["autenticado"] = True
             session["user_id"] = user_auth.get("user_id")
             session["telegram_id"] = user_auth.get("telegram_id")
@@ -898,9 +901,22 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
         # 2. Intentar autenticar por contraseña maestra (PWA_PASSWORD)
         if clave_esperada and intento and hmac.compare_digest(intento, clave_esperada):
+            # El user_id del formulario no es confiable (el login.html ni
+            # siquiera lo pide): solo se adopta si existe en users.json.
+            # Un ID inexistente o revocado se descarta en vez de firmar
+            # eventos y presencia a nombre de otro usuario.
+            uid_verificado = None
+            if uid_form is not None:
+                try:
+                    _uid_candidato = int(uid_form)
+                except (ValueError, TypeError):
+                    _uid_candidato = None
+                if _uid_candidato is not None and _rol_de(_uid_candidato, users_file):
+                    uid_verificado = _uid_candidato
+            session.clear()
             session["autenticado"] = True
-            session["user_id"] = uid_form
-            session["rol"] = _rol_de(uid_form, users_file) or "OWNER"
+            session["user_id"] = uid_verificado
+            session["rol"] = _rol_de(uid_verificado, users_file) or "OWNER"
             session["nombre"] = "Propietario" if session["rol"] == "OWNER" else "Usuario"
             session["avatar"] = "patron" if session["rol"] == "OWNER" else "admin"
             return redirect("/")
@@ -2205,6 +2221,30 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.get("/api/simular-cruzamiento")
+    def api_simular_cruzamiento():
+        """Simulador de cruzamiento en 1 toque (Fase 5.2): vaca + toro ->
+        veredicto de consanguinidad 3G ANTES de servir. Solo lectura
+        (nunca crea animales) y abierto a todos los roles autenticados,
+        porque el trabajador lo necesita en el corral al inseminar."""
+        vaca = (request.args.get("vaca") or "").strip()
+        toro = (request.args.get("toro") or "").strip()
+        if not vaca or not toro:
+            return jsonify({"ok": False, "error": "Indique vaca y toro (ej. ?vaca=JA457&toro=T01)."}), 400
+        db_s = _db(db_path)
+        try:
+            sim = db_s.simular_cruzamiento(vaca, toro)
+            sim["ok"] = True
+            return jsonify(sim)
+        except Exception:
+            logger.exception("Error al simular cruzamiento %s x %s", vaca, toro)
+            return jsonify({"ok": False, "error": "No se pudo evaluar el cruzamiento."}), 500
+        finally:
+            try:
+                db_s.close()
+            except Exception:
+                pass
+
     @app.get("/api/badges")
     def api_badges():
         # Contadores ligeros para los badges de la navegación (Agenda/Repro/Sanidad).
@@ -2502,9 +2542,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             # Verificar que el PIN no esté en colisión con OTRO usuario. Los
             # PIN se guardan hasheados, así que no se puede comparar por
             # igualdad de string -- usuario_con_pin verifica contra cada hash.
+            # Mensaje genérico a propósito: no revela el PIN ni a quién
+            # pertenece, para que un ADMIN no pueda cosechar PINs ajenos.
             u_dup = auth_inst.usuario_con_pin(pin, excluir_user_id=uid)
             if u_dup is not None:
-                return jsonify({"error": f"El PIN '{pin}' ya está en uso por '{u_dup.get('nombre')}'. Cada usuario debe tener un PIN único."}), 400
+                return jsonify({"error": "Ese PIN ya está asignado a otro usuario. Elija un PIN de 4 dígitos diferente."}), 400
 
             auth_inst.agregar_usuario(
                 user_id=uid,
@@ -2516,6 +2558,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 borrar_telegram_id=borrar_tg,
             )
             usr_guardado = auth_inst.obtener_usuario(uid) or {}
+            # El PIN nunca vuelve al cliente: ya quedó hasheado en
+            # users.json y el frontend solo muestra "····". Quien creó el
+            # usuario debe dictar el PIN en persona, no por la red.
             return jsonify({
                 "ok": True,
                 "mensaje": f"Usuario '{nombre}' (Level {1 if rol_nuevo=='OWNER' else 2 if rol_nuevo=='ADMIN' else 3}) guardado exitosamente.",
@@ -2524,7 +2569,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     "telegram_id": usr_guardado.get("telegram_id"),
                     "nombre": nombre,
                     "rol": rol_nuevo,
-                    "pin": pin,
                     "avatar": usr_guardado.get("avatar") or ("patron" if rol_nuevo=="OWNER" else "admin" if rol_nuevo=="ADMIN" else "vaquero"),
                 }
             })
@@ -2557,10 +2601,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     if u.get("user_id") == target_uid and str(u.get("rol", "")).strip().upper() == "OWNER":
                         return jsonify({"error": "Un ADMIN no puede modificar el PIN de un OWNER."}), 403
 
-            # Verificar colisión de PIN (contra cada hash, ver usuario_con_pin)
+            # Verificar colisión de PIN (contra cada hash, ver usuario_con_pin).
+            # Genérico a propósito: no revela el PIN ni a quién pertenece.
             u_dup = auth_inst.usuario_con_pin(nuevo_pin, excluir_user_id=target_uid)
             if u_dup is not None:
-                return jsonify({"error": f"El PIN '{nuevo_pin}' ya está en uso por '{u_dup.get('nombre')}'. Ingrese un PIN diferente."}), 400
+                return jsonify({"error": "Ese PIN ya está asignado a otro usuario. Ingrese un PIN diferente."}), 400
 
             auth_inst.asignar_pin(target_uid, nuevo_pin)
             return jsonify({"ok": True, "mensaje": "PIN actualizado exitosamente."})
@@ -2722,6 +2767,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             registrado_por=uid,
                             tipo_evento=tipo_evento,
                             padre_tag=padre_tag,
+                            distocia=bool(payload.get("distocia")),
                         )
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
@@ -2953,6 +2999,63 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             evento_origen=payload.get("evento_origen") or "sync_offline",
                             fecha=fecha,
                             hora=payload.get("hora"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("palpacion", "tacto", "diagnostico"):
+                        p_peso = payload.get("peso_kg")
+                        p_cc = payload.get("cond_corporal")
+                        peso_val = float(p_peso) if (p_peso and str(p_peso).replace(".", "", 1).isdigit()) else None
+                        cc_val = float(p_cc) if (p_cc and str(p_cc).replace(".", "", 1).isdigit()) else None
+                        db_sync.registrar_diagnostico(
+                            vaca_tag=payload.get("animal_tag") or payload.get("tag") or payload.get("vaca_tag"),
+                            fecha=fecha,
+                            resultado=payload.get("resultado") or "PREÑADA",
+                            dias_gestacion=payload.get("dias_gestacion"),
+                            responsable=payload.get("responsable") or payload.get("veterinario"),
+                            registrado_por=uid,
+                            metodo=payload.get("metodo") or "TACTO",
+                            hallazgo=payload.get("hallazgo"),
+                            detalle=payload.get("detalle") or payload.get("notas"),
+                            toro_pajuela=payload.get("toro_pajuela") or payload.get("reproductor"),
+                            peso_kg=peso_val,
+                            cond_corporal=cc_val,
+                        )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("nitrogeno", "recarga_nitrogeno"):
+                        db_sync.registrar_recarga_nitrogeno(
+                            fecha_recarga=fecha,
+                            dias_intervalo=int(payload.get("dias_intervalo") or 21),
+                            proxima_recarga=payload.get("proxima_recarga"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("pajuela", "pajuela_add", "inventario_pajuela"):
+                        db_sync.registrar_pajuela(
+                            codigo_toro=payload.get("codigo_toro") or payload.get("toro"),
+                            raza=payload.get("raza"),
+                            procedencia=payload.get("procedencia"),
+                            canastilla=payload.get("canastilla"),
+                            cantidad=int(payload.get("cantidad") or 1),
+                            costo=float(payload.get("costo") or 0.0),
+                            fecha_ingreso=fecha,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("aforo", "aforo_potrero"):
+                        afo_val = float(payload.get("aforo_kg_m2") or payload.get("aforo") or 0.0)
+                        db_sync.registrar_aforo(
+                            potrero_id_o_nom=payload.get("potrero_id") or payload.get("potrero") or payload.get("nombre"),
+                            aforo_kg_m2=afo_val,
+                            fecha=fecha,
+                            metodo=payload.get("metodo") or "CUADRO_1M2",
+                            registrado_por=uid,
                         )
                         procesados += 1
                         if id_local:
@@ -3207,6 +3310,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         if _rol_actual() not in ("OWNER", "ADMIN"):
             return jsonify({"error": "Se requiere rol ADMIN u OWNER para descargar reportes PDF."}), 403
 
+        import time
+        seccion = request.args.get("seccion")
         periodo = request.args.get("periodo") or "semanal"
         p_lower = str(periodo).lower().strip()
         dias = 7
@@ -3220,7 +3325,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             dias = max(1, int(p_lower))
 
         os.makedirs(REPORTES_DIR_DEFAULT, exist_ok=True)
-        ruta_salida = os.path.join(REPORTES_DIR_DEFAULT, f"reporte_ja_{periodo}_{int(time.time())}.pdf")
+        sec_sufijo = f"_{seccion}" if seccion else ""
+        ruta_salida = os.path.join(REPORTES_DIR_DEFAULT, f"reporte_ja{sec_sufijo}_{periodo}_{int(time.time())}.pdf")
 
         db_rep = _db(db_path)
         try:
@@ -3228,10 +3334,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 from ..reports.pdf_report import generar_pdf
             except ImportError:
                 from src.reports.pdf_report import generar_pdf  # type: ignore
-            ruta = generar_pdf(db_rep, dias=dias, ruta_salida=ruta_salida, periodo=periodo)
+            ruta = generar_pdf(db_rep, dias=dias, ruta_salida=ruta_salida, periodo=periodo, seccion=seccion)
             if not ruta or not os.path.isfile(ruta):
                 abort(500)
-            nombre_descarga = f"reporte_ganaderia_ja_{periodo}.pdf"
+            nombre_descarga = f"reporte_ganaderia_ja{sec_sufijo}_{periodo}.pdf"
             return send_file(os.path.abspath(ruta), mimetype="application/pdf",
                              as_attachment=True, download_name=nombre_descarga)
         except Exception as e:
@@ -3239,6 +3345,107 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             abort(500)
         finally:
             db_rep.close()
+
+    @app.get("/api/reporte.xlsx")
+    def api_reporte_xlsx():
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Se requiere rol ADMIN u OWNER para exportar datos en Excel."}), 403
+
+        import io
+        seccion = request.args.get("seccion") or "inventario"
+        dias_arg = request.args.get("dias")
+        dias = int(dias_arg) if (dias_arg and str(dias_arg).isdigit()) else 90
+
+        db_rep = _db(db_path)
+        try:
+            try:
+                from ..reports.excel_report import exportar_excel_bytes
+            except ImportError:
+                from src.reports.excel_report import exportar_excel_bytes  # type: ignore
+            contenido_xlsx = exportar_excel_bytes(db_rep, seccion=seccion, dias=dias)
+            nombre_descarga = f"reporte_{seccion}_ganaderia_ja.xlsx"
+            return send_file(
+                io.BytesIO(contenido_xlsx),
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                as_attachment=True,
+                download_name=nombre_descarga,
+            )
+        except Exception as e:
+            logger.exception("Error al generar reporte Excel en PWA: %s", e)
+            return jsonify({"error": f"Error al generar reporte Excel: {str(e)}"}), 500
+        finally:
+            db_rep.close()
+
+    @app.get("/api/pajuelas")
+    def api_pajuelas():
+        db_inst = _db(db_path)
+        try:
+            pajuelas = _filas_dict(db_inst.listar_pajuelas())
+            alertas = _filas_dict(db_inst.alertas_stock_pajuelas(3))
+            termo = db_inst.ultimo_estado_termo()
+            return jsonify({
+                "ok": True,
+                "pajuelas": pajuelas,
+                "alertas_stock": alertas,
+                "termo": termo,
+                "total_pajuelas": sum(p.get("cantidad", 0) for p in pajuelas),
+                "total_toros": len(pajuelas),
+            })
+        finally:
+            db_inst.close()
+
+    @app.post("/api/pajuelas")
+    def api_pajuelas_crear():
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        toro = (data.get("codigo_toro") or data.get("toro") or "").strip()
+        if not toro:
+            return jsonify({"error": "Código de toro requerido"}), 400
+        db_inst = _db(db_path)
+        try:
+            pid = db_inst.registrar_pajuela(
+                codigo_toro=toro,
+                raza=data.get("raza"),
+                procedencia=data.get("procedencia"),
+                canastilla=data.get("canastilla"),
+                cantidad=int(data.get("cantidad") or 1),
+                costo=float(data.get("costo") or 0.0),
+                fecha_ingreso=data.get("fecha") or data.get("fecha_ingreso"),
+            )
+            return jsonify({"ok": True, "id": pid})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+        finally:
+            db_inst.close()
+
+    @app.get("/api/termo-nitrogeno")
+    def api_termo_nitrogeno():
+        db_inst = _db(db_path)
+        try:
+            estado = db_inst.ultimo_estado_termo()
+            recargas = _filas_dict(db_inst.listar_recargas_nitrogeno(10))
+            return jsonify({"ok": True, "termo": estado, "recargas": recargas})
+        finally:
+            db_inst.close()
+
+    @app.post("/api/termo-nitrogeno/recarga")
+    def api_termo_recarga():
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        db_inst = _db(db_path)
+        try:
+            rid = db_inst.registrar_recarga_nitrogeno(
+                fecha_recarga=data.get("fecha") or data.get("fecha_recarga"),
+                dias_intervalo=int(data.get("dias_intervalo") or 21),
+                proxima_recarga=data.get("proxima_recarga"),
+            )
+            return jsonify({"ok": True, "id": rid})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+        finally:
+            db_inst.close()
 
     @app.get("/api/sistema")
     def api_sistema():

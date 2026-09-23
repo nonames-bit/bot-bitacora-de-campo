@@ -691,6 +691,30 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
       - **Cabecera PWA**: `actualizarClimaHeader` en `src/pwa/static/app.js` ahora activa la cortina animada `#header-lluvia` estrictamente cuando `esta_lloviendo` es `true`. En ausencia de lluvia muestra sol radiante (`☀️`), nublado (`⛅`) o reposo nocturno (`🌙 ✨`).
       - **Validación**: 19 pruebas en `tests/test_pronostico.py` en verde (100% pasando), `node --check` y `python -m compileall` sin errores.
 - [x] Suite de pruebas con pytest: **844+ pruebas en verde** (100% pasando).
+- [x] **PWA móvil: burbuja, KPIs, foto y mapa alineado (2026-09-23)**:
+  - La burbuja del chat y la lupita viven dentro de la barra inferior en celular (≤640px), no encima de precios, edad ni mapa.
+  - La última tarjeta KPI impar ocupa la fila completa (sin hueco). Etiqueta "Activos" sin glifos ♀♂ que se veían rotos.
+  - Identificar por foto usa botón "Tomar foto o elegir" en español, no el input nativo "Choose File".
+  - Abrir una ficha ya no vuelve a mostrar la barra Potrero/Tag. El clima dice "prob. del día" y solo marca "Lloviendo ahora" si hay lluvia en el momento.
+  - El mapa satelital cuenta activos con el mismo potrero vigente que Inventario (`COALESCE(potrero_id, último traslado)`), no solo `potrero_id`.
+  - Verificado en móvil 390×844 (Edge headless + copia de la base, `scratch/verif_cambios_movil.py`): 9/9 checks en verde y `node --check`, `ruff`, `compileall`, `test_mapa_data.py` (4) y `test_potreros_reales_inventario.py` (9) pasando.
+- [x] **Endurecimiento de sesión PWA (2026-09-23)**:
+  - Cada login exitoso (PIN o maestra) parte de sesión limpia (`session.clear()`): no se arrastra `telegram_id` ni identidad previa en equipos compartidos.
+  - La clave maestra ya no adopta un `user_id` arbitrario del formulario (el `login.html` ni lo pide): solo se acepta si existe en `users.json`; si no, sesión OWNER sin `user_id`.
+  - El alta de usuario (`POST /api/usuarios`) no devuelve el PIN y los errores de colisión son genéricos (sin valor ni dueño del PIN). El listado ya lo enmascaraba como `····`.
+  - Pruebas: colisión genérica actualizada + 2 tests nuevos (sesión maestra y no-devolución de PIN); `test_pwa_api.py` (14 login/usuarios) y `test_pwa_agenda.py` (6) en verde.
+- [x] **Simulador de cruzamiento en 1 toque, Fase 5.2 parcial (2026-09-23)**:
+  - `Database.simular_cruzamiento(vaca, toro)` (solo lectura, sin crear fantasmas): veredicto APTO / NO RECOMENDADO / NO EVALUABLE con ancestros comunes (padre/abuelo/bisabuelo por rama), relación directa y aviso de pedigrí parcial. Mismo criterio 3G de `verificar_consanguinidad`.
+  - PWA: `GET /api/simular-cruzamiento` (todos los roles) + veredicto automático en el paso 3 de Captura Servicio/IA (avisa, no bloquea). Telegram: la confirmación de servicio anexa el veredicto 🧬 cuando el toro es del hato.
+  - Pruebas: `tests/test_simular_cruzamiento.py` (11 en verde: medios hermanos, abuelo en 2G, padre-hija, toro externo, typo sin fantasma, endpoint 401/400 y confirmación del bot); verificado en móvil con JA457 × T01 (APTO con aviso de pedigrí parcial).
+- [x] **Tablero Integral de Potreros, Descargas por Sección (Excel/PDF), Banco de Semen y Tactos SG en PWA (2026-09-23)** 🌿📊❄️🖐️:
+  - **Tablero Integral de Potreros**: Eliminada la redundancia de 3 gráficos apilados y tablas repetidas. Sustituido por selector interactivo de gráficos (`🗺️ Mapa Potreros (Voisin)`, `📊 Ocupación y Carga`, `🌾 Aforos y Forraje`) y un **Tablero Integral de Potreros** que reúne en una sola fila por potrero: área (ha), días de ocupación/reposo, semáforo Voisin, cabezas activas, último aforo manual (kg MV/m² y kg MS/ha) y biomasa satelital MS/ha, con atajos directos a listar aretes y registrar aforo.
+  - **Descargas de Informes Especializados en PDF y Excel (`.xlsx`)**: Añadida barra de exportación en las cabeceras de Leche, Finanzas, Potreros/Pasturas, Sanidad, Inventario y Reproducción. Motor nativo `src/reports/excel_report.py` con `openpyxl` y endpoints parametrizados `GET /api/reporte.pdf?seccion=...` y `GET /api/reporte.xlsx?seccion=...`.
+  - **Banco de Semen & Termo Criogénico**: Módulo en Reproducción con KPIs de días restantes de nitrógeno líquido, stock total de pajuelas, toros disponibles y alertas de stock bajo (≤ 3 pajuelas), tabla de canastillas e inventario detallado de pajuelas, con modales de recarga y entrada rápida.
+  - **Tactos / Palpaciones al Estilo Software Ganadero**: Formulario en Captura Rápida y botón en Ficha del Animal con método de diagnóstico (Manual vs Ecógrafo), resultado (Preñada/Vacía/Dudosa), días de gestación con cálculo reactivo de FEP (`FEP = Fecha + 283 - Días`), reproductor, hallazgo ovárico/zootécnico, Condición Corporal (1-5), peso (kg), profesional y notas.
+  - **Validación Completa**: 16 pruebas en `tests/test_reporte_excel.py`, 18 pruebas en `tests/test_palpacion_termo.py`, verificación visual con Edge Headless CDP (9 capturas en `docs/screenshots_features/`) tanto en móvil (390×844 DPR=2) como en escritorio (1280×800) y sintaxis JS verificada con `node --check`.
+
+
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

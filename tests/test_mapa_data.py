@@ -47,6 +47,36 @@ def test_datos_mapa_finca_diferencia_potreros_por_categoria_ndvi(db):
     assert props["Potrero Excelente"]["color_ndvi"] != props["Potrero Critico"]["color_ndvi"]
 
 
+def test_mapa_cuenta_activos_por_potrero_vigente(db):
+    """El mapa usa la misma regla que Inventario: potrero_id manda;
+    el último traslado solo cubre NULL. Históricos no inflan el conteo."""
+    pot_a = _crear_potrero_real(db, "Potrero A")
+    pot_b = _crear_potrero_real(db, "Potrero B")
+
+    db.registrar_animal("SIN-FICHA", sexo="Hembra", estado="ACTIVO")
+    aid = db.animal_id("SIN-FICHA")
+    db.execute(
+        "INSERT INTO traslados (animal_id, fecha, potrero_destino) VALUES (?, ?, ?)",
+        (aid, "2026-09-01", pot_a),
+    )
+
+    db.registrar_animal("EN-B", sexo="Hembra", estado="ACTIVO", potrero=pot_b)
+    bid = db.animal_id("EN-B")
+    db.execute(
+        "INSERT INTO traslados (animal_id, fecha, potrero_destino) VALUES (?, ?, ?)",
+        (bid, "2026-01-01", pot_a),
+    )
+
+    db.registrar_animal("MUERTO-A", sexo="Hembra", estado="MUERTO", potrero=pot_a)
+
+    res = datos_mapa_finca(db)
+    props = {f["properties"]["nombre"]: f["properties"] for f in res["potreros_geojson"]["features"]}
+    assert props["Potrero A"]["animales_count"] == 1
+    assert props["Potrero A"]["animales_tags"] == ["SIN-FICHA"]
+    assert props["Potrero B"]["animales_count"] == 1
+    assert props["Potrero B"]["animales_tags"] == ["EN-B"]
+
+
 def test_datos_mapa_finca_sin_potreros(db):
     res = datos_mapa_finca(db)
     assert res["ok"] is True

@@ -11,7 +11,7 @@ from typing import Any, Optional
 from shapely import wkt as shapely_wkt
 from shapely.geometry import mapping as shapely_mapping
 
-from ..db.database import Database
+from ..db.database import POTRERO_ACTUAL_EXPR, ULT_TRASLADO_CTE, Database
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,33 @@ def color_voisin(n_animales: int, dias_ocupacion: Optional[int], dias_reposo: Op
             return "#ef6c00", f"Recién desocupado ({dias_r}d de reposo)"
 
 
+def _animales_por_potrero_vigente(db: Database) -> tuple[dict[int, int], dict[int, list[str]]]:
+    """Conteo y hasta 8 tags de animales ACTIVO por potrero vigente.
+
+    Misma expresión que Inventario (`POTRERO_ACTUAL_EXPR`): el potrero_id de
+    la ficha manda; el último traslado solo se usa si potrero_id es NULL.
+    """
+    filas = db.query(
+        f"WITH {ULT_TRASLADO_CTE} "
+        f"SELECT {POTRERO_ACTUAL_EXPR} AS potrero_id, a.tag AS tag "
+        "FROM animales a "
+        "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+        "WHERE a.estado = 'ACTIVO' "
+        "ORDER BY a.tag ASC"
+    )
+    conteo: dict[int, int] = {}
+    tags: dict[int, list[str]] = {}
+    for r in filas:
+        p_id = r["potrero_id"]
+        if p_id is None:
+            continue
+        conteo[p_id] = conteo.get(p_id, 0) + 1
+        muestra = tags.setdefault(p_id, [])
+        if len(muestra) < 8 and r["tag"]:
+            muestra.append(r["tag"])
+    return conteo, tags
+
+
 def datos_mapa_finca(db: Database) -> dict[str, Any]:
     """Genera el GeoJSON completo de la finca, potreros, ganado y usuarios activos."""
     hoy_iso = date.today().isoformat()
@@ -59,28 +86,10 @@ def datos_mapa_finca(db: Database) -> dict[str, Any]:
            FROM potreros WHERE geom_wkt_4326 IS NOT NULL ORDER BY nombre"""
     )
 
-    # 2. Conteo de animales activos por potrero
-    animales_filas = db.query(
-        """SELECT potrero_id, COUNT(*) AS n
-           FROM animales
-           WHERE estado = 'ACTIVO' AND potrero_id IS NOT NULL
-           GROUP BY potrero_id"""
-    )
-    animales_por_potrero = {r["potrero_id"]: r["n"] for r in animales_filas}
-
-    # Muestra de tags por potrero (hasta 8 animales para tooltip)
-    tags_filas = db.query(
-        """SELECT potrero_id, tag
-           FROM animales
-           WHERE estado = 'ACTIVO' AND potrero_id IS NOT NULL
-           ORDER BY tag ASC"""
-    )
-    tags_por_potrero: dict[int, list[str]] = {}
-    for r in tags_filas:
-        p_id = r["potrero_id"]
-        tags_por_potrero.setdefault(p_id, [])
-        if len(tags_por_potrero[p_id]) < 8:
-            tags_por_potrero[p_id].append(r["tag"])
+    # 2. Conteo de ACTIVOS por potrero vigente — misma regla que Inventario:
+    # COALESCE(a.potrero_id, último traslado). potrero_id manda si está puesto;
+    # el traslado solo cubre NULL. No se usa COALESCE(estado, 'ACTIVO').
+    animales_por_potrero, tags_por_potrero = _animales_por_potrero_vigente(db)
 
     # 3. Última lectura NDVI / SAR satelital por potrero
     resumen_ndvi = db.resumen_ndvi_finca()

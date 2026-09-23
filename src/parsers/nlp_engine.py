@@ -144,6 +144,10 @@ PALABRAS_NO_TAG = {
     "chequeo", "chequeos", "prenada", "prenado", "vacia", "vacio", "gestante", "confirmada",
     "confirmado", "pajuela", "pajuelas", "termo", "nitrogeno", "canastilla", "dias", "dia",
     "mes", "meses", "semana", "semanas", "medio", "media",
+    # Sexo de la cría: sin esto, "parió la 47, ternero macho" extraía
+    # "macho" como segundo tag y registrar_parto() creaba un animal
+    # fantasma ACTIVO llamado "macho"/"hembra" que inflaba el inventario.
+    "macho", "machos", "hembra", "hembras",
 }
 
 
@@ -156,7 +160,23 @@ def es_consulta(texto: str) -> bool:
     if "?" in t or "¿" in t:
         return True
     for w in PALABRAS_CONSULTA:
+        if w == "que":
+            continue  # se evalúa aparte abajo (relativo vs. interrogativo)
         if re.search(rf"\b{re.escape(w)}\b", t):
+            return True
+    # "que" sin tilde es ambiguo tras normalizar: relativo ("parió la 47
+    # que estaba gorda") o interrogativo ("¿qué vacas debo inseminar?").
+    # Solo cuenta como pregunta si empieza con "que" o si NO hay un evento
+    # concreto sobre un animal puntual (intención + arete con dígitos).
+    # Sin esto, cualquier nota con subordinada se volvía consulta y el
+    # evento nunca se registraba (pérdida silenciosa de datos de campo).
+    if re.search(r"\bque\b", t):
+        if re.search(r"^que\b", t):
+            return True
+        if clasificar(t) is None:
+            return True
+        tag_q = extraer_tag(t)
+        if not tag_q or not any(c.isdigit() for c in tag_q):
             return True
     # Plural + periodo sin arete/nombre puntual: casi siempre es una pregunta
     # agregada (ej. "animales muertos este mes", "vacas vendidas esta semana"),

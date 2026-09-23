@@ -14,6 +14,10 @@
   // PARTO_HEADS/DESTETE_ICON solo se usan vía icon(), por eso quedan
   // encapsuladas en JA sin alias local.
   var esc = window.JA.esc;
+  // Permite solo <b> y <br> después de escapar. Cualquier otra etiqueta queda texto.
+  function htmlBasico(s) {
+    return esc(s).replace(/&lt;(\/?)(b|br)\s*\/?&gt;/gi, "<$1$2>");
+  }
   var mostrarToast = window.JA.mostrarToast;
   var vibrarConfirmacion = window.JA.vibrarConfirmacion;
   var chipEstado = window.JA.chipEstado;
@@ -26,6 +30,17 @@
   var fmtMoneda = window.JA.fmtMoneda;
 
   var icon = window.JA.icon;
+
+  function barraDescargaSeccion(seccion, nombre) {
+    return "<div class='descarga-seccion-barra' style='display:inline-flex; align-items:center; gap:6px;'>"
+      + "<a href='/api/reporte.pdf?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;' target='_blank' title='Descargar reporte PDF de " + esc(nombre) + "'>"
+      + icon("download", 12) + "PDF</a>"
+      + "<a href='/api/reporte.xlsx?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--verde-marca); border:1px solid var(--verde-marca);' target='_blank' title='Descargar datos en Excel de " + esc(nombre) + "'>"
+      + icon("table", 12) + "Excel</a>"
+      + "</div>";
+  }
+
+  var _pasturasGraficoActivo = "mapa_potreros";
 
   /* ---------- Vaquita Interactiva y Animaciones del Header ---------- */
   var _vacaEstadoActual = null; // 'dia', 'noche', 'cria', 'toro', 'ternero'
@@ -420,18 +435,25 @@
   }
 
   /* ---------- Vistas principales ---------- */
+  function htmlClimaMm(opts) {
+    var lluvia = Number(opts.lluvia_mm) || 0;
+    var prob = opts.prob_lluvia_pct;
+    var ahora = !!opts.esta_lloviendo || Number(opts.lluvia_actual_mm) > 0.1;
+    var alerta = ahora ? "rojo" : (lluvia >= 8 ? "ambar" : "verde");
+    var html = "<span class='chip " + alerta + "' style='font-size:11px;'>" + icon("droplet", 11) + esc(lluvia.toFixed(1)) + " mm</span>";
+    if (ahora) html += "<span class='chip rojo' style='font-size:11px;'>Lloviendo ahora</span>";
+    if (prob != null && prob !== "") {
+      html += "<span style='font-size:11px; color:var(--texto-suave);'>" + esc(Math.round(prob)) + "% prob. del día</span>";
+    }
+    return html;
+  }
   function renderResumenDiaTablero(d) {
     var clima = d.clima_hoy;
     var climaHtml;
     if (clima) {
-      var lluvia = Number(clima.lluvia_mm) || 0;
-      var prob = clima.prob_lluvia_pct;
-      var alertaClima = (lluvia >= 10 || (prob != null && prob >= 70)) ? "rojo"
-        : (lluvia >= 2 || (prob != null && prob >= 40)) ? "ambar" : "verde";
       climaHtml = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
         + "<b style='font-size:15px;'>" + esc(Math.round(clima.temp_max_c)) + "° / " + esc(Math.round(clima.temp_min_c)) + "°</b>"
-        + "<span class='chip " + alertaClima + "' style='font-size:11px;'>" + icon("droplet", 11) + esc(lluvia.toFixed(1)) + " mm</span>"
-        + (prob != null ? "<span style='font-size:11px; color:var(--texto-suave);'>" + esc(Math.round(prob)) + "% prob.</span>" : "")
+        + htmlClimaMm(clima)
         + "</div>";
     } else {
       climaHtml = "<span style='font-size:12.5px; color:var(--texto-suave);'>Sin pronóstico disponible.</span>";
@@ -518,7 +540,7 @@
       + "<div style='display:flex; gap:6px; align-items:center;'>" + searchBtn + pdfBtn + "</div>"
       + "</div>";
     h += "<div class='kpis'>"
-      + kpi(d.activos, "Activos ♀♂") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
+      + kpi(d.activos, "Activos") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
       + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
       + kpi(d.celos_7d, "Celos 7d") + kpi(d.servicios_7d, "Serv. 7d")
       + kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : "") + "</div>";
@@ -628,7 +650,62 @@
     return h;
   }
   function renderRepro(d) {
-    var h = "<h3>" + icon("sperm") + "Reproducción</h3>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
+      + barraDescargaSeccion("reproduccion", "Reproducción")
+      + "</div>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+
+    // Banco de Semen & Termo Criogénico (Software Ganadero)
+    var termo = d.termo;
+    var pajuelas = d.pajuelas || [];
+    var totalPaj = pajuelas.reduce(function (s, p) { return s + (Number(p.cantidad) || 0); }, 0);
+    var alertasPaj = d.alertas_pajuelas || [];
+
+    var semNitr = !termo ? "gris" : (termo.dias_restantes <= 3 ? "rojo" : (termo.dias_restantes <= 7 ? "ambar" : "verde"));
+    var txtNitr = !termo ? "Sin datos de recarga" : (termo.dias_restantes > 0 ? (termo.dias_restantes + " días restantes") : "¡Recarga vencida!");
+
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+      + "<div style='font-size:14px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("snowflake", 16) + "Banco de Semen & Termo Criogénico"
+      + "</div>"
+      + "<div style='display:flex; gap:6px; flex-wrap:wrap;'>"
+      + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='palpacion' style='font-size:11.5px; padding:5px 10px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
+      + icon("stethoscope", 13) + "Tacto / Palpación</button>"
+      + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='pajuela' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
+      + icon("sperm", 13) + "➕ Entrada Pajuelas</button>"
+      + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='nitrogeno' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
+      + icon("snowflake", 13) + "❄️ Recarga Nitrógeno</button>"
+      + "</div>"
+      + "</div>"
+      + "<div class='kpis' style='margin-bottom:12px;'>"
+      + kpi("<span class='chip " + semNitr + "' style='font-size:13px; font-weight:700;'><b>" + esc(txtNitr) + "</b></span>", "Termo Nitrógeno Líquido", termo && termo.dias_restantes <= 3 ? "alerta" : "ok")
+      + kpi(esc(totalPaj) + " pajuelas", "Stock Total de Semen", "ok")
+      + kpi(esc(pajuelas.length) + " toros", "Reproductores Disponibles")
+      + (alertasPaj.length ? kpi("<span class='chip rojo'><b>" + alertasPaj.length + " en riesgo</b></span>", "Alertas Stock ≤ 3 pajuelas", "alerta") : "")
+      + "</div>";
+
+    if (pajuelas.length) {
+      h += "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-bottom:6px; text-transform:uppercase;'>Inventario Detallado de Pajuelas:</div>"
+        + "<div class='tabla-scroll'><table><tr><th>Toro</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Cantidad</th><th style='text-align:right;'>Costo Unit.</th><th>Procedencia</th></tr>";
+      h += pajuelas.map(function (p) {
+        var cant = Number(p.cantidad) || 0;
+        var cantChip = cant <= 2 ? "<span class='chip rojo'><b>" + cant + " un.</b></span>" : (cant <= 5 ? "<span class='chip ambar'><b>" + cant + " un.</b></span>" : "<span class='chip verde'><b>" + cant + " un.</b></span>");
+        var costoStr = p.costo ? ("$" + Number(p.costo).toLocaleString("es-CO")) : "—";
+        return "<tr>"
+          + "<td><b>" + esc(p.codigo_toro) + "</b></td>"
+          + "<td>" + esc(p.raza || "—") + "</td>"
+          + "<td style='text-align:center;'><span class='chip gris'>" + esc(p.canastilla || "—") + "</span></td>"
+          + "<td style='text-align:right;'>" + cantChip + "</td>"
+          + "<td style='text-align:right; font-family:var(--font-mono);'>" + esc(costoStr) + "</td>"
+          + "<td style='font-size:11.5px; color:var(--texto-suave);'>" + esc(p.procedencia || "—") + "</td>"
+          + "</tr>";
+      }).join("");
+      h += "</table></div>";
+    } else {
+      h += vacio("No hay pajuelas registradas en el termo criogénico. Use el botón «➕ Entrada Pajuelas» para cargar el catálogo.");
+    }
+    h += "</div>";
 
     // 1. Tarjeta Destacada: Índice de Fertilidad Oficial (Software Ganadero)
     var ifInfo = d.indice_fertilidad || {};
@@ -657,13 +734,42 @@
 
     var k = d.kpis || {};
     h += "<h4>" + icon("chartBar") + "Indicadores del hato</h4>";
+    var pm = d.perdidas || {};
     h += "<div class='kpis'>"
       + kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio")
       + kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : "")
       + kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción")
       + kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok")
       + kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto")
+      + kpi((pm.tasa_perdida_pct != null ? pm.tasa_perdida_pct + "%" : "—"), "Pérdidas gestacionales (" + (pm.perdidas || 0) + ")", (pm.tasa_perdida_pct || 0) >= 5 ? "alerta" : "")
+      + kpi((pm.tasa_distocia_pct != null ? pm.tasa_distocia_pct + "%" : "—"), "Partos difíciles (" + (pm.distocias || 0) + ")", (pm.tasa_distocia_pct || 0) >= 10 ? "alerta" : "")
       + "</div>";
+
+    // Pérdidas gestacionales y distocias (cierre Fase 5.2): últimas
+    // pérdidas y vacas reincidentes que el mayordomo debe vigilar.
+    if (pm && (pm.perdidas || pm.distocias)) {
+      h += "<div class='card' style='padding:14px 16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--color-rojo-txt, #dc2626);'>"
+        + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>⚠️ Pérdidas gestacionales y partos difíciles</div>"
+        + "<div style='font-size:12.5px; color:var(--texto-suave); margin-bottom:8px;'>"
+        + esc(pm.partos || 0) + " partos · " + esc(pm.perdidas || 0) + " pérdidas (" + esc(pm.tasa_perdida_pct || 0) + "%) · "
+        + esc(pm.distocias || 0) + " difíciles (" + esc(pm.tasa_distocia_pct || 0) + "%) · "
+        + esc(pm.crias_muertas_parto || 0) + " crías muertas al nacer</div>";
+      if (pm.reincidentes && pm.reincidentes.length) {
+        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🔁 Vacas reincidentes (≥2 pérdidas):</div>"
+          + "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;'>"
+          + pm.reincidentes.map(function (r) {
+            return "<a href='#' class='ficha-link chip rojo' data-ir-ficha='" + esc(r.vaca) + "' style='font-size:12px; padding:3px 8px; font-weight:bold; text-decoration:none;'>" + esc(r.vaca) + " ×" + esc(r.perdidas) + "</a>";
+          }).join("") + "</div>";
+      }
+      if (pm.recientes && pm.recientes.length) {
+        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>Últimas pérdidas:</div>"
+          + "<div style='font-size:12.5px; display:flex; flex-direction:column; gap:3px;'>"
+          + pm.recientes.slice(0, 5).map(function (r) {
+            return "<div>• <b>" + esc(r.vaca) + "</b> · " + esc(r.tipo_evento) + " · " + esc(fechaCorta(r.fecha)) + "</div>";
+          }).join("") + "</div>";
+      }
+      h += "</div>";
+    }
 
     // 2. Distribución de Días Abiertos (DA) por tramos (Software Ganadero)
     if (d.distribucion_dias_abiertos && d.distribucion_dias_abiertos.length) {
@@ -713,9 +819,17 @@
       ], "Sin partos próximos en 30 días.");
     h += "<h4>" + icon("stethoscope") + "Diagnósticos de gestación recientes</h4>"
       + tabla(d.diagnosticos, [
-        ["tag", "Vaca"], ["fecha", "Fecha"],
+        ["tag", "Vaca", "text", function (v) { return "<b>" + esc(v) + "</b>"; }],
+        ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
-        ["dias_gestacion", "Días gest."]
+        ["dias_gestacion", "Días gest.", "text", function (v) { return v ? (v + " d") : "—"; }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFIA" ? "<span class='chip azul' style='font-size:11px;'>📡 Ecografía</span>" : "<span class='chip gris' style='font-size:11px;'>✋ Tacto</span>"; }],
+        ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
+          var hTxt = v || (r && r.detalle) || "—";
+          var toro = (r && r.toro_pajuela) ? ("<br><small style='color:var(--verde-marca); font-weight:600;'>Toro: " + esc(r.toro_pajuela) + "</small>") : "";
+          return esc(hTxt) + toro;
+        }],
+        ["responsable", "Profesional"]
       ], "Sin diagnósticos recientes.");
     h += "<h4>" + icon("flame") + "Celos recientes</h4>"
       + tabla(d.celos_recientes, [["tag", "Vaca"], ["fecha", "Fecha"], ["am_pm", "AM/PM"]], "Sin celos recientes.");
@@ -734,7 +848,10 @@
     return h;
   }
   function renderSanidad(d) {
-    var h = "<h3>" + icon("shieldPlus") + "Sanidad</h3>" + erroresHtml(d);
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("shieldPlus") + "Sanidad</h3>"
+      + barraDescargaSeccion("sanidad", "Sanidad")
+      + "</div>" + erroresHtml(d);
     // Alta operativa directa (misma tabla que Telegram/Captura vía POST /api/sanidad/tratamiento).
     var hoySan = new Date().toISOString().slice(0, 10);
     h += "<div class='card' style='padding:12px 14px; margin-bottom:12px; border-left:4px solid var(--verde-marca);'>"
@@ -842,9 +959,12 @@
       actualizarClimaHeader();
     }
     var simple = modoPasturasEsSimple();
-    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='float:right; font-size:12px; padding:5px 12px; margin-top:-4px;'>"
+    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px; margin-left:8px;'>"
       + (simple ? "🔬 Ver técnico" : "😊 Ver simple") + "</button>";
-    var h = "<h3>" + icon("grass") + "Pasturas (Voisin)" + btnModo + "</h3>" + erroresHtml(d);
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("grass", 22) + "Pasturas (Voisin & Aforos)" + btnModo + "</h3>"
+      + barraDescargaSeccion("pasturas", "Pasturas")
+      + "</div>" + erroresHtml(d);
 
     var pron = d.pronostico;
     h += "<h4>" + icon("rain") + "Pronóstico del clima (7 días)</h4>";
@@ -855,13 +975,12 @@
       pron.dias.forEach(function (dd) {
         var prob = dd.prob_lluvia_pct;
         var lluvia = Number(dd.lluvia_mm) || 0;
-        var alerta = (lluvia >= 10 || (prob != null && prob >= 70)) ? "rojo"
-          : (lluvia >= 2 || (prob != null && prob >= 40)) ? "ambar" : "verde";
+        var alerta = lluvia >= 8 ? "ambar" : "verde";
         h += "<div class='card' style='min-width:110px; flex-shrink:0; padding:10px; text-align:center;'>"
           + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>" + esc(fechaCorta(dd.fecha)) + "</div>"
           + "<div style='font-size:13px; font-weight:700; margin:4px 0;'>" + esc(Math.round(dd.temp_max_c)) + "° / " + esc(Math.round(dd.temp_min_c)) + "°</div>"
           + "<span class='chip " + alerta + "' style='font-size:11px;'>" + icon("droplet", 11) + esc(lluvia.toFixed(1)) + " mm</span>"
-          + (prob != null ? "<div style='font-size:10.5px; color:var(--texto-suave); margin-top:4px;'>" + esc(Math.round(prob)) + "% prob.</div>" : "")
+          + (prob != null ? "<div style='font-size:10.5px; color:var(--texto-suave); margin-top:4px;'>" + esc(Math.round(prob)) + "% prob. del día</div>" : "")
           + "</div>";
       });
       h += "</div>";
@@ -948,10 +1067,54 @@
         + "</div></div>";
     }
 
-    h += grafico("mapa_potreros", "Rotación de potreros (Voisin)") + grafico("ocupacion", "Ocupación de potreros") + grafico("aforo", "Aforo de forraje");
-    h += "<h4>" + icon("hourglass") + "Ocupación y reposo por potrero</h4>";
-    if (!d.potreros || !d.potreros.length) { h += vacio("Sin potreros con geometría registrada."); }
-    else {
+    // Indexación de aforos y lecturas satelitales por nombre de potrero (evita tablas repetidas)
+    var aforosPorPot = {};
+    (d.aforos_recientes || []).forEach(function (a) {
+      var k = String(a.potrero || "").toUpperCase().trim();
+      if (k && !aforosPorPot[k]) aforosPorPot[k] = a;
+    });
+    var satPorPot = {};
+    (d.ndvi_reciente || []).forEach(function (s) {
+      var k = String(s.potrero || "").toUpperCase().trim();
+      if (k && !satPorPot[k]) satPorPot[k] = s;
+    });
+
+    // 1. Selector de Pestañas de Gráficos (evita apilar 3 gráficos verticales gigantes)
+    var graficosPasturas = [
+      { id: "mapa_potreros", nom: "🗺️ Mapa Potreros (Voisin)", desc: "Distribución satelital y rotación" },
+      { id: "ocupacion", nom: "📊 Ocupación y Carga", desc: "Carga animal por potrero" },
+      { id: "aforo", nom: "🌾 Aforos y Forraje", desc: "Disponibilidad de forraje verde" }
+    ];
+    h += "<div class='card' style='padding:12px; margin:14px 0 10px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<div style='font-size:13px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("chartLine", 15) + "Visualización Gráfica de Potreros"
+      + "</div>"
+      + "<div class='tabs-graficos-pasturas' style='display:flex; gap:6px; flex-wrap:wrap;'>";
+    graficosPasturas.forEach(function (g) {
+      var act = _pasturasGraficoActivo === g.id ? " act' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none;'" : "'";
+      h += "<button type='button' class='tema-btn btn-tab-graf-pasturas" + act + " data-graf='" + g.id + "' style='font-size:11.5px; padding:5px 11px; border-radius:6px; cursor:pointer;'>" + g.nom + "</button>";
+    });
+    h += "</div></div>";
+
+    if (_pasturasGraficoActivo === "mapa_potreros") {
+      h += grafico("mapa_potreros", "Rotación de potreros (Voisin)");
+    } else if (_pasturasGraficoActivo === "ocupacion") {
+      h += grafico("ocupacion", "Ocupación de potreros");
+    } else if (_pasturasGraficoActivo === "aforo") {
+      h += grafico("aforo", "Aforo de forraje");
+    }
+    h += "</div>";
+
+    // 2. Tablero Integral Unificado de Potreros (Consolida Ocupación, Reposo, Animales y Aforo en una sola vista)
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin:18px 0 8px;'>"
+      + "<h4 style='margin:0;'>" + icon("hourglass") + "Tablero Integral de Potreros (Voisin, Carga & Aforos)</h4>"
+      + "<div style='font-size:12px; color:var(--texto-suave);'>Consolidado oficial del hato activo</div>"
+      + "</div>";
+
+    if (!d.potreros || !d.potreros.length) {
+      h += vacio("Sin potreros con geometría registrada.");
+    } else {
       function iconoPastoVoisin(dias) {
         if (dias == null) return "⚪ ";
         var num = Number(dias);
@@ -960,78 +1123,71 @@
         if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌾</span>";
         return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🍂</span>";
       }
-      h += "<div class='tabla-scroll'><table><tr><th>Potrero</th><th>Estado</th><th style='text-align:center;'>Animales</th><th style='text-align:center;'>Ocupación</th><th style='text-align:center;'>Reposo</th><th style='text-align:right;'>Ha</th><th style='text-align:center;'>Acción</th></tr>";
+
+      h += "<div class='tabla-scroll'><table>"
+        + "<tr>"
+        + "<th>Potrero</th>"
+        + "<th>Estado Voisin</th>"
+        + "<th style='text-align:center;'>Ocupación / Reposo</th>"
+        + "<th style='text-align:center;'>Animales</th>"
+        + "<th style='text-align:right;'>Aforo / Forraje</th>"
+        + "<th style='text-align:right;'>Biomasa MS</th>"
+        + "<th style='text-align:center;'>Acción</th>"
+        + "</tr>";
+
       h += d.potreros.map(function (p) {
         var nom = p.nombre || p.codigo || p.id;
+        var nomKey = String(nom).toUpperCase().trim();
         var nAnim = Number(p.total_animales) || 0;
         var st = p.estado_rotacion || (nAnim > 0 ? (p.semaforo === "🟢" ? "Pastoreo óptimo" : p.semaforo === "🟡" ? "Rotar pronto" : "Sobreocupado") : "En reposo");
-        var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "—";
-        var ocupTxt = nAnim > 0
-          ? (p.dias_ocupacion != null ? p.dias_ocupacion + " d" : "<span style='color:var(--verde-marca); font-weight:600;'>Activo</span>")
-          : "<span style='color:var(--texto-suave);'>—</span>";
-        var repTxt = nAnim > 0
-          ? "<span style='color:var(--texto-suave);'>—</span>"
-          : (iconoPastoVoisin(p.dias_reposo) + (p.dias_reposo != null ? p.dias_reposo + " d" : "—"));
+        var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "";
+
+        var tiempoTxt = nAnim > 0
+          ? "<span style='font-weight:700; color:var(--verde-marca);'>⏳ Ocupado " + (p.dias_ocupacion != null ? p.dias_ocupacion + "d" : "activo") + "</span>"
+          : (iconoPastoVoisin(p.dias_reposo) + "<span style='color:var(--texto);'>Reposo " + (p.dias_reposo != null ? p.dias_reposo + "d" : "—") + "</span>");
+
         var animCol = nAnim > 0
           ? "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11.5px; padding:3px 9px; border-radius:5px; font-weight:700; display:inline-flex; align-items:center; gap:5px; background:rgba(46,125,50,0.12); color:var(--verde-marca); border:1px solid var(--verde-marca);' title='Ver " + nAnim + " animales en " + esc(nom) + "'>"
             + icon("cow", 12) + "<span><b>" + nAnim + "</b> cab.</span></button>"
           : "<span style='color:var(--texto-suave); font-size:12px;'>0 (Vacío)</span>";
 
-        return "<tr><td style='white-space:nowrap;'><a href='#' class='link-potrero-animales' data-potrero='" + esc(nom) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
-          + esc(nom) + "</a></td><td style='white-space:nowrap;'>" + chipEstado(p.semaforo + " " + st) + "</td>"
+        // Cruce con aforos recientes y satélite
+        var afoRec = aforosPorPot[nomKey];
+        var satRec = satPorPot[nomKey];
+
+        var aforoStr = "—";
+        if (afoRec && afoRec.aforo_kg_m2 != null) {
+          aforoStr = "<b>" + Number(afoRec.aforo_kg_m2).toFixed(2) + "</b> kg/m²";
+        } else if (satRec && satRec.aforo_estimado_kg_m2 != null) {
+          aforoStr = "<b>" + Number(satRec.aforo_estimado_kg_m2).toFixed(2) + "</b> kg/m² <small style='color:var(--texto-suave);'>(sat)</small>";
+        }
+
+        var biomasaStr = "—";
+        if (satRec && satRec.biomasa_estimada_kg_ha != null) {
+          biomasaStr = Math.round(satRec.biomasa_estimada_kg_ha).toLocaleString("es-CO") + " kg/ha";
+        }
+
+        return "<tr>"
+          + "<td style='white-space:nowrap;'>"
+          + "<a href='#' class='link-potrero-animales' data-potrero='" + esc(nom) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales en " + esc(nom) + "'>" + esc(nom) + "</a>"
+          + (haTxt ? ("<br><small style='color:var(--texto-suave); font-size:11px;'>" + esc(haTxt) + "</small>") : "")
+          + "</td>"
+          + "<td style='white-space:nowrap;'>" + chipEstado(p.semaforo + " " + st) + "</td>"
+          + "<td style='text-align:center; white-space:nowrap;'>" + tiempoTxt + "</td>"
           + "<td style='text-align:center; white-space:nowrap;'>" + animCol + "</td>"
-          + "<td style='white-space:nowrap; text-align:center; font-weight:600;'>" + ocupTxt + "</td>"
-          + "<td style='white-space:nowrap; text-align:center;'>" + repTxt + "</td>"
-          + "<td style='white-space:nowrap; text-align:right;'>" + haTxt + "</td>"
-          + "<td style='text-align:center; white-space:nowrap;'><button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11px; padding:3px 8px; border-radius:5px; white-space:nowrap; display:inline-flex; align-items:center; gap:4px;' title='Ver animales en " + esc(nom) + "'>"
-          + icon("cow", 12) + "<span>Listar</span></button></td></tr>";
+          + "<td style='text-align:right; white-space:nowrap;'>" + aforoStr + "</td>"
+          + "<td style='text-align:right; white-space:nowrap; font-family:var(--font-mono); font-size:12px;'>" + biomasaStr + "</td>"
+          + "<td style='text-align:center; white-space:nowrap;'>"
+          + "<div style='display:inline-flex; gap:4px;'>"
+          + "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(nom) + "' style='font-size:11px; padding:3px 8px; border-radius:5px;' title='Listar aretes'>" + icon("cow", 11) + "Listar</button>"
+          + "<button type='button' class='tema-btn btn-aforar-pot-directo' data-potrero='" + esc(nom) + "' style='font-size:11px; padding:3px 8px; border-radius:5px; color:var(--verde-marca); border:1px solid var(--verde-marca);' title='Registrar aforo'>" + icon("grass", 11) + "Aforo</button>"
+          + "</div></td>"
+          + "</tr>";
       }).join("");
+
       h += "</table></div>";
     }
-    var colPotrero = ["potrero", "Potrero", "text", function (v) {
-      return "<a href='#' class='link-potrero-animales' data-potrero='" + esc(v) + "' style='font-weight:700; color:var(--verde-marca); text-decoration:none;' title='Ver animales en " + esc(v) + "'>" + esc(v) + "</a>";
-    }];
-    var columnasNdvi = simple ? [
-      colPotrero,
-      ["ndvi_promedio", "Estado", "text", function (v) {
-        var n = Number(v);
-        var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
-        var etq = n >= 0.6 ? "Excelente" : n >= 0.4 ? "Regular" : n > 0 ? "Bajo" : "Sin datos";
-        return "<span class='chip " + c + "'><b>" + esc(etq) + "</b></span>";
-      }],
-      ["fecha", "Fecha"],
-    ] : [
-      colPotrero,
-      ["fuente", "Sensor / Modo", "text", function (v) {
-        var s = String(v || "");
-        if (s.indexOf("Sentinel-1") >= 0 || s.indexOf("SAR") >= 0 || s.indexOf("Radar") >= 0) {
-          return "<span class='chip azul' style='font-size:11px; font-weight:700;' title='" + esc(s) + "'>📡 Radar SAR (S1)</span>";
-        }
-        return "<span class='chip verde' style='font-size:11px;' title='" + esc(s) + "'>🛰️ Óptico (S2)</span>";
-      }],
-      ["fecha", "Fecha"],
-      ["ndvi_promedio", "NDVI / Proxy", "text", function (v) {
-        var n = Number(v);
-        var c = n >= 0.6 ? "verde" : n >= 0.4 ? "ambar" : n > 0 ? "rojo" : "gris";
-        return "<span class='chip " + c + "'><b>" + esc(Number(v).toFixed(3)) + "</b></span>";
-      }],
-      ["biomasa_estimada_kg_ha", "Biomasa MS", "text", function (v) {
-        return v != null ? esc(Math.round(v).toLocaleString()) + " kg/ha" : "—";
-      }],
-      ["aforo_estimado_kg_m2", "Aforo MV", "text", function (v) {
-        return v != null ? esc(Number(v).toFixed(2)) + " kg/m²" : "—";
-      }],
-      ["cobertura_nubes_pct", "Condición", "text", function (v, row) {
-        var f = String(row && row.fuente || "");
-        if (f.indexOf("Sentinel-1") >= 0 || f.indexOf("SAR") >= 0) {
-          return "<span style='font-size:11.5px; color:#1e3c72; font-weight:600;'>🛡️ Penetra nubes</span>";
-        }
-        var n = Number(v) || 0;
-        return n > 0 ? "<span style='font-size:11.5px;'>☁️ " + esc(n.toFixed(0)) + "% nubes</span>" : "<span style='font-size:11.5px; color:#2e7d32;'>☀️ Despejado</span>";
-      }]
-    ];
-    h += "<h4>" + icon("chartLine") + (simple ? "Estado Reciente por Potrero" : "Lecturas Satelitales Recientes por Potrero") + "</h4>"
-      + tabla(d.ndvi_reciente, columnasNdvi, "Sin lecturas satelitales recientes.");
+
     h += "<h4>" + icon("rain") + "Pluviómetro Local Reciente</h4>"
       + tabla(d.pluviometria_reciente, [
         ["fecha", "Fecha"],
@@ -1040,16 +1196,6 @@
         }],
         ["observaciones", "Observaciones"]
       ], "Sin registros de pluviometría manual.");
-    h += "<h4>" + icon("grass") + "Aforos de Pasto Recientes</h4>"
-      + tabla(d.aforos_recientes, [
-        ["potrero", "Potrero"], ["fecha", "Fecha"],
-        ["aforo_kg_m2", "Aforo MV", "text", function (v) {
-          return "<b>" + esc(v) + " kg/m²</b>";
-        }],
-        ["pct_ms", "% MS", "text", function (v) {
-          return esc(v) + " %";
-        }]
-      ], "Sin aforos históricos registrados.");
     // D2 — Checklist de Ronda Voisin: flujo en 3 pasos (potrero → 10-15
     // puntos GPS → resultado con semáforo). La lista de potreros se guarda
     // en potrerosRondaCache para el modal (bindPasturas la reutiliza).
@@ -1134,7 +1280,8 @@
           var ronda = out.j.ronda || {};
           var chip = ronda.semaforo === "VERDE" ? "verde" : ronda.semaforo === "AMARILLO" ? "ambar" : "rojo";
           // `mensaje` lo genera el servidor (formatear_ronda_voisin) con <b> intencional.
-          res.innerHTML = "<div>" + (out.j.mensaje || "") + "</div>"
+          // Se escapa todo y solo se restauran <b> y <br>, para no pintar HTML arbitrario.
+          res.innerHTML = "<div>" + htmlBasico(out.j.mensaje || "") + "</div>"
             + "<div style='margin-top:6px;'><span class='chip " + chip + "' style='font-size:14px;'><b>" + esc(ronda.semaforo || "") + " · " + esc(ronda.dias_disponibles) + " días</b></span></div>";
           if (selPot) pintarHistorial(selPot.value);
           var box = document.getElementById("rondas-recientes");
@@ -1432,6 +1579,43 @@
         ejecutarSyncSatelite("auto");
       });
     }
+
+    // Selector de pestañas de gráficos en Pasturas (Voisin, Ocupación, Aforo)
+    qa(".btn-tab-graf-pasturas").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var g = this.getAttribute("data-graf");
+        if (g) {
+          _pasturasGraficoActivo = g;
+          cargar(true);
+        }
+      });
+    });
+
+    // Botón Aforo Directo desde la tabla de potreros
+    qa(".btn-aforar-pot-directo").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var pot = this.getAttribute("data-potrero");
+        try { localStorage.setItem("bitacora_ultimo_potrero", pot); } catch (ePot) {}
+        _tipoCapturaActual = "pesaje"; // o abrir modal de aforo
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eScroll) { window.scrollTo(0, 0); }
+      });
+    });
+  }
+
+  function bindRepro() {
+    qa(".btn-ir-cap-directo").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var tipo = this.getAttribute("data-tipo");
+        if (tipo) {
+          _tipoCapturaActual = tipo;
+          irAVista("captura");
+          cargar(true);
+          try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+        }
+      });
+    });
   }
 
   function fechaDiaSemana(fStr) {
@@ -1535,7 +1719,10 @@
 
     var h = "<div class='leche-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
+      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
+      + barraDescargaSeccion("leche", "Leche")
       + btnIa
+      + "</div>"
       + "</div>" + erroresHtml(d);
 
     // 1. KPIs Ejecutivos de Producción
@@ -1703,7 +1890,10 @@
     var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
     var h = "<div class='finanzas-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
+      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
+      + barraDescargaSeccion("finanzas", "Finanzas")
       + btnGasto
+      + "</div>"
       + "</div>" + erroresHtml(d);
 
     var anoActual = new Date().getFullYear();
@@ -3125,7 +3315,7 @@
     }
     var h = "<div class='inv-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("cow") + "Inventario y Población</h3>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + expBtn + "</div>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + barraDescargaSeccion("inventario", "Inventario") + expBtn + "</div>"
       + "</div>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
       + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
@@ -4141,6 +4331,9 @@
     var tipos = [
       { id: "parto", nom: "Parto", ico: "cowCalf" },
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
+      { id: "palpacion", nom: "Tacto / Palpación", ico: "stethoscope" },
+      { id: "pajuela", nom: "Stock Pajuelas", ico: "sperm" },
+      { id: "nitrogeno", nom: "Recarga Nitrógeno", ico: "snowflake" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
       { id: "destete", nom: "Destete", ico: "destete" },
@@ -4220,6 +4413,7 @@
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
+        + "<div id='cap-distocia-wrap' style='margin-top:2px;'><label>¿Parto difícil / asistido (distocia)? <select id='cap-distocia' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NO'>No, parto normal</option><option value='SI'>Sí, difícil o asistido</option></select></label></div>"
         + "<div style='margin-top:6px; margin-bottom:8px;'>"
         + "<label>Toro / Padre de la cría (opcional): <select id='cap-toro-padre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>-- Sin especificar (opcional) --</option></select></label>"
         + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajuela...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
@@ -4329,6 +4523,47 @@
         + "<label>Arete / Animal relacionado (opcional): <input id='cap-tag' placeholder='ej. N069' list='dl-tags' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Potrero relacionado (opcional): <input id='cap-fin-potrero' placeholder='ej. Olegario' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Notas: <input id='cap-notas' placeholder='Detalles adicionales' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "palpacion") {
+      h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Método de Diagnóstico: <select id='cap-palp-metodo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='TACTO'>Manual (Tacto rectal)</option><option value='ECOGRAFO'>Ecógrafo (Ultrasonido)</option></select></label></div>"
+        + "<div style='flex:1;'><label>Resultado: <select id='cap-palp-resultado' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PREÑADA' selected>Preñada (P)</option><option value='VACIA'>Vacía (V)</option><option value='DUDOSA'>Dudosa (D)</option></select></label></div>"
+        + "</div>"
+        + "<div id='cap-palp-prenada-box' style='padding:10px; border-radius:8px; background:rgba(46,125,50,0.06); border:1px solid rgba(46,125,50,0.3); margin:6px 0;'>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Días de Preñez / Gestación: <input type='number' min='1' max='300' id='cap-palp-dias' placeholder='ej. 45' value='45' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>FEP Calculada: <input type='date' id='cap-palp-fep' readonly style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo-card); font-weight:700;'></label></div>"
+        + "</div>"
+        + "<div style='margin-top:8px;'><label>Reproductor / Toro de la Preñez: <input id='cap-palp-toro' placeholder='ej. GUZ-01 o Nombre de Toro/Pajuela' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Hallazgo Zootécnico / Ovario (opcional): <input id='cap-palp-hallazgo' placeholder='ej. CL derecho 22mm, Folículo preovulatorio, Quiste, Útero normal...' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Condición Corporal (1-5): <select id='cap-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0' selected>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
+        + "<div style='flex:1;'><label>Peso actual (kg, opcional): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 450' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Veterinario / Profesional: <input id='cap-palp-responsable' placeholder='ej. Dr. Carlos Rodríguez' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Confirmación ecográfica 45 días' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "pajuela") {
+      h += "<label>Código o Nombre del Toro: <input id='cap-paj-toro' placeholder='ej. GUZ-01 / DON FULANO' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Raza: <input id='cap-paj-raza' placeholder='ej. Gyr, Brahman, Guzerat' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Canastilla: <input id='cap-paj-canastilla' placeholder='ej. Canastilla 1, A-2' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Cantidad de pajuelas que ingresan: <input type='number' min='1' id='cap-paj-cant' value='5' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Costo por pajuela ($): <input type='number' step='100' id='cap-paj-costo' placeholder='ej. 45000' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<label>Procedencia / Casa Genética: <input id='cap-paj-procedencia' placeholder='ej. Ciale, Semex, Ganadería El Oasis' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Notas adicionales: <input id='cap-notas' placeholder='ej. Registro Asocebú 89123' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "nitrogeno") {
+      h += "<div class='aviso' style='margin:2px 0 8px;'>❄️ Registro de recarga de nitrógeno líquido en termo criogénico para mantener la viabilidad del semen.</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Intervalo de autonomía (días estimados): <input type='number' min='1' max='90' id='cap-nitr-intervalo' value='21' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Próxima recarga calculada: <input type='date' id='cap-nitr-prox' readonly style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo-card); font-weight:700;'></label></div>"
+        + "</div>"
+        + "<label>Proveedor / Empresa de recarga: <input id='cap-nitr-proveedor' placeholder='ej. Linde, CryoGas, Técnico IA' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Costo de la recarga ($): <input type='number' step='1000' id='cap-nitr-costo' placeholder='ej. 120000' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Notas / Nivel medido con regla (cm): <input id='cap-notas' placeholder='ej. Lleno al tope, medido con varilla 14 cm' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     }
 
     var hintFoto = "Foto de respaldo en campo";
@@ -4350,6 +4585,15 @@
     } else if (tipo === "pesaje") {
       titFoto = "Foto de Báscula / Animal";
       hintFoto = "Foto del animal en báscula, arete o condición corporal";
+    } else if (tipo === "palpacion") {
+      titFoto = "Foto Ecografía / Ficha Reproductiva";
+      hintFoto = "Foto de la pantalla del ecógrafo, ovario o útero palpado";
+    } else if (tipo === "pajuela") {
+      titFoto = "Foto de Pajuela / Catálogo";
+      hintFoto = "Foto de la pajuela, catálogo del toro o certificado genético";
+    } else if (tipo === "nitrogeno") {
+      titFoto = "Foto del Termo / Comprobante Recarga";
+      hintFoto = "Foto del termo criogénico o recibo de recarga de nitrógeno";
     } else if (tipo === "celo") {
       titFoto = "Foto de Manifestación de Celo";
       hintFoto = "Foto de manifestación de celo (moco, monta, comportamiento)";
@@ -4547,8 +4791,69 @@
     }
 
     function nombreTipoCap(id) {
-      var noms = { parto: "Parto", pesaje: "Pesaje", tratamiento: "Tratamiento", traslado: "Traslado", destete: "Destete", celo: "Celo", servicio: "Servicio / IA", leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea" };
+      var noms = {
+        parto: "Parto", pesaje: "Pesaje", palpacion: "Tacto / Palpación", pajuela: "Stock Pajuelas",
+        nitrogeno: "Recarga Nitrógeno", tratamiento: "Tratamiento", traslado: "Traslado",
+        destete: "Destete", secado: "Secado", celo: "Celo", servicio: "Servicio / IA",
+        leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea"
+      };
       return noms[id] || id;
+    }
+
+    function bindCamposPalpacion() {
+      if (_tipoCapturaActual !== "palpacion") return;
+      var selRes = document.getElementById("cap-palp-resultado");
+      var prenadaBox = document.getElementById("cap-palp-prenada-box");
+      var fFecha = document.getElementById("cap-fecha");
+      var fDias = document.getElementById("cap-palp-dias");
+      var fFep = document.getElementById("cap-palp-fep");
+
+      function calcularFep() {
+        if (!fFep) return;
+        var dias = parseInt(fDias ? fDias.value : 0, 10);
+        var fStr = (fFecha && fFecha.value) || new Date().toISOString().slice(0, 10);
+        if (!isNaN(dias) && dias > 0 && dias <= 290) {
+          var fDate = new Date(fStr + "T12:00:00");
+          var diasFaltan = 283 - dias;
+          var fepDate = new Date(fDate.getTime() + (diasFaltan * 86400000));
+          fFep.value = fepDate.toISOString().slice(0, 10);
+        } else {
+          fFep.value = "";
+        }
+      }
+
+      function toggleBox() {
+        var esPrenada = !selRes || selRes.value === "PREÑADA";
+        if (prenadaBox) prenadaBox.style.display = esPrenada ? "block" : "none";
+        if (esPrenada) calcularFep();
+      }
+
+      if (selRes) selRes.addEventListener("change", toggleBox);
+      if (fDias) fDias.addEventListener("input", calcularFep);
+      if (fFecha) fFecha.addEventListener("change", calcularFep);
+      toggleBox();
+    }
+
+    function bindCamposNitrogeno() {
+      if (_tipoCapturaActual !== "nitrogeno") return;
+      var fFecha = document.getElementById("cap-fecha");
+      var fInterv = document.getElementById("cap-nitr-intervalo");
+      var fProx = document.getElementById("cap-nitr-prox");
+
+      function calcularProx() {
+        if (!fProx) return;
+        var intD = parseInt(fInterv ? fInterv.value : 21, 10);
+        var fStr = (fFecha && fFecha.value) || new Date().toISOString().slice(0, 10);
+        if (!isNaN(intD) && intD > 0) {
+          var fDate = new Date(fStr + "T12:00:00");
+          var proxDate = new Date(fDate.getTime() + (intD * 86400000));
+          fProx.value = proxDate.toISOString().slice(0, 10);
+        }
+      }
+
+      if (fInterv) fInterv.addEventListener("input", calcularProx);
+      if (fFecha) fFecha.addEventListener("change", calcularProx);
+      calcularProx();
     }
 
     function bindCamposTarea() {
@@ -4666,6 +4971,11 @@
             + "🐂 <b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
             + "</div>";
         }
+        if (!esPerdida && (d["cap-distocia"] === "SI")) {
+          h += "<div style='margin-bottom:6px; font-size:13px; background:rgba(220,38,38,0.08); padding:6px 10px; border-radius:6px; border-left:4px solid var(--color-rojo-txt, #dc2626);'>"
+            + "⚠️ <b>Parto difícil (distocia):</b> vigilar la vaca en el postparto."
+            + "</div>";
+        }
         if (d["cap-pot-cria"] || d["cap-pot-madre"]) {
           h += "<div style='margin-bottom:6px; font-size:12.5px; color:var(--texto-suave);'>"
             + "📍 " + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
@@ -4678,6 +4988,75 @@
         return h;
       }
 
+      if (_capTipo === "palpacion") {
+        var vacaP = d["cap-tag"] || "—";
+        var resP = d["cap-palp-resultado"] || "PREÑADA";
+        var metP = d["cap-palp-metodo"] === "ECOGRAFO" ? "📟 Ecógrafo" : "🖐️ Manual (Tacto)";
+        var chipP = resP === "PREÑADA" ? "verde" : (resP === "VACIA" ? "rojo" : "ambar");
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
+          + "🖐️ " + esc(nombreTipoCap(_capTipo)) + " · <span class='chip " + chipP + "'>" + esc(resP) + "</span>"
+          + "</div>"
+          + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
+          + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+          + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Vaca / Arete:</small>"
+          + "<b style='font-size:15px; color:var(--texto); font-family:var(--font-mono);'>" + esc(vacaP) + "</b>"
+          + "</div>"
+          + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+          + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Método:</small>"
+          + "<b style='font-size:13px; color:var(--texto);'>" + esc(metP) + "</b>"
+          + "</div>"
+          + "</div>";
+        if (resP === "PREÑADA") {
+          h += "<div style='background:rgba(46,125,50,0.09); border-left:4px solid #2e7d32; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+            + "<div style='font-size:13px;'>🤰 <b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
+            + (d["cap-palp-fep"] ? (" · FEP: <b>" + esc(fechaCorta(d["cap-palp-fep"])) + "</b>") : "")
+            + "</div>"
+            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>🐂 Toro/Pajuela: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
+            + "</div>";
+        }
+        if (d["cap-palp-hallazgo"]) {
+          h += "<div style='margin-bottom:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>🔬 Hallazgo: <b>" + esc(d["cap-palp-hallazgo"]) + "</b></div>";
+        }
+        if (d["cap-cc"] || d["cap-peso"]) {
+          h += "<div style='margin-bottom:6px; font-size:12px; color:var(--texto-suave);'>"
+            + (d["cap-cc"] ? ("Condición Corporal: <b>" + esc(d["cap-cc"]) + "/5</b> ") : "")
+            + (d["cap-peso"] ? ("· Peso: <b>" + esc(d["cap-peso"]) + " kg</b>") : "")
+            + "</div>";
+        }
+        if (d["cap-palp-responsable"]) {
+          h += "<div style='font-size:12px; color:var(--texto-suave);'>👨‍⚕️ Profesional: <b>" + esc(d["cap-palp-responsable"]) + "</b></div>";
+        }
+        if (d["cap-notas"]) {
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        }
+        return h;
+      }
+
+      if (_capTipo === "pajuela") {
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+          + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+          + "<div style='font-size:14px;'>🐂 <b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
+          + (d["cap-paj-raza"] ? (" (" + esc(d["cap-paj-raza"]) + ")") : "") + "</div>"
+          + "<div style='font-size:12.5px; margin-top:3px;'>Canastilla: <b>" + esc(d["cap-paj-canastilla"] || "—") + "</b> · Entrada: <b>" + esc(d["cap-paj-cant"] || "1") + " pajuelas</b>"
+          + (d["cap-paj-costo"] ? (" · Costo unit: <b>" + fmtMoneda(Number(d["cap-paj-costo"])) + "</b>") : "") + "</div>"
+          + (d["cap-paj-procedencia"] ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Procedencia: " + esc(d["cap-paj-procedencia"]) + "</div>") : "")
+          + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        return h;
+      }
+
+      if (_capTipo === "nitrogeno") {
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+          + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+          + "<div style='font-size:13px;'>Intervalo estimado: <b>" + esc(d["cap-nitr-intervalo"] || "21") + " días</b>"
+          + (d["cap-nitr-prox"] ? (" · Próxima recarga: <b>" + esc(fechaCorta(d["cap-nitr-prox"])) + "</b>") : "") + "</div>"
+          + (d["cap-nitr-proveedor"] ? ("<div style='font-size:12.5px; margin-top:3px;'>Proveedor: <b>" + esc(d["cap-nitr-proveedor"]) + "</b></div>") : "")
+          + (d["cap-nitr-costo"] ? ("<div style='font-size:12.5px; margin-top:2px;'>Costo: <b>" + fmtMoneda(Number(d["cap-nitr-costo"])) + "</b></div>") : "")
+          + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        return h;
+      }
+
       var tagR = d["cap-tag"] || d["cap-cria-tag"] || d["cap-tarea-potrero"] || "—";
       h = "<b>" + esc(nombreTipoCap(_capTipo)) + "</b> · Objetivo: <b>" + esc(tagR) + "</b> · Fecha: <b>" + esc(fechaCorta(fechaR)) + "</b>";
       if (d["cap-cria-tag"] && d["cap-tag"]) {
@@ -4687,7 +5066,73 @@
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
+      // Simulador 1-toque (Fase 5.2): en Servicio/IA con vaca y toro se
+      // evalúa consanguinidad 3G antes de guardar. Solo avisa, no bloquea.
+      if (_capTipo === "servicio") {
+        var vacaS = (d["cap-tag"] || "").trim();
+        var toroS = (d["cap-toro"] || "").trim();
+        if (vacaS && toroS) {
+          h += "<div id='sim-consang-box' style='margin-top:8px; font-size:13px;'>⏳ Evaluando consanguinidad 3G…</div>";
+          programarSimConsang(vacaS, toroS);
+        }
+      }
       return h;
+    }
+
+    // Evaluación diferida del simulador con caché por pareja: el resumen
+    // se re-renderiza al teclear, así no se repite el fetch para la misma
+    // vaca + toro y una respuesta tardía no pinta sobre otra pareja.
+    var _simConsangKey = "";
+    var _simConsangPend = "";
+    var _simConsangTimer = null;
+    function programarSimConsang(vaca, toro) {
+      var key = vaca + "|" + toro;
+      if (key === _simConsangKey) return;
+      _simConsangPend = key;
+      if (_simConsangTimer) clearTimeout(_simConsangTimer);
+      _simConsangTimer = setTimeout(function () { evaluarSimConsang(vaca, toro, key); }, 350);
+    }
+    function evaluarSimConsang(vaca, toro, key) {
+      fetch("/api/simular-cruzamiento?vaca=" + encodeURIComponent(vaca) + "&toro=" + encodeURIComponent(toro))
+        .then(function (r) { return r.json(); })
+        .then(function (sim) {
+          if (key !== _simConsangPend) return;
+          var box = document.getElementById("sim-consang-box");
+          if (!box) return;
+          _simConsangKey = key;
+          box.innerHTML = htmlSimConsang(sim, vaca, toro);
+        })
+        .catch(function () {
+          if (key !== _simConsangPend) return;
+          var box2 = document.getElementById("sim-consang-box");
+          if (box2) box2.innerHTML = "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ Sin conexión: no se pudo evaluar consanguinidad.</span>";
+        });
+    }
+    function htmlSimConsang(sim, vaca, toro) {
+      if (!sim || !sim.ok) {
+        return "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ No se pudo evaluar consanguinidad.</span>";
+      }
+      if (!sim.evaluable) {
+        return "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:6px; padding:8px 10px; margin-top:4px;'>"
+          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip gris'>NO EVALUABLE</span>"
+          + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>" + esc(sim.detalle || "") + "</div></div>";
+      }
+      if (sim.apto) {
+        return "<div style='background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:8px 10px; border-radius:6px; margin-top:4px;'>"
+          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip verde'>APTO</span> <span style='font-size:12px;'>" + esc(vaca) + " × " + esc(toro) + "</span>"
+          + (sim.advertencia ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>⚠️ " + esc(sim.advertencia) + "</div>") : "")
+          + "</div>";
+      }
+      var anc = (sim.ancestros_comunes || []).map(function (a) {
+        return esc(a.tag) + " (" + esc(a.parentesco_vaca) + "/" + esc(a.parentesco_toro) + ")";
+      }).join(", ");
+      return "<div style='background:rgba(220,38,38,0.08); border-left:4px solid var(--color-rojo-txt, #dc2626); padding:8px 10px; border-radius:6px; margin-top:4px;'>"
+        + "🧬 <b>Consanguinidad 3G:</b> <span class='chip rojo'>NO RECOMENDADO</span>"
+        + "<div style='font-size:12.5px; margin-top:2px;'>" + esc(sim.detalle || "") + "</div>"
+        + (anc ? ("<div style='font-size:12px; color:var(--texto-suave);'>En común: " + anc + "</div>") : "")
+        + (sim.relacion_directa ? ("<div style='font-size:12px; color:var(--texto-suave);'>" + esc(sim.relacion_directa) + "</div>") : "")
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Puede guardar igual si el dueño lo autoriza.</div>"
+        + "</div>";
     }
 
     // El avance 2→3 valida los requeridos del paso 2 (respeta el modo
@@ -4719,6 +5164,8 @@
       bindSugerenciaTagCriaParto();
       bindToroParto();
       bindCamposTarea();
+      bindCamposPalpacion();
+      bindCamposNitrogeno();
       aplicarDefaultsCaptura();
 
       var fTag = document.getElementById("cap-tag");
@@ -5328,6 +5775,9 @@
         wrap2.style.display = esGemelar ? "block" : "none";
         if (wrapCria) wrapCria.style.display = esPerdida ? "none" : "block";
         if (avisoPerdida) avisoPerdida.style.display = esPerdida ? "block" : "none";
+        // La distocia solo aplica a nacimientos, no a pérdidas.
+        var wrapDis = document.getElementById("cap-distocia-wrap");
+        if (wrapDis) wrapDis.style.display = esPerdida ? "none" : "block";
         if (labelCria1) labelCria1.firstChild.textContent = esGemelar ? "Arete de la Cría 1: " : "Arete de la Cría (Nuevo): ";
       }
       sel.addEventListener("change", toggle);
@@ -5480,6 +5930,7 @@
           payload.potrero_cria = (q("#cap-pot-cria") && q("#cap-pot-cria").value || "").trim() || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.distocia = (q("#cap-distocia") && q("#cap-distocia").value === "SI") && !esPerdidaEnvio;
           var toroPadre = (typeof obtenerToroPadreSeleccionado === "function") ? obtenerToroPadreSeleccionado() : null;
           if (toroPadre) {
             payload.padre_tag = toroPadre;
@@ -5571,6 +6022,38 @@
           payload.asignado_a = (q("#cap-tarea-asignado") && q("#cap-tarea-asignado").value || "").trim() || "Encargado";
           payload.prioridad = (q("#cap-tarea-prioridad") && q("#cap-tarea-prioridad").value) || "NORMAL";
           payload.hora = (q("#cap-tarea-hora") && q("#cap-tarea-hora").value) || null;
+        } else if (_tipoCapturaActual === "palpacion") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.vaca_tag = payload.animal_tag;
+          payload.tag = payload.animal_tag;
+          payload.metodo = (q("#cap-palp-metodo") && q("#cap-palp-metodo").value) || "TACTO";
+          payload.resultado = (q("#cap-palp-resultado") && q("#cap-palp-resultado").value) || "PREÑADA";
+          var diasGest = parseInt(q("#cap-palp-dias") && q("#cap-palp-dias").value, 10);
+          payload.dias_gestacion = (!isNaN(diasGest) && diasGest > 0) ? diasGest : null;
+          payload.reproductor = (q("#cap-palp-toro") && q("#cap-palp-toro").value || "").trim() || null;
+          payload.toro_pajuela = payload.reproductor;
+          payload.hallazgo = (q("#cap-palp-hallazgo") && q("#cap-palp-hallazgo").value || "").trim() || null;
+          payload.cond_corporal = parseFloat(q("#cap-cc") && q("#cap-cc").value) || null;
+          payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
+          payload.responsable = (q("#cap-palp-responsable") && q("#cap-palp-responsable").value || "").trim() || null;
+          payload.veterinario = payload.responsable;
+          payload.detalle = (q("#cap-notas") && q("#cap-notas").value || "").trim() || null;
+          payload.notas = payload.detalle;
+        } else if (_tipoCapturaActual === "pajuela") {
+          payload.codigo_toro = (q("#cap-paj-toro") && q("#cap-paj-toro").value || "").trim();
+          payload.toro = payload.codigo_toro;
+          payload.raza = (q("#cap-paj-raza") && q("#cap-paj-raza").value || "").trim() || null;
+          payload.canastilla = (q("#cap-paj-canastilla") && q("#cap-paj-canastilla").value || "").trim() || null;
+          payload.cantidad = parseInt(q("#cap-paj-cant") && q("#cap-paj-cant").value || 1, 10);
+          payload.costo = parseFloat(q("#cap-paj-costo") && q("#cap-paj-costo").value) || 0.0;
+          payload.procedencia = (q("#cap-paj-procedencia") && q("#cap-paj-procedencia").value || "").trim() || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value || "").trim() || null;
+        } else if (_tipoCapturaActual === "nitrogeno") {
+          payload.dias_intervalo = parseInt(q("#cap-nitr-intervalo") && q("#cap-nitr-intervalo").value || 21, 10);
+          payload.proxima_recarga = (q("#cap-nitr-prox") && q("#cap-nitr-prox").value) || null;
+          payload.proveedor = (q("#cap-nitr-proveedor") && q("#cap-nitr-proveedor").value || "").trim() || null;
+          payload.costo = parseFloat(q("#cap-nitr-costo") && q("#cap-nitr-costo").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value || "").trim() || null;
         }
 
         // Adjuntar foto opcional. Si ya se analizó con IA (leche/gasto), la
@@ -7355,7 +7838,9 @@
         editIdInp.value = uid;
         nomInp.value = nom;
         rolSel.value = rol;
-        pinInp.value = (pin && pin !== "****") ? pin : "";
+        // El listado enmascara el PIN como "····": nunca se rellena, el
+        // admin debe digitar uno nuevo (el backend valida 4 dígitos).
+        pinInp.value = (pin && pin !== "****" && pin !== "····") ? pin : "";
         uidInp.value = uid;
         uidInp.disabled = true;
         if (tgIdInp) tgIdInp.value = tgid || "";
@@ -8394,6 +8879,11 @@
   ];
   // HTML del panel "identificar por foto del arete" (solo en el dashboard,
   // no en la página /ficha/<tag> que llega desde el QR ya identificado).
+  function inputFotoIdentHtml() {
+    return "<input type='file' id='f-ident-foto' class='input-foto-oculto' accept='image/*' capture='environment'>"
+      + "<label for='f-ident-foto' class='btn-foto-campo'>" + icon("camera", 15) + "Tomar foto o elegir</label>"
+      + "<span class='foto-nombre' id='ident-foto-nombre'>Ninguna foto</span>";
+  }
   function identPanelHtml(colapsable) {
     if (colapsable) {
       return "<details class='card ident-box' style='margin-top:10px; margin-bottom:12px; padding:10px 14px;'>"
@@ -8404,7 +8894,7 @@
         + "<div style='margin-top:10px;'>"
         + "<p class='aviso' style='margin:4px 0 8px; font-size:12px;'>Tome la foto del arete con el celular o pegue un código RFID/arete y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
         + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
-        + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1; min-width:0; max-width:100%; box-sizing:border-box;'>"
+        + inputFotoIdentHtml()
         + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
         + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
         + "</div>"
@@ -8418,7 +8908,7 @@
       + "<b>" + icon("camera") + "Identificar por foto del arete</b>"
       + "<p class='aviso' style='margin:4px 0'>Tome la foto del arete con el celular o pegue un código RFID/arete arriba y pulse Cargar. También puede <b>escanear un QR</b> de las fichas de corral.</p>"
       + "<div style='display:flex; gap: 8px; flex-wrap:wrap; align-items:center; margin:6px 0'>"
-      + "<input type='file' id='f-ident-foto' accept='image/*' style='min-height:40px; flex:1; min-width:0; max-width:100%; box-sizing:border-box;'>"
+      + inputFotoIdentHtml()
       + "<button id='btn-ident' type='button'>" + icon("search") + "Identificar</button>"
       + "<button id='btn-scan-qr' type='button'>" + icon("camera") + "Escanear QR</button>"
       + "</div>"
@@ -8717,6 +9207,14 @@
     }
     if (id === "repro") {
       var h = "";
+      var esHembra = String(f.sexo || "").toUpperCase() === "HEMBRA" || f.sexo === "H";
+      if (esHembra) {
+        h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:var(--superficie); padding:10px 12px; border-radius:8px; border:1px solid var(--borde);'>"
+          + "<div style='font-size:13px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>" + icon("stethoscope", 16) + "Control Reproductivo & Tactos</div>"
+          + "<button type='button' class='tema-btn btn-palpar-ficha-directo' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
+          + icon("stethoscope", 13) + "🖐️ Palpación / Eco</button>"
+          + "</div>";
+      }
       var colsPartos = [
         ["fecha", "Fecha"], ["cria_tag", "Cría"], ["sexo_cria", "Sexo"],
         ["peso_nacimiento", "Peso nac.", "num"],
@@ -8745,8 +9243,17 @@
       h += "<h4>Servicios / IA</h4>" + tabla(f.servicios, colsServ, "Sin servicios registrados.");
 
       var colsDiag = [
-        ["fecha", "Fecha"], ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
-        ["dias_gestacion", "Días gest."]
+        ["fecha", "Fecha"],
+        ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>📟 Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>🖐️ Tacto</span>"; }],
+        ["dias_gestacion", "Días", "text", function (v) { return v ? (esc(v) + " d") : "—"; }],
+        ["toro_pajuela", "Toro / Pajuela", "text", function (v) { return v ? esc(v) : "—"; }],
+        ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
+          var p = [];
+          if (v) p.push("<b>" + esc(v) + "</b>");
+          if (r && r.detalle) p.push("<small style='color:var(--texto-suave);'>" + esc(r.detalle) + "</small>");
+          return p.length ? p.join("<br>") : "—";
+        }]
       ];
       if (esOwner) {
         colsDiag.push(["id", "", "text", function (id, r) {
@@ -9212,6 +9719,26 @@
         if (panel) panel.innerHTML = fichaTab(b.getAttribute("data-tab"), ficha || window.__ultimaFicha || {});
       });
     });
+
+    var panelEl = document.getElementById("ficha-panel");
+    if (panelEl && !panelEl.__palpBound) {
+      panelEl.__palpBound = true;
+      panelEl.addEventListener("click", function (e) {
+        var btnPalp = e.target.closest(".btn-palpar-ficha-directo");
+        if (btnPalp) {
+          var t = btnPalp.getAttribute("data-tag");
+          if (t) {
+            try { localStorage.setItem("bitacora_ultimo_tag", t); } catch (eTag) {}
+            window.__capTagPendiente = t;
+          }
+          _tipoCapturaActual = "palpacion";
+          irAVista("captura");
+          cargar(true);
+          try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eScroll) { window.scrollTo(0, 0); }
+        }
+      });
+    }
+
     // BLOQUE 4: el FAB lleva a Captura prellenando el tag de esta ficha.
     var btnFab = document.getElementById("btn-ficha-registrar");
     if (btnFab) {
@@ -9379,7 +9906,7 @@
     irAVista("ficha");
 
     var barraFiltros = document.getElementById("barra-filtros");
-    if (barraFiltros) barraFiltros.style.display = "";
+    if (barraFiltros) barraFiltros.style.display = "none";
 
     if (typeof abrirFicha === "function" && vista) {
       abrirFicha(tag, vista, true, true, tabId);
@@ -10069,6 +10596,11 @@
     var file = document.getElementById("f-ident-foto");
     var btnQr = document.getElementById("btn-scan-qr");
     if (!btn || !file) return;
+    file.addEventListener("change", function () {
+      var nom = document.getElementById("ident-foto-nombre");
+      if (!nom) return;
+      nom.textContent = (file.files && file.files[0]) ? file.files[0].name : "Ninguna foto";
+    });
     btn.addEventListener("click", function () {
       var estado = document.getElementById("ident-estado");
       var out = document.getElementById("ident-resultado");
@@ -10408,6 +10940,7 @@
       else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
       if (actual === "tablero") bindTablero();
+      if (actual === "repro") bindRepro();
       if (actual === "pasturas") bindPasturas();
       if (actual === "leche") bindLeche();
       if (actual === "finanzas") bindFinanzas();
@@ -10662,10 +11195,6 @@
         if (!v) return;
         cerrarModalMas();
         irAVista(v);
-        var barraFiltros = document.getElementById("barra-filtros");
-        if (barraFiltros) {
-          barraFiltros.style.display = (v === "ayuda") ? "none" : "";
-        }
         cargar();
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
       });

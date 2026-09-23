@@ -45,6 +45,8 @@ CREATE TABLE IF NOT EXISTS animales (
 -- tipo_evento: PARTO | GEMELAR | ABORTO | REABSORCION | MOMIFICACION |
 -- MACERACION | MUERTE_FETAL (ver src/db/models.py TIPOS_EVENTO_PARTO).
 -- grupo_parto_id agrupa las 2+ filas de un mismo parto GEMELAR.
+-- distocia: 1 si el parto (PARTO/GEMELAR) fue difícil o asistido; solo
+-- aplica a nacimientos, nunca a pérdidas (ABORTO/etc. la llevan en 0).
 CREATE TABLE IF NOT EXISTS partos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     vaca_id INTEGER,
@@ -55,7 +57,8 @@ CREATE TABLE IF NOT EXISTS partos (
     id_cria INTEGER,
     notas TEXT,
     tipo_evento TEXT DEFAULT 'PARTO',
-    grupo_parto_id INTEGER
+    grupo_parto_id INTEGER,
+    distocia INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS muertes (
@@ -265,6 +268,10 @@ CREATE TABLE IF NOT EXISTS diagnosticos_gestacion (
     fecha TEXT,
     resultado TEXT NOT NULL,
     dias_gestacion INTEGER,
+    metodo TEXT DEFAULT 'TACTO',
+    hallazgo TEXT,
+    detalle TEXT,
+    toro_pajuela TEXT,
     responsable TEXT,
     creado_en TEXT,
     registrado_por INTEGER

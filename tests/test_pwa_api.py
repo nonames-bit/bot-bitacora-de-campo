@@ -607,6 +607,36 @@ def test_api_ficha_grafico_whitelist(client):
     assert client.get("/api/ficha/ZZ999/grafico/peso").status_code == 404
 
 
+def test_api_reporte_xlsx_descarga_valida(client):
+    """Smoke P0.2: /api/reporte.xlsx debe devolver un .xlsx real (200) con
+    sesión OWNER (el fixture `client` loguea con master password). Antiguamente
+    el endpoint devolvía 500 (ImportError de openpyxl) en producción y ningún
+    test lo importaba, por eso el CI no lo detectaba."""
+    import io
+    import zipfile
+    import openpyxl
+
+    r = client.get("/api/reporte.xlsx?seccion=inventario")
+    assert r.status_code == 200
+    assert r.data[:2] == b"PK"
+    assert zipfile.is_zipfile(io.BytesIO(r.data))
+    wb = openpyxl.load_workbook(io.BytesIO(r.data))
+    assert wb.active.title == "Hato Activo"
+
+
+def test_api_reporte_xlsx_trabajador_403(tmp_path, db_file):
+    """Un TRABAJADOR no puede exportar datos en Excel (RBAC 403)."""
+    users_json = str(tmp_path / "users_xlsx.json")
+    with open(users_json, "w", encoding="utf-8") as f:
+        json.dump([{"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"}], f)
+
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+    c = app.test_client()
+    c.post("/login", data={"pin": "7777"})
+    assert c.get("/api/reporte.xlsx").status_code == 403
+
+
+
 def test_autenticacion_pin_roles_y_usuario(tmp_path, db_file):
     users_json = str(tmp_path / "users_test.json")
     import json
@@ -1145,10 +1175,14 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     assert r_adm_create.status_code == 200
     assert r_adm_create.get_json()["ok"] is True
 
-    # No se puede repetir PIN (colisión)
+    # No se puede repetir PIN (colisión). El mensaje es genérico a
+    # propósito: no revela el PIN en disputa ni a quién pertenece, para
+    # que un ADMIN no pueda cosechar PINs ajenos probando valores.
     r_colision = c_adm.post("/api/usuarios", json={"nombre": "Repetido", "rol": "TRABAJADOR", "pin": "7777"})
     assert r_colision.status_code == 400
-    assert "7777" in r_colision.get_json()["error"] and "Pepe" in r_colision.get_json()["error"]
+    err_col = r_colision.get_json()["error"]
+    assert "7777" not in err_col and "Pepe" not in err_col
+    assert "otro usuario" in err_col
 
     # Admin no puede eliminar OWNER
     r_adm_del_owner = c_adm.post("/api/usuarios/100/eliminar")
@@ -1221,6 +1255,71 @@ def test_api_usuarios_autenticacion_y_rbac(tmp_path, db_file):
     # Próximo request de c_vet debe ser rechazado con 401 porque el usuario ya no existe en users.json
     r_vet_revocado = c_vet.get("/api/usuario")
     assert r_vet_revocado.status_code == 401
+
+
+def test_login_maestra_verifica_user_id_y_rota_sesion(tmp_path, db_file):
+    """La clave maestra no adopta un user_id arbitrario del formulario
+    (login.html ni siquiera lo pide) y cada login exitoso parte de una
+    sesión limpia, sin arrastrar identidad previa (ej. telegram_id)."""
+    import json
+    users_data = [
+        {"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234", "telegram_id": 111111},
+        {"user_id": 300, "nombre": "Trabajador", "rol": "TRABAJADOR", "pin": "3333"},
+    ]
+    u_path = str(tmp_path / "users_sesion.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    assert app is not None
+    app.config.update({"TESTING": True})
+
+    # 1. user_id inexistente o revocado: se descarta, sesión OWNER sin user_id
+    c = app.test_client()
+    c.post("/login", data={"password": "master-password", "user_id": "99999"})
+    info = c.get("/api/usuario").get_json()
+    assert info["user_id"] is None
+    assert info["rol"] == "OWNER"
+    assert info["telegram_id"] is None
+
+    # 2. user_id existente y válido: sí se adopta (con su rol real)
+    c2 = app.test_client()
+    c2.post("/login", data={"password": "master-password", "user_id": "300"})
+    info2 = c2.get("/api/usuario").get_json()
+    assert info2["user_id"] == 300
+    assert info2["rol"] == "TRABAJADOR"
+
+    # 3. Rotación: login por PIN y luego por maestra no arrastra identidad
+    c3 = app.test_client()
+    c3.post("/login", data={"pin": "1234"})
+    assert c3.get("/api/usuario").get_json()["telegram_id"] == 111111
+    c3.post("/login", data={"password": "master-password"})
+    info3 = c3.get("/api/usuario").get_json()
+    assert info3["user_id"] is None
+    assert info3["telegram_id"] is None
+    assert info3["nombre"] == "Propietario"
+
+
+def test_api_guardar_usuario_no_devuelve_pin(tmp_path, db_file):
+    """El alta de usuario no devuelve el PIN en la respuesta: ya quedó
+    hasheado en users.json y el frontend solo muestra "····"."""
+    import json
+    users_data = [
+        {"user_id": 100, "nombre": "Duenio", "rol": "OWNER", "pin": "1234"},
+    ]
+    u_path = str(tmp_path / "users_sinpin.json")
+    with open(u_path, "w", encoding="utf-8") as f:
+        json.dump(users_data, f)
+    app = crear_app(db_file, users_file=u_path, password="master-password")
+    assert app is not None
+    app.config.update({"TESTING": True})
+    c = app.test_client()
+    c.post("/login", data={"pin": "1234"})
+    r = c.post("/api/usuarios", json={"nombre": "Pepe", "rol": "TRABAJADOR", "pin": "7777"})
+    assert r.status_code == 200
+    cuerpo = r.get_json()
+    assert cuerpo["ok"] is True
+    assert "pin" not in cuerpo["usuario"]
+    assert "7777" not in json.dumps(cuerpo, ensure_ascii=False)
 
 
 def test_usuarios_presencia_y_monitor_en_linea(tmp_path):

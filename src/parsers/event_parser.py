@@ -85,6 +85,16 @@ TIPO_EVENTO_PARTO_RE: list[tuple[str, re.Pattern]] = [
 # Parto múltiple (no implica pérdida): "parió mellizos/gemelos".
 GEMELAR_RE = re.compile(r"\bgemel|\bmelliz")
 
+# Parto difícil/asistido (distocia): "parió con dificultad", "hubo que
+# sacarle el ternero", "parto distócico". Solo marca PARTO/GEMELAR (el
+# registro ignora el flag en pérdidas). Se evita "difícil" solo, que en
+# campo también califica vacas bravas o potreros.
+DISTOCIA_RE = re.compile(
+    r"distoci\w*|parto\s+dif[ií]cil|dif[ií]cil\s+(?:el\s+)?parto|"
+    r"(?:hubo|toc[oó]|tuvo|tuvimos|tuvieron)\s+que\s+(?:sacar|jalar|ayudar)|"
+    r"sacam(?:os|do|ron)?\s+el\s+ternero|jalar\s+el\s+ternero|meter\s+mano"
+)
+
 
 def _causa_muerte(texto_norm: str) -> Optional[str]:
     """Aísla la causa presunta tras el verbo de muerte."""
@@ -222,6 +232,7 @@ class EventParser:
         ev.datos["sexo_cria"] = sexo
         ev.datos["estado_cria"] = estado
         ev.datos["peso_nacimiento"] = peso
+        ev.datos["distocia"] = bool(DISTOCIA_RE.search(t))
         # Una segunda mención numérica puede ser el tag de la cría.
         tags = nlu.extraer_tags(t)
         if len(tags) >= 2:

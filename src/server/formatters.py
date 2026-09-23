@@ -2545,15 +2545,51 @@ def formatear_estado_termo(db: Database, hoy: Optional[date] = None) -> str:
     return "\n".join(lineas)
 
 
+def _lineas_perdidas_reproductivas(db: Database) -> list[str]:
+    """Bloque de pérdidas gestacionales y distocias para /kpi_reprod
+    (cierre Fase 5.2). Independiente de los KPIs de concepción: se muestra
+    aunque aún no haya servicios o diagnósticos registrados."""
+    try:
+        perd = db.metricas_perdidas_reproductivas()
+    except Exception:
+        return []
+    if not perd or (not perd.get("perdidas") and not perd.get("distocias")):
+        return []
+    lineas = [
+        "────────────────────────────────────────",
+        "⚠️ <b>PÉRDIDAS GESTACIONALES & DISTOCIAS</b>",
+        f"• Partos: <b>{perd['partos']}</b> · Pérdidas: <b>{perd['perdidas']}</b> "
+        f"(<b>{perd['tasa_perdida_pct']}%</b>)",
+    ]
+    if perd.get("por_tipo"):
+        det = ", ".join(f"{t}: {n}" for t, n in sorted(perd["por_tipo"].items()))
+        lineas.append(f"• Desglose: {det}")
+    lineas.append(
+        f"• Partos difíciles (distocia): <b>{perd['distocias']}</b> "
+        f"(<b>{perd['tasa_distocia_pct']}%</b> de los partos)"
+    )
+    if perd.get("crias_muertas_parto"):
+        lineas.append(f"• Crías muertas al nacer: <b>{perd['crias_muertas_parto']}</b>")
+    if perd.get("reincidentes"):
+        rep = ", ".join(f"{_esc(r['vaca'])} (×{r['perdidas']})" for r in perd["reincidentes"][:5])
+        lineas.append(f"• 🔁 Vacas reincidentes (≥2 pérdidas): {rep}")
+    if perd.get("recientes"):
+        ult = perd["recientes"][0]
+        lineas.append(f"• Última pérdida: <b>{_esc(ult['vaca'])}</b> · {ult['tipo_evento']} · {ult['fecha']}")
+    return lineas
+
+
 def formatear_kpis_reproduccion(db: Database) -> str:
     """Formatea el reporte detallado de tasa de concepción y S/C."""
     kpis = db.kpis_reproductivos_concepcion()
     if not kpis or (kpis["total_servicios"] == 0 and kpis["total_evaluados"] == 0):
-        return (
+        base = (
             "🎯 <b>KPIs REPRODUCTIVOS & CONCEPCIÓN</b>\n"
             "────────────────────────────────────────\n"
             "⚠️ <i>No hay suficientes servicios o diagnósticos registrados para calcular indicadores.</i>"
         )
+        extra = _lineas_perdidas_reproductivas(db)
+        return base + ("\n" + "\n".join(extra) if extra else "")
 
     sc_str = f"{kpis['servicios_por_concepcion']:.2f}" if kpis["servicios_por_concepcion"] else "N/D"
     lineas = [
@@ -2576,6 +2612,8 @@ def formatear_kpis_reproduccion(db: Database) -> str:
                 f"• <b>{_esc(t['toro'])}</b>: <b>{t['tasa_concepcion']:.1f}%</b> concepción "
                 f"({t['prenadas']}/{t['evaluados']} preñadas) | S/C: {sc_t}"
             )
+
+    lineas.extend(_lineas_perdidas_reproductivas(db))
 
     return "\n".join(lineas)
 

@@ -120,6 +120,7 @@ class Bot:
                 peso_nacimiento=d.get("peso_nacimiento"), id_cria_tag=d.get("id_cria"),
                 registrado_por=user_id, tipo_evento=tipo_evento,
                 grupo_parto_id=grupo_parto_id,
+                distocia=bool(d.get("distocia")),
             )
             if grupo_gemelar is not None and tipo_evento == "GEMELAR" and clave_grupo not in grupo_gemelar and nuevo_id:
                 grupo_gemelar[clave_grupo] = nuevo_id
@@ -285,10 +286,11 @@ class Bot:
                 "REABSORCION": "reabsorción embrionaria", "MOMIFICACION": "momificación fetal",
                 "MACERACION": "maceración fetal", "MUERTE_FETAL": "muerte fetal",
             }
+            dist = " Parto difícil ⚠️: vigilar la vaca en el postparto." if d.get("distocia") else ""
             if tipo_evento in etiquetas:
-                return f"Registrado {etiquetas[tipo_evento]} de la {tag}."
+                return f"Registrado {etiquetas[tipo_evento]} de la {tag}.{dist}"
             sexo = d.get("sexo_cria") or "?"
-            return f"Registrado parto de la {tag} (cría {sexo.lower()})."
+            return f"Registrado parto de la {tag} (cría {sexo.lower()}).{dist}"
         if ev.tipo == "secado":
             motivo_str = f" ({d['motivo']})" if d.get("motivo") else ""
             return f"Registrado secado de la {tag}{motivo_str}."
@@ -299,7 +301,23 @@ class Bot:
             dias_str = f" ({d['dias_gestacion']} días)" if d.get("dias_gestacion") else ""
             return f"Registrado diagnóstico de gestación de la {tag}: {res}{dias_str}."
         if ev.tipo == "servicio":
-            return f"Registrado servicio ({d.get('tipo_servicio', 'IA')}) de la {tag}."
+            base = f"Registrado servicio ({d.get('tipo_servicio', 'IA')}) de la {tag}."
+            # Simulador 1-toque (Fase 5.2): si el toro es del hato y hay
+            # pedigrí, se avisa el veredicto 3G en la misma confirmación.
+            # Solo se anexa cuando es evaluable, para no spamear cada IA
+            # con pajuela comercial (toro externo sin registro).
+            toro = (d.get("toro_pajilla") or "").strip()
+            if toro and tag != "lote":
+                try:
+                    sim = self.db.simular_cruzamiento(tag, toro)
+                except Exception:
+                    sim = None
+                if sim and sim.get("evaluable"):
+                    if sim.get("apto"):
+                        base += " 🧬 Consanguinidad 3G: APTO."
+                    else:
+                        base += f" 🧬 Consanguinidad 3G: NO RECOMENDADO ({sim.get('detalle')})."
+            return base
         if ev.tipo == "celo":
             return f"Registrado celo de la {tag}."
         if ev.tipo == "tratamiento":

@@ -120,6 +120,8 @@ class Database:
                     self.conn.execute("ALTER TABLE partos ADD COLUMN tipo_evento TEXT DEFAULT 'PARTO'")
                 if "grupo_parto_id" not in cols_p:
                     self.conn.execute("ALTER TABLE partos ADD COLUMN grupo_parto_id INTEGER")
+                if "distocia" not in cols_p:
+                    self.conn.execute("ALTER TABLE partos ADD COLUMN distocia INTEGER DEFAULT 0")
             if "animales" in tablas:
                 cols_a = {r[1] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()}
                 if "hierro" not in cols_a:
@@ -159,6 +161,16 @@ class Database:
                 if "registrado_por" not in cols_cc:
                     self.conn.execute("ALTER TABLE condicion_corporal ADD COLUMN registrado_por INTEGER")
                 self.conn.execute("CREATE INDEX IF NOT EXISTS idx_condicion_corporal_animal_fecha ON condicion_corporal(animal_id, fecha)")
+            if "diagnosticos_gestacion" in tablas:
+                cols_dg = {r[1] for r in self.conn.execute("PRAGMA table_info(diagnosticos_gestacion)").fetchall()}
+                for col_name, col_type in [
+                    ("metodo", "TEXT DEFAULT 'TACTO'"),
+                    ("hallazgo", "TEXT"),
+                    ("detalle", "TEXT"),
+                    ("toro_pajuela", "TEXT"),
+                ]:
+                    if col_name not in cols_dg:
+                        self.conn.execute(f"ALTER TABLE diagnosticos_gestacion ADD COLUMN {col_name} {col_type}")
         except Exception:
             pass
 
@@ -221,6 +233,19 @@ class Database:
                 self.conn.execute("ALTER TABLE partos ADD COLUMN tipo_evento TEXT DEFAULT 'PARTO'")
             if "grupo_parto_id" not in cols:
                 self.conn.execute("ALTER TABLE partos ADD COLUMN grupo_parto_id INTEGER")
+            if "distocia" not in cols:
+                self.conn.execute("ALTER TABLE partos ADD COLUMN distocia INTEGER DEFAULT 0")
+            # Backfill: partos históricos cuya nota ya decía distocia/parto
+            # difícil (el campo no existía cuando se registraron).
+            self.conn.execute(
+                "UPDATE partos SET distocia = 1 "
+                "WHERE COALESCE(distocia, 0) = 0 "
+                "AND COALESCE(tipo_evento, 'PARTO') IN ('PARTO', 'GEMELAR') "
+                "AND notas IS NOT NULL "
+                "AND (UPPER(notas) LIKE '%DISTOC%' OR UPPER(notas) LIKE '%PARTO DIFICIL%' "
+                "OR UPPER(notas) LIKE '%PARTO DIFÍCIL%' OR UPPER(notas) LIKE '%HUBO QUE SACAR%' "
+                "OR UPPER(notas) LIKE '%TUVIMOS QUE SACAR%')"
+            )
             self.conn.execute(
                 "UPDATE partos SET tipo_evento = 'ABORTO' "
                 "WHERE tipo_evento IS NULL AND id_cria IS NULL AND UPPER(COALESCE(estado_cria, '')) = 'MUERTO'"
@@ -665,13 +690,18 @@ class Database:
                         estado_cria="VIVO", peso_nacimiento=None, id_cria_tag=None,
                         notas=None, potrero_cria=None, potrero_madre=None,
                         registrado_por=None, tipo_evento="PARTO",
-                        grupo_parto_id=None, padre_tag=None) -> Optional[int]:
+                        grupo_parto_id=None, padre_tag=None,
+                        distocia=False) -> Optional[int]:
         """Registra un parto/evento reproductivo. Retorna el id (int) de la
         fila creada o ya existente (reintento idempotente); retorna None si
-        el registro fue rechazado por autorreferencia (vaca == cría)."""
+        el registro fue rechazado por autorreferencia (vaca == cría).
+
+        ``distocia`` marca parto difícil/asistido; solo aplica a PARTO y
+        GEMELAR (las pérdidas la llevan en 0 aunque se reciba en 1)."""
         tipo_evento = (tipo_evento or "PARTO").strip().upper()
         if tipo_evento not in TIPOS_EVENTO_PARTO:
             tipo_evento = "PARTO"
+        distocia_flag = 1 if (distocia and tipo_evento in ("PARTO", "GEMELAR")) else 0
         # Reabsorción/momificación/maceración/muerte fetal/aborto nunca
         # generan una cría: se ignora cualquier id_cria_tag recibido por
         # error y se homologa estado_cria='MUERTO' para no romper el resto
@@ -766,6 +796,12 @@ class Database:
                 fila = self.query_one("SELECT grupo_parto_id FROM partos WHERE id = ?", (existente,))
                 if fila is not None and fila["grupo_parto_id"] is None:
                     self.execute("UPDATE partos SET grupo_parto_id = ? WHERE id = ?", (grupo_parto_id, existente))
+            # Reintento que ahora sí trae distocia: se propaga sin pisar
+            # una marca ya existente (igual que grupo_parto_id arriba).
+            if distocia_flag:
+                fila_d = self.query_one("SELECT distocia FROM partos WHERE id = ?", (existente,))
+                if fila_d is not None and not (fila_d["distocia"] or 0):
+                    self.execute("UPDATE partos SET distocia = 1 WHERE id = ?", (existente,))
             return existente
 
         if padre_tag and ("toro" not in (notas or "").lower() and "padre" not in (notas or "").lower()):
@@ -776,7 +812,7 @@ class Database:
             vaca_id=vaca_id, fecha=iso(fecha), sexo_cria=sexo_cria,
             estado_cria=estado_cria, peso_nacimiento=peso_nacimiento,
             id_cria=id_cria, notas=notas, tipo_evento=tipo_evento,
-            grupo_parto_id=grupo_parto_id,
+            grupo_parto_id=grupo_parto_id, distocia=distocia_flag,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
         # Primer gemelo de un parto GEMELAR: si no se pasó grupo_parto_id
@@ -2393,7 +2429,10 @@ class Database:
     # Reproducción y Diagnóstico Gestacional (Fase 5.1)
     # ------------------------------------------------------------------ #
     def registrar_diagnostico(self, vaca_tag, fecha=None, resultado="PREÑADA",
-                              dias_gestacion=None, responsable=None, registrado_por=None) -> int:
+                              dias_gestacion=None, responsable=None, registrado_por=None,
+                              metodo: Optional[str] = "TACTO", hallazgo: Optional[str] = None,
+                              detalle: Optional[str] = None, toro_pajuela: Optional[str] = None,
+                              peso_kg: Optional[float] = None, cond_corporal: Optional[float] = None) -> int:
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         f = iso(fecha) or date.today().isoformat()
         res_str = str(resultado or "PREÑADA").strip().upper()
@@ -2405,6 +2444,7 @@ class Database:
             res_norm = res_str
 
         dias_g = int(dias_gestacion) if (dias_gestacion is not None and str(dias_gestacion).isdigit()) else None
+        metodo_norm = str(metodo or "TACTO").strip().upper()
 
         existente = self._id_si_ya_existe("diagnosticos_gestacion", {
             "vaca_id": vaca_id, "fecha": f, "resultado": res_norm,
@@ -2414,14 +2454,64 @@ class Database:
 
         diag_id = self.insert("diagnosticos_gestacion", dict(
             vaca_id=vaca_id, fecha=f, resultado=res_norm,
-            dias_gestacion=dias_g, responsable=responsable,
+            dias_gestacion=dias_g, metodo=metodo_norm,
+            hallazgo=(hallazgo or "").strip() or None,
+            detalle=(detalle or "").strip() or None,
+            toro_pajuela=(toro_pajuela or "").strip() or None,
+            responsable=responsable,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+
+        # Registrar simultáneamente peso y/o condición corporal si se suministraron (workflow Software Ganadero)
+        if peso_kg is not None:
+            try:
+                p_val = float(peso_kg)
+                if p_val > 0:
+                    self.registrar_pesaje(
+                        animal_tag_or_id=vaca_id,
+                        peso_kg=p_val,
+                        fecha=f,
+                        evento=f"PESAJE_{metodo_norm}",
+                        notas=f"Pesaje durante examen ginecológico ({metodo_norm})",
+                        registrado_por=registrado_por,
+                    )
+            except Exception as e_peso:
+                logger.warning("No se pudo registrar pesaje asociado al diagnóstico: %s", e_peso)
+
+        if cond_corporal is not None:
+            try:
+                cc_val = float(cond_corporal)
+                if 1.0 <= cc_val <= 5.0:
+                    self.registrar_condicion_corporal(
+                        animal_tag_or_id=vaca_id,
+                        escala_1_5=cc_val,
+                        fecha=f,
+                        observador=responsable,
+                        registrado_por=registrado_por,
+                    )
+            except Exception as e_cc:
+                logger.warning("No se pudo registrar condición corporal asociada al diagnóstico: %s", e_cc)
 
         # Actualizar estado del servicio más reciente de la vaca
         if res_norm == "PREÑADA":
             f_date = to_date(f)
             fep_diag = iso(add_days(f_date, 283 - dias_g)) if (dias_g and dias_g > 0 and f_date) else None
+            if toro_pajuela:
+                try:
+                    self.execute(
+                        """
+                        UPDATE servicios
+                        SET toro_pajilla = COALESCE(toro_pajilla, ?)
+                        WHERE id = (
+                            SELECT id FROM servicios
+                            WHERE vaca_id = ? AND (fecha <= ? OR fecha IS NULL)
+                            ORDER BY fecha DESC LIMIT 1
+                        )
+                        """,
+                        (toro_pajuela.strip(), vaca_id, f),
+                    )
+                except Exception:
+                    pass
             if fep_diag:
                 self.execute(
                     """
@@ -3141,6 +3231,218 @@ class Database:
         ancestros_h = self._ancestros(ha, 3)
         ancestros_t = self._ancestros(ta, 3)
         return bool(ancestros_h & ancestros_t) or ta in ancestros_h or ha in ancestros_t
+
+    def _ancestros_nivel(self, animal_id: Optional[int], generaciones: int = 3) -> dict[int, int]:
+        """Ancestro -> nivel mínimo (1=padres, 2=abuelos, 3=bisabuelos)."""
+        niveles: dict[int, int] = {}
+        if animal_id is None:
+            return niveles
+        frontera = {animal_id}
+        for nivel in range(1, generaciones + 1):
+            nuevos: set[int] = set()
+            for aid in frontera:
+                row = self.query_one(
+                    "SELECT madre_id, padre_id FROM animales WHERE id_animal = ?", (aid,)
+                )
+                if row is None:
+                    continue
+                for pid in (row["madre_id"], row["padre_id"]):
+                    if pid is not None and pid != aid and pid not in niveles:
+                        niveles[pid] = nivel
+                        nuevos.add(pid)
+            frontera = nuevos
+        return niveles
+
+    @staticmethod
+    def _etiqueta_parentesco(nivel: int, sexo: Optional[str]) -> str:
+        sx = str(sexo or "").strip().lower()
+        es_macho = sx.startswith("m")
+        if nivel <= 1:
+            return "padre" if es_macho else "madre"
+        if nivel == 2:
+            return "abuelo" if es_macho else "abuela"
+        return "bisabuelo" if es_macho else "bisabuela"
+
+    def simular_cruzamiento(self, vaca_tag, toro_tag) -> dict:
+        """Simulador de cruzamiento en 1 toque (Fase 5.2): evalúa ANTES de
+        servir si la vaca y el toro comparten familia en 3 generaciones.
+
+        Solo lectura: nunca crea animales (un typo no genera fantasmas).
+        Criterio idéntico a ``verificar_consanguinidad``: cualquier ancestro
+        común en 3G o relación directa => NO RECOMENDADO.
+        """
+        vaca_t = str(vaca_tag or "").strip()
+        toro_t = str(toro_tag or "").strip()
+        no_eval = lambda motivo: {
+            "evaluable": False, "apto": False, "veredicto": "NO EVALUABLE",
+            "relacion_directa": None, "ancestros_comunes": [],
+            "padres_conocidos_vaca": 0, "padres_conocidos_toro": 0,
+            "pedigree_completo": False, "advertencia": None, "detalle": motivo,
+        }
+        if not vaca_t or not toro_t:
+            return no_eval("Faltan la vaca o el toro para simular.")
+        vaca_id = self.animal_id(vaca_t)
+        toro_id = self.animal_id(toro_t)
+        if vaca_id is None:
+            return no_eval(f"La vaca '{vaca_t}' no está registrada.")
+        if toro_id is None:
+            return no_eval(
+                f"El toro '{toro_t}' no está registrado en el hato "
+                "(pajuela comercial o toro externo: sin pedigrí que comparar)."
+            )
+        if vaca_id == toro_id:
+            return no_eval("La vaca y el toro son el mismo animal.")
+
+        niv_vaca = self._ancestros_nivel(vaca_id, 3)
+        niv_toro = self._ancestros_nivel(toro_id, 3)
+        padres_vaca = sum(1 for _id, nv in niv_vaca.items() if nv == 1)
+        padres_toro = sum(1 for _id, nv in niv_toro.items() if nv == 1)
+        if not niv_vaca and not niv_toro:
+            return no_eval(
+                "Ninguno de los dos tiene padres registrados: "
+                "no hay pedigrí que comparar."
+            )
+
+        def _ficha(aid: int) -> dict:
+            row = self.query_one(
+                "SELECT tag, nombre, sexo FROM animales WHERE id_animal = ?", (aid,)
+            )
+            if row is None:
+                return {"tag": str(aid), "nombre": ""}
+            return {"tag": row["tag"], "nombre": row["nombre"] or ""}
+
+        # Relación directa (padre-hija, madre-hijo o el toro dentro del
+        # árbol de la vaca y viceversa).
+        relacion = None
+        if toro_id in niv_vaca:
+            fila_toro = self.query_one("SELECT sexo FROM animales WHERE id_animal = ?", (toro_id,))
+            relacion = (
+                f"el toro '{toro_t}' es "
+                f"{self._etiqueta_parentesco(niv_vaca[toro_id], fila_toro['sexo'] if fila_toro else None)} "
+                f"de la vaca '{vaca_t}'"
+            )
+        elif vaca_id in niv_toro:
+            relacion = f"la vaca '{vaca_t}' es ancestro del toro '{toro_t}'"
+
+        comunes = []
+        for aid in sorted(niv_vaca.keys() & niv_toro.keys()):
+            f = _ficha(aid)
+            sexo_row = self.query_one("SELECT sexo FROM animales WHERE id_animal = ?", (aid,))
+            sexo = sexo_row["sexo"] if sexo_row else None
+            comunes.append({
+                "tag": f["tag"],
+                "nombre": f["nombre"],
+                "parentesco_vaca": self._etiqueta_parentesco(niv_vaca[aid], sexo),
+                "parentesco_toro": self._etiqueta_parentesco(niv_toro[aid], sexo),
+            })
+
+        if relacion or comunes:
+            if relacion:
+                detalle = f"Parentesco directo: {relacion}."
+            else:
+                primero = comunes[0]
+                detalle = (
+                    f"Comparten a '{primero['tag']}' "
+                    f"({primero['parentesco_vaca']} de la vaca, "
+                    f"{primero['parentesco_toro']} del toro)"
+                    + (f" y {len(comunes) - 1} ancestro(s) más" if len(comunes) > 1 else "")
+                    + "."
+                )
+            return {
+                "evaluable": True, "apto": False, "veredicto": "NO RECOMENDADO",
+                "relacion_directa": relacion, "ancestros_comunes": comunes,
+                "padres_conocidos_vaca": padres_vaca, "padres_conocidos_toro": padres_toro,
+                "pedigree_completo": padres_vaca == 2 and padres_toro == 2,
+                "advertencia": None, "detalle": detalle,
+            }
+
+        advertencia = None
+        if padres_vaca < 2 or padres_toro < 2:
+            faltantes = []
+            if padres_vaca < 2:
+                faltantes.append(f"vaca '{vaca_t}' ({padres_vaca}/2 padres)")
+            if padres_toro < 2:
+                faltantes.append(f"toro '{toro_t}' ({padres_toro}/2 padres)")
+            advertencia = "Pedigrí parcial, falta registrar: " + "; ".join(faltantes) + "."
+        return {
+            "evaluable": True, "apto": True, "veredicto": "APTO",
+            "relacion_directa": None, "ancestros_comunes": [],
+            "padres_conocidos_vaca": padres_vaca, "padres_conocidos_toro": padres_toro,
+            "pedigree_completo": padres_vaca == 2 and padres_toro == 2,
+            "advertencia": advertencia,
+            "detalle": "Sin parentesco conocido en 3 generaciones.",
+        }
+
+    def metricas_perdidas_reproductivas(self) -> dict:
+        """Pérdidas gestacionales y distocias (cierre Fase 5.2).
+
+        Pérdidas = ABORTO/REABSORCION/MOMIFICACION/MACERACION/MUERTE_FETAL.
+        Un parto GEMELAR cuenta como UN evento (2 filas). Tasa de pérdida =
+        pérdidas / (partos + pérdidas). Tasa de distocia = partos difíciles /
+        partos (PARTO/GEMELAR). Solo lectura.
+        """
+        tipos_perdida = tuple(t for t in TIPOS_EVENTO_SIN_CRIA)
+        try:
+            filas = self.query(
+                "SELECT p.id, p.vaca_id, p.fecha, "
+                "COALESCE(p.tipo_evento, 'PARTO') AS tipo_evento, "
+                "COALESCE(p.distocia, 0) AS distocia, "
+                "COALESCE(p.estado_cria, '') AS estado_cria, "
+                "a.tag AS vaca_tag "
+                "FROM partos p LEFT JOIN animales a ON a.id_animal = p.vaca_id "
+                "WHERE p.vaca_id IS NOT NULL"
+            )
+        except Exception:
+            return {
+                "partos": 0, "perdidas": 0, "tasa_perdida_pct": 0.0,
+                "por_tipo": {}, "distocias": 0, "tasa_distocia_pct": 0.0,
+                "crias_muertas_parto": 0, "recientes": [], "reincidentes": [],
+            }
+        partos_nac: set = set()
+        distocias_nac: set = set()
+        perdidas = 0
+        por_tipo: dict[str, int] = {}
+        crias_muertas = 0
+        recientes: list[dict] = []
+        por_vaca: dict[str, int] = {}
+        for r in filas:
+            tipo = str(r["tipo_evento"] or "PARTO").upper()
+            clave_nac = (r["vaca_id"], str(r["fecha"] or "")[:10])
+            if tipo in tipos_perdida:
+                perdidas += 1
+                por_tipo[tipo] = por_tipo.get(tipo, 0) + 1
+                tag_v = r["vaca_tag"] or str(r["vaca_id"])
+                por_vaca[tag_v] = por_vaca.get(tag_v, 0) + 1
+                recientes.append({
+                    "vaca": tag_v, "fecha": r["fecha"],
+                    "tipo_evento": tipo,
+                })
+            else:
+                partos_nac.add(clave_nac)
+                if (r["distocia"] or 0):
+                    distocias_nac.add(clave_nac)
+                if str(r["estado_cria"] or "").upper() == "MUERTO":
+                    crias_muertas += 1
+        n_partos = len(partos_nac)
+        n_dist = len(distocias_nac)
+        total_ev = n_partos + perdidas
+        recientes.sort(key=lambda x: str(x["fecha"] or ""), reverse=True)
+        reincidentes = [
+            {"vaca": tag_v, "perdidas": n}
+            for tag_v, n in sorted(por_vaca.items(), key=lambda kv: -kv[1])
+            if n >= 2
+        ]
+        return {
+            "partos": n_partos,
+            "perdidas": perdidas,
+            "tasa_perdida_pct": round(perdidas / total_ev * 100, 1) if total_ev else 0.0,
+            "por_tipo": por_tipo,
+            "distocias": n_dist,
+            "tasa_distocia_pct": round(n_dist / n_partos * 100, 1) if n_partos else 0.0,
+            "crias_muertas_parto": crias_muertas,
+            "recientes": recientes[:10],
+            "reincidentes": reincidentes,
+        }
 
     def marcar_historicos_sg(self) -> int:
         """Marca como HISTORICO los animales asignados a potreros numéricos viejos (01-23) de SG."""
