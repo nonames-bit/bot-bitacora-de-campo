@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import glob
-import io
 import json
 import os
 import sys
@@ -241,7 +240,6 @@ def exportar_excel(rep: dict[str, Any], ruta_excel: str) -> None:
     """Exporta el reporte comparativo a un libro de Excel (.xlsx) estructurado."""
     try:
         import openpyxl
-        from openpyxl.styles import Alignment, Font, PatternFill
     except ImportError:
         print("[!] Advertencia: openpyxl no está instalado. No se pudo generar el archivo Excel.")
         return

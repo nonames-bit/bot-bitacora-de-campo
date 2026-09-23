@@ -12,12 +12,10 @@ en la base SQLite nativa.
 """
 from __future__ import annotations
 
-import io
 import logging
 import os
 import sys
 import zipfile
-from datetime import date
 from typing import Optional
 
 from ..db.database import Database
