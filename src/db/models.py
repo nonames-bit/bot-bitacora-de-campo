@@ -189,7 +189,9 @@ CREATE TABLE IF NOT EXISTS condicion_corporal (
     animal_id INTEGER,
     fecha TEXT,
     valor REAL,
-    notas TEXT
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS produccion_leche (

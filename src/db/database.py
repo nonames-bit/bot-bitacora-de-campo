@@ -153,6 +153,11 @@ class Database:
             if "produccion_leche" in tablas:
                 self.conn.execute("CREATE INDEX IF NOT EXISTS idx_produccion_leche_animal_fecha ON produccion_leche(animal_id, fecha)")
             if "condicion_corporal" in tablas:
+                cols_cc = {r[1] for r in self.conn.execute("PRAGMA table_info(condicion_corporal)").fetchall()}
+                if "creado_en" not in cols_cc:
+                    self.conn.execute("ALTER TABLE condicion_corporal ADD COLUMN creado_en TEXT")
+                if "registrado_por" not in cols_cc:
+                    self.conn.execute("ALTER TABLE condicion_corporal ADD COLUMN registrado_por INTEGER")
                 self.conn.execute("CREATE INDEX IF NOT EXISTS idx_condicion_corporal_animal_fecha ON condicion_corporal(animal_id, fecha)")
         except Exception:
             pass
@@ -1670,7 +1675,8 @@ class Database:
     # Condición Corporal (escala 1.0 - 5.0)
     # ------------------------------------------------------------------ #
     def registrar_condicion_corporal(self, animal_tag, fecha=None, valor=None,
-                                     notas=None, registrado_por=None) -> int:
+                                     notas=None, registrado_por=None,
+                                     creado_en=None) -> int:
         aid = self.resolve_animal(animal_tag, crear=True)
         f = iso(fecha)
         try:
@@ -1685,7 +1691,7 @@ class Database:
             return existente["id"]
         return self.insert("condicion_corporal", dict(
             animal_id=aid, fecha=f, valor=val_float, notas=notas,
-            creado_en=self._ahora(), registrado_por=registrado_por,
+            creado_en=creado_en or self._ahora(), registrado_por=registrado_por,
         ))
 
     def ultima_condicion_corporal(self, animal_tag_or_id) -> Optional[sqlite3.Row]:
