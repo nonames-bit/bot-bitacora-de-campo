@@ -3,7 +3,6 @@
 import os
 import tempfile
 import pytest
-from datetime import date
 from src.db.database import Database
 from src.pwa.app import crear_app
 
