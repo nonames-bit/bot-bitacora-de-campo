@@ -1,0 +1,45 @@
+# Dependencias DIRECTAS de producción (auditoría P1.7).
+# El lock real es requirements.txt, generado con:
+#   uv pip compile requirements.in --universal -o requirements.txt
+# No instalar este archivo directamente: usar requirements.txt (pinneado).
+# Las de desarrollo van en requirements-dev.in / requirements-dev.txt.
+
+python-telegram-bot[job-queue]>=21.0
+python-dotenv>=1.0
+reportlab>=4.0
+openpyxl>=3.1  # exportación Excel del endpoint /api/reporte.xlsx (src/reports/excel_report.py)
+faster-whisper>=1.0.0
+matplotlib>=3.8
+seaborn>=0.13
+scipy>=1.11  # ajuste gamma para el SPI (Alerta Temprana de Sequía, src/engine/spi.py)
+pypdf>=5.0
+Pillow>=10.0.0
+shapely>=2.1.0
+pyproj>=3.7.0
+earthengine-api>=1.0.0
+# OCR (opcional):
+# pytesseract>=0.3.10
+# easyocr>=1.7.0
+
+# Vigilante de copias en tiempo real (opcional; sin él, copias_watcher usa polling 60s):
+# watchdog>=4.0
+
+# Fase 7 A (QR fichas) + D (Dashboard PWA VPS):
+Flask>=3.0
+qrcode[pil]>=7.4
+
+# PWA en producción: servidor WSGI multi-hilo (waitress). Sin él, la PWA cae
+# al servidor de desarrollo de Flask (solo para local, no exponer a internet).
+waitress>=3.0
+psutil>=5.9.0
+
+# Web Push real (VAPID) para notificaciones de campo y del chat de equipo
+# incluso con el navegador cerrado. Sin esto, src/server/push_sender.py
+# se degrada con elegancia (no envía nada, no lanza). Requiere
+# VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_CLAIMS_EMAIL en .env.
+pywebpush>=2.0
+
+# OCR de aretes/fotos (Etapa C / fotos del bot) — opcional; sin ello la
+# detección degrada con elegancia a sidecar/manual:
+# pytesseract>=0.3.10
+# tesseract-ocr (binario del sistema: apt install tesseract-ocr)

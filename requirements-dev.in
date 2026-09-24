@@ -1,0 +1,8 @@
+# Dependencias de desarrollo/CI (auditoría P1.7).
+# El lock real es requirements-dev.txt, generado con:
+#   uv pip compile requirements-dev.in --universal -o requirements-dev.txt
+# CI y scripts/desplegar.sh instalan: requirements.txt + requirements-dev.txt.
+# El VPS de producción (setup_vps.sh) instala solo requirements.txt.
+
+pytest>=8.0
+ruff>=0.6

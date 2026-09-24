@@ -13,7 +13,16 @@ git fetch origin main
 git reset --hard origin/main
 
 echo "== Instalando dependencias (por si cambiaron) =="
-.venv/bin/pip install -q -r requirements.txt
+# requirements.txt es el lock pinneado (auditoría P1.7). Si el intérprete del
+# VPS no puede instalarlo (otra versión de Python), se cae a requirements.in
+# para no dejar el deploy roto; en ese caso conviene regenerar el lock EN el VPS:
+#   uv pip compile requirements.in --python-version "$(python3 -V | cut -d' ' -f2)" -o requirements.txt
+if ! .venv/bin/pip install -q -r requirements.txt; then
+    echo "⚠️ Lock requirements.txt no instalable en este intérprete; usando requirements.in (sin pin)."
+    .venv/bin/pip install -q -r requirements.in
+fi
+# requirements-dev.txt: pytest/ruff, necesarios para la puerta de pruebas de abajo.
+.venv/bin/pip install -q -r requirements-dev.txt
 
 echo "== Corriendo suite de pruebas antes de reiniciar =="
 .venv/bin/python -m pytest -q

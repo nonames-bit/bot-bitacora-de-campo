@@ -31,7 +31,14 @@ if [ ! -d ".venv" ]; then
     python3 -m venv .venv
 fi
 .venv/bin/pip install --upgrade pip
-.venv/bin/pip install -r requirements.txt
+# requirements.txt es el lock pinneado (auditoría P1.7). Si el intérprete del
+# VPS no puede instalarlo, se cae a requirements.in para no dejar la PWA sin
+# dependencias; regenerar el lock EN el VPS si eso ocurre:
+#   uv pip compile requirements.in --python-version "$(python3 -V | cut -d' ' -f2)" -o requirements.txt
+if ! .venv/bin/pip install -r requirements.txt; then
+    echo "⚠️ Lock requirements.txt no instalable en este intérprete; usando requirements.in (sin pin)."
+    .venv/bin/pip install -r requirements.in
+fi
 
 echo "=== [6/7] Configurando variables de entorno (.env) ==="
 if [ ! -f ".env" ]; then
