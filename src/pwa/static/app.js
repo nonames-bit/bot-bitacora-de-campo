@@ -11199,6 +11199,19 @@
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
       });
     });
+
+    // El ítem "Deshacer" no navega a una vista (no tiene data-v): al tocarlo
+    // cierra el sheet y abre el modal de últimos eventos. Antes era onclick
+    // inline, bloqueado por la CSP production script-src 'self'.
+    var sheetDeshacer = document.getElementById("sheet-item-deshacer");
+    if (sheetDeshacer) {
+      sheetDeshacer.addEventListener("click", function () {
+        cerrarModalMas();
+        if (typeof window.mostrarModalUltimosEventos === "function") {
+          window.mostrarModalUltimosEventos();
+        }
+      });
+    }
   }
 
   function actualizarFabGlobal() {
@@ -11671,6 +11684,18 @@
         cerrarMenu();
         var btnAyuda = document.getElementById("btn-ayuda");
         if (btnAyuda) btnAyuda.click();
+      });
+    }
+
+    // Acción deshacer / últimos eventos desde menú (antes onclick inline,
+    // bloqueado por la CSP production script-src 'self').
+    var menuBtnDeshacer = document.getElementById("menu-btn-deshacer");
+    if (menuBtnDeshacer) {
+      menuBtnDeshacer.addEventListener("click", function () {
+        cerrarMenu();
+        if (typeof window.mostrarModalUltimosEventos === "function") {
+          window.mostrarModalUltimosEventos();
+        }
       });
     }
 

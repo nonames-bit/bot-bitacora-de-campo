@@ -33,5 +33,8 @@ jobs:
             node --check "$f"
           done
 
+      - name: Guardas de templates PWA (CSP sin handlers inline)
+        run: python scripts/verificar_csp_templates.py
+
       - name: Run tests
         run: pytest -q

@@ -18,7 +18,7 @@
 <body>
 <div id="barra-red">Sin conexión — operando en modo local (los eventos se guardan en cola).</div>
 <header>
-  <span class="marca-titulo" id="marca-header-btn" role="button" tabindex="0" onclick="window.abrirMenuUsuario &amp;&amp; window.abrirMenuUsuario()" title="Opciones rápidas y usuario" aria-label="Abrir menú de usuario y opciones rápidas">
+  <span class="marca-titulo" id="marca-header-btn" role="button" tabindex="0" title="Opciones rápidas y usuario" aria-label="Abrir menú de usuario y opciones rápidas">
     <span class="logo-ja-wrapper">
       <img src="/static/logo.jpg" class="logo-ja" alt="Logo Ganadería JA" width="28" height="28">
       <span id="header-menu-dot" class="header-menu-dot" style="display:none;" title="Avisos pendientes"></span>
@@ -286,7 +286,7 @@
           <small>Manual y guías</small>
         </button>
 
-        <button type="button" id="menu-btn-deshacer" class="menu-acceso-btn" onclick="window.cerrarMenuUsuario &amp;&amp; window.cerrarMenuUsuario(); window.mostrarModalUltimosEventos &amp;&amp; window.mostrarModalUltimosEventos();">
+        <button type="button" id="menu-btn-deshacer" class="menu-acceso-btn">
           <div class="acceso-ico-wrap" style="color:var(--rojo-alerta, #DC2626);">
             <svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
           </div>
@@ -486,7 +486,7 @@
             </div>
           </button>
 
-          <button class="modulo-item" id="sheet-item-deshacer" type="button" onclick="document.getElementById('modal-mas-modulos').style.display='none'; window.mostrarModalUltimosEventos &amp;&amp; window.mostrarModalUltimosEventos();">
+          <button class="modulo-item" id="sheet-item-deshacer" type="button">
             <span class="modulo-ico" style="background:rgba(220,38,38,0.12); color:#DC2626;"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span>
             <div class="modulo-info">
               <b>Deshacer Registro</b>
