@@ -359,10 +359,11 @@ Para backups pesados (con fotos históricas):
 * Al detectar un nuevo `.Zip`, lo procesa e importa automáticamente.
 * Envía una notificación instantánea al `OWNER` por Telegram sin intervención manual.
 
-### 10.3 Exportación de Datos para SG (`/exportar`)
+### 10.3 Exportación de Datos para SG (`/exportar`, solo OWNER)
 * `/exportar`: Genera y envía un paquete `.Zip` con las 8 tablas DBF listas para Software Ganadero.
 * `/exportar csv`: Exporta toda la base de datos en archivos CSV tabulares.
 * `/exportar json`: Exporta la base en formato JSON.
+* Solo el OWNER puede exportar (entrega la base completa) y cada exportación avisa a los demás OWNER por Telegram.
 
 ---
 
@@ -413,7 +414,7 @@ Para backups pesados (con fotos históricas):
 | `/poblacion` | Admin / Owner | Pirámide de edades y brackets demográficos de SG. |
 | `/genetica` | Admin / Owner | Composición racial y cruces del hato. |
 | `/reporte [días]` | Admin / Owner | Genera y envía el informe zootécnico en PDF institucional. |
-| `/exportar [dbf\|csv\|json]` | Admin / Owner | Exporta paquetes de datos para Software Ganadero o análisis. |
+| `/exportar [dbf\|csv\|json]` | Owner | Exporta paquetes de datos para Software Ganadero o análisis (solo OWNER: entrega la base completa y avisa a los demás OWNER). |
 | `/importar` | Admin / Owner | Instrucciones para importar backups ZIP de SG. |
 | `/confirmar_importar` | Admin / Owner | Ejecuta la importación del backup subido. |
 | `/descartar_backup` | Admin / Owner | Elimina el backup pendiente sin procesar. |

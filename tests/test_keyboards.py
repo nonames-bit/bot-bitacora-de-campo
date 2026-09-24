@@ -153,13 +153,14 @@ def test_teclado_sistema_menu_owner():
 
 
 def test_teclado_sistema_menu_admin():
-    # "Ver Últimos Logs" y "Usuarios / Permisos" los rechaza el handler para
-    # cualquiera que no sea OWNER (auth.puede_gestionar_usuarios), así que un
-    # ADMIN no debe ver ninguno de los dos botones.
+    # "Descargar Backup ZIP", "Ver Últimos Logs" y "Usuarios / Permisos" los
+    # rechaza el handler para cualquiera que no sea OWNER
+    # (auth.puede_gestionar_usuarios: el backup es la base completa), así
+    # que un ADMIN no debe ver ninguno de esos botones.
     teclado = crear_teclado_sistema_menu("ADMIN")
     callbacks = [btn.callback_data for fila in teclado.inline_keyboard for btn in fila]
     assert "cmd:reporte" in callbacks
-    assert "cmd:exportar" in callbacks
+    assert "cmd:exportar" not in callbacks
     assert "cmd:sistema" in callbacks
     assert "cmd:logs" not in callbacks
     assert "cmd:usuarios" not in callbacks

@@ -583,7 +583,7 @@ Texto "parió la 47 y vacune la 12 con 20ml"
 | `/status` | ✅ | ✅ | ❌ |
 | `/usuarios` | ✅ | ✅ | ❌ |
 | `/reporte [diario\|semanal\|N]` | ✅ | ✅ | ❌ |
-| `/exportar [dbf\|csv\|json]` | ✅ | ✅ | ❌ |
+| `/exportar [dbf\|csv\|json]` (solo OWNER, avisa a los demás OWNER) | ✅ | ❌ | ❌ |
 | `/importar`, `/confirmar_importar` | ✅ | ✅ | ❌ |
 | `/agregar_usuario`, `/quitar_usuario` | ✅ | ❌ | ❌ |
 | `/logs` | ✅ | ❌ | ❌ |

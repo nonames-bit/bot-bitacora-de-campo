@@ -3700,6 +3700,49 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   flex: 1 1 160px;
   box-sizing: border-box;
 }
+/* ==========================================================================
+   Modo Campo (mayordomo): 4 botones grandes + resumen de hoy.
+   Sin dependencias de escritorio: todo vive en esta vista.
+   ========================================================================== */
+.campo-head { margin: 2px 2px 12px; }
+.campo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.campo-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 118px;
+  padding: 14px 8px;
+  border-radius: 14px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--texto);
+  cursor: pointer;
+  box-shadow: 0 2px 6px var(--sombra);
+}
+.campo-tile b { font-size: 17px; }
+.campo-tile small { font-size: 12px; color: var(--texto-suave); text-align: center; }
+.campo-tile:active { transform: scale(0.96); }
+.campo-tile .svg-icon { width: 30px !important; height: 30px !important; color: var(--verde-marca); }
+.campo-tile-captura {
+  background: var(--verde-marca);
+  border-color: var(--verde-marca);
+  color: #fff;
+}
+.campo-tile-captura small { color: rgba(255, 255, 255, 0.85); }
+.campo-tile-captura .svg-icon { color: #fff; }
+.campo-hoy { padding: 14px 16px; }
+body.modo-campo #vista { font-size: 15px; }
+@media (min-width: 641px) {
+  .campo-grid { grid-template-columns: repeat(4, 1fr); }
+  .campo-tile { min-height: 150px; }
+}
 .foto-nombre {
   flex: 1 1 120px;
   min-width: 0;

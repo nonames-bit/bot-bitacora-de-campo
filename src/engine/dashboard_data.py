@@ -680,6 +680,24 @@ def datos_reproduccion(db: Database) -> dict:
         logger.error("seccion pajuelas/termo fallo", exc_info=True)
         errores["pajuelas_termo"] = str(e)
 
+    evaluacion_inseminadores = []
+    try:
+        evaluacion_inseminadores = db.evaluar_inseminadores()
+    except Exception as e:
+        logger.error("seccion evaluacion_inseminadores fallo", exc_info=True)
+        errores["evaluacion_inseminadores"] = str(e)
+
+    iatf_data = {}
+    try:
+        iatf_data = {
+            "lotes": db.listar_lotes_iatf(),
+            "protocolos": db.listar_protocolos_iatf(),
+            "metricas": db.evaluar_metricas_iatf(),
+        }
+    except Exception as e:
+        logger.error("seccion iatf fallo", exc_info=True)
+        errores["iatf"] = str(e)
+
     out: dict[str, Any] = {
         "fep_30d": fep,
         "celos_recientes": celos,
@@ -694,6 +712,8 @@ def datos_reproduccion(db: Database) -> dict:
         "pajuelas": pajuelas_data,
         "termo": termo_data,
         "alertas_pajuelas": alertas_paj,
+        "evaluacion_inseminadores": evaluacion_inseminadores,
+        "iatf": iatf_data,
     }
     if errores:
         out["errores"] = errores

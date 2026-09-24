@@ -136,17 +136,20 @@ def crear_teclado_sistema_menu(rol: Optional[str] = None) -> InlineKeyboardMarku
     keyboard = [
         [
             InlineKeyboardButton("📋 Reporte Semanal PDF", callback_data="cmd:reporte"),
-            InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar"),
         ],
         [
             InlineKeyboardButton("🖨️ Fichas QR", callback_data="cmd:qr"),
             InlineKeyboardButton("⚙️ Servidor & Sistema", callback_data="cmd:sistema"),
         ],
     ]
-    # "Ver Últimos Logs" y "Usuarios / Permisos" solo los procesa el handler
-    # para el OWNER (rechaza a ADMIN con un mensaje de error) — se ocultan
-    # aquí para no mostrar botones que van a rebotar.
+    # "Descargar Backup ZIP" entrega la base completa: solo OWNER (igual
+    # que "Ver Últimos Logs" y "Usuarios / Permisos", que el handler
+    # rechaza a ADMIN) — se ocultan aquí para no mostrar botones que
+    # van a rebotar.
     if rol == "OWNER" or rol is None:
+        keyboard[0].append(
+            InlineKeyboardButton("📦 Descargar Backup ZIP", callback_data="cmd:exportar")
+        )
         keyboard.append([
             InlineKeyboardButton("📜 Ver Últimos Logs", callback_data="cmd:logs"),
             InlineKeyboardButton("👥 Usuarios / Permisos", callback_data="cmd:usuarios"),

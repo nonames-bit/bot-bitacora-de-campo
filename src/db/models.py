@@ -559,6 +559,74 @@ CREATE TABLE IF NOT EXISTS sync_ids_procesados (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sync_ids_procesado_en ON sync_ids_procesados(procesado_en);
+
+-- Catálogo de Inseminadores / Técnicos para registro estandarizado y evaluación zootécnica
+CREATE TABLE IF NOT EXISTS inseminadores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL UNIQUE,
+    telefono TEXT,
+    es_usuario_sistema INTEGER DEFAULT 0,
+    user_id INTEGER,
+    activo INTEGER DEFAULT 1,
+    notas TEXT,
+    creado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_inseminadores_nombre ON inseminadores(nombre);
+
+-- Biblioteca de Protocolos Hormonales IATF (Inseminación Artificial a Tiempo Fijo)
+CREATE TABLE IF NOT EXISTS protocolos_iatf (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    categoria TEXT DEFAULT 'CARNE_DOBLE_PROPOSITO', -- CARNE_DOBLE_PROPOSITO, LECHE, NOVILLAS, PERSONALIZADO
+    descripcion TEXT,
+    duracion_dias INTEGER DEFAULT 10,
+    pasos_json TEXT NOT NULL, -- listado de días relativos, acción, producto, dosis sugerida, vía y advertencias
+    activo INTEGER DEFAULT 1
+);
+
+-- Lotes de Sincronización IATF activos o históricos
+CREATE TABLE IF NOT EXISTS lotes_iatf (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    protocolo_id INTEGER REFERENCES protocolos_iatf(id),
+    protocolo_nombre TEXT,
+    categoria TEXT,
+    fecha_inicio TEXT NOT NULL, -- Día 0
+    fecha_iatf TEXT NOT NULL,   -- Día calculado de inseminación
+    hora_iatf TEXT DEFAULT '08:00',
+    toro_pajuela TEXT,
+    inseminador TEXT,
+    estado TEXT DEFAULT 'EN_CURSO', -- PLANIFICADO, EN_CURSO, INSEMINADO, FINALIZADO, CANCELADO
+    paso_actual INTEGER DEFAULT 0,
+    historial_pasos_json TEXT, -- [{paso: 0, fecha: "...", producto: "...", dosis: "...", marca: "...", realizado_por: "..."}]
+    notas TEXT,
+    creado_en TEXT,
+    creado_por INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_lotes_iatf_estado ON lotes_iatf(estado);
+CREATE INDEX IF NOT EXISTS idx_lotes_iatf_fecha_inicio ON lotes_iatf(fecha_inicio);
+
+-- Hembras individuales vinculadas a cada Lote IATF con seguimiento de drogas y resultado
+CREATE TABLE IF NOT EXISTS lote_iatf_animales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lote_id INTEGER REFERENCES lotes_iatf(id) ON DELETE CASCADE,
+    animal_id INTEGER REFERENCES animales(id_animal),
+    tag TEXT NOT NULL,
+    condicion_corporal REAL,
+    toro_pajuela TEXT,
+    inseminador TEXT,
+    estado_animal TEXT DEFAULT 'SINCRONIZANDO', -- SINCRONIZANDO, EXCLUIDA, INSEMINADA, PREÑADA, VACIA
+    motivo_exclusion TEXT,
+    servicio_id INTEGER REFERENCES servicios(id),
+    resultado_diagnostico TEXT,
+    fecha_diagnostico TEXT,
+    dias_gestacion INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_lote ON lote_iatf_animales(lote_id);
+CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_tag ON lote_iatf_animales(tag);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -571,6 +639,7 @@ TABLAS = [
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
     "precios_mercado", "mensajes_equipo", "sync_ids_procesados",
+    "inseminadores", "protocolos_iatf", "lotes_iatf", "lote_iatf_animales",
 ]
 
 

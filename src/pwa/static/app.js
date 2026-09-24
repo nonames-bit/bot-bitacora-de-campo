@@ -523,6 +523,167 @@
       });
     }
   }
+  /* ---------- Modo Campo (mayordomo): 4 botones grandes + hoy ---------- */
+  function renderCampo() {
+    var nom = (window.__usuarioActual && window.__usuarioActual.nombre) || "Mayordomo";
+    var hoy = new Date();
+    var fechaLarga = hoy.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
+    var h = "<div class='campo-head'>"
+      + "<div style='font-size:15px; color:var(--texto-suave); text-transform:capitalize;'>" + esc(fechaLarga) + "</div>"
+      + "<div style='font-size:22px; font-weight:800;'>🤠 Hola, " + esc(nom) + "</div>"
+      + "<div style='font-size:13.5px; color:var(--texto-suave);'>¿Qué vamos a hacer hoy en el corral?</div>"
+      + "</div>"
+      + "<div class='campo-grid'>"
+      + "<button type='button' class='campo-tile campo-tile-captura' data-ir='captura'>" + icon("plus", 30) + "<b>Registrar</b><small>Parto, celo, pesaje…</small></button>"
+      + "<button type='button' class='campo-tile' data-ir='agenda'>" + icon("calendar", 30) + "<b>Hoy</b><small id='campo-hoy-sub'>Ver pendientes…</small></button>"
+      + "<button type='button' class='campo-tile' data-ir='ficha'>" + icon("search", 30) + "<b>Ficha</b><small>Buscar por arete</small></button>"
+      + "<button type='button' class='campo-tile' data-ir='mapa'>" + icon("pin", 30) + "<b>GPS</b><small>Dónde estoy</small></button>"
+      + "</div>"
+      + "<div class='card campo-hoy' id='campo-hoy-box'>"
+      + "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
+      + "<div style='font-size:13.5px; color:var(--texto-suave);'>⏳ Cargando pendientes…</div>"
+      + "</div>"
+      + "<div id='campo-gps-box'></div>";
+    var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
+    if (rol !== "TRABAJADOR") {
+      h += "<button type='button' id='btn-campo-salir' class='tema-btn' style='width:100%; padding:12px; font-size:14px;'>← Volver a la vista de oficina</button>";
+    }
+    return h;
+  }
+  function bindCampo() {
+    qa(".campo-tile").forEach(function (t) {
+      t.addEventListener("click", function () {
+        var v = t.getAttribute("data-ir");
+        if (!v) return;
+        try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib) {}
+        // GPS sin mapa: localiza y ofrece guardar la ronda aquí mismo.
+        // El mapa satelital es solo oficina (/api/mapa/datos da 403).
+        if (v === "mapa") {
+          localizarGPSCampo();
+          try { window.scrollTo(0, document.body.scrollHeight); } catch (eSc2) {}
+          return;
+        }
+        irAVista(v);
+        cargar(true);
+        try { window.scrollTo(0, 0); } catch (eSc) { window.scrollTo(0, 0); }
+      });
+    });
+    var salir = document.getElementById("btn-campo-salir");
+    if (salir) salir.addEventListener("click", function () {
+      irAVista("tablero");
+      cargar(true);
+    });
+    fetch("/api/agenda?dias=7").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      pintarResumenCampo(d || {});
+    }).catch(function () {
+      var box = document.getElementById("campo-hoy-box");
+      if (box) box.innerHTML = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
+        + "<div style='font-size:13.5px; color:var(--texto-suave);'>⚠️ Sin conexión: abra la Agenda cuando vuelva la señal.</div>";
+    });
+  }
+  function pintarResumenCampo(d) {
+    var box = document.getElementById("campo-hoy-box");
+    if (!box) return;
+    var urg = [];
+    (d.eventos || []).forEach(function (e) {
+      if (e.faltan_dias == null || e.faltan_dias <= 0) urg.push({ txt: (e.etiqueta || e.tipo || "Alerta"), det: e.tag ? ("Arete " + e.tag) : (e.descripcion || ""), dias: e.faltan_dias });
+    });
+    (d.recordatorios || []).forEach(function (r) {
+      if (r.faltan_dias == null || r.faltan_dias <= 0) urg.push({ txt: r.mensaje || "Tarea", det: (r.hora ? ("Hora " + r.hora + " · ") : "") + (r.animal_tag || r.potrero_nombre || ""), dias: r.faltan_dias });
+    });
+    urg = urg.slice(0, 6);
+    var nRet = (d.retiros || []).length;
+    var sub = document.getElementById("campo-hoy-sub");
+    var total = urg.length + nRet;
+    if (sub) sub.textContent = total ? (total + " pendiente" + (total === 1 ? "" : "s")) : "Todo al día ✓";
+    var h = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>";
+    if (!urg.length && !nRet) {
+      h += "<div style='font-size:15px;'>✅ Todo al día. Buen trabajo en el corral.</div>";
+    } else {
+      h += "<div style='display:flex; flex-direction:column; gap:8px;'>"
+        + urg.map(function (u) {
+          var cuando = (u.dias == null) ? "Sin fecha" : (u.dias <= 0 ? (u.dias === 0 ? "Hoy" : ("Hace " + Math.abs(u.dias) + " d")) : ("En " + u.dias + " d"));
+          return "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
+            + "<div style='font-size:15px; font-weight:700;'>" + esc(u.txt) + "</div>"
+            + "<div style='font-size:13px; color:var(--texto-suave);'>" + esc(cuando) + (u.det ? (" · " + esc(u.det)) : "") + "</div></div>";
+        }).join("");
+      if (nRet) {
+        h += "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
+          + "<div style='font-size:15px; font-weight:700;'>💉 " + nRet + " en retiro sanitario</div>"
+          + "<div style='font-size:13px; color:var(--texto-suave);'>Revise leche y carne antes de entregar</div></div>";
+      }
+      h += "</div>";
+    }
+    h += "<button type='button' id='btn-campo-ver-agenda' class='tema-btn' style='width:100%; margin-top:10px; padding:12px; font-size:14px;'>Ver agenda completa →</button>";
+    box.innerHTML = h;
+    var btnA = document.getElementById("btn-campo-ver-agenda");
+    if (btnA) btnA.addEventListener("click", function () { irAVista("agenda"); cargar(true); });
+  }
+  // GPS del modo campo (equivale al /aqui del bot): detecta el potrero
+  // donde está parado y ofrece guardar la ronda. Sin mapa: funciona con
+  // cualquier rol y con guantes (botones grandes).
+  function localizarGPSCampo() {
+    var box = document.getElementById("campo-gps-box");
+    if (!box) return;
+    if (!navigator.geolocation) {
+      box.innerHTML = "<div class='card campo-hoy'>📍 Este equipo no da ubicación GPS.</div>";
+      return;
+    }
+    box.innerHTML = "<div class='card campo-hoy'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
+    try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib2) {}
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude;
+      var lon = pos.coords.longitude;
+      fetch("/api/gps/potrero", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: lat, lon: lon })
+      }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d || !d.detectado) {
+          box.innerHTML = "<div class='card campo-hoy'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          return;
+        }
+        var pot = d.potrero || {};
+        box.innerHTML = "<div class='card campo-hoy' style='border-left:5px solid var(--verde-marca);'>"
+          + "<div style='font-size:15px; font-weight:800;'>📍 Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
+          + "<div style='font-size:13.5px; color:var(--texto-suave); margin:2px 0 10px;'>"
+          + esc(d.total_animales || 0) + " animales aquí · " + esc(Number(lat).toFixed(5)) + ", " + esc(Number(lon).toFixed(5)) + "</div>"
+          + "<button type='button' id='btn-campo-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
+          + "</div>";
+        var btnG = document.getElementById("btn-campo-guardar-ronda");
+        if (btnG) btnG.addEventListener("click", function () {
+          btnG.disabled = true;
+          btnG.textContent = "Guardando…";
+          fetch("/api/gps/ronda", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: lat, lon: lon, potrero_id: pot.id || null, potrero_nombre: pot.nombre || null, punto_control: "recorrido" })
+          }).then(function (r2) { return r2.json(); }).then(function (ok) {
+            if (ok && ok.ok) {
+              mostrarToast("✅ Ronda guardada en " + (pot.nombre || "campo"), "verde");
+              try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch (eVib3) {}
+            } else {
+              mostrarToast("❌ " + ((ok && ok.error) || "No se pudo guardar"), "rojo");
+              btnG.disabled = false;
+              btnG.textContent = "Guardar ronda aquí";
+            }
+          }).catch(function (err) {
+            mostrarToast("❌ Sin conexión: " + (err && err.message || err), "rojo");
+            btnG.disabled = false;
+            btnG.textContent = "Guardar ronda aquí";
+          });
+        });
+      }).catch(function () {
+        box.innerHTML = "<div class='card campo-hoy'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
+      });
+    }, function () {
+      box.innerHTML = "<div class='card campo-hoy'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  }
+
   function renderTablero(d) {
     window.__datosUltimoTablero = d;
     if (d && d.clima_hoy) {
@@ -704,6 +865,141 @@
       h += "</table></div>";
     } else {
       h += vacio("No hay pajuelas registradas en el termo criogénico. Use el botón «➕ Entrada Pajuelas» para cargar el catálogo.");
+    }
+    h += "</div>";
+
+    // Guardar colecciones IATF e inseminadores en window para modales
+    window.__protocolosIatf = (d.iatf && d.iatf.protocolos) || [];
+    window.__lotesIatf = (d.iatf && d.iatf.lotes) || [];
+    window.__evaluacionInseminadores = d.evaluacion_inseminadores || [];
+
+    // 🧬 Sincronizaciones IATF (Inseminación Artificial a Tiempo Fijo)
+    var iatf = d.iatf || {};
+    var lotesIatf = iatf.lotes || [];
+    var metricasIatf = iatf.metricas || {};
+
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid #0284c7;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+      + "<div style='font-size:14px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("clipboard", 16) + "Sincronizaciones IATF & Cronograma de Fármacos"
+      + "</div>"
+      + "<div style='display:flex; gap:6px; flex-wrap:wrap;'>"
+      + "<button type='button' class='tema-btn' id='btn-ver-protocolos-iatf' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; border:1px solid var(--borde-fuerte); background:var(--superficie-elevada); color:var(--texto);'>"
+      + icon("clipboard", 13) + "📖 Protocolos & Marcas</button>"
+      + "<button type='button' class='tema-btn' id='btn-nuevo-lote-iatf' style='font-size:11.5px; padding:5px 10px; background:#0284c7; color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
+      + icon("plus", 13) + "➕ Iniciar Lote IATF</button>"
+      + "</div>"
+      + "</div>"
+      + "<div class='kpis' style='margin-bottom:12px;'>"
+      + kpi(esc(metricasIatf.lotes_en_curso || 0) + " activo(s)", "Lotes en Curso", (metricasIatf.lotes_en_curso > 0 ? "ok" : ""))
+      + kpi(esc(metricasIatf.total_hembras_sincronizadas || 0) + " vientres", "Hembras Sincronizadas", "ok")
+      + kpi((metricasIatf.total_prenadas || 0) + " / " + (metricasIatf.total_diagnosticadas || 0), "Preñadas IATF Confirmadas")
+      + kpi(metricasIatf.tasa_prenez_global_pct != null ? (metricasIatf.tasa_prenez_global_pct + "%") : "—", "Tasa Preñez IATF", metricasIatf.tasa_prenez_global_pct != null && metricasIatf.tasa_prenez_global_pct >= 50 ? "ok" : "")
+      + "</div>";
+
+    if (lotesIatf.length) {
+      h += "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-bottom:8px; text-transform:uppercase;'>Lotes de Sincronización Registrados:</div>"
+        + "<div style='display:flex; flex-direction:column; gap:12px;'>";
+
+      lotesIatf.forEach(function (lote) {
+        var estadoBadge = lote.estado === "EN_CURSO" ? "<span class='chip azul'><b>EN CURSO</b></span>" :
+          (lote.estado === "IATF_REALIZADA" ? "<span class='chip ambar'><b>IATF REALIZADA</b></span>" :
+          (lote.estado === "FINALIZADO" ? "<span class='chip verde'><b>FINALIZADO</b></span>" : "<span class='chip gris'>" + esc(lote.estado) + "</span>"));
+
+        var catBadge = lote.protocolo_categoria === "CARNE" ? "<span class='chip' style='background:#fee2e2; color:#991b1b; font-size:10.5px;'>Carne / DP</span>" :
+          (lote.protocolo_categoria === "LECHE" ? "<span class='chip' style='background:#e0f2fe; color:#075985; font-size:10.5px;'>Lechería</span>" :
+          "<span class='chip' style='background:#fef3c7; color:#92400e; font-size:10.5px;'>Novillas</span>");
+
+        var pasos = lote.protocolo_pasos || [];
+        var stepperHtml = "<div style='display:flex; gap:6px; overflow-x:auto; padding:6px 0; -webkit-overflow-scrolling:touch; margin:8px 0;'>";
+        pasos.forEach(function (p, idx) {
+          var yaPaso = idx < lote.paso_actual;
+          var esActual = idx === lote.paso_actual && lote.estado === "EN_CURSO";
+          var bdrColor = yaPaso ? "var(--verde-marca, #16a34a)" : (esActual ? "#0284c7" : "var(--borde)");
+          var bgStep = yaPaso ? "rgba(22,163,74,0.08)" : (esActual ? "rgba(2,132,199,0.1)" : "var(--superficie)");
+          var iconStep = yaPaso ? "✅" : (esActual ? "👉" : "⏳");
+
+          stepperHtml += "<div style='flex:1; min-width:130px; border:1px solid " + bdrColor + "; background:" + bgStep + "; border-radius:6px; padding:6px 8px; font-size:11px;'>"
+            + "<div style='font-weight:700; color:var(--texto); display:flex; justify-content:space-between;'>"
+            + "<span>Día " + p.dia_relativo + "</span> <span>" + iconStep + "</span>"
+            + "</div>"
+            + "<div style='color:var(--texto-suave); font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;' title='" + esc(p.accion) + "'>" + esc(p.accion) + "</div>"
+            + "</div>";
+        });
+        stepperHtml += "</div>";
+
+        var btnsAccion = "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;'>";
+        if (lote.estado === "EN_CURSO") {
+          if (lote.paso_actual < 2) {
+            btnsAccion += "<button type='button' class='tema-btn btn-paso-iatf' data-lote-id='" + lote.id + "' data-paso-idx='" + lote.paso_actual + "' style='font-size:11.5px; padding:4px 9px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:600;'>"
+              + "💊 Registrar Dosis / Fármaco</button>";
+          }
+          if (lote.paso_actual === 2 || lote.paso_actual === 1) {
+            btnsAccion += "<button type='button' class='tema-btn btn-inseminar-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; background:var(--verde-marca); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:700;'>"
+              + "🧬 Inseminar Lote Completo (1-Toque)</button>";
+          }
+        }
+        btnsAccion += "<button type='button' class='tema-btn btn-detalle-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; border:1px solid var(--borde-fuerte); border-radius:5px; cursor:pointer; background:var(--superficie); color:var(--texto);'>"
+          + "📋 Ver Hembras (" + (lote.animales_activos || lote.total_animales) + ")</button>";
+        btnsAccion += "</div>";
+
+        h += "<div style='border:1px solid var(--borde); background:var(--superficie-elevada, rgba(0,0,0,0.02)); border-radius:8px; padding:12px 14px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;'>"
+          + "<div>"
+          + "<span style='font-weight:700; font-size:13.5px; color:var(--texto);'>" + esc(lote.nombre) + "</span> "
+          + catBadge + " "
+          + estadoBadge
+          + "</div>"
+          + "<div style='font-size:11.5px; color:var(--texto-suave);'>Inicio: <b>" + esc(fechaCorta(lote.fecha_inicio)) + "</b> · IATF: <b>" + esc(lote.hora_iatf || "08:00") + "</b></div>"
+          + "</div>"
+          + "<div style='font-size:12px; color:var(--texto-suave); margin-top:4px;'>"
+          + "Protocolo: <b>" + esc(lote.protocolo_nombre) + "</b> · Toro sugerido: <b>" + esc(lote.toro_pajuela || "Sin asignar") + "</b> · Inseminador: <b>" + esc(lote.inseminador || "Sin asignar") + "</b>"
+          + "</div>"
+          + stepperHtml
+          + btnsAccion
+          + "</div>";
+      });
+      h += "</div>";
+    } else {
+      h += vacio("No hay lotes IATF en curso. Use «➕ Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
+    }
+    h += "</div>";
+
+    // 🏆 Evaluación y Efectividad de Inseminadores
+    var insems = d.evaluacion_inseminadores || [];
+
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid #8b5cf6;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+      + "<div style='font-size:14px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
+      + icon("chartBar", 16) + "Evaluación & Efectividad de Inseminadores"
+      + "</div>"
+      + "<button type='button' class='tema-btn' id='btn-nuevo-inseminador' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; background:var(--superficie-elevada, #f3f4f6); color:var(--texto); border:1px solid var(--borde-fuerte);'>"
+      + icon("userPlus", 13) + "➕ Nuevo Inseminador</button>"
+      + "</div>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>"
+      + "Monitoreo zootécnico del desempeño por técnico: tasa de concepción y servicios requeridos por preñez."
+      + "</div>";
+
+    if (insems.length) {
+      h += "<div class='tabla-scroll'><table><tr><th>Inseminador / Técnico</th><th style='text-align:right;'>Total IAs</th><th style='text-align:right;'>Preñadas</th><th style='text-align:right;'>Vacías</th><th style='text-align:right;'>Concepción</th><th style='text-align:right;'>Serv / Conc (S/C)</th><th>Teléfono</th></tr>";
+      h += insems.map(function (ins) {
+        var semColor = ins.semaforo === "VERDE" ? "verde" : (ins.semaforo === "AMARILLO" ? "ambar" : (ins.semaforo === "ROJO" ? "rojo" : "gris"));
+        var tasaTxt = ins.tasa_concepcion_pct != null ? (ins.tasa_concepcion_pct + "%") : "—";
+        var scTxt = ins.servicios_por_concepcion != null ? (ins.servicios_por_concepcion.toFixed(1)) : "—";
+        var badgeUser = ins.es_usuario_sistema ? "<span class='chip azul' style='font-size:10px; padding:2px 5px; margin-left:5px;'>Usuario App</span>" : "";
+        return "<tr>"
+          + "<td><b>" + esc(ins.inseminador) + "</b>" + badgeUser + "</td>"
+          + "<td style='text-align:right; font-weight:700;'>" + (ins.total_ias || 0) + "</td>"
+          + "<td style='text-align:right; color:var(--verde-marca, #16a34a); font-weight:700;'>" + (ins.prenadas || 0) + "</td>"
+          + "<td style='text-align:right; color:var(--color-rojo-txt, #dc2626);'>" + (ins.vacias || 0) + "</td>"
+          + "<td style='text-align:right;'><span class='chip " + semColor + "' style='font-weight:700; font-size:12px;'>" + tasaTxt + "</span></td>"
+          + "<td style='text-align:right; font-family:var(--font-mono); font-weight:600;'>" + scTxt + "</td>"
+          + "<td style='font-size:12px; color:var(--texto-suave);'>" + esc(ins.telefono || "—") + "</td>"
+          + "</tr>";
+      }).join("");
+      h += "</table></div>";
+    } else {
+      h += vacio("No hay inseminadores registrados. Use el botón «➕ Nuevo Inseminador» para darlos de alta o registre servicios por IA.");
     }
     h += "</div>";
 
@@ -1614,6 +1910,49 @@
           cargar(true);
           try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
         }
+      });
+    });
+
+    var btnNuevoIns = document.getElementById("btn-nuevo-inseminador");
+    if (btnNuevoIns) {
+      btnNuevoIns.addEventListener("click", function () {
+        mostrarModalNuevoInseminador(function () { cargar(true); });
+      });
+    }
+
+    var btnNuevoLote = document.getElementById("btn-nuevo-lote-iatf");
+    if (btnNuevoLote) {
+      btnNuevoLote.addEventListener("click", function () {
+        mostrarModalNuevoLoteIATF(window.__protocolosIatf || [], function () { cargar(true); });
+      });
+    }
+
+    var btnVerProts = document.getElementById("btn-ver-protocolos-iatf");
+    if (btnVerProts) {
+      btnVerProts.addEventListener("click", function () {
+        mostrarModalProtocolosInfo(window.__protocolosIatf || []);
+      });
+    }
+
+    qa(".btn-paso-iatf").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lid = this.getAttribute("data-lote-id");
+        var pidx = this.getAttribute("data-paso-idx");
+        if (lid) mostrarModalPasoIATF(Number(lid), Number(pidx || 0), function () { cargar(true); });
+      });
+    });
+
+    qa(".btn-inseminar-lote-iatf").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lid = this.getAttribute("data-lote-id");
+        if (lid) mostrarModalInseminarLoteIATF(Number(lid), function () { cargar(true); });
+      });
+    });
+
+    qa(".btn-detalle-lote-iatf").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var lid = this.getAttribute("data-lote-id");
+        if (lid) mostrarModalDetalleLoteIATF(Number(lid), function () { cargar(true); });
       });
     });
   }
@@ -2711,6 +3050,574 @@
           if (errEl) { errEl.textContent = "❌ Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
         });
     });
+  }
+
+  /* ==========================================================================
+     MODALES: CATÁLOGO DE INSEMINADORES & SINCRONIZACIONES IATF
+     ========================================================================== */
+
+  var _cacheInseminadores = null;
+  function cargarListaInseminadores(callback) {
+    if (_cacheInseminadores && _cacheInseminadores.length) {
+      poblarInseminadores(_cacheInseminadores);
+      if (typeof callback === "function") callback(_cacheInseminadores);
+      return;
+    }
+    fetch("/api/inseminadores")
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d && d.ok && d.inseminadores) {
+          _cacheInseminadores = d.inseminadores;
+          poblarInseminadores(d.inseminadores);
+          if (typeof callback === "function") callback(d.inseminadores);
+        }
+      })
+      .catch(function () { /* best-effort */ });
+
+    function poblarInseminadores(insemList) {
+      if (!insemList) insemList = [];
+      var items = insemList.map(function (it) {
+        var label = it.nombre + (it.telefono ? " (" + it.telefono + ")" : "");
+        return { value: it.nombre, label: label };
+      });
+      rellenarDatalist("dl-inseminadores", items);
+      var inp = document.getElementById("cap-inseminador");
+      if (inp && !inp.value && window.__usuarioActual && window.__usuarioActual.nombre) {
+        inp.value = window.__usuarioActual.nombre;
+      }
+    }
+  }
+
+  function mostrarModalNuevoInseminador(onSuccess) {
+    var overlay = document.getElementById("inseminador-modal");
+    if (overlay) overlay.remove();
+
+    var html = "<div id='inseminador-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:440px;'>"
+      + "<div class='modal-header'><b>" + icon("userPlus", 16) + " Registrar Inseminador Oficial</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-modal'>✕</button></div>"
+      + "<div style='padding:16px;'>"
+      + "<form id='form-nuevo-inseminador' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Nombre Completo del Inseminador / Técnico:*<br>"
+      + "<input id='ins-nombre' required placeholder='ej. Carlos Gómez, Dr. Morales' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Teléfono de Contacto (opcional):<br>"
+      + "<input id='ins-telefono' type='tel' placeholder='ej. 3101234567' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='display:flex; align-items:center; gap:8px; font-size:12.5px; cursor:pointer; background:var(--superficie-elevada); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
+      + "<input type='checkbox' id='ins-es-usuario' style='width:auto;'> <span>¿Es operario / usuario de la finca?</span></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Notas / Observaciones:<br>"
+      + "<input id='ins-notas' placeholder='ej. Especialista en IATF novillas' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<div id='ins-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
+      + "<button type='button' class='tema-btn' id='btn-cancel-ins-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0;'>Guardar Inseminador</button>"
+      + "</div>"
+      + "</form>"
+      + "</div></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("inseminador-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-ins-modal");
+    var btnCan = document.getElementById("btn-cancel-ins-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    if (btnCan) btnCan.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var form = document.getElementById("form-nuevo-inseminador");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById("ins-form-error");
+      var nom = (document.getElementById("ins-nombre").value || "").trim();
+      if (!nom) {
+        if (errEl) { errEl.textContent = "El nombre es obligatorio"; errEl.style.display = "block"; }
+        return;
+      }
+      var payload = {
+        nombre: nom,
+        telefono: (document.getElementById("ins-telefono").value || "").trim() || null,
+        es_usuario_sistema: Boolean(document.getElementById("ins-es-usuario").checked),
+        notas: (document.getElementById("ins-notas").value || "").trim() || null
+      };
+      fetch("/api/inseminadores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.ok) {
+            mostrarToast("Inseminador " + nom + " registrado", "verde");
+            _cacheInseminadores = null;
+            cargarListaInseminadores();
+            cerrar();
+            if (typeof onSuccess === "function") onSuccess(nom);
+          } else {
+            if (errEl) { errEl.textContent = res.error || "No se pudo registrar"; errEl.style.display = "block"; }
+          }
+        }).catch(function (err) {
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+        });
+    });
+  }
+
+  function mostrarModalProtocolosInfo(protocolos) {
+    var overlay = document.getElementById("iatf-protocolos-info-modal");
+    if (overlay) overlay.remove();
+
+    var prots = (protocolos && protocolos.length) ? protocolos : (window.__protocolosIatf || []);
+
+    var htmlProts = prots.map(function (p) {
+      var pasos = Array.isArray(p.pasos) ? p.pasos : (typeof p.pasos === "string" ? JSON.parse(p.pasos || "[]") : []);
+      var pasosHtml = pasos.map(function (ps) {
+        var prodsHtml = (ps.productos || []).map(function (pr) {
+          var marcas = (pr.marcas_sugeridas || []).join(", ");
+          return "<div style='font-size:11.5px; background:var(--superficie); padding:4px 8px; border-radius:4px; border:1px solid var(--borde); margin-top:3px;'>"
+            + "<b>" + esc(pr.tipo || "") + ":</b> " + esc(pr.principio_activo || "") + " · Dosis: <b>" + esc(pr.dosis_sugerida || "") + "</b>"
+            + (marcas ? (" · <span style='color:var(--verde-marca);'>Marcas: " + esc(marcas) + "</span>") : "")
+            + "</div>";
+        }).join("");
+
+        return "<div style='margin-bottom:8px; padding-left:10px; border-left:3px solid var(--azul-marca);'>"
+          + "<div style='font-weight:700; font-size:12.5px; color:var(--texto);'>Día " + ps.dia_relativo + ": " + esc(ps.accion) + "</div>"
+          + "<div style='font-size:11.5px; color:var(--texto-suave);'>" + esc(ps.descripcion || "") + "</div>"
+          + prodsHtml
+          + "</div>";
+      }).join("");
+
+      return "<div style='background:var(--superficie-elevada); border:1px solid var(--borde); border-radius:8px; padding:12px 14px; margin-bottom:12px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;'>"
+        + "<span style='font-size:14px; font-weight:700; color:var(--texto);'>" + esc(p.nombre) + "</span>"
+        + "<span class='chip azul' style='font-size:11px;'>Duración: " + p.duracion_dias + " días</span>"
+        + "</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:10px;'>" + esc(p.descripcion || "") + "</div>"
+        + pasosHtml
+        + "</div>";
+    }).join("");
+
+    var html = "<div id='iatf-protocolos-info-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:640px; max-height:85vh; overflow-y:auto;'>"
+      + "<div class='modal-header'><b>" + icon("clipboard", 16) + " Biblioteca de Protocolos Hormonales IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-prots-modal'>✕</button></div>"
+      + "<div style='padding:16px;'>"
+      + "<p style='margin:0 0 12px 0; font-size:12.5px; color:var(--texto-suave);'>Protocolos zootécnicos validados con dosis sugeridas y marcas comerciales de referencia (evaluables según respuesta de fertilidad):</p>"
+      + htmlProts
+      + "</div></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("iatf-protocolos-info-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-prots-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+  }
+
+  function mostrarModalNuevoLoteIATF(protocolos, onSuccess) {
+    var overlay = document.getElementById("nuevo-lote-iatf-modal");
+    if (overlay) overlay.remove();
+
+    var prots = (protocolos && protocolos.length) ? protocolos : (window.__protocolosIatf || []);
+    var hoyFmt = new Date().toISOString().slice(0, 10);
+
+    var optsProt = prots.map(function (p) {
+      return "<option value='" + p.id + "'>" + esc(p.nombre) + " (" + esc(p.categoria) + " - " + p.duracion_dias + "d)</option>";
+    }).join("");
+
+    var html = "<div id='nuevo-lote-iatf-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:560px; max-height:90vh; overflow-y:auto;'>"
+      + "<div class='modal-header'><b>" + icon("plus", 16) + " Iniciar Nuevo Lote IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-lote-modal'>✕</button></div>"
+      + "<div style='padding:16px;'>"
+      + "<form id='form-nuevo-lote-iatf' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Nombre / Identificador del Lote:*<br>"
+      + "<input id='lote-nombre' required placeholder='ej. Lote Novillas 2026-A, Vacas DP Grupo 1' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Protocolo Hormonal:*<br>"
+      + "<select id='lote-protocolo-id' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'>" + optsProt + "</select></label>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Fecha de Inicio (Día 0):*<br>"
+      + "<input id='lote-fecha-inicio' type='date' value='" + hoyFmt + "' required style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:12.5px; font-weight:600;'>Hora de IATF (Día 10):<br>"
+      + "<input id='lote-hora-iatf' type='time' value='08:00' required style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Toro / Pajuela Sugerido:<br>"
+      + "<input id='lote-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Inseminador Asignado:<br>"
+      + "<input id='lote-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Aretes de las Hembras a Sincronizar:*<br>"
+      + "<span style='font-size:11.5px; color:var(--texto-suave); font-weight:normal;'>Escriba o pegue los tags separados por espacio, coma o salto de línea.</span><br>"
+      + "<textarea id='lote-animales-tags' required rows='3' placeholder='ej. 47, 52, JA176, N069, PATRICIA' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:13px; box-sizing:border-box;'></textarea></label>"
+      + "<div id='lote-conteo-preview' style='font-size:12px; font-weight:700; color:var(--azul-marca);'>0 hembras ingresadas</div>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Notas / Observaciones:<br>"
+      + "<input id='lote-notas' placeholder='ej. Lote con cría al pie, seleccionadas con CC >= 2.75' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<div class='aviso' style='font-size:11.5px; margin:4px 0;'>💡 Al crear el lote, el sistema programará automáticamente las alertas de drogas en la Agenda PWA, notificaciones push y Telegram para los días exactos de aplicación (Día 0, Día 8 y Día 10).</div>"
+      + "<div id='lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
+      + "<button type='button' class='tema-btn' id='btn-cancel-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0;'>Iniciar Lote IATF</button>"
+      + "</div>"
+      + "</form>"
+      + "</div></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("nuevo-lote-iatf-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-lote-modal");
+    var btnCan = document.getElementById("btn-cancel-lote-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    if (btnCan) btnCan.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var inpIns = document.getElementById("lote-inseminador");
+    if (inpIns && window.__usuarioActual && window.__usuarioActual.nombre) {
+      inpIns.value = window.__usuarioActual.nombre;
+    }
+    cargarListaInseminadores();
+
+    var txtTags = document.getElementById("lote-animales-tags");
+    var cntPrev = document.getElementById("lote-conteo-preview");
+    function actualizarConteo() {
+      var val = (txtTags.value || "").trim();
+      var arr = val ? val.replace(/,/g, " ").split(/\s+/).filter(Boolean) : [];
+      cntPrev.textContent = arr.length + " hembra(s) ingresada(s)";
+    }
+    if (txtTags) {
+      txtTags.addEventListener("input", actualizarConteo);
+      txtTags.addEventListener("paste", function () { setTimeout(actualizarConteo, 50); });
+    }
+
+    var form = document.getElementById("form-nuevo-lote-iatf");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById("lote-form-error");
+      var nom = (document.getElementById("lote-nombre").value || "").trim();
+      var protId = document.getElementById("lote-protocolo-id").value;
+      var fIni = document.getElementById("lote-fecha-inicio").value;
+      var rawTags = (txtTags.value || "").trim();
+      var tagsArr = rawTags ? rawTags.replace(/,/g, " ").split(/\s+/).filter(Boolean) : [];
+
+      if (!nom || !protId || !fIni || !tagsArr.length) {
+        if (errEl) { errEl.textContent = "Complete todos los campos requeridos y al menos un animal"; errEl.style.display = "block"; }
+        return;
+      }
+
+      var payload = {
+        nombre: nom,
+        protocolo_id: Number(protId),
+        fecha_inicio: fIni,
+        hora_iatf: document.getElementById("lote-hora-iatf").value || "08:00",
+        toro_pajuela: (document.getElementById("lote-toro").value || "").trim() || null,
+        inseminador: (inpIns.value || "").trim() || null,
+        animales_tags: tagsArr,
+        notas: (document.getElementById("lote-notas").value || "").trim() || null
+      };
+
+      fetch("/api/iatf/lotes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.ok) {
+            mostrarToast("Lote " + nom + " (" + tagsArr.length + " vacas) iniciado con alertas", "verde");
+            cerrar();
+            if (typeof onSuccess === "function") onSuccess();
+          } else {
+            if (errEl) { errEl.textContent = res.error || "No se pudo crear el lote"; errEl.style.display = "block"; }
+          }
+        }).catch(function (err) {
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+        });
+    });
+  }
+
+  function mostrarModalPasoIATF(loteId, pasoIdx, onSuccess) {
+    var overlay = document.getElementById("iatf-paso-modal");
+    if (overlay) overlay.remove();
+
+    var lotes = window.__lotesIatf || [];
+    var lote = null;
+    for (var i = 0; i < lotes.length; i++) {
+      if (Number(lotes[i].id) === Number(loteId)) { lote = lotes[i]; break; }
+    }
+
+    var pasos = lote && lote.protocolo_pasos ? lote.protocolo_pasos : [];
+    var paso = pasos[pasoIdx] || { accion: "Paso " + pasoIdx, productos: [] };
+
+    var prods = paso.productos || [];
+    var marcasSugeridas = [];
+    var dosisSugerida = "";
+    var prodNombreSugerido = "";
+    if (prods.length > 0) {
+      prodNombreSugerido = prods.map(function (pr) { return pr.principio_activo || pr.tipo; }).join(" + ");
+      prods.forEach(function (pr) {
+        if (pr.marcas_sugeridas) marcasSugeridas = marcasSugeridas.concat(pr.marcas_sugeridas);
+        if (pr.dosis_sugerida && !dosisSugerida) dosisSugerida = pr.dosis_sugerida;
+      });
+    }
+
+    var marcaSugeridaStr = marcasSugeridas.join(" / ");
+
+    var html = "<div id='iatf-paso-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:480px;'>"
+      + "<div class='modal-header'><b>💊 Registrar Aplicación de Fármacos</b><button type='button' class='modal-cerrar' id='btn-cerrar-paso-modal'>✕</button></div>"
+      + "<div style='padding:16px;'>"
+      + "<div style='background:rgba(2,132,199,0.08); border-left:4px solid #0284c7; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
+      + "<b>Lote:</b> " + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "<br>"
+      + "<b>Acción:</b> " + esc(paso.accion)
+      + "</div>"
+      + "<form id='form-paso-iatf' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Fármaco / Principio Activo:*<br>"
+      + "<input id='paso-producto' required value='" + esc(prodNombreSugerido) + "' placeholder='ej. Retiro P4 + Cloprostenol + Cipionato + eCG' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Marca Comercial Utilizada:*<br>"
+      + "<input id='paso-marca' required placeholder='ej. Ciclase DL + ECP + Novormon 400UI' value='" + esc(marcaSugeridaStr) + "' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Dosis Aplicada:*<br>"
+      + "<input id='paso-dosis' required placeholder='ej. 2ml PGF + 0.5ml ECP + 2ml eCG' value='" + esc(dosisSugerida) + "' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Operario / Aplicado Por:<br>"
+      + "<input id='paso-operario' placeholder='Nombre del operario' list='dl-inseminadores' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Notas / Observaciones de Campo:<br>"
+      + "<input id='paso-notas' placeholder='ej. Retiro normal, 0 pérdidas de dispositivos' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<div id='paso-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
+      + "<button type='button' class='tema-btn' id='btn-cancel-paso-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0;'>Confirmar Aplicación</button>"
+      + "</div>"
+      + "</form>"
+      + "</div></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("iatf-paso-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-paso-modal");
+    var btnCan = document.getElementById("btn-cancel-paso-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    if (btnCan) btnCan.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var inpOp = document.getElementById("paso-operario");
+    if (inpOp && window.__usuarioActual && window.__usuarioActual.nombre) {
+      inpOp.value = window.__usuarioActual.nombre;
+    }
+
+    var form = document.getElementById("form-paso-iatf");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById("paso-form-error");
+      var payload = {
+        paso_index: pasoIdx,
+        producto: document.getElementById("paso-producto").value,
+        marca: document.getElementById("paso-marca").value,
+        dosis: document.getElementById("paso-dosis").value,
+        realizado_por: inpOp.value || null,
+        notas: document.getElementById("paso-notas").value || null
+      };
+
+      fetch("/api/iatf/lotes/" + loteId + "/paso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.ok) {
+            mostrarToast("Paso registrado exitosamente", "verde");
+            cerrar();
+            if (typeof onSuccess === "function") onSuccess();
+          } else {
+            if (errEl) { errEl.textContent = res.error || "No se pudo registrar"; errEl.style.display = "block"; }
+          }
+        }).catch(function (err) {
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+        });
+    });
+  }
+
+  function mostrarModalInseminarLoteIATF(loteId, onSuccess) {
+    var overlay = document.getElementById("iatf-inseminar-modal");
+    if (overlay) overlay.remove();
+
+    var lotes = window.__lotesIatf || [];
+    var lote = null;
+    for (var i = 0; i < lotes.length; i++) {
+      if (Number(lotes[i].id) === Number(loteId)) { lote = lotes[i]; break; }
+    }
+
+    var hoyFmt = new Date().toISOString().slice(0, 10);
+    var nHembras = lote ? (lote.animales_activos || lote.total_animales || 0) : 0;
+
+    var html = "<div id='iatf-inseminar-modal' class='modal-overlay'>"
+      + "<div class='modal-contenido' style='max-width:500px;'>"
+      + "<div class='modal-header'><b>🧬 Inseminación Masiva a 1-Toque (IATF)</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-lote-modal'>✕</button></div>"
+      + "<div style='padding:16px;'>"
+      + "<div style='background:rgba(22,163,74,0.08); border-left:4px solid var(--verde-marca); padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
+      + "Se registrará el servicio por IATF para las <b>" + nHembras + " hembras activas</b> de <b>" + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "</b> "
+      + "y se descontarán automáticamente las pajuelas del termo criogénico."
+      + "</div>"
+      + "<form id='form-inseminar-lote' style='display:flex; flex-direction:column; gap:10px;'>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Código Toro / Pajuela a Descontar:*<br>"
+      + "<input id='ins-lote-toro' required value='" + esc(lote && lote.toro_pajuela ? lote.toro_pajuela : "") + "' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Técnico Inseminador Responsable:*<br>"
+      + "<input id='ins-lote-inseminador' required value='" + esc(lote && lote.inseminador ? lote.inseminador : "") + "' placeholder='Nombre del inseminador' list='dl-inseminadores' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Fecha de Inseminación:*<br>"
+      + "<input id='ins-lote-fecha' type='date' value='" + hoyFmt + "' required style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "<label style='flex:1; min-width:110px; font-size:12.5px; font-weight:600;'>Hora:*<br>"
+      + "<input id='ins-lote-hora' type='time' value='" + esc(lote && lote.hora_iatf ? lote.hora_iatf : "08:00") + "' required style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
+      + "</div>"
+      + "<div id='ins-lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
+      + "<button type='button' class='tema-btn' id='btn-cancel-ins-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0; background:var(--verde-marca); border-color:var(--verde-marca);'>Confirmar Inseminación (" + nHembras + " vacas)</button>"
+      + "</div>"
+      + "</form>"
+      + "</div></div></div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("iatf-inseminar-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-ins-lote-modal");
+    var btnCan = document.getElementById("btn-cancel-ins-lote-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    if (btnCan) btnCan.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var inpIns = document.getElementById("ins-lote-inseminador");
+    if (inpIns && !inpIns.value && window.__usuarioActual && window.__usuarioActual.nombre) {
+      inpIns.value = window.__usuarioActual.nombre;
+    }
+
+    var form = document.getElementById("form-inseminar-lote");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var errEl = document.getElementById("ins-lote-form-error");
+      var payload = {
+        toro_pajuela: document.getElementById("ins-lote-toro").value,
+        inseminador: inpIns.value,
+        fecha: document.getElementById("ins-lote-fecha").value,
+        hora: document.getElementById("ins-lote-hora").value
+      };
+
+      fetch("/api/iatf/lotes/" + loteId + "/inseminar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) { return r.json(); })
+        .then(function (res) {
+          if (res.ok) {
+            mostrarToast("Inseminación completada (" + (res.resultado ? res.resultado.servicios_creados : "") + " servicios registrados)", "verde");
+            cerrar();
+            if (typeof onSuccess === "function") onSuccess();
+          } else {
+            if (errEl) { errEl.textContent = res.error || "No se pudo inseminar el lote"; errEl.style.display = "block"; }
+          }
+        }).catch(function (err) {
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+        });
+    });
+  }
+
+  function mostrarModalDetalleLoteIATF(loteId, onSuccess) {
+    var overlay = document.getElementById("iatf-detalle-modal");
+    if (overlay) overlay.remove();
+
+    fetch("/api/iatf/lotes/" + loteId)
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok || !res.lote) {
+          mostrarToast("No se pudo cargar el lote", "rojo");
+          return;
+        }
+        var lote = res.lote;
+        var animales = lote.animales || [];
+        var pasosHist = lote.historial_pasos || [];
+
+        var histHtml = pasosHist.length ? pasosHist.map(function (h) {
+          return "<tr>"
+            + "<td><b>" + esc(fechaCorta(h.fecha)) + "</b></td>"
+            + "<td>" + esc(h.producto || "—") + "</td>"
+            + "<td><span class='chip verde' style='font-size:11px;'>" + esc(h.marca || "—") + "</span></td>"
+            + "<td style='font-family:var(--font-mono);'>" + esc(h.dosis || "—") + "</td>"
+            + "<td style='font-size:12px; color:var(--texto-suave);'>" + esc(h.realizado_por || "—") + "</td>"
+            + "</tr>";
+        }).join("") : "<tr><td colspan='5' style='text-align:center; color:var(--texto-suave);'>Sin aplicaciones registradas aún.</td></tr>";
+
+        var animsHtml = animales.map(function (a) {
+          var estBadge = a.estado === "ACTIVO" ? "<span class='chip verde' style='font-size:10.5px;'>ACTIVA</span>" :
+            "<span class='chip rojo' style='font-size:10.5px;'>" + esc(a.motivo_exclusion || "EXCLUIDA") + "</span>";
+
+          var diagBadge = a.diagnostico_resultado ?
+            (a.diagnostico_resultado === "PREÑADA" ? "<span class='chip verde' style='font-weight:700;'>PREÑADA (" + a.diagnostico_dias + "d)</span>" : "<span class='chip rojo'>VACÍA</span>") :
+            "<span class='chip gris' style='font-size:11px;'>Pendiente Eco</span>";
+
+          var btnExc = (a.estado === "ACTIVO" && lote.estado === "EN_CURSO") ?
+            ("<button type='button' class='btn-exc-animal-iatf' data-tag='" + esc(a.tag) + "' style='font-size:11px; padding:2px 6px; border:1px solid #dc2626; color:#dc2626; background:transparent; border-radius:4px; cursor:pointer;'>Excluir</button>") : "";
+
+          return "<tr>"
+            + "<td><a href='#' class='ficha-link' data-ir-ficha='" + esc(a.tag) + "' style='font-weight:700; text-decoration:none;'><b>" + esc(a.tag) + "</b></a></td>"
+            + "<td>" + (a.condicion_corporal_inicial ? ("CC: " + a.condicion_corporal_inicial) : "—") + "</td>"
+            + "<td>" + estBadge + "</td>"
+            + "<td>" + diagBadge + "</td>"
+            + "<td style='text-align:right;'>" + btnExc + "</td>"
+            + "</tr>";
+        }).join("");
+
+        var modalHtml = "<div id='iatf-detalle-modal' class='modal-overlay'>"
+          + "<div class='modal-contenido' style='max-width:650px; max-height:85vh; overflow-y:auto;'>"
+          + "<div class='modal-header'><b>📋 Detalle del Lote: " + esc(lote.nombre) + "</b><button type='button' class='modal-cerrar' id='btn-cerrar-det-lote-modal'>✕</button></div>"
+          + "<div style='padding:16px;'>"
+          + "<div style='display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; font-size:12.5px;'>"
+          + "<div>Protocolo: <b>" + esc(lote.protocolo_nombre) + "</b> (" + esc(lote.protocolo_categoria) + ")</div>"
+          + "<div>Inicio: <b>" + esc(fechaCorta(lote.fecha_inicio)) + "</b> · IATF: <b>" + esc(lote.hora_iatf) + "</b></div>"
+          + "</div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>💊 Historial de Fármacos, Marcas y Dosis Aplicadas:</div>"
+          + "<div class='tabla-scroll' style='margin-bottom:14px;'><table><tr><th>Fecha</th><th>Producto</th><th>Marca Usada</th><th>Dosis</th><th>Operario</th></tr>" + histHtml + "</table></div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🐄 Hembras del Lote (" + animales.length + "):</div>"
+          + "<div class='tabla-scroll'><table><tr><th>Arete</th><th>CC Inicial</th><th>Estado</th><th>Diagnóstico</th><th style='text-align:right;'>Acción</th></tr>" + animsHtml + "</table></div>"
+          + "</div></div></div>";
+
+        var wrap = document.createElement("div");
+        wrap.innerHTML = modalHtml;
+        document.body.appendChild(wrap.firstChild);
+
+        var ov = document.getElementById("iatf-detalle-modal");
+        function cerrar() { if (ov) ov.remove(); }
+        var btnC = document.getElementById("btn-cerrar-det-lote-modal");
+        if (btnC) btnC.addEventListener("click", cerrar);
+        ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+        qa(".btn-exc-animal-iatf").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var tag = this.getAttribute("data-tag");
+            var motivo = prompt("Motivo de exclusión de " + tag + " (ej. pérdida de dispositivo, celo anticipado, lesión):", "Pérdida de dispositivo");
+            if (!motivo) return;
+            fetch("/api/iatf/lotes/" + loteId + "/excluir", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ tag: tag, motivo: motivo })
+            }).then(function (r) { return r.json(); })
+              .then(function (rx) {
+                if (rx.ok) {
+                  mostrarToast("Animal " + tag + " excluido", "ambar");
+                  cerrar();
+                  mostrarModalDetalleLoteIATF(loteId, onSuccess);
+                  if (typeof onSuccess === "function") onSuccess();
+                } else {
+                  alert(rx.error || "No se pudo excluir");
+                }
+              });
+          });
+        });
+      });
   }
 
   function renderKpisMercado(d) {
@@ -4491,8 +5398,8 @@
     } else if (tipo === "servicio") {
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
-        + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Inseminador: <input id='cap-inseminador' placeholder='Nombre del técnico' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+        + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;'>➕</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>💡 Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
@@ -4777,6 +5684,23 @@
       }
       var fFechaDef = document.getElementById("cap-fecha");
       if (fFechaDef && !fFechaDef.value) fFechaDef.value = new Date().toISOString().slice(0, 10);
+
+      // Inseminador por defecto: usuario en sesión si el campo está presente y vacío
+      var fInsemDef = document.getElementById("cap-inseminador");
+      if (fInsemDef && !fInsemDef.value && window.__usuarioActual && window.__usuarioActual.nombre) {
+        fInsemDef.value = window.__usuarioActual.nombre;
+      }
+      cargarListaInseminadores();
+
+      var btnNuevoInsCap = document.getElementById("btn-nuevo-inseminador-cap");
+      if (btnNuevoInsCap && !btnNuevoInsCap.dataset.bound) {
+        btnNuevoInsCap.dataset.bound = "1";
+        btnNuevoInsCap.addEventListener("click", function () {
+          mostrarModalNuevoInseminador(function (nuevoNombre) {
+            if (fInsemDef && nuevoNombre) fInsemDef.value = nuevoNombre;
+          });
+        });
+      }
     }
 
     function recolectarCapDatos() {
@@ -8800,7 +9724,9 @@
       if (sheetMapa) sheetMapa.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "gps") b.style.display = "none";
+        // El botón Campo de la barra es exclusivo del mayordomo
+        // (oficina entra por el sheet "Modo Campo").
+        if (v === "gps" || v === "campo") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -8819,7 +9745,7 @@
       if (sheetUsuarios) sheetUsuarios.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "sistema" || v === "gps") b.style.display = "none";
+        if (v === "sistema" || v === "gps" || v === "campo") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -8836,10 +9762,21 @@
       if (sheetUsuarios) sheetUsuarios.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "none";
-      var permitidas = ["captura", "manga", "ficha"];
+      // Modo Campo: el mayordomo entra a 4 botones grandes (Captura,
+      // Agenda-hoy, Ficha, GPS) en vez del tablero de oficina. La Agenda
+      // es lectura/consulta que ya necesita en el corral. El mapa
+      // satelital sigue exclusivo de oficina (ver /api/mapa/datos): el
+      // botón GPS del modo campo localiza y guarda la ronda sin mapa.
+      var permitidas = ["captura", "manga", "ficha", "campo", "agenda"];
+      var btnCampo = document.getElementById("btn-nav-campo");
+      if (btnCampo) btnCampo.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
+        if (v === "mapa") {
+          b.style.display = "none";
+          return;
+        }
         if (permitidas.indexOf(v) !== -1) {
           b.style.display = "";
         } else {
@@ -8848,6 +9785,10 @@
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
+        if (v === "mapa") {
+          m.style.display = "none";
+          return;
+        }
         if (permitidas.indexOf(v) !== -1) {
           m.style.display = "";
         } else {
@@ -8855,7 +9796,7 @@
         }
       });
       if (permitidas.indexOf(actual) === -1 && actual !== "ayuda") {
-        irAVista("captura");
+        irAVista("campo");
         cargar();
       }
     }
@@ -10677,6 +11618,7 @@
             return { value: a.tag, label: desc };
           }));
         }
+        cargarListaInseminadores();
       }).catch(function () { /* best-effort */ });
   }
   var cargarListaPotreros = cargarListasAutocompletar; // Alias de retrocompatibilidad
@@ -10805,6 +11747,7 @@
   function cargar(animar) {
     if (animar === undefined) animar = true;
     actualizarFabGlobal();
+    try { document.body.classList.toggle("modo-campo", actual === "campo"); } catch (eBody) {}
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
@@ -10847,6 +11790,15 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
+      }
+      return;
+    }
+
+    if (actual === "campo") {
+      if (!animar) return; // En polling silencioso no resetear el resumen
+      if (vista) {
+        montarVista(vista, renderCampo(), animar);
+        bindCampo();
       }
       return;
     }
@@ -11126,6 +12078,7 @@
     inventario: "Inventario",
     finanzas: "Finanzas",
     mapa: "Mapa & GPS",
+    campo: "Campo",
     manga: "Manga",
     agenda: "Agenda",
     repro: "Repro",

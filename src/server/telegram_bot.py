@@ -143,6 +143,36 @@ GRAFICOS_PANEL = {
 # ---------------------------------------------------------------------- #
 # Construcción del Bot de Telegram (SDK python-telegram-bot)
 # ---------------------------------------------------------------------- #
+async def _notificar_exportacion_owners(context, auth, user_id: int, etiqueta: str) -> None:
+    """Avisa a los demás OWNER que se exportó la base completa.
+
+    La exportación es rara y sensible: si una cuenta OWNER se compromete,
+    el dueño real se entera por este canal. Nunca tumba la exportación si
+    el aviso falla.
+    """
+    try:
+        nombre = auth.obtener_usuario(user_id) or {}
+        quien = nombre.get("nombre") or f"Usuario {user_id}"
+        for u in auth.listar_usuarios():
+            if str(u.get("rol", "")).strip().upper() != "OWNER":
+                continue
+            try:
+                destino = int(u.get("telegram_id") or u.get("user_id") or 0)
+            except (ValueError, TypeError):
+                continue
+            if not destino or destino == int(user_id):
+                continue
+            try:
+                await context.bot.send_message(
+                    chat_id=destino,
+                    text=f"📦 El OWNER {quien} exportó la base completa ({etiqueta}).",
+                )
+            except Exception as eu:
+                logger.warning("No se pudo avisar exportación al OWNER %s: %s", destino, eu)
+    except Exception as e:
+        logger.warning("Fallo al notificar exportación: %s", e)
+
+
 def construir_application(
     token: str,
     db: Database,
@@ -1942,8 +1972,14 @@ def construir_application(
             if not update.effective_user or not update.message:
                 return
             user_id = update.effective_user.id
-            if not auth.puede_administrar(user_id):
-                await update.message.reply_text("⛔ No autorizado.")
+            # La exportación entrega la base COMPLETA (hato, finanzas,
+            # usuarios): solo el OWNER. Un ADMIN comprometido no debe
+            # poder exfiltrarla con un solo comando.
+            if not auth.puede_gestionar_usuarios(user_id):
+                await update.message.reply_text(
+                    "⛔ Solo el OWNER puede exportar la base completa. "
+                    "Pídale al propietario que la genere."
+                )
                 return
             _tocar_actividad(user_id, update.effective_user.first_name or "")
 
@@ -1992,6 +2028,7 @@ def construir_application(
                 filename=os.path.basename(zip_generado),
                 caption=f"{desc} ({tam_mb:.2f} MB)",
             )
+            _notificar_exportacion_owners(context, auth, user_id, etiqueta)
         except Exception as e:
             logger.error("Error en cmd_exportar: %s", e, exc_info=True)
             if update.message:
@@ -2274,9 +2311,11 @@ def construir_application(
 
             elif data == "cmd:exportar":
                 await query.answer()
-                if not auth.puede_administrar(user_id):
+                if not auth.puede_gestionar_usuarios(user_id):
                     if query.message:
-                        await query.message.reply_text("⛔ No autorizado.")
+                        await query.message.reply_text(
+                            "⛔ Solo el OWNER puede exportar la base completa."
+                        )
                     return
                 try:
                     from ..exporters import export_zip
@@ -2293,6 +2332,7 @@ def construir_application(
                                 filename=os.path.basename(ruta_zip),
                                 caption="📦 Backup exportado en formato ZIP con las tablas del sistema.",
                             )
+                        await _notificar_exportacion_owners(context, auth, user_id, "dbf")
                 except Exception as eexp:
                     logger.error("Error al exportar en callback: %s", eexp)
                     if query.message:

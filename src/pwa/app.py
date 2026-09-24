@@ -11,10 +11,12 @@ Si Flask no está instalado el módulo se importa sin romper el bot
 """
 from __future__ import annotations
 
+import functools
 import hashlib
 import json
 import logging
 import os
+from urllib.parse import urlparse
 import re
 import shutil
 import socket
@@ -57,7 +59,7 @@ mimetypes.add_type("font/woff2", ".woff2")
 mimetypes.add_type("font/woff", ".woff")
 
 try:
-    from .rate_limit_store import RateLimitStore
+    from .rate_limit_store import CastigoStore, RateLimitStore
     from ..db.database import Database
     from ..engine.dashboard_data import (
         _filas_dict as _filas_dict,
@@ -82,7 +84,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
 
     _sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-    from src.pwa.rate_limit_store import RateLimitStore  # type: ignore
+    from src.pwa.rate_limit_store import CastigoStore, RateLimitStore  # type: ignore
     from src.db.database import Database  # type: ignore
     from src.engine.dashboard_data import (  # type: ignore
         _filas_dict as _filas_dict,
@@ -154,6 +156,63 @@ try:
     load_dotenv(os.path.join(RAIZ_PROYECTO, ".env"))
 except Exception:
     pass
+
+# Cabeceras de seguridad servidas por Flask (defensa en profundidad: las
+# mismas que pone scripts/nginx-bitacora.conf; si alguien sirve la PWA sin
+# nginx — p. ej. http://IP:8080 directo en LAN — no queda desprotegida).
+_CSP_PWA = (
+    "default-src 'self'; "
+    "img-src 'self' data: https://server.arcgisonline.com; "
+    "script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "connect-src 'self' https://server.arcgisonline.com; "
+    "object-src 'none'; frame-ancestors 'self'"
+)
+_PERMISSIONS_PWA = (
+    "geolocation=(self), camera=(self), microphone=(self), "
+    "bluetooth=(self), payment=(), usb=(), magnetometer=(), gyroscope=()"
+)
+
+
+def _origen_permitido(origen: str, referido: str, host: str) -> bool:
+    """Segunda barrera anti-CSRF (además de SameSite=Lax).
+
+    Los navegadores siempre mandan Origin en POST fetch/formulario (y
+    Referer salvo política estricta): si alguno viene, su host debe ser el
+    nuestro. Si no viene ninguno (curl, clientes viejos), se permite como
+    antes — no se pierde nada respecto al estado previo.
+    """
+    origen = (origen or "").strip()
+    referido = (referido or "").strip()
+    if not origen and not referido:
+        return True
+    host_base = (host or "").lower().split(":")[0]
+    for url in (origen, referido):
+        if not url:
+            continue
+        try:
+            if (urlparse(url).hostname or "").lower() != host_base:
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def _error_interno(codigo: int = 500, con_ok: bool = True, extra: Optional[dict] = None):
+    """Respuesta genérica sin fugas: el detalle ya quedó en el log de cada
+    sitio (todos llaman logger.exception antes). Nunca devolver str(e) al
+    cliente: trae rutas de disco, fragmentos SQL y nombres de columnas."""
+    if codigo == 400:
+        msg = "No se pudo completar la operación. Revise los datos e intente de nuevo."
+    else:
+        codigo = 500
+        msg = "Error interno del servidor. Intente de nuevo."
+    cuerpo: dict = {"error": msg}
+    if con_ok:
+        cuerpo = {"ok": False, **cuerpo}
+    if extra:
+        cuerpo.update(extra)
+    return jsonify(cuerpo), codigo
+
 
 DB_PATH_DEFAULT = os.getenv("BITACORA_DB", os.path.join(RAIZ_PROYECTO, "data", "bitacora.db"))
 USERS_FILE_DEFAULT = os.getenv("USERS_FILE", os.path.join(RAIZ_PROYECTO, "src", "server", "users.json"))
@@ -753,13 +812,60 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     # no reabre la ventana de fuerza bruta.
     if login_store_path:
         _login_store = RateLimitStore(login_store_path)
+        _castigo_store = CastigoStore(login_store_path + ".castigos")
+        _api_store = RateLimitStore(login_store_path + ".api")
     elif os.environ.get("PYTEST_CURRENT_TEST"):
         import tempfile, time
-        _login_store = RateLimitStore(os.path.join(tempfile.gettempdir(), f"pytest_login_{os.getpid()}_{time.time_ns()}.json"))
+        _sfx = f"pytest_{os.getpid()}_{time.time_ns()}"
+        _tmp = tempfile.gettempdir()
+        _login_store = RateLimitStore(os.path.join(_tmp, f"pytest_login_{_sfx}.json"))
+        _castigo_store = CastigoStore(os.path.join(_tmp, f"pytest_castigo_{_sfx}.json"))
+        _api_store = RateLimitStore(os.path.join(_tmp, f"pytest_api_{_sfx}.json"))
     else:
         _login_store = RateLimitStore(os.path.join(RAIZ_PROYECTO, "data", "login_intentos.json"))
+        _castigo_store = CastigoStore(os.path.join(RAIZ_PROYECTO, "data", "login_castigos.json"))
+        _api_store = RateLimitStore(os.path.join(RAIZ_PROYECTO, "data", "api_limites.json"))
     _LOGIN_MAX_INTENTOS = 8
-    _LOGIN_VENTANA_SEG = 60.0
+    # Ventana de 5 minutos (no 60 s): cada intento fallido verifica el PIN
+    # contra TODOS los usuarios (hash intencionalmente costoso), así que en
+    # hardware modesto 8 fallos tardan ~1 min y con 60 s la ventana se
+    # deslizaba y el bloqueo nunca se activaba de forma determinista.
+    # 8 intentos / 5 min sigue siendo holgado para uso real y más estricto
+    # contra fuerza bruta; el mensaje de 429 ya dice la espera real.
+    _LOGIN_VENTANA_SEG = 300.0
+
+    # Cuotas por usuario+IP en endpoints costosos: sin esto, cualquier
+    # sesión autenticada (o robada) puede saturar los hilos de waitress
+    # golpeando Whisper/OCR/satélite/matplotlib y tumbar la PWA para todos.
+    # Límites holgados para uso real en campo con reintentos por mala señal.
+    _API_LIMITES = {
+        "voz": (12, 60.0),
+        "identificar": (30, 60.0),
+        "satelite": (6, 300.0),
+        "grafico": (40, 60.0),
+        "sync": (40, 60.0),
+        "mensajes": (90, 60.0),
+    }
+
+    def _limite_api(bucket: str):
+        def _deco(fn):
+            @functools.wraps(fn)
+            def _envuelta(*args, **kwargs):
+                max_n, ventana = _API_LIMITES[bucket]
+                uid = session.get("user_id") if session is not None else None
+                clave = f"{bucket}|{_cliente_ip()}|{uid}"
+                if _api_store.bloqueado(clave, max_n, ventana):
+                    resp = jsonify({
+                        "ok": False,
+                        "error": "Demasiadas solicitudes. Espere un momento e intente de nuevo.",
+                    })
+                    resp.status_code = 429
+                    resp.headers["Retry-After"] = str(int(ventana))
+                    return resp
+                _api_store.registrar(clave)
+                return fn(*args, **kwargs)
+            return _envuelta
+        return _deco
 
     def _cliente_ip() -> str:
         # request.remote_addr ya viene corregido por ProxyFix (confía en
@@ -773,6 +879,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     def _login_registrar_intento(ip: str) -> None:
         _login_store.registrar(ip)
+
+    def _texto_espera(segundos: float) -> str:
+        """Texto humano para un bloqueo ("un minuto", "~3 minutos")."""
+        mins = max(1, int(round(segundos / 60.0)))
+        return "un minuto" if mins <= 1 else f"~{mins} minutos"
 
     def _rol_actual() -> Optional[str]:
         if session is None:
@@ -806,9 +917,45 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             "avatar": session.get("avatar") or default_av,
         }
 
+    @app.after_request
+    def _cabeceras_seguridad(resp):
+        try:
+            resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+            resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+            resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+            resp.headers.setdefault("Content-Security-Policy", _CSP_PWA)
+            resp.headers.setdefault("Permissions-Policy", _PERMISSIONS_PWA)
+            if request is not None and request.is_secure:
+                resp.headers.setdefault(
+                    "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+                )
+        except Exception:
+            pass
+        return resp
+
     @app.before_request
     def _requerir_login():
-        if request is None or request.endpoint in _RUTAS_PUBLICAS:
+        if request is None:
+            return None
+        # Chequeo de origen en escrituras: si el navegador manda Origin o
+        # Referer y no es el nuestro, es un POST entre sitios (CSRF) y se
+        # bloquea con 403 antes de tocar sesión o base de datos. Va ANTES
+        # de la vía pública porque /login también acepta POST.
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            _ruta = request.path or ""
+            if _ruta.startswith("/api/") or _ruta == "/login":
+                if not _origen_permitido(
+                    request.headers.get("Origin") or "",
+                    request.headers.get("Referer") or "",
+                    request.host or "",
+                ):
+                    logger.warning(
+                        "POST entre sitios bloqueado: ruta=%s ip=%s", _ruta, _cliente_ip()
+                    )
+                    if _ruta.startswith("/api/"):
+                        return jsonify({"ok": False, "error": "Origen no permitido."}), 403
+                    return ("⛔ Origen no permitido.", 403)
+        if request.endpoint in _RUTAS_PUBLICAS:
             return None
         if session.get("autenticado"):
             uid = session.get("user_id")
@@ -867,9 +1014,19 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 503,
             )
         ip = _cliente_ip()
-        if _login_bloqueado(ip):
+        # Backoff progresivo: cada ventana agotada duplica el bloqueo
+        # (60s, 120s, 240s… tope 1h). Sin esto, el PIN de 4 dígitos se
+        # barre en días rotando pocos IPs.
+        castigo = _castigo_store.segundos_restantes(ip)
+        if castigo > 0:
             return (
-                "⚠️ Demasiados intentos fallidos. Espere un minuto e intente de nuevo.",
+                f"⚠️ Demasiados intentos fallidos. Espere {_texto_espera(castigo)} e intente de nuevo.",
+                429,
+            )
+        if _login_bloqueado(ip):
+            espera = _castigo_store.castigar(ip)
+            return (
+                f"⚠️ Demasiados intentos fallidos. Espere {_texto_espera(espera)} e intente de nuevo.",
                 429,
             )
         intento = (request.form.get("password") or request.form.get("pin") or "").strip()
@@ -888,6 +1045,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             user_auth = None
 
         if user_auth:
+            # Éxito: se levantan ventana y castigo de esta IP y se rota la
+            # sesión (no arrastrar claves previas en equipos compartidos).
+            _login_store.olvidar(ip)
+            _castigo_store.perdonar(ip)
             # Rotación de sesión: no arrastrar claves de una sesión previa
             # (ej. telegram_id de otro usuario en un equipo compartido).
             session.clear()
@@ -913,6 +1074,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     _uid_candidato = None
                 if _uid_candidato is not None and _rol_de(_uid_candidato, users_file):
                     uid_verificado = _uid_candidato
+            _login_store.olvidar(ip)
+            _castigo_store.perdonar(ip)
             session.clear()
             session["autenticado"] = True
             session["user_id"] = uid_verificado
@@ -1198,6 +1361,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             db_r.close()
 
     @app.post("/api/satelite/actualizar")
+    @_limite_api("satelite")
     def api_satelite_actualizar():
         """Sincroniza lecturas satelitales (Sentinel-1 SAR Radar o Sentinel-2 Óptico)
         directamente vía Google Earth Engine para los potreros con geometría real.
@@ -1273,7 +1437,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             })
         except Exception as e:
             logger.exception("Error actualizando satelite desde PWA: %s", e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_s.close()
@@ -1336,9 +1500,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             from src.integrations.mercado_sync import sincronizar_precios_mercado
             res = sincronizar_precios_mercado(db_m, forzar=True)
             return jsonify(res)
-        except Exception as e:
+        except Exception:
             logger.exception("Error al forzar sincronización de mercado")
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_m.close()
@@ -1380,9 +1544,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 notas=notas
             )
             return jsonify({"ok": True, "id": id_p, "mensaje": "Precio registrado correctamente."})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al registrar precio de mercado")
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_m.close()
@@ -1454,9 +1618,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 registrado_por=uid,
             )
             return jsonify({"ok": True, "id": fid})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al registrar finanza")
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _error_interno(400)
         finally:
             db_f.close()
 
@@ -1501,9 +1665,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             if not ok:
                 return jsonify({"ok": False, "error": f"No existe ningún movimiento con id {id_finanza}."}), 404
             return jsonify({"ok": True})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al editar finanza")
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _error_interno(400)
         finally:
             db_f.close()
 
@@ -1517,9 +1681,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             if not ok:
                 return jsonify({"ok": False, "error": f"No existe ningún movimiento con id {id_finanza}."}), 404
             return jsonify({"ok": True})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al eliminar finanza")
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _error_interno(400)
         finally:
             db_f.close()
 
@@ -1729,7 +1893,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             })
         except Exception as e:
             logger.exception("Error al guardar quincena de leche: %s", e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_inst.close()
@@ -1776,7 +1940,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True, "tag": tag})
         except Exception as e:
             logger.exception("Error al crear animal %s: %s", tag, e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_a.close()
@@ -1809,7 +1973,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True, "tag": tag})
         except Exception as e:
             logger.exception("Error al editar animal %s: %s", tag, e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_a.close()
@@ -1834,7 +1998,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True})
         except Exception as e:
             logger.exception("Error al pausar ordeño de %s: %s", tag, e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_a.close()
@@ -1854,7 +2018,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True})
         except Exception as e:
             logger.exception("Error al reanudar ordeño de %s: %s", tag, e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_a.close()
@@ -1893,7 +2057,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify(res), status_code
         except Exception as e:
             logger.exception("Error al rectificar tag %s -> %s: %s", tag_actual, tag_nuevo, e)
-            return jsonify({"ok": False, "error": f"Error al rectificar animal: {e}"}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_r.close()
@@ -2120,7 +2284,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify(res)
         except Exception as e:
             logger.exception("Error al eliminar evento %s #%s: %s", tipo, eid, e)
-            return jsonify({"ok": False, "error": f"Error interno al eliminar evento: {str(e)}"}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_r.close()
@@ -2155,7 +2319,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             })
         except Exception as e:
             logger.exception("Error al listar eventos recientes: %s", e)
-            return jsonify({"ok": False, "error": str(e)}), 500
+            return _error_interno(500)
         finally:
             try:
                 db_r.close()
@@ -2214,7 +2378,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True, "toros": toros})
         except Exception as e:
             logger.exception("Error al listar toros: %s", e)
-            return jsonify({"ok": False, "error": str(e), "toros": []}), 500
+            return _error_interno(500, extra={"toros": []})
         finally:
             try:
                 db_t.close()
@@ -2256,6 +2420,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         return jsonify(out)
 
     @app.post("/api/identificar")
+    @_limite_api("identificar")
     def api_identificar():
         # Identificación por texto (arete/RFID/lector de corral) o foto del
         # arete. SOLO LECTURA: nunca inserta ni actualiza registros.
@@ -2336,9 +2501,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         "hace_texto": p.get("hace_texto", "Nunca"),
                     }
             return jsonify({"ok": True, "usuarios": usuarios, "mi_rol": rol})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al listar usuarios")
-            return jsonify({"error": f"Error al leer usuarios: {e}"}), 500
+            return _error_interno(500, con_ok=False)
 
     @app.get("/api/usuarios/online")
     def api_usuarios_online():
@@ -2404,6 +2569,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         return jsonify({"ok": True})
 
     @app.get("/api/mensajes-equipo")
+    @_limite_api("mensajes")
     def api_mensajes_equipo():
         """Lista el canal único de avisos del equipo (broadcast, cualquier rol autenticado)."""
         try:
@@ -2424,6 +2590,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             db_m.close()
 
     @app.post("/api/mensajes-equipo")
+    @_limite_api("mensajes")
     def api_mensajes_equipo_crear():
         """Publica un mensaje en el canal de equipo (cualquier rol autenticado)."""
         datos = request.get_json(silent=True) or {}
@@ -2572,9 +2739,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     "avatar": usr_guardado.get("avatar") or ("patron" if rol_nuevo=="OWNER" else "admin" if rol_nuevo=="ADMIN" else "vaquero"),
                 }
             })
-        except Exception as e:
+        except Exception:
             logger.exception("Error al guardar usuario")
-            return jsonify({"error": str(e)}), 400
+            return _error_interno(400, con_ok=False)
 
     @app.post("/api/usuarios/<int:target_uid>/pin")
     def api_cambiar_pin_usuario(target_uid: int):
@@ -2609,9 +2776,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
             auth_inst.asignar_pin(target_uid, nuevo_pin)
             return jsonify({"ok": True, "mensaje": "PIN actualizado exitosamente."})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al cambiar PIN")
-            return jsonify({"error": str(e)}), 400
+            return _error_interno(400, con_ok=False)
 
     @app.post("/api/usuarios/<int:target_uid>/eliminar")
     def api_eliminar_usuario(target_uid: int):
@@ -2639,9 +2806,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
             auth_inst.quitar_usuario(target_uid)
             return jsonify({"ok": True, "mensaje": f"Usuario '{target_user.get('nombre')}' eliminado exitosamente."})
-        except Exception as e:
+        except Exception:
             logger.exception("Error al eliminar usuario")
-            return jsonify({"error": str(e)}), 400
+            return _error_interno(400, con_ok=False)
 
     def _guardar_foto_evento(db_inst, payload: dict, tipo: str, fecha: str, uid_user: Optional[int]) -> Optional[int]:
         """Procesa y almacena una foto adjunta (opcional) enviada en base64 desde la captura rápida."""
@@ -2729,6 +2896,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return None
 
     @app.post("/api/sync")
+    @_limite_api("sync")
     def api_sync():
         from datetime import datetime
 
@@ -2757,7 +2925,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     id_local = id_local.strip()[:128]
 
                 # Idempotencia (P0.1): si este id_local ya fue procesado, el
-                # reintento del cliente (respuesta perdida en conexion rural)
+                # reintento del cliente (respuesta perdida en conexión rural)
                 # NO debe volver a registrar el evento; se devuelve en ids_ok
                 # para que el cliente purgue la cola igual que la primera vez.
                 if id_local:
@@ -3081,10 +3249,46 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                    elif tipo in ("inseminador", "nuevo_inseminador"):
+                        db_sync.registrar_inseminador(
+                            nombre=payload.get("nombre"),
+                            telefono=payload.get("telefono"),
+                            notas=payload.get("notas"),
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("iatf_paso", "droga_iatf"):
+                        lid_p = payload.get("lote_id")
+                        if lid_p:
+                            db_sync.registrar_avance_paso_iatf(
+                                lote_id=int(lid_p),
+                                paso_index=int(payload.get("paso_index") or 0),
+                                producto_aplicado=payload.get("producto"),
+                                dosis=payload.get("dosis"),
+                                marca=payload.get("marca"),
+                                realizado_por=payload.get("realizado_por") or str(uid or ""),
+                                notas=payload.get("notas"),
+                            )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
+                    elif tipo in ("iatf_inseminar", "lote_iatf_inseminar"):
+                        lid_i = payload.get("lote_id")
+                        if lid_i:
+                            db_sync.ejecutar_inseminacion_lote_iatf(
+                                lote_id=int(lid_i),
+                                toro_pajuela=payload.get("toro_pajuela") or payload.get("toro"),
+                                inseminador=payload.get("inseminador"),
+                                fecha=fecha,
+                            )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
                     else:
                         errores.append(f"Tipo de evento no reconocido: {tipo}")
 
-                    # Idempotencia (P0.1): el evento se proceso bien en esta
+                    # Idempotencia (P0.1): el evento se procesó bien en esta
                     # pasada -> persistir su id_local para que un reintento
                     # futuro (misma cola offline reenviada) no lo duplique.
                     if id_local and len(ids_ok) > n_ids_previos:
@@ -3096,11 +3300,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         )
                 except Exception as e:
                     logger.exception("Error al sincronizar evento %s: %s", id_local, e)
-                    errores.append(f"Error en evento {id_local or tipo}: {str(e)}")
+                    errores.append(f"Error en evento {id_local or tipo}")
 
             # Poda barata de la tabla de idempotencia: los reintentos del
             # cliente ocurren a los minutos/horas, no a los meses. Ventana de
-            # 7 dias cubre cualquier cola offline larga sin crecimiento
+            # 7 días cubre cualquier cola offline larga sin crecimiento
             # ilimitado en el SQLite del VPS.
             try:
                 db_sync.execute(
@@ -3164,9 +3368,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 "ok": True, "movidos": len(tags), "animales": tags,
                 "potrero_origen": fila_origen["nombre"], "potrero_destino": fila_destino["nombre"],
             })
-        except Exception as e:
+        except Exception:
             logger.exception("Error en traslado masivo por potrero")
-            return jsonify({"ok": False, "error": str(e)}), 400
+            return _error_interno(400)
         finally:
             db_t.close()
 
@@ -3295,11 +3499,12 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({"ok": True, "pregunta": pregunta, "respuesta": respuesta})
         except Exception as e:
             logger.exception("Error al responder pregunta en PWA: %s", e)
-            return jsonify({"ok": False, "error": f"Error al procesar consulta: {e}"}), 500
+            return _error_interno(500)
         finally:
             db_q.close()
 
     @app.post("/api/voz")
+    @_limite_api("voz")
     def api_voz():
         audio_file = request.files.get("audio") if request.files else None
         if not audio_file or not audio_file.filename:
@@ -3322,7 +3527,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 texto_transcripto = tr.texto if tr else ""
             except Exception as e:
                 logger.warning("Fallo en transcripción Whisper: %s", e)
-                return jsonify({"ok": False, "error": f"No se pudo transcribir el audio: {e}"}), 500
+                return _error_interno(500)
 
             if not texto_transcripto:
                 return jsonify({"ok": False, "error": "No se detectó voz clara en el audio."})
@@ -3416,7 +3621,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             )
         except Exception as e:
             logger.exception("Error al generar reporte Excel en PWA: %s", e)
-            return jsonify({"error": f"Error al generar reporte Excel: {str(e)}"}), 500
+            return _error_interno(500, con_ok=False)
         finally:
             db_rep.close()
 
@@ -3458,8 +3663,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 fecha_ingreso=data.get("fecha") or data.get("fecha_ingreso"),
             )
             return jsonify({"ok": True, "id": pid})
-        except Exception as e:
-            return jsonify({"error": str(e)}), 400
+        except Exception:
+            logger.exception("Error al registrar pajuela")
+            return _error_interno(400, con_ok=False)
         finally:
             db_inst.close()
 
@@ -3486,8 +3692,195 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 proxima_recarga=data.get("proxima_recarga"),
             )
             return jsonify({"ok": True, "id": rid})
+        except Exception:
+            logger.exception("Error al registrar recarga de nitrógeno")
+            return _error_interno(400, con_ok=False)
+        finally:
+            db_inst.close()
+
+    @app.get("/api/inseminadores")
+    def api_inseminadores():
+        db_inst = _db(db_path)
+        try:
+            inseminadores = [dict(i) for i in db_inst.listar_inseminadores()]
+            evaluacion = db_inst.evaluar_inseminadores()
+            return jsonify({"ok": True, "inseminadores": inseminadores, "evaluacion": evaluacion})
+        except Exception:
+            logger.exception("Error al listar inseminadores")
+            return _error_interno(500)
+        finally:
+            db_inst.close()
+
+    @app.post("/api/inseminadores")
+    def api_inseminadores_crear():
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        if not nombre:
+            return jsonify({"ok": False, "error": "El nombre del inseminador es obligatorio"}), 400
+        db_inst = _db(db_path)
+        try:
+            iid = db_inst.registrar_inseminador(
+                nombre=nombre,
+                telefono=data.get("telefono"),
+                es_usuario_sistema=bool(data.get("es_usuario_sistema")),
+                user_id=data.get("user_id"),
+                notas=data.get("notas"),
+            )
+            return jsonify({"ok": True, "id": iid})
+        except Exception:
+            logger.exception("Error al registrar inseminador")
+            return _error_interno(400)
+        finally:
+            db_inst.close()
+
+    @app.get("/api/iatf/protocolos")
+    def api_iatf_protocolos():
+        db_inst = _db(db_path)
+        try:
+            protocolos = db_inst.listar_protocolos_iatf()
+            return jsonify({"ok": True, "protocolos": protocolos})
+        except Exception:
+            logger.exception("Error al listar protocolos IATF")
+            return _error_interno(500)
+        finally:
+            db_inst.close()
+
+    @app.get("/api/iatf/lotes")
+    def api_iatf_lotes():
+        estado = request.args.get("estado")
+        db_inst = _db(db_path)
+        try:
+            lotes = db_inst.listar_lotes_iatf(estado=estado)
+            metricas = db_inst.evaluar_metricas_iatf()
+            return jsonify({"ok": True, "lotes": lotes, "metricas": metricas})
+        except Exception:
+            logger.exception("Error al listar lotes IATF")
+            return _error_interno(500)
+        finally:
+            db_inst.close()
+
+    @app.get("/api/iatf/lotes/<int:lote_id>")
+    def api_iatf_lote_detalle(lote_id):
+        db_inst = _db(db_path)
+        try:
+            lote = db_inst.obtener_detalle_lote_iatf(lote_id)
+            if not lote:
+                return jsonify({"ok": False, "error": "Lote IATF no encontrado"}), 404
+            return jsonify({"ok": True, "lote": lote})
+        except Exception:
+            logger.exception("Error al obtener detalle del lote IATF %s", lote_id)
+            return _error_interno(500)
+        finally:
+            db_inst.close()
+
+    @app.post("/api/iatf/lotes")
+    def api_iatf_lotes_crear():
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        nombre = (data.get("nombre") or "").strip()
+        protocolo_id = data.get("protocolo_id")
+        fecha_inicio = data.get("fecha_inicio") or data.get("fecha")
+        animales_tags = data.get("animales_tags") or data.get("tags") or []
+
+        if not nombre or not protocolo_id or not fecha_inicio or not animales_tags:
+            return jsonify({
+                "ok": False,
+                "error": "Nombre, protocolo, fecha de inicio y lista de animales son obligatorios"
+            }), 400
+
+        if isinstance(animales_tags, str):
+            animales_tags = [t.strip().upper() for t in animales_tags.replace(",", " ").split() if t.strip()]
+
+        db_inst = _db(db_path)
+        try:
+            uid = session.get("user_id")
+            lid = db_inst.crear_lote_iatf(
+                nombre=nombre,
+                protocolo_id=int(protocolo_id),
+                fecha_inicio=str(fecha_inicio)[:10],
+                animales_tags=animales_tags,
+                toro_pajuela=data.get("toro_pajuela") or data.get("toro"),
+                inseminador=data.get("inseminador"),
+                hora_iatf=data.get("hora_iatf") or "08:00",
+                categoria=data.get("categoria"),
+                notas=data.get("notas"),
+                creado_por=uid,
+            )
+            return jsonify({"ok": True, "id": lid})
         except Exception as e:
-            return jsonify({"error": str(e)}), 400
+            logger.exception("Error al crear lote IATF")
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_inst.close()
+
+    @app.post("/api/iatf/lotes/<int:lote_id>/paso")
+    def api_iatf_lote_paso(lote_id):
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        paso_index = data.get("paso_index")
+        if paso_index is None:
+            return jsonify({"ok": False, "error": "Índice de paso requerido"}), 400
+        db_inst = _db(db_path)
+        try:
+            uid = session.get("user_id")
+            u_nom = session.get("nombre") or session.get("username") or str(uid or "")
+            ok = db_inst.registrar_avance_paso_iatf(
+                lote_id=lote_id,
+                paso_index=int(paso_index),
+                producto_aplicado=data.get("producto") or data.get("producto_aplicado"),
+                dosis=data.get("dosis"),
+                marca=data.get("marca"),
+                realizado_por=data.get("realizado_por") or u_nom,
+                notas=data.get("notas"),
+            )
+            return jsonify({"ok": ok})
+        except Exception as e:
+            logger.exception("Error al avanzar paso IATF en lote %s", lote_id)
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_inst.close()
+
+    @app.post("/api/iatf/lotes/<int:lote_id>/inseminar")
+    def api_iatf_lote_inseminar(lote_id):
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        db_inst = _db(db_path)
+        try:
+            res = db_inst.ejecutar_inseminacion_lote_iatf(
+                lote_id=lote_id,
+                toro_pajuela=data.get("toro_pajuela") or data.get("toro"),
+                inseminador=data.get("inseminador"),
+                fecha=data.get("fecha"),
+                hora=data.get("hora"),
+            )
+            return jsonify({"ok": True, "resultado": res})
+        except Exception as e:
+            logger.exception("Error al ejecutar inseminación de lote IATF %s", lote_id)
+            return jsonify({"ok": False, "error": str(e)}), 400
+        finally:
+            db_inst.close()
+
+    @app.post("/api/iatf/lotes/<int:lote_id>/excluir")
+    def api_iatf_lote_excluir(lote_id):
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
+        data = request.get_json(silent=True) or {}
+        tag = (data.get("tag") or "").strip().upper()
+        motivo = (data.get("motivo") or "Exclusión operativa").strip()
+        if not tag:
+            return jsonify({"ok": False, "error": "Tag del animal requerido"}), 400
+        db_inst = _db(db_path)
+        try:
+            ok = db_inst.excluir_animal_lote_iatf(lote_id=lote_id, tag=tag, motivo=motivo)
+            return jsonify({"ok": ok})
+        except Exception as e:
+            logger.exception("Error al excluir animal de lote IATF")
+            return jsonify({"ok": False, "error": str(e)}), 400
         finally:
             db_inst.close()
 
@@ -4017,6 +4410,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             db_graf.close()
 
     @app.get("/api/grafico/<tipo>")
+    @_limite_api("grafico")
     def api_grafico(tipo):
         generadores = _generadores_graficos_pwa()
         generador = generadores.get(tipo)
@@ -4058,6 +4452,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         return send_file(os.path.abspath(cache_path), mimetype="image/png")
 
     @app.get("/api/grafico-datos/<tipo>")
+    @_limite_api("grafico")
     def api_grafico_datos(tipo):
         """Devuelve los datos estructurados JSON de un gráfico para renderizado
         vectorial SVG/HTML interactivo adaptado a los temas en el cliente."""

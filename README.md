@@ -101,7 +101,7 @@ implementado todavía.
 | `/duplicados` | ✅ | ✅ | — |
 | `/usuarios` | ✅ | ✅ | — |
 | `/reporte` [diario\|semanal\|N] | ✅ | ✅ | — |
-| `/exportar` | ✅ | ✅ | — |
+| `/exportar` (solo OWNER: entrega la base completa y avisa a los demás OWNER) | ✅ | — | — |
 | `/importar` (guía) | ✅ | ✅ | — |
 | Enviar archivo `.zip` como documento | ✅ | ✅ | — |
 | `/confirmar_importar` | ✅ | ✅ | — |
@@ -122,13 +122,12 @@ implementado todavía.
 - **OWNER y ADMIN:** `/graficos` (panel interactivo de gráficos en 4 categorías: Hato, Reproducción, Pasturas y Leche con vista detalle simplificada), `/potreros` y `/potreros sg` (matriz exacta de existencias por potrero de Software Ganadero),
   `/ocupacion` / `/rotacion` (días de pastoreo y descanso Voisin con semáforo), `/alertas`,
   `/animales`, `/status`, `/usuarios`, `/reporte [diario|semanal|N]` (genera y envía el reporte PDF institucional con logo `GANADERÍA JA`),
-  `/exportar` (genera y envía el archivo ZIP con las 8 tablas DBF para Software Ganadero),
   `/importar` (guía de importación), enviar el `.zip` del backup directamente como
   documento por el chat, `/confirmar_importar` (procesa el backup pendiente) y
   `/descartar_backup` (elimina el backup pendiente sin procesar).
   Límite de Telegram: **20 MB**; archivos más pesados se suben por SSH y se importan
   con `scripts/importar_backup.sh` (ver [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)).
-- **Solo OWNER:** `/agregar_usuario <user_id> <ROL> [nombre]`,
+- **Solo OWNER:** `/exportar` (genera y envía el archivo ZIP con las 8 tablas DBF para Software Ganadero; cada exportación avisa a los demás OWNER), `/agregar_usuario <user_id> <ROL> [nombre]`,
   `/quitar_usuario <user_id>`, `/renombrar_animal <tag_viejo> <tag_nuevo> [--fusionar]` (rectificación de chapetas mal leídas con fusión atómica de eventos) y `/logs`.
 
 ### Setup rápido (local)
@@ -218,7 +217,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\vigilar_copias_windows.ps1 -C
 
 - **Lenguaje / Runtime:** Python 3.10+
 - **Base de Datos:** SQLite
-- **Pruebas:** Pytest — **761 pruebas en verde** (100% pasando)
+- **Pruebas:** suite de Pytest en verde — el conteo exacto lo publica el CI (no se hardcodea aquí)
 - **Skills integradas:**
   - `@inseminacion-calc` — cálculos reproductivos (FEP, días abiertos, IEP)
   - `@plan-sanitario` — calendarios de vacunación, tratamientos y tiempos de retiro
@@ -369,7 +368,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - [x] Inclusión de `ffmpeg`, `sqlite3`, `tesseract-ocr` en `setup_vps.sh` y activación de `Pillow>=10.0.0` en `requirements.txt`.
   - [x] **Seguimiento auditoría 2026-08-30 (H-10..H-12 y recomendaciones)**: file-lock atómico (`threading.Lock` + `tempfile` + `os.replace`) en `auth.py`; backoff adaptativo por longitud de nota en la cascada LLM (`try_multiagent_parse` con `timeout=None`); validación Zip Slip + zip-bomb (`_validar_zip_seguro`, límite 1 GB total / 512 MB por entrada) en `dbf_importer.py`; `watchdog` documentado como extra opcional; test de concurrencia WAL (`tests/test_concurrencia_wal.py`); y lista blanca canónica de `tipo_evento` para la salida de la Capa 2 LLM con log de rechazos (`TIPOS_EVENTO_LLM_VALIDOS`).
   - [x] **Hardening WS-1 — 4 bugs críticos corregidos** (`tests/test_bugs_criticos.py`): `registrar_servicio` en `src/db/database.py` ya no traga fallo de `descontar_pajuela` (warning con detalle); `create_tables` con try/except individual + traceback (`vincular_fotos_huerfanas`, `marcar_historicos_sg`, autorreferencias); `import_fotos` en `src/importers/dbf_importer.py` retorna `{"error": ...}` en Zip corrupto/inseguro y no inserta fila fantasma; `copias_watcher.py` solo persiste estado sin errores y distingue "con errores" de "Exitoso"; `formatear_reporte_importacion` en `src/server/formatters.py` muestra errores por tabla.
-- [x] Suite de pruebas con pytest: **761 pruebas en verde** (100% pasando)
+- [x] Suite de pruebas con pytest en verde (conteo vigente en el CI)
 - [x] **Árbol Genealógico & Trazabilidad 3G Completo en PWA y Bot (2026-09-06)**:
   - **PWA Ficha Técnica**: Incorporada la pestaña interactiva `[ 🌳 Genealogía (3G) ]` en la ficha de cada animal con diagrama de pedigree estructurado (padres, abuelos paternos y maternos, bisabuelos), semáforo zootécnico de consanguinidad parental en 3G, lista interactiva de crías/descendientes con navegación táctil fluida entre fichas y bloque de texto compartible para WhatsApp/Telegram. En la pestaña `General`, se integraron abuelos y crías directas con botón de salto al pedigree.
   - **Bot de Telegram**: Nuevos comandos `/arbol <tag>`, `/genealogia <tag>`, `/pedigree` y `/trazabilidad` con vista zootécnica completa (G1, G2, G3 bisabuelos, verificación de consanguinidad y crías registradas tanto para hembras como machos) y menú interactivo de selección rápida cuando no se indica tag.
@@ -407,7 +406,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
     - Endpoint `@app.get("/api/potrero/<potrero_ref>/animales")` y función `animales_de_potrero()` con filtrado estricto `estado = 'ACTIVO'` (Regla Fundamental de Inventario).
     - Enlace táctil en nombres de potreros y botón `👥 Listar` en la tabla de rotación y ocupación.
     - Modal móvil optimizado (390×844 DPR=2) con resumen de categorías SG (`NV`, `VS`, `VP`, `CH`, `CM`, `HL`, `ML`, `MC`, `TR`), buscador en tiempo real y tabla con columnas: Número (con salto a ficha técnica), Nombre, Edad, Estado y Días en el potrero.
-    - Formateo de hectáreas a 1 decimal (`10.0 ha`) y 104 pruebas unitarias de API pasando al 100%.
+    - Formateo de hectáreas a 1 decimal (`10.0 ha`) y pruebas unitarias de API en verde.
 - [x] **Fase 5.1 — Reproducción Completa & Termo Criogénico**: Evento palpación directo (Preñada/Vacía con días de gestación), tablas `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`, KPIs tasa de concepción y S/C, sincronización con ficha zootécnica (estado reproductivo y sección diagnósticos), limpieza de FEP en diagnósticos VACIA, descuento automático de pajuelas al inseminar, comandos `/pajuela_stock`, `/pajuela_add`, `/termo`, `/recarga_n2`, alerta automática de recarga N₂ (<=3d) integrada en Despacho Matutino y OCR de facturas de pajuelas (`src/ocr/factura_parser.py`) con propuesta y confirmación táctil de stock.
 - [x] **Fase 6.2 — Capacidad de Carga Dinámica e Integración Pluviométrica & Balance Forrajero Estacional**:
   - Modelado zootécnico de Materia Seca (MS): demanda diaria al $2.8\%$ del Peso Vivo ($12.6\text{ kg MS/UGG/día}$).
@@ -690,7 +689,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
       - **Telemetría en tiempo real**: Se incorporó el bloque `&current=temperature_2m,relative_humidity_2m,precipitation,rain,showers,weather_code` en `src/engine/pronostico.py`, determinando `esta_lloviendo` por precipitación activa instantánea o códigos WMO (51-67, 80-82, 95-99). Se expuso en `clima_hoy` (`datos_tablero`) y `datos_pasturas` con TTL de 30 min para mantener frescos los datos en la PWA.
       - **Cabecera PWA**: `actualizarClimaHeader` en `src/pwa/static/app.js` ahora activa la cortina animada `#header-lluvia` estrictamente cuando `esta_lloviendo` es `true`. En ausencia de lluvia muestra sol radiante (`☀️`), nublado (`⛅`) o reposo nocturno (`🌙 ✨`).
       - **Validación**: 19 pruebas en `tests/test_pronostico.py` en verde (100% pasando), `node --check` y `python -m compileall` sin errores.
-- [x] Suite de pruebas con pytest: **844+ pruebas en verde** (100% pasando).
+- [x] Suite de pruebas con pytest en verde (conteo vigente en el CI).
 - [x] **PWA móvil: burbuja, KPIs, foto y mapa alineado (2026-09-23)**:
   - La burbuja del chat y la lupita viven dentro de la barra inferior en celular (≤640px), no encima de precios, edad ni mapa.
   - La última tarjeta KPI impar ocupa la fila completa (sin hueco). Etiqueta "Activos" sin glifos ♀♂ que se veían rotos.
@@ -713,6 +712,15 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Vista Reproducción con KPIs de pérdidas/distocias + tarjeta de reincidentes y últimas pérdidas; `/kpi_reprod` con la misma sección (visible aun sin datos de concepción).
   - Dos bugs del NLU hallados al paso y corregidos: `es_consulta` trataba cualquier "que" como pregunta (notas como "parió la 47 que estaba gorda" nunca se registraban; ahora solo cuenta si empieza con "que" o no hay evento+arete) y `extraer_tags` devolvía "macho"/"hembra" (cada "parió la 47, ternero macho" creaba un animal fantasma ACTIVO; verificado que ya no).
   - Pruebas: `tests/test_distocia_perdidas.py` (23 en verde) + regresión NLU/bot (136 + 91 + 57 + 25) y 13/13 checks visuales en móvil.
+- [x] **Seguridad: backoff de login, cuotas en API y exportación solo OWNER (2026-09-24)**:
+  - Login con backoff progresivo (`CastigoStore` en `data/login_castigos.json`): cada ventana de 8 intentos / 5 min agotada duplica el bloqueo (60s → 1h); un éxito limpia ventana y castigo. El PIN de 4 dígitos ya no se barre en días.
+  - Cuotas por usuario+IP en endpoints costosos (429 + `Retry-After`): voz 12/min, identificar 30/min, satélite 6/5min, gráficos 40/min, sync 40/min, mensajes 90/min. Sin esto, una sesión saturaba waitress y tumbaba la PWA.
+  - `/exportar` (comando y botón) solo OWNER + aviso a los demás OWNER por Telegram; botón oculto para ADMIN y manual actualizado.
+  - Pruebas: `tests/test_seguridad_rate_limit.py` (5 en verde: progresión/tope/persistencia del castigo, escalado y limpieza en login, 429 en API) + regresión (37 + 14 + 60).
+- [x] **Modo Campo del mayordomo (2026-09-24)**:
+  - Vista `campo` (`?v=campo`): saludo con fecha, 4 mosaicos grandes (Registrar, Hoy, Ficha, GPS) y resumen "Hoy en la finca" (vencidos + hoy, retiros, enlace a agenda). Botón Campo en la barra solo para TRABAJADOR y mosaico "Modo Campo" en el sheet para todos.
+  - El TRABAJADOR cae en campo al entrar (antes caía en captura); puede abrir agenda y ficha; el GPS localiza y guarda la ronda sin mapa (el satelital sigue solo oficina, 403 intacto).
+  - Pruebas: `tests/test_modo_campo.py` (3 en verde) + 10/10 checks visuales con login PIN real de trabajador (cae en campo, GPS detecta ORDENIO SANTA MARTHA con 62 animales y la ronda queda persistida).
 - [x] **Tablero Integral de Potreros, Descargas por Sección (Excel/PDF), Banco de Semen y Tactos SG en PWA (2026-09-23)** 🌿📊❄️🖐️:
   - **Tablero Integral de Potreros**: Eliminada la redundancia de 3 gráficos apilados y tablas repetidas. Sustituido por selector interactivo de gráficos (`🗺️ Mapa Potreros (Voisin)`, `📊 Ocupación y Carga`, `🌾 Aforos y Forraje`) y un **Tablero Integral de Potreros** que reúne en una sola fila por potrero: área (ha), días de ocupación/reposo, semáforo Voisin, cabezas activas, último aforo manual (kg MV/m² y kg MS/ha) y biomasa satelital MS/ha, con atajos directos a listar aretes y registrar aforo.
   - **Descargas de Informes Especializados en PDF y Excel (`.xlsx`)**: Añadida barra de exportación en las cabeceras de Leche, Finanzas, Potreros/Pasturas, Sanidad, Inventario y Reproducción. Motor nativo `src/reports/excel_report.py` con `openpyxl` y endpoints parametrizados `GET /api/reporte.pdf?seccion=...` y `GET /api/reporte.xlsx?seccion=...`.
@@ -774,8 +782,23 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - **Distribución de Días Abiertos (DA)**: 9 intervalos zootécnicos idénticos a SG (`0-90`, `91-120`, ..., `>300`) con barras proporcionales.
         - **Intervalo Entre Partos (IEP)**: 6 tramos de frecuencia (`<365`, `365-395`, ..., `>485`).
         - **Días En Leche (DEL) & Curva de Lactancia**: Promedio DEL del lote y vacas por etapa (Pico, Meseta, Descenso, Prolongada) en la pestaña Leche.
-    - **Auditoría de Referencia**: Documento técnico `docs/sg_reportes_referencia/ANALISIS_FOTOS_SG.md` analizando las 11 fotos de Software Ganadero suministradas por el usuario.
-    - **Validación Visual**: Emulación y capturas automatizadas en móvil (390×844 DPR=2) y escritorio (1280×800) mediante Edge Headless + CDP guardadas en `docs/screenshots_sg/`. Suite de pruebas pasando con 20 tests en `test_eliminar_eventos.py` y `test_reproductive_engine.py`.
+    - **Catálogo & Evaluación de Inseminadores (`src/db/models.py`, `src/db/database.py`, `src/pwa/`)**:
+        - Nueva tabla `inseminadores` con auto-siembra inicial de técnicos históricos de `servicios` y usuarios del sistema (`Auth`).
+        - Evaluación zootécnica de inseminadores (`evaluar_inseminadores`): IAs realizadas, diagnosticadas, preñadas, vacías, Tasa de Concepción (%) y Servicios por Concepción (S/C).
+        - Semáforo zootécnico oficial: 🟢 $\ge 55\%$ (Excelente), 🟡 $45-54\%$ (Aceptable), 🔴 $< 45\%$ (Revisar técnica de inseminación).
+        - Selector rápido en Captura de Servicio/IA (`dl-inseminadores`), prellenado automático con el usuario en sesión y modal `[➕]` para alta inmediata de técnicos en campo.
+    - **Sincronizaciones IATF & Cronograma de Fármacos (`src/db/models.py`, `src/db/database.py`, `src/pwa/`)**:
+        - Tablas zootécnicas `protocolos_iatf`, `lotes_iatf`, `lote_iatf_animales`.
+        - Sembrado de protocolos estándar de la industria validados para trópico bajo/medio:
+            - *Convencional 8 Días con eCG* (Carne / Doble Propósito en anestro / vacas con cría).
+            - *Convencional 8 Días Lechería Especializada* (con GnRH o BE al inicio, retiro PGF2α + ECP).
+            - *J-Synch 6 Días* (Novillas de primer servicio / alta ciclicidad con GnRH al retiro).
+        - Cronograma automático de alertas de fármacos en `recordatorios_programados` (Día 0, Día 8, Día 10) y recordatorio ecográfico automático (Día 35 post-IATF).
+        - Registro de aplicación de fármacos paso a paso con trazabilidad de marca comercial y dosis (DIB, Cronipres, Sincrodiol, Ciclase, Lutalyse, ECP, Novormon, Conceptal).
+        - Inseminación Masiva a 1-Toque: genera los servicios en bloque, descuenta existencias de pajuelas en `pajuelas_inventario` y actualiza el lote a `IATF_REALIZADA`.
+        - Endpoints REST `/api/inseminadores`, `/api/iatf/protocolos`, `/api/iatf/lotes` y soporte offline en `/api/sync`.
+        - Pruebas unitarias completas en `tests/test_inseminadores_iatf.py` y validación visual en viewport móvil (390×844 DPR=2) y escritorio (1280×800).
+
 
 ---
 

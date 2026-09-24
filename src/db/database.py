@@ -1,11 +1,12 @@
 """Capa de acceso a datos SQLite para la bitácora de campo zootécnico."""
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sqlite3
 from contextlib import contextmanager
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 from ..utils import add_days, iso, to_date
@@ -171,6 +172,72 @@ class Database:
                 ]:
                     if col_name not in cols_dg:
                         self.conn.execute(f"ALTER TABLE diagnosticos_gestacion ADD COLUMN {col_name} {col_type}")
+
+            # Asegurar existencia de nuevas tablas zootécnicas si la BD ya existía
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS inseminadores (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL UNIQUE,
+                    telefono TEXT,
+                    es_usuario_sistema INTEGER DEFAULT 0,
+                    user_id INTEGER,
+                    activo INTEGER DEFAULT 1,
+                    notas TEXT,
+                    creado_en TEXT
+                )
+            """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS protocolos_iatf (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    categoria TEXT DEFAULT 'CARNE_DOBLE_PROPOSITO',
+                    descripcion TEXT,
+                    duracion_dias INTEGER DEFAULT 10,
+                    pasos_json TEXT NOT NULL,
+                    activo INTEGER DEFAULT 1
+                )
+            """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS lotes_iatf (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT NOT NULL,
+                    protocolo_id INTEGER REFERENCES protocolos_iatf(id),
+                    protocolo_nombre TEXT,
+                    categoria TEXT,
+                    fecha_inicio TEXT NOT NULL,
+                    fecha_iatf TEXT NOT NULL,
+                    hora_iatf TEXT DEFAULT '08:00',
+                    toro_pajuela TEXT,
+                    inseminador TEXT,
+                    estado TEXT DEFAULT 'EN_CURSO',
+                    paso_actual INTEGER DEFAULT 0,
+                    historial_pasos_json TEXT,
+                    notas TEXT,
+                    creado_en TEXT,
+                    creado_por INTEGER
+                )
+            """)
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS lote_iatf_animales (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    lote_id INTEGER REFERENCES lotes_iatf(id) ON DELETE CASCADE,
+                    animal_id INTEGER REFERENCES animales(id_animal),
+                    tag TEXT NOT NULL,
+                    condicion_corporal REAL,
+                    toro_pajuela TEXT,
+                    inseminador TEXT,
+                    estado_animal TEXT DEFAULT 'SINCRONIZANDO',
+                    motivo_exclusion TEXT,
+                    servicio_id INTEGER REFERENCES servicios(id),
+                    resultado_diagnostico TEXT,
+                    fecha_diagnostico TEXT,
+                    dias_gestacion INTEGER
+                )
+            """)
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_inseminadores_nombre ON inseminadores(nombre)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lotes_iatf_estado ON lotes_iatf(estado)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_lote ON lote_iatf_animales(lote_id)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_tag ON lote_iatf_animales(tag)")
         except Exception:
             pass
 
@@ -180,6 +247,11 @@ class Database:
     def create_tables(self) -> "Database":
         self._migrar_columnas_esenciales()
         self.conn.executescript(SCHEMA_SQL)
+        try:
+            self.sembrar_inseminadores_iniciales()
+            self.sembrar_protocolos_iatf_iniciales()
+        except Exception:
+            pass
         # Migración idempotente para columnas añadidas
         try:
             cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()]
@@ -1691,6 +1763,23 @@ class Database:
             self.conn.execute("DELETE FROM aforos_historico WHERE id = ?", (eid,))
             self.conn.commit()
             return {"ok": True, "tipo": "aforo", "id": eid, "mensaje": f"Aforo #{eid} eliminado correctamente."}
+
+        elif t in ("lote_iatf", "lotes_iatf", "iatf"):
+            fila = self.query_one("SELECT * FROM lotes_iatf WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Lote IATF #{eid} no encontrado."}
+            self.conn.execute("DELETE FROM lote_iatf_animales WHERE lote_id = ?", (eid,))
+            self.conn.execute("DELETE FROM lotes_iatf WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "lote_iatf", "id": eid, "mensaje": f"Lote IATF #{eid} eliminado correctamente."}
+
+        elif t in ("inseminador", "inseminadores"):
+            fila = self.query_one("SELECT * FROM inseminadores WHERE id = ?", (eid,))
+            if not fila:
+                return {"ok": False, "error": f"Inseminador #{eid} no encontrado."}
+            self.conn.execute("UPDATE inseminadores SET activo = 0 WHERE id = ?", (eid,))
+            self.conn.commit()
+            return {"ok": True, "tipo": "inseminador", "id": eid, "mensaje": f"Inseminador #{eid} desactivado correctamente."}
 
         else:
             return {"ok": False, "error": f"Tipo de evento no soportado para eliminación: '{tipo}'."}
@@ -4482,5 +4571,832 @@ class Database:
             "variacion_pct": variacion_pct,
             "fecha": fila["fecha"],
         }
+
+    # ------------------------------------------------------------------ #
+    # Catálogo y Evaluación de Inseminadores
+    # ------------------------------------------------------------------ #
+    def sembrar_inseminadores_iniciales(self) -> int:
+        """Puebla inseminadores a partir de servicios históricos y users.json si la tabla está vacía."""
+        try:
+            n = self.query_one("SELECT COUNT(*) AS c FROM inseminadores")["c"]
+            if n > 0:
+                return 0
+            insertados = 0
+            ahora = datetime.now().isoformat(timespec="seconds")
+            # 1. Nombres únicos de servicios
+            filas = self.query("""
+                SELECT DISTINCT TRIM(inseminador) AS nom
+                FROM servicios
+                WHERE inseminador IS NOT NULL AND TRIM(inseminador) != ''
+                ORDER BY nom
+            """)
+            for f in filas:
+                nom = f["nom"]
+                if nom:
+                    try:
+                        self.conn.execute(
+                            "INSERT OR IGNORE INTO inseminadores (nombre, creado_en) VALUES (?, ?)",
+                            (nom, ahora)
+                        )
+                        insertados += 1
+                    except Exception:
+                        pass
+            # 2. Usuarios del sistema
+            try:
+                from ..server.auth import Auth
+                auth = Auth()
+                for uid, udata in getattr(auth, "_usuarios", {}).items():
+                    nom = udata.get("nombre") or udata.get("usuario")
+                    if nom and nom.strip():
+                        try:
+                            self.conn.execute(
+                                "INSERT OR IGNORE INTO inseminadores (nombre, es_usuario_sistema, user_id, creado_en) VALUES (?, 1, ?, ?)",
+                                (nom.strip(), int(uid) if str(uid).isdigit() else None, ahora)
+                            )
+                            insertados += 1
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            self.conn.commit()
+            return insertados
+        except Exception as e:
+            logger.debug("Error sembrando inseminadores: %s", e)
+            return 0
+
+    def listar_inseminadores(self, solo_activos: bool = True) -> list[dict[str, Any]]:
+        """Lista los inseminadores ordenados por nombre."""
+        self.sembrar_inseminadores_iniciales()
+        if solo_activos:
+            filas = self.query("SELECT * FROM inseminadores WHERE activo = 1 ORDER BY nombre ASC")
+        else:
+            filas = self.query("SELECT * FROM inseminadores ORDER BY nombre ASC")
+        return [dict(f) for f in filas]
+
+    def registrar_inseminador(
+        self,
+        nombre: str,
+        telefono: Optional[str] = None,
+        es_usuario_sistema: bool = False,
+        user_id: Optional[int] = None,
+        notas: Optional[str] = None,
+    ) -> int:
+        """Registra o reactiva un técnico en el catálogo de inseminadores."""
+        nombre_limpio = (nombre or "").strip()
+        if not nombre_limpio:
+            raise ValueError("El nombre del inseminador no puede estar vacío.")
+        ahora = datetime.now().isoformat(timespec="seconds")
+        existente = self.query_one(
+            "SELECT id, activo FROM inseminadores WHERE UPPER(nombre) = UPPER(?) LIMIT 1",
+            (nombre_limpio,)
+        )
+        if existente:
+            self.conn.execute(
+                """UPDATE inseminadores
+                   SET activo = 1,
+                       telefono = COALESCE(?, telefono),
+                       notas = COALESCE(?, notas),
+                       es_usuario_sistema = CASE WHEN ? THEN 1 ELSE es_usuario_sistema END,
+                       user_id = COALESCE(?, user_id)
+                   WHERE id = ?""",
+                (telefono, notas, es_usuario_sistema, user_id, existente["id"])
+            )
+            self.conn.commit()
+            return existente["id"]
+        return self.insert("inseminadores", dict(
+            nombre=nombre_limpio,
+            telefono=telefono,
+            es_usuario_sistema=1 if es_usuario_sistema else 0,
+            user_id=user_id,
+            activo=1,
+            notas=notas,
+            creado_en=ahora,
+        ))
+
+    def evaluar_inseminadores(self) -> list[dict[str, Any]]:
+        """Calcula la efectividad zootécnica de cada inseminador:
+        servicios, diagnosticados, preñadas, vacías, tasa de concepción % y servicios/concepción (S/C).
+        """
+        self.sembrar_inseminadores_iniciales()
+        filas = self.query("""
+            WITH serv_con_diag AS (
+                SELECT s.id AS servicio_id,
+                       s.inseminador,
+                       s.vaca_id,
+                       s.fecha AS fecha_servicio,
+                       (
+                           SELECT dg.resultado
+                           FROM diagnosticos_gestacion dg
+                           WHERE dg.vaca_id = s.vaca_id
+                             AND dg.fecha >= s.fecha
+                           ORDER BY dg.fecha ASC, dg.id ASC
+                           LIMIT 1
+                       ) AS resultado_diag
+                FROM servicios s
+                WHERE s.inseminador IS NOT NULL AND TRIM(s.inseminador) != ''
+            )
+            SELECT scd.inseminador AS nombre,
+                   COUNT(*) AS total_servicios,
+                   SUM(CASE WHEN scd.resultado_diag IS NOT NULL THEN 1 ELSE 0 END) AS diagnosticados,
+                   SUM(CASE WHEN scd.resultado_diag IN ('PREÑADA', 'PRENADA', 'P') THEN 1 ELSE 0 END) AS prenadas,
+                   SUM(CASE WHEN scd.resultado_diag IN ('VACÍA', 'VACIA', 'V') THEN 1 ELSE 0 END) AS vacias,
+                   SUM(CASE WHEN scd.resultado_diag IN ('DUDOSA', 'D') THEN 1 ELSE 0 END) AS dudosas,
+                   MIN(scd.fecha_servicio) AS primer_servicio,
+                   MAX(scd.fecha_servicio) AS ultimo_servicio
+            FROM serv_con_diag scd
+            GROUP BY scd.inseminador
+            ORDER BY total_servicios DESC, prenadas DESC
+        """)
+        resultado = []
+        nombres_vistos = set()
+        for f in filas:
+            nom = f["nombre"]
+            nombres_vistos.add(nom.upper())
+            tot = int(f["total_servicios"] or 0)
+            diag = int(f["diagnosticados"] or 0)
+            pren = int(f["prenadas"] or 0)
+            vac = int(f["vacias"] or 0)
+            dud = int(f["dudosas"] or 0)
+            tasa_concepcion = round((pren / diag) * 100, 1) if diag > 0 else None
+            sc = round(tot / pren, 2) if pren > 0 else None
+            # Semáforo zootécnico oficial
+            if tasa_concepcion is None:
+                semaforo = "gris"
+                estado_label = "Sin diagnósticos suficientes"
+            elif tasa_concepcion >= 55.0:
+                semaforo = "verde"
+                estado_label = "Excelente efectividad (≥55%)"
+            elif tasa_concepcion >= 45.0:
+                semaforo = "amarillo"
+                estado_label = "Normal / Aceptable (45-54%)"
+            else:
+                semaforo = "rojo"
+                estado_label = "Baja concepción (<45%, revisar técnica)"
+
+            resultado.append({
+                "nombre": nom,
+                "inseminador": nom,
+                "total_servicios": tot,
+                "total_ias": tot,
+                "diagnosticados": diag,
+                "diagnosticadas": diag,
+                "prenadas": pren,
+                "vacias": vac,
+                "dudosas": dud,
+                "pendientes_diagnostico": max(0, tot - diag),
+                "tasa_concepcion_pct": tasa_concepcion,
+                "servicios_por_concepcion": sc,
+                "semaforo": semaforo.upper(),
+                "estado_label": estado_label,
+                "primer_servicio": f["primer_servicio"],
+                "ultimo_servicio": f["ultimo_servicio"],
+            })
+
+        # Incluir técnicos activos del catálogo que aún no tengan servicios
+        insem_cat = self.listar_inseminadores(solo_activos=True)
+        for ic in insem_cat:
+            nom_c = ic["nombre"]
+            if nom_c.upper() not in nombres_vistos:
+                resultado.append({
+                    "nombre": nom_c,
+                    "inseminador": nom_c,
+                    "total_servicios": 0,
+                    "total_ias": 0,
+                    "diagnosticados": 0,
+                    "diagnosticadas": 0,
+                    "prenadas": 0,
+                    "vacias": 0,
+                    "dudosas": 0,
+                    "pendientes_diagnostico": 0,
+                    "tasa_concepcion_pct": None,
+                    "servicios_por_concepcion": None,
+                    "semaforo": "GRIS",
+                    "estado_label": "Sin servicios registrados",
+                    "primer_servicio": None,
+                    "ultimo_servicio": None,
+                })
+
+        return resultado
+
+    # ------------------------------------------------------------------ #
+    # Protocolos y Sincronizaciones IATF
+    # ------------------------------------------------------------------ #
+    def sembrar_protocolos_iatf_iniciales(self) -> int:
+        """Puebla los protocolos IATF estándar de la industria si la tabla está vacía."""
+        try:
+            n = self.query_one("SELECT COUNT(*) AS c FROM protocolos_iatf")["c"]
+            if n > 0:
+                return 0
+            insertados = 0
+            for prot in PROTOCOLOS_IATF_DEFAULT:
+                self.conn.execute(
+                    """INSERT INTO protocolos_iatf (nombre, categoria, descripcion, duracion_dias, pasos_json, activo)
+                       VALUES (?, ?, ?, ?, ?, 1)""",
+                    (
+                        prot["nombre"],
+                        prot.get("categoria", "CARNE_DOBLE_PROPOSITO"),
+                        prot.get("descripcion", ""),
+                        prot.get("duracion_dias", 10),
+                        json.dumps(prot.get("pasos", []), ensure_ascii=False),
+                    )
+                )
+                insertados += 1
+            self.conn.commit()
+            return insertados
+        except Exception as e:
+            logger.debug("Error sembrando protocolos IATF: %s", e)
+            return 0
+
+    def listar_protocolos_iatf(self, categoria: Optional[str] = None) -> list[dict[str, Any]]:
+        """Devuelve los protocolos IATF activos deserializados."""
+        self.sembrar_protocolos_iatf_iniciales()
+        if categoria:
+            filas = self.query(
+                "SELECT * FROM protocolos_iatf WHERE activo = 1 AND categoria = ? ORDER BY id ASC",
+                (categoria,)
+            )
+        else:
+            filas = self.query("SELECT * FROM protocolos_iatf WHERE activo = 1 ORDER BY id ASC")
+        resultado = []
+        for f in filas:
+            d = dict(f)
+            try:
+                d["pasos"] = json.loads(d.get("pasos_json") or "[]")
+            except Exception:
+                d["pasos"] = []
+            resultado.append(d)
+        return resultado
+
+    def obtener_protocolo_iatf(self, protocolo_id: int) -> Optional[dict[str, Any]]:
+        """Obtiene un protocolo IATF por ID."""
+        self.sembrar_protocolos_iatf_iniciales()
+        f = self.query_one("SELECT * FROM protocolos_iatf WHERE id = ? LIMIT 1", (protocolo_id,))
+        if not f:
+            return None
+        d = dict(f)
+        try:
+            d["pasos"] = json.loads(d.get("pasos_json") or "[]")
+        except Exception:
+            d["pasos"] = []
+        return d
+
+    def crear_lote_iatf(
+        self,
+        nombre: str,
+        protocolo_id: int,
+        fecha_inicio: str,
+        animales_tags: list[str],
+        toro_pajuela: Optional[str] = None,
+        inseminador: Optional[str] = None,
+        hora_iatf: str = "08:00",
+        categoria: Optional[str] = None,
+        notas: Optional[str] = None,
+        creado_por: Optional[int] = None,
+    ) -> int:
+        """Crea un lote de sincronización IATF, vincula las hembras y programa las alertas de fármacos."""
+        prot = self.obtener_protocolo_iatf(protocolo_id)
+        if not prot:
+            raise ValueError(f"Protocolo IATF con ID {protocolo_id} no encontrado.")
+        if not animales_tags:
+            raise ValueError("Debe incluir al menos un animal para iniciar el lote IATF.")
+
+        fecha_ini_dt = date.fromisoformat(fecha_inicio)
+        duracion = int(prot.get("duracion_dias", 10))
+        fecha_iatf_dt = fecha_ini_dt + timedelta(days=duracion)
+        fecha_iatf_str = fecha_iatf_dt.isoformat()
+        ahora = datetime.now().isoformat(timespec="seconds")
+
+        lote_id = self.insert("lotes_iatf", dict(
+            nombre=nombre.strip(),
+            protocolo_id=protocolo_id,
+            protocolo_nombre=prot.get("nombre"),
+            categoria=categoria or prot.get("categoria"),
+            fecha_inicio=fecha_inicio,
+            fecha_iatf=fecha_iatf_str,
+            hora_iatf=hora_iatf or "08:00",
+            toro_pajuela=toro_pajuela,
+            inseminador=inseminador,
+            estado="EN_CURSO",
+            paso_actual=0,
+            historial_pasos_json=json.dumps([], ensure_ascii=False),
+            notas=notas,
+            creado_en=ahora,
+            creado_por=creado_por,
+        ))
+
+        # Insertar animales en lote_iatf_animales
+        for t in animales_tags:
+            tag_limpio = t.strip().upper()
+            if not tag_limpio:
+                continue
+            aid = self.animal_id(tag_limpio)
+            cc = None
+            if aid:
+                try:
+                    row_cc = self.query_one(
+                        "SELECT valor FROM condicion_corporal WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
+                        (aid,)
+                    )
+                    if row_cc:
+                        cc = float(row_cc["valor"])
+                except Exception:
+                    pass
+            self.insert("lote_iatf_animales", dict(
+                lote_id=lote_id,
+                animal_id=aid,
+                tag=tag_limpio,
+                condicion_corporal=cc,
+                toro_pajuela=toro_pajuela,
+                inseminador=inseminador,
+                estado_animal="SINCRONIZANDO",
+            ))
+
+        # Programar tareas en recordatorios_programados para cada paso de droga
+        cant_vacas = len(animales_tags)
+        pasos = prot.get("pasos", [])
+        for p in pasos:
+            dia_rel = int(p.get("dia_relativo", 0))
+            f_paso = (fecha_ini_dt + timedelta(days=dia_rel)).isoformat()
+            h_paso = p.get("hora_sugerida", "07:30") if dia_rel < duracion else hora_iatf
+            nom_accion = p.get("accion", "Manejo IATF")
+            msg = f"💊 IATF [{nombre.strip()}] (Día {dia_rel}): {nom_accion} a {cant_vacas} hembras"
+            try:
+                self.registrar_recordatorio(
+                    mensaje=msg,
+                    fecha_programada=f_paso,
+                    hora=h_paso,
+                    tipo_tarea="IATF",
+                    prioridad="ALTA",
+                    asignado_a=inseminador,
+                )
+            except Exception as e:
+                logger.debug("Error registrando recordatorio IATF paso: %s", e)
+
+        # Recordatorio ecográfico post-IATF (Día 35 post inseminación)
+        try:
+            f_eco = (fecha_iatf_dt + timedelta(days=35)).isoformat()
+            msg_eco = f"📟 IATF [{nombre.strip()}]: Ecografía Gestacional (35 días post-servicio) a {cant_vacas} vacas"
+            self.registrar_recordatorio(
+                mensaje=msg_eco,
+                fecha_programada=f_eco,
+                hora="08:00",
+                tipo_tarea="ECOGRAFIA",
+                prioridad="ALTA",
+                asignado_a=inseminador,
+            )
+        except Exception as e:
+            logger.debug("Error registrando recordatorio eco IATF: %s", e)
+
+        return lote_id
+
+    def obtener_detalle_lote_iatf(self, lote_id: int) -> Optional[dict[str, Any]]:
+        """Obtiene toda la información de un lote IATF, su historial de drogas y el estado de sus vacas."""
+        lote = self.query_one("SELECT * FROM lotes_iatf WHERE id = ? LIMIT 1", (lote_id,))
+        if not lote:
+            return None
+        d = dict(lote)
+        try:
+            d["historial_pasos"] = json.loads(d.get("historial_pasos_json") or "[]")
+        except Exception:
+            d["historial_pasos"] = []
+
+        prot = self.obtener_protocolo_iatf(d["protocolo_id"]) if d.get("protocolo_id") else None
+        d["protocolo"] = prot
+
+        # Animales del lote con diagnóstico cruzado si ya hubo chequeo
+        animales = self.query("""
+            SELECT lia.*,
+                   (
+                       SELECT dg.resultado
+                       FROM diagnosticos_gestacion dg
+                       JOIN servicios s ON s.id = lia.servicio_id
+                       WHERE dg.vaca_id = s.vaca_id AND dg.fecha >= s.fecha
+                       ORDER BY dg.fecha ASC LIMIT 1
+                   ) AS diag_actual,
+                   (
+                       SELECT dg.fecha
+                       FROM diagnosticos_gestacion dg
+                       JOIN servicios s ON s.id = lia.servicio_id
+                       WHERE dg.vaca_id = s.vaca_id AND dg.fecha >= s.fecha
+                       ORDER BY dg.fecha ASC LIMIT 1
+                   ) AS diag_fecha
+            FROM lote_iatf_animales lia
+            WHERE lia.lote_id = ?
+            ORDER BY lia.tag ASC
+        """, (lote_id,))
+
+        lista_anim = []
+        tot_sinc = len(animales)
+        tot_insem = 0
+        tot_excl = 0
+        tot_pren = 0
+        tot_vac = 0
+
+        for a in animales:
+            ad = dict(a)
+            st = ad.get("estado_animal")
+            diag = ad.get("diag_actual") or ad.get("resultado_diagnostico")
+            if st == "EXCLUIDA":
+                tot_excl += 1
+            elif st == "INSEMINADA":
+                tot_insem += 1
+            if diag in ("PREÑADA", "PRENADA", "P"):
+                tot_pren += 1
+                ad["estado_animal"] = "PREÑADA"
+            elif diag in ("VACÍA", "VACIA", "V"):
+                tot_vac += 1
+                ad["estado_animal"] = "VACIA"
+            lista_anim.append(ad)
+
+        diag_total = tot_pren + tot_vac
+        tasa_pren = round((tot_pren / diag_total) * 100, 1) if diag_total > 0 else None
+
+        d["animales"] = lista_anim
+        d["animales_activos"] = tot_sinc - tot_excl
+        d["resumen"] = {
+            "sincronizadas": tot_sinc,
+            "inseminadas": tot_insem,
+            "excluidas": tot_excl,
+            "prenadas": tot_pren,
+            "vacias": tot_vac,
+            "pendientes_diagnostico": max(0, tot_insem - diag_total),
+            "tasa_prenez_pct": tasa_pren,
+        }
+        return d
+
+    def listar_lotes_iatf(self, estado: Optional[str] = None) -> list[dict[str, Any]]:
+        """Lista todos los lotes IATF ordenados cronológicamente."""
+        self.sembrar_protocolos_iatf_iniciales()
+        if estado:
+            filas = self.query("SELECT id FROM lotes_iatf WHERE estado = ? ORDER BY fecha_inicio DESC, id DESC", (estado,))
+        else:
+            filas = self.query("SELECT id FROM lotes_iatf ORDER BY fecha_inicio DESC, id DESC")
+        res = []
+        for f in filas:
+            det = self.obtener_detalle_lote_iatf(f["id"])
+            if det:
+                res.append(det)
+        return res
+
+    def registrar_avance_paso_iatf(
+        self,
+        lote_id: int,
+        paso_index: int,
+        producto_aplicado: Optional[str] = None,
+        dosis: Optional[str] = None,
+        marca: Optional[str] = None,
+        realizado_por: Optional[str] = None,
+        notas: Optional[str] = None,
+    ) -> bool:
+        """Registra la aplicación de la droga o manejo correspondiente al paso indicado del lote."""
+        lote = self.query_one("SELECT * FROM lotes_iatf WHERE id = ? LIMIT 1", (lote_id,))
+        if not lote:
+            return False
+        lote_d = dict(lote)
+        historial = []
+        try:
+            historial = json.loads(lote_d.get("historial_pasos_json") or "[]")
+        except Exception:
+            historial = []
+
+        registro_paso = {
+            "paso": paso_index,
+            "fecha": date.today().isoformat(),
+            "hora": datetime.now().strftime("%H:%M"),
+            "producto": producto_aplicado,
+            "dosis": dosis,
+            "marca": marca,
+            "realizado_por": realizado_por,
+            "notas": notas,
+        }
+        historial.append(registro_paso)
+        nuevo_paso = max(int(lote_d.get("paso_actual") or 0), paso_index + 1)
+        self.conn.execute(
+            """UPDATE lotes_iatf
+               SET paso_actual = ?,
+                   historial_pasos_json = ?
+               WHERE id = ?""",
+            (nuevo_paso, json.dumps(historial, ensure_ascii=False), lote_id)
+        )
+        self.conn.commit()
+        return True
+
+    def excluir_animal_lote_iatf(self, lote_id: int, tag: str, motivo: str) -> bool:
+        """Marca una hembra como excluida del lote IATF (ej. perdió dispositivo o baja condición)."""
+        tag_u = (tag or "").strip().upper()
+        self.conn.execute(
+            """UPDATE lote_iatf_animales
+               SET estado_animal = 'EXCLUIDA',
+                   motivo_exclusion = ?
+               WHERE lote_id = ? AND UPPER(tag) = ?""",
+            (motivo, lote_id, tag_u)
+        )
+        self.conn.commit()
+        return True
+
+    def ejecutar_inseminacion_lote_iatf(
+        self,
+        lote_id: int,
+        toro_pajuela: Optional[str] = None,
+        inseminador: Optional[str] = None,
+        fecha: Optional[str] = None,
+        hora: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """Dispara masivamente los servicios de las vacas activas del lote IATF,
+        descuenta pajuelas en inventario y actualiza el lote a IATF_REALIZADA."""
+        lote = self.query_one("SELECT * FROM lotes_iatf WHERE id = ? LIMIT 1", (lote_id,))
+        if not lote:
+            raise ValueError(f"Lote IATF {lote_id} no encontrado.")
+
+        lote_d = dict(lote)
+        animales_lote = self.query(
+            "SELECT * FROM lote_iatf_animales WHERE lote_id = ? AND estado_animal = 'SINCRONIZANDO'",
+            (lote_id,)
+        )
+        fecha_insem = fecha or lote_d.get("fecha_iatf") or date.today().isoformat()
+        toro_final = toro_pajuela or lote_d.get("toro_pajuela")
+        ins_final = inseminador or lote_d.get("inseminador")
+
+        inseminadas = 0
+        errores = []
+        pajuelas_consumidas = 0
+        animales_inseminados = []
+
+        for a in animales_lote:
+            ad = dict(a)
+            tag = ad["tag"]
+            toro_vaca = ad.get("toro_pajuela") or toro_final
+            ins_vaca = ad.get("inseminador") or ins_final
+            try:
+                sid = self.registrar_servicio(
+                    vaca_tag=tag,
+                    toro_pajilla=toro_vaca,
+                    inseminador=ins_vaca,
+                    tipo_servicio="IATF",
+                    fecha=fecha_insem,
+                )
+                self.conn.execute(
+                    """UPDATE lote_iatf_animales
+                       SET estado_animal = 'INSEMINADA',
+                           servicio_id = ?,
+                           toro_pajuela = ?,
+                           inseminador = ?
+                       WHERE id = ?""",
+                    (sid, toro_vaca, ins_vaca, ad["id"])
+                )
+                inseminadas += 1
+                animales_inseminados.append(tag)
+                if toro_vaca:
+                    try:
+                        if self.descontar_pajuela(toro_vaca, cantidad=1):
+                            pajuelas_consumidas += 1
+                    except Exception:
+                        pass
+            except Exception as e:
+                errores.append(f"{tag}: {str(e)}")
+
+        self.conn.execute(
+            """UPDATE lotes_iatf
+               SET estado = 'IATF_REALIZADA',
+                   toro_pajuela = COALESCE(?, toro_pajuela),
+                   inseminador = COALESCE(?, inseminador)
+               WHERE id = ?""",
+            (toro_final, ins_final, lote_id)
+        )
+        self.conn.commit()
+
+        return {
+            "ok": len(errores) == 0,
+            "lote_id": lote_id,
+            "total_hembras": len(animales_lote),
+            "inseminadas": inseminadas,
+            "servicios_creados": inseminadas,
+            "pajuelas_consumidas": pajuelas_consumidas,
+            "pajuelas_descontadas": pajuelas_consumidas,
+            "animales": animales_inseminados,
+            "toro": toro_final,
+            "inseminador": ins_final,
+            "fecha": fecha_insem,
+            "errores": errores,
+        }
+
+    def evaluar_metricas_iatf(self) -> dict[str, Any]:
+        """Calcula el consolidado zootécnico global de IATF por lotes y por protocolos/marcas."""
+        lotes = self.listar_lotes_iatf()
+        total_lotes = len(lotes)
+        lotes_activos = sum(1 for l in lotes if l.get("estado") in ("PLANIFICADO", "EN_CURSO"))
+        total_sincronizadas = sum(l.get("resumen", {}).get("sincronizadas", 0) for l in lotes)
+        total_inseminadas = sum(l.get("resumen", {}).get("inseminadas", 0) for l in lotes)
+        total_prenadas = sum(l.get("resumen", {}).get("prenadas", 0) for l in lotes)
+        total_vacias = sum(l.get("resumen", {}).get("vacias", 0) for l in lotes)
+        diag_total = total_prenadas + total_vacias
+        tasa_global = round((total_prenadas / diag_total) * 100, 1) if diag_total > 0 else None
+
+        # Desglose por protocolo y marcas
+        por_protocolo = {}
+        for l in lotes:
+            pnom = l.get("protocolo_nombre") or "General"
+            if pnom not in por_protocolo:
+                por_protocolo[pnom] = {"lotes": 0, "inseminadas": 0, "prenadas": 0, "vacias": 0}
+            por_protocolo[pnom]["lotes"] += 1
+            por_protocolo[pnom]["inseminadas"] += l.get("resumen", {}).get("inseminadas", 0)
+            por_protocolo[pnom]["prenadas"] += l.get("resumen", {}).get("prenadas", 0)
+            por_protocolo[pnom]["vacias"] += l.get("resumen", {}).get("vacias", 0)
+
+        for pnom, st in por_protocolo.items():
+            diag_p = st["prenadas"] + st["vacias"]
+            st["tasa_prenez_pct"] = round((st["prenadas"] / diag_p) * 100, 1) if diag_p > 0 else None
+
+        return {
+            "total_lotes": total_lotes,
+            "lotes_activos": lotes_activos,
+            "total_sincronizadas": total_sincronizadas,
+            "total_inseminadas": total_inseminadas,
+            "total_prenadas": total_prenadas,
+            "total_vacias": total_vacias,
+            "tasa_prenez_global_pct": tasa_global,
+            "por_protocolo": por_protocolo,
+        }
+
+
+# =========================================================================== #
+# Biblioteca de Protocolos Hormonales IATF Estándar (Dosis y Marcas de Campo) #
+# =========================================================================== #
+PROTOCOLOS_IATF_DEFAULT = [
+    {
+        "nombre": "Convencional 8 Días con eCG (Carne / Doble Propósito)",
+        "categoria": "CARNE_DOBLE_PROPOSITO",
+        "descripcion": "Protocolo de 3 manejos con Dispositivo de Progesterona (DIB/CIDR) + eCG. Ideal para vacas con cría al pie o en anestro.",
+        "duracion_dias": 10,
+        "pasos": [
+            {
+                "paso": 0,
+                "dia_relativo": 0,
+                "accion": "Colocación de Dispositivo P4 + Benzoato de Estradiol",
+                "descripcion": "Insertar dispositivo intravaginal P4 (1.0g) y aplicar inductor folicular.",
+                "productos": [
+                    {
+                        "tipo": "Dispositivo Intravaginal",
+                        "principio_activo": "Progesterona (P4) 1.0g",
+                        "marcas_sugeridas": ["DIB 1.0g (Syntex)", "Cronipres 1.0g (Biogénesis)", "CIDR (Zoetis)"],
+                        "dosis_sugerida": "1 dispositivo",
+                        "via": "Intravaginal",
+                    },
+                    {
+                        "tipo": "Inductor de Onda Folicular",
+                        "principio_activo": "Benzoato de Estradiol 2.0mg",
+                        "marcas_sugeridas": ["Sincrodiol (Ourofino)", "Gonadiol (Zoetis)", "Bioestrogen"],
+                        "dosis_sugerida": "2.0 ml (2.0 mg)",
+                        "via": "Intramuscular (IM)",
+                    },
+                ],
+            },
+            {
+                "paso": 1,
+                "dia_relativo": 8,
+                "accion": "Retiro de Dispositivo P4 + PGF2α + Cipionato Estradiol + eCG",
+                "descripcion": "Retirar dispositivo y aplicar luteolítico + inductor de ovulación + estimulador folicular.",
+                "productos": [
+                    {
+                        "tipo": "Prostaglandina (Luteolítico)",
+                        "principio_activo": "D-Cloprostenol / Dinoprost",
+                        "marcas_sugeridas": ["Ciclase DL (Syntex)", "Lutalyse (Zoetis)", "Sincrocio (Ourofino)"],
+                        "dosis_sugerida": "2.0 ml (150 µg)",
+                        "via": "Intramuscular (IM)",
+                    },
+                    {
+                        "tipo": "Inductor de Ovulación",
+                        "principio_activo": "Cipionato de Estradiol (ECP)",
+                        "marcas_sugeridas": ["ECP (Zoetis)", "SincroCP (Ourofino)", "Cipiosyn"],
+                        "dosis_sugerida": "0.5 - 1.0 ml (0.5 - 1.0 mg)",
+                        "via": "Intramuscular (IM)",
+                    },
+                    {
+                        "tipo": "Estimulador Folicular (eCG)",
+                        "principio_activo": "Gonadotropina Coriónica Equina (eCG)",
+                        "marcas_sugeridas": ["Novormon (Syntex/Zoetis)", "Folligon (MSD)", "SincroeCG"],
+                        "dosis_sugerida": "1.5 - 2.0 ml (300 - 400 UI)",
+                        "via": "Intramuscular (IM)",
+                        "nota": "Clave en vacas con cría o anestro",
+                    },
+                ],
+            },
+            {
+                "paso": 2,
+                "dia_relativo": 10,
+                "hora_sugerida": "08:00",
+                "accion": "Inseminación Artificial a Tiempo Fijo (IATF)",
+                "descripcion": "Inseminar a todo el lote a las 48-52 horas de retirado el dispositivo. No requiere detección de celo.",
+                "productos": [
+                    {
+                        "tipo": "Inductor Ovulatorio (Opcional)",
+                        "principio_activo": "GnRH (Acetato de Buserelina)",
+                        "marcas_sugeridas": ["Conceptal (MSD)", "Gonasyn", "Cystorelin"],
+                        "dosis_sugerida": "2.5 ml (10 µg)",
+                        "via": "Intramuscular (IM)",
+                        "nota": "Opcional si la hembra no muestra celo franco",
+                    }
+                ],
+            },
+            {
+                "paso": 3,
+                "dia_relativo": 40,
+                "accion": "Diagnóstico de Gestación (Ecografía / Tacto)",
+                "descripcion": "Chequeo ecográfico a los 30 días post-IATF para confirmar preñeces y evaluar tasa de preñez del protocolo.",
+                "productos": [],
+            },
+        ],
+    },
+    {
+        "nombre": "Convencional 8 Días Lechería Especializada",
+        "categoria": "LECHE",
+        "descripcion": "Protocolo de 3 manejos con Progesterona adaptado a vacas en ordeño de alta y media producción.",
+        "duracion_dias": 10,
+        "pasos": [
+            {
+                "paso": 0,
+                "dia_relativo": 0,
+                "accion": "Colocación Dispositivo P4 + Benzoato de Estradiol",
+                "descripcion": "Dispositivo DIB 1.0g + 2.0mg Benzoato de Estradiol",
+                "productos": [
+                    {"tipo": "Dispositivo P4", "principio_activo": "Progesterona 1.0g", "marcas_sugeridas": ["DIB 1.0g", "CIDR"], "dosis_sugerida": "1 dispositivo", "via": "Intravaginal"},
+                    {"tipo": "Inductor", "principio_activo": "Benzoato de Estradiol 2.0mg", "marcas_sugeridas": ["Sincrodiol", "Gonadiol"], "dosis_sugerida": "2.0 ml", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 1,
+                "dia_relativo": 8,
+                "accion": "Retiro Dispositivo P4 + Prostaglandina + Cipionato Estradiol",
+                "descripcion": "Retirar dispositivo + 2ml PGF2α + 1ml Cipionato de Estradiol",
+                "productos": [
+                    {"tipo": "Luteolítico", "principio_activo": "D-Cloprostenol", "marcas_sugeridas": ["Ciclase DL", "Lutalyse", "Sincrocio"], "dosis_sugerida": "2.0 ml", "via": "IM"},
+                    {"tipo": "Inductor Ovulación", "principio_activo": "Cipionato Estradiol", "marcas_sugeridas": ["ECP", "SincroCP"], "dosis_sugerida": "0.5 - 1.0 ml", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 2,
+                "dia_relativo": 10,
+                "hora_sugerida": "09:00",
+                "accion": "Inseminación Artificial a Tiempo Fijo (52-54h post-retiro)",
+                "descripcion": "Inseminar a tiempo fijo. Aplicar GnRH en vacas altas productoras.",
+                "productos": [
+                    {"tipo": "GnRH", "principio_activo": "Buserelina 10µg", "marcas_sugeridas": ["Conceptal"], "dosis_sugerida": "2.5 ml", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 3,
+                "dia_relativo": 42,
+                "accion": "Diagnóstico Gestacional (Ecógrafo)",
+                "descripcion": "Evaluación por ecógrafo a los 32 días post-servicio.",
+                "productos": [],
+            },
+        ],
+    },
+    {
+        "nombre": "J-Synch 6 Días (Novillas de Vientre)",
+        "categoria": "NOVILLAS",
+        "descripcion": "Protocolo de proestro prolongado con dispositivo de menor dosis (0.5g) para novillas de levante aptas.",
+        "duracion_dias": 9,
+        "pasos": [
+            {
+                "paso": 0,
+                "dia_relativo": 0,
+                "accion": "Dispositivo P4 (0.5g) + Benzoato de Estradiol",
+                "descripcion": "Colocación de dispositivo P4 dosis baja + 1.0-2.0mg BE",
+                "productos": [
+                    {"tipo": "Dispositivo", "principio_activo": "Progesterona 0.5g", "marcas_sugeridas": ["DIB 0.5g", "Cronipres 0.5g"], "dosis_sugerida": "1 dispositivo", "via": "Intravaginal"},
+                    {"tipo": "Inductor", "principio_activo": "Benzoato de Estradiol 2.0mg", "marcas_sugeridas": ["Sincrodiol"], "dosis_sugerida": "1.0 - 2.0 ml", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 1,
+                "dia_relativo": 6,
+                "accion": "Retiro Dispositivo P4 + PGF2α + eCG 300 UI",
+                "descripcion": "Retiro del dispositivo + Prostaglandina + eCG (sin estrógeno al retiro en J-Synch)",
+                "productos": [
+                    {"tipo": "Luteolítico", "principio_activo": "D-Cloprostenol", "marcas_sugeridas": ["Ciclase DL", "Lutalyse"], "dosis_sugerida": "2.0 ml", "via": "IM"},
+                    {"tipo": "eCG", "principio_activo": "eCG 300 UI", "marcas_sugeridas": ["Novormon", "Folligon"], "dosis_sugerida": "1.5 ml (300 UI)", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 2,
+                "dia_relativo": 9,
+                "hora_sugerida": "08:00",
+                "accion": "IATF a las 72 horas + GnRH obligatoria",
+                "descripcion": "Inseminar a las 72h post-retiro aplicando GnRH (Conceptal) a todas las novillas.",
+                "productos": [
+                    {"tipo": "GnRH", "principio_activo": "Buserelina 10µg", "marcas_sugeridas": ["Conceptal"], "dosis_sugerida": "2.5 ml", "via": "IM"},
+                ],
+            },
+            {
+                "paso": 3,
+                "dia_relativo": 39,
+                "accion": "Diagnóstico de Gestación",
+                "descripcion": "Chequeo ecográfico a 30 días post IATF.",
+                "productos": [],
+            },
+        ],
+    },
+]
 
 

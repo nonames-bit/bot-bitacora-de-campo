@@ -1415,7 +1415,6 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "⚙️ <b>2. Informes y Sincronización:</b>\n"
             "• <code>/status</code> — Tablero ejecutivo de la finca\n"
             "• <code>/reporte</code> — Generar reporte semanal en PDF\n"
-            "• <code>/exportar</code> — Descargar backup del sistema (paquete ZIP)\n"
             "• <code>/importar</code> — Instrucciones para importar backup DBF\n"
             "• <code>/confirmar_importar</code> — Procesar backup subido\n"
             "• <code>/descartar_backup</code> — Eliminar backup pendiente\n"
