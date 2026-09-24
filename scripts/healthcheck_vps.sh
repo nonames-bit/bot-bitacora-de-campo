@@ -78,3 +78,49 @@ Verificar si hay notas de campo llegando y si la sincronización de backups SG s
         limpiar_alerta "db_desactualizada"
     fi
 fi
+
+# 4. Servicio de la PWA activo (auditoría P1.6: antes NO se monitoreaba; si
+# bitacora-pwa se colgaba por OOM o un hang, nadie se enteraba hasta entrar).
+if systemctl is-active --quiet bitacora-pwa; then
+    limpiar_alerta "pwa_caida"
+else
+    enviar_alerta "🔴 <b>ALERTA: bitacora-pwa NO está activo</b> en el VPS.
+Revisar con: <code>systemctl status bitacora-pwa</code>" "pwa_caida"
+fi
+
+# 5. nginx activo (es quien expone 443; si cae, la PWA es inalcanzable aunque
+# el servicio Python siga vivo).
+if systemctl is-active --quiet nginx; then
+    limpiar_alerta "nginx_caido"
+else
+    enviar_alerta "🔴 <b>ALERTA: nginx NO está activo</b> en el VPS.
+Revisar con: <code>systemctl status nginx</code>" "nginx_caido"
+fi
+
+# 6. La PWA responde por HTTPS (prueba end-to-end nginx + TLS + waitress).
+URL_PWA="${PWA_URL:-https://ganaderiaja.duckdns.org/login}"
+if curl -sf -m 10 -o /dev/null "$URL_PWA"; then
+    limpiar_alerta "pwa_http"
+else
+    enviar_alerta "🔴 <b>ALERTA: la PWA no responde</b> en $URL_PWA.
+Revisar nginx y bitacora-pwa (<code>curl -v $URL_PWA</code>)." "pwa_http"
+fi
+
+# 7. Watcher de copias de SG (solo si está configurado como proceso continuo;
+# el modo --once por cron se omite para no generar falsas alarmas).
+if systemctl list-unit-files 2>/dev/null | grep -q '^bitacora-copias'; then
+    if systemctl is-active --quiet bitacora-copias; then
+        limpiar_alerta "copias_watcher"
+    else
+        enviar_alerta "🟡 <b>bitacora-copias (watcher de copias SG) NO está activo.</b>
+Revisar con: <code>systemctl status bitacora-copias</code>" "copias_watcher"
+    fi
+elif crontab -l 2>/dev/null | grep 'vigilar_copias.sh' | grep -qv -- '--once'; then
+    if pgrep -f "vigilar_copias.sh" >/dev/null 2>&1; then
+        limpiar_alerta "copias_watcher"
+    else
+        enviar_alerta "🟡 <b>El watcher de copias de SG está agendado en cron pero no corre.</b>" "copias_watcher"
+    fi
+else
+    limpiar_alerta "copias_watcher"
+fi
