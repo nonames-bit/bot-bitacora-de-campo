@@ -30,6 +30,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 from ..utils import to_date
+from ..db.database import POTRERO_ACTUAL_EXPR, ULT_TRASLADO_CTE
 from .query.helpers import calcular_existencias_potreros_sg
 
 try:
@@ -1037,6 +1038,28 @@ def generar_grafico_ocupacion_potreros(db, output_dir: str = "data/reportes",
     return _guardar(fig, output_dir, f"grafico_ocupacion_potreros_{hoy.isoformat()}.png", dpi=dpi, hoy=hoy)
 
 
+def _animales_activos_por_potrero_vigente(db) -> dict:
+    """Conteo de animales ACTIVO por potrero VIGENTE (auditoría P2.12).
+
+    Usa la expresión canónica (`POTRERO_ACTUAL_EXPR` = potrero_id → último
+    traslado si es NULL) que ya usan Inventario/Mapa/Pasturas. Antes el gráfico
+    NDVI agrupaba solo por `animales.potrero_id`, así que un animal trasladado
+    con `potrero_id` NULL quedaba fuera y el gráfico contradecía a esas vistas.
+    """
+    conteo: dict = {}
+    for r in db.query(
+        f"WITH {ULT_TRASLADO_CTE} "
+        f"SELECT {POTRERO_ACTUAL_EXPR} AS potrero_id, COUNT(*) AS n "
+        "FROM animales a "
+        "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+        "WHERE a.estado = 'ACTIVO' "
+        f"GROUP BY {POTRERO_ACTUAL_EXPR}"
+    ):
+        if r["potrero_id"] is not None:
+            conteo[r["potrero_id"]] = r["n"]
+    return conteo
+
+
 def generar_mapa_potreros(db, output_dir: str = "data/reportes",
                           hoy: Optional[date] = None, dpi: int = 130) -> Optional[str]:
     """Mapa de los potreros reales (Fase B del plan geoespacial: los que
@@ -1063,12 +1086,7 @@ def generar_mapa_potreros(db, output_dir: str = "data/reportes",
         return None
 
     ndvi_por_potrero = {p["potrero_id"]: p for p in db.resumen_ndvi_finca().get("potreros", [])}
-    animales_por_potrero = {
-        r["potrero_id"]: r["n"] for r in db.query(
-            "SELECT potrero_id, COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO' "
-            "AND potrero_id IS NOT NULL GROUP BY potrero_id"
-        )
-    }
+    animales_por_potrero = _animales_activos_por_potrero_vigente(db)
 
     lats = [float(p["centroide_lat"]) for p in potreros if p["centroide_lat"] is not None]
     lat_promedio = sum(lats) / len(lats) if lats else 0.0
