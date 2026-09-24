@@ -36,5 +36,8 @@ jobs:
       - name: Guardas de templates PWA (CSP sin handlers inline)
         run: python scripts/verificar_csp_templates.py
 
+      - name: Guardas JS (sin funciones duplicadas en el mismo ámbito)
+        run: python scripts/verificar_js_duplicados.py
+
       - name: Run tests
         run: pytest -q
