@@ -90,3 +90,8 @@ src/pwa/static/ternero.mp4
 reportes/
 # Manuales de referencia pesados:
 docs/Manuales Informacion/Manual29SoftwareGanadero.pdf
+
+# (auditoría P2.13) Skills triplicadas (.agents/.claude/.opencode). La canónica
+# es .agents/skills; las copias de .claude/.opencode quedan locales sin versión
+# para evitar drift manual.
+.claude/skills/

@@ -49,7 +49,7 @@ Integración bioeconómica entre productividad animal, praderas y costos operati
 ---
 
 ### 📱 FASE 7: PWA Oficina + Corral Offline
-> **Estado 2026-09-05:** A (QR) + D (dashboard 10 vistas) + B-lite (SW offline lectura) ✅ implementadas; pendiente B completa (cola + sync + SOS) y C (RFID/OCR corral). Ver `docs/PLAN_FASE7_PWA.md`.
+> **Estado 2026-09-24:** A (QR) + D (dashboard) + B completa (cola offline en IndexedDB + `/api/sync` idempotente + Service Worker offline) + SOS de contingencia (Telegram) ✅ implementadas; C parcial (OCR de aretes ✅ con tesseract/easyocr opcional; lectura por bastón RFID pendiente). Ver `docs/PLAN_FASE7_PWA.md`.
 Herramientas visuales ejecutivas y resiliencia de captura para condiciones de nula conectividad en manga/corral.
 - **Dashboard Web Ejecutivo (PWA):** Panel gerencial web responsivo para consulta consolidada, filtros avanzados y visualización de KPIs zootécnicos.
 - **Fichas QR en PDF por Lote:** Generación masiva de fichas técnicas en PDF con códigos QR por animal o lote para impresión y lectura rápida.
