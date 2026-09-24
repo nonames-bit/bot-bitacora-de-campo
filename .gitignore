@@ -74,3 +74,19 @@ docs/fotos del software Ganadero SG/fotos app ganadero/
 
 # Herramientas locales de agentes
 .opencode/
+
+# (auditoría P2.13, 2026-09-23) Binarios de evidencia y artefactos generados que
+# se des-trackearon: engordaban el repo (~21 MB) y no son código ni doc enlazada.
+# Evidencia visual generada por scripts/verify_*.py:
+docs/screenshots/
+docs/screenshots_features/
+docs/screenshots_sg/
+# Capturas masivas de referencia de Software Ganadero:
+docs/fotos del software Ganadero SG/
+# Videos fuente de los GIF del header (el asset servido es el GIF):
+src/pwa/static/toro.mp4
+src/pwa/static/ternero.mp4
+# Reportes generados por scripts (comparación SG):
+reportes/
+# Manuales de referencia pesados:
+docs/Manuales Informacion/Manual29SoftwareGanadero.pdf
