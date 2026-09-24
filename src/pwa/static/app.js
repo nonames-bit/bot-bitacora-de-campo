@@ -511,21 +511,6 @@
         try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
       });
     }
-    var btnToggleFiltros = document.getElementById("btn-toggle-filtros");
-    if (btnToggleFiltros) {
-      btnToggleFiltros.addEventListener("click", function () {
-        var bf = document.getElementById("barra-filtros");
-        if (bf) {
-          var estabaOculto = bf.style.display === "none";
-          bf.style.display = estabaOculto ? "" : "none";
-          bf.__forzadoVisible = estabaOculto;
-          if (estabaOculto) {
-            var inp = document.getElementById("f-tag") || document.getElementById("f-potrero");
-            if (inp) inp.focus();
-          }
-        }
-      });
-    }
   }
   /* ---------- Modo Campo (mayordomo): 4 botones grandes + hoy ---------- */
   function renderCampo() {
@@ -699,10 +684,11 @@
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='font-size:12px; text-decoration:none; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
-    var searchBtn = "<button type='button' id='btn-toggle-filtros' class='tema-btn' style='font-size:12px; padding:5px 10px; display:inline-flex; align-items:center; gap:4px;' title='Buscar potrero o arete'>" + icon("search", 13) + "Buscar</button>";
+    // Sin botón "Buscar": la lupita flotante (🔍) abre el mismo buscador
+    // con arete Y potrero, para no duplicar controles en el celular.
     var h = "<div class='tablero-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px; font-size:18px;'>" + icon("grid") + "Tablero finca" + pot + "</h3>"
-      + "<div style='display:flex; gap:6px; align-items:center;'>" + searchBtn + pdfBtn + "</div>"
+      + "<div style='display:flex; gap:6px; align-items:center;'>" + pdfBtn + "</div>"
       + "</div>";
     h += "<div class='kpis'>"
       + kpi(d.activos, "Activos") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
@@ -769,7 +755,16 @@
         } else if (tipo === "TRATAMIENTO") {
           chipHtml = "<span class='chip rojo' style='font-weight:700;'>" + icon("pill", 13) + " Tratamiento</span>";
         } else if (tipo === "SERVICIO") {
-          chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("sperm", 13) + " Inseminación</span>";
+          var descUpper = (ev.descripcion || "").toUpperCase();
+          var esMonta = descUpper.indexOf("MONTA") >= 0 || descUpper.indexOf("MN") === 0 || descUpper.indexOf("TORO") >= 0;
+          var esIATF = descUpper.indexOf("IATF") >= 0;
+          if (esMonta) {
+            chipHtml = "<span class='chip ambar' style='font-weight:700;'>" + icon("bull", 13) + " Monta Natural</span>";
+          } else if (esIATF) {
+            chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("sperm", 13) + " IATF</span>";
+          } else {
+            chipHtml = "<span class='chip verde' style='font-weight:700;'>" + icon("sperm", 13) + " Inseminación</span>";
+          }
         } else {
           chipHtml = "<span class='chip gris'>" + esc(tipo) + "</span>";
         }
@@ -5327,6 +5322,7 @@
         + "<div id='cap-distocia-wrap' style='margin-top:2px;'><label>¿Parto difícil / asistido (distocia)? <select id='cap-distocia' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NO'>No, parto normal</option><option value='SI'>Sí, difícil o asistido</option></select></label></div>"
         + "<div style='margin-top:6px; margin-bottom:8px;'>"
         + "<label>Toro / Padre de la cría (opcional): <select id='cap-toro-padre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>-- Sin especificar (opcional) --</option></select></label>"
+        + "<div id='cap-toro-sugerido-hint' style='font-size:12px; margin:4px 0 6px 2px; min-height:18px;'></div>"
         + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajuela...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
         + "</div>"
         + "<div id='cap-gemelo2-wrap' style='display:none; padding:10px; border:1px dashed var(--borde-fuerte); border-radius:8px;'>"
@@ -5840,6 +5836,114 @@
       });
     }
 
+    function bindSugerenciaPadreParto() {
+      if (_tipoCapturaActual !== "parto") return;
+      var fMadre = document.getElementById("cap-tag");
+      var fFecha = document.getElementById("cap-fecha");
+      var selToro = document.getElementById("cap-toro-padre");
+      var hintToro = document.getElementById("cap-toro-sugerido-hint");
+      if (!fMadre || !selToro) return;
+
+      var _toroModificadoManualmente = false;
+      selToro.addEventListener("change", function () {
+        _toroModificadoManualmente = true;
+      });
+
+      var _timerSugPadre = null;
+      var _ultVacaConsultada = "";
+      var _ultFechaConsultada = "";
+
+      function consultarSugerenciaPadre() {
+        var vaca = (fMadre.value || "").trim();
+        var fecha = (fFecha && fFecha.value) || new Date().toISOString().slice(0, 10);
+        if (!vaca) {
+          if (hintToro) hintToro.innerHTML = "";
+          return;
+        }
+        if (vaca === _ultVacaConsultada && fecha === _ultFechaConsultada) return;
+        _ultVacaConsultada = vaca;
+        _ultFechaConsultada = fecha;
+
+        var url = "/api/parto/sugerir-padre?vaca=" + encodeURIComponent(vaca) + "&fecha=" + encodeURIComponent(fecha);
+        fetch(url)
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            if (!hintToro) return;
+            if (data && data.ok && data.sugerencia) {
+              var s = data.sugerencia;
+              var tagToro = s.toro_tag || "";
+              var nomToro = s.toro_nombre ? (" · " + s.toro_nombre) : "";
+              var esMN = s.metodo === "MONTA_NATURAL_POTRERO";
+              var iconoMetodo = esMN ? icon("bull", 13) : icon("sperm", 13);
+              var badgeMetodo = esMN
+                ? "<span class='chip ambar' style='padding:1px 6px; font-size:10.5px; font-weight:700;'>" + iconoMetodo + " Monta Natural</span>"
+                : "<span class='chip verde' style='padding:1px 6px; font-size:10.5px; font-weight:700;'>" + iconoMetodo + " " + esc(s.tipo_servicio || "IA") + "</span>";
+
+              var html = "<div style='display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; background:rgba(217, 119, 6, 0.09); border:1px solid rgba(217, 119, 6, 0.35); border-radius:6px; padding:5px 8px; margin-top:2px;'>"
+                + "<span style='font-weight:700; color:var(--texto); font-size:11.5px;'>💡 Sugerencia de Padre:</span> "
+                + badgeMetodo
+                + "<b style='color:var(--texto); font-size:12px;'>" + esc(tagToro + nomToro) + "</b>"
+                + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(s.explicacion) + ")</small>"
+                + "<button type='button' class='btn-aplicar-toro-sug' style='background:var(--ambar, #d97706); color:#fff; border:none; border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer;'>Aplicar</button>"
+                + "</div>";
+
+              hintToro.innerHTML = html;
+
+              function aplicarToro() {
+                var existe = false;
+                for (var i = 0; i < selToro.options.length; i++) {
+                  if (selToro.options[i].value.toUpperCase() === tagToro.toUpperCase()) {
+                    selToro.selectedIndex = i;
+                    existe = true;
+                    break;
+                  }
+                }
+                if (!existe) {
+                  var opt = document.createElement("option");
+                  opt.value = tagToro;
+                  opt.textContent = tagToro + nomToro + " (Sugerido)";
+                  selToro.insertBefore(opt, selToro.firstChild ? selToro.firstChild.nextSibling : null);
+                  selToro.value = tagToro;
+                }
+                var wrapOtro = document.getElementById("cap-toro-otro-wrap");
+                if (wrapOtro) wrapOtro.style.display = "none";
+              }
+
+              var btnAplicar = hintToro.querySelector(".btn-aplicar-toro-sug");
+              if (btnAplicar) {
+                btnAplicar.addEventListener("click", function (ev) {
+                  ev.preventDefault();
+                  aplicarToro();
+                });
+              }
+
+              // Si el select no ha sido tocado manualmente o está vacío, preseleccionar automáticamente
+              if (!_toroModificadoManualmente && (!selToro.value || selToro.value === "")) {
+                aplicarToro();
+              }
+            } else {
+              hintToro.innerHTML = "";
+            }
+          })
+          .catch(function () {
+            if (hintToro) hintToro.innerHTML = "";
+          });
+      }
+
+      function dispararDebounce() {
+        if (_timerSugPadre) clearTimeout(_timerSugPadre);
+        _timerSugPadre = setTimeout(consultarSugerenciaPadre, 350);
+      }
+
+      fMadre.addEventListener("input", dispararDebounce);
+      fMadre.addEventListener("change", dispararDebounce);
+      if (fFecha) fFecha.addEventListener("change", dispararDebounce);
+
+      if (fMadre.value.trim()) {
+        dispararDebounce();
+      }
+    }
+
     // Paso 3: resumen legible y estructurado antes de guardar.
     function resumenCapHtml() {
       var d = recolectarCapDatos();
@@ -6091,6 +6195,7 @@
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
       bindToroParto();
+      bindSugerenciaPadreParto();
       bindCamposTarea();
       bindCamposPalpacion();
       bindCamposNitrogeno();
@@ -10178,7 +10283,14 @@
       h += "<h4>Partos registrados</h4>" + tabla(f.partos, colsPartos, "Sin partos registrados.");
 
       var colsServ = [
-        ["fecha", "Fecha"], ["tipo_servicio", "Tipo"], ["toro_pajilla", "Toro"],
+        ["fecha", "Fecha"],
+        ["tipo_servicio", "Tipo", "text", function (v) {
+          var t = (v || "").toUpperCase();
+          if (t === "MONTA" || t === "MN" || t.indexOf("MONTA") >= 0) return "<span class='chip ambar' style='font-size:11px; font-weight:700;'>" + icon("bull", 12) + " Monta</span>";
+          if (t === "IATF") return "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + icon("sperm", 12) + " IATF</span>";
+          return "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + icon("sperm", 12) + " IA</span>";
+        }],
+        ["toro_pajilla", "Toro / Pajuela"],
         ["fep_calculada", "FEP", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
         ["estado", "Estado", "text", function (v) { return chipResultado(v); }]
       ];
@@ -11759,6 +11871,9 @@
     if (barraFiltros) {
       if (actual === "tablero") {
         var hayFiltro = (q("#f-potrero") && q("#f-potrero").value.trim()) || (q("#f-tag") && q("#f-tag").value.trim());
+        // El forzado solo vive mientras haya filtro: si el usuario lo
+        // borra, la barra vuelve a ocultarse sola en el celular.
+        if (!hayFiltro) barraFiltros.__forzadoVisible = false;
         if (window.innerWidth <= 640 && !hayFiltro && !barraFiltros.__forzadoVisible) {
           barraFiltros.style.display = "none";
         } else {
@@ -12218,6 +12333,8 @@
     var fabBuscar = document.getElementById("fab-global-buscar");
     var modalBuscar = document.getElementById("modal-buscar-ficha-rapida");
     var inputTagRapido = document.getElementById("input-tag-buscar-rapido");
+    var inputPotreroRapido = document.getElementById("input-potrero-buscar-rapido");
+    var btnFiltrarTablero = document.getElementById("btn-filtrar-tablero-buscar");
     var formBuscarRapido = document.getElementById("form-buscar-ficha-rapida");
     var feedbackBuscar = document.getElementById("buscar-ficha-feedback");
     var btnCerrarBuscar = document.getElementById("btn-cerrar-modal-buscar-ficha");
@@ -12242,6 +12359,35 @@
           inputTagRapido.select();
         }, 150);
       }
+      // El potrero arranca con el filtro vigente del Tablero, si lo hay.
+      if (inputPotreroRapido && !inputPotreroRapido.value) {
+        var potVigente = (q("#f-potrero") && q("#f-potrero").value.trim()) || "";
+        if (potVigente) inputPotreroRapido.value = potVigente;
+      }
+    }
+    // "Ver en Tablero": aplica potrero (y arete, si se escribió) al filtro
+    // del Tablero y lo muestra, para no depender de la barra superior.
+    function filtrarTableroDesdeModal() {
+      var tag = (inputTagRapido && inputTagRapido.value.trim()) || "";
+      var pot = (inputPotreroRapido && inputPotreroRapido.value.trim()) || "";
+      if (!tag && !pot) {
+        if (feedbackBuscar) feedbackBuscar.textContent = "Escribe un arete o un potrero para filtrar.";
+        return;
+      }
+      cerrarModalBuscar();
+      vibrarConfirmacion();
+      var inpPot = document.getElementById("f-potrero");
+      if (inpPot) inpPot.value = pot;
+      var inpTag = document.getElementById("f-tag");
+      if (inpTag) inpTag.value = tag;
+      irAVista("tablero");
+      var bf = document.getElementById("barra-filtros");
+      if (bf) {
+        bf.style.display = "";
+        bf.__forzadoVisible = true;
+      }
+      cargar(true);
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eScrollTab) { window.scrollTo(0, 0); }
     }
     window.abrirModalBuscarFichaRapida = abrirModalBuscar;
 
@@ -12264,12 +12410,19 @@
         if (e.target === modalBuscar) cerrarModalBuscar();
       });
     }
+    if (btnFiltrarTablero) {
+      btnFiltrarTablero.addEventListener("click", function (e) {
+        e.preventDefault();
+        filtrarTableroDesdeModal();
+      });
+    }
     if (formBuscarRapido) {
       formBuscarRapido.addEventListener("submit", function (e) {
         e.preventDefault();
         var tag = (inputTagRapido && inputTagRapido.value.trim()) || "";
         if (!tag) {
-          if (feedbackBuscar) feedbackBuscar.textContent = "Por favor escribe un número de arete o nombre.";
+          // Sin arete, el Enter equivale a filtrar el Tablero.
+          filtrarTableroDesdeModal();
           return;
         }
         cerrarModalBuscar();

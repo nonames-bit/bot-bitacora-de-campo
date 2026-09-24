@@ -48,6 +48,12 @@ if _RAIZ_REPO not in sys.path:
     sys.path.insert(0, _RAIZ_REPO)
 
 try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(_RAIZ_REPO, ".env"))
+except ImportError:
+    pass
+
+try:
     from ..utils import to_date
 except (ImportError, ValueError):
     from src.utils import to_date  # type: ignore
@@ -2382,6 +2388,26 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         finally:
             try:
                 db_t.close()
+            except Exception:
+                pass
+
+    @app.get("/api/parto/sugerir-padre")
+    def api_parto_sugerir_padre():
+        """Sugiere el padre más probable para un parto según servicios previos o toros en el mismo potrero."""
+        vaca = (request.args.get("vaca") or request.args.get("tag") or "").strip()
+        fecha = (request.args.get("fecha") or "").strip() or None
+        if not vaca:
+            return jsonify({"ok": False, "error": "Parámetro 'vaca' requerido."}), 400
+        db_s = _db(db_path)
+        try:
+            res = db_s.sugerir_padre_parto(vaca, fecha)
+            return jsonify(res)
+        except Exception as e:
+            logger.exception("Error al sugerir padre de parto: %s", e)
+            return jsonify({"ok": False, "error": str(e)}), 500
+        finally:
+            try:
+                db_s.close()
             except Exception:
                 pass
 

@@ -800,6 +800,20 @@ class Database:
         id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
         padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
 
+        # Si no se pasó padre explícito pero hay cría y vaca, sugerir y asociar automáticamente
+        # según servicio previo registrado o toro en el potrero durante la concepción (~283d)
+        if not padre_id and id_cria is not None and vaca_id is not None:
+            try:
+                sug_padre = self.sugerir_padre_parto(vaca_id, fecha)
+                if sug_padre and sug_padre.get("ok") and sug_padre.get("sugerencia"):
+                    t_tag = sug_padre["sugerencia"].get("toro_tag")
+                    if t_tag:
+                        padre_id = self.resolve_animal(t_tag, crear=True, sexo="Macho")
+                        if not padre_tag:
+                            padre_tag = t_tag
+            except Exception:
+                pass
+
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
             return None
 
@@ -894,6 +908,201 @@ class Database:
         if tipo_evento == "GEMELAR" and grupo_parto_id is None:
             self.execute("UPDATE partos SET grupo_parto_id = ? WHERE id = ?", (nuevo_id, nuevo_id))
         return nuevo_id
+
+    def sugerir_padre_parto(self, vaca_tag_or_id: Any,
+                            fecha_parto: Optional[Any] = None) -> dict[str, Any]:
+        """
+        Calcula y sugiere el padre más probable para el parto de una vaca.
+        
+        Metodología zootécnica:
+        1. Ventana de concepción: Fecha de parto - 283 días (promedio gestación bovina),
+           con un intervalo de búsqueda de +/- 15 días (268 a 298 días).
+        2. Prioridad 1: Verificar si hay un servicio registrado (IA, IATF o Monta Natural)
+           en dicha ventana en la tabla `servicios`.
+        3. Prioridad 2: Si no hay servicio registrado, determinar en qué potrero estaba
+           la vaca en la fecha estimada de concepción (analizando traslados históricos o
+           potrero actual). Luego comprobar qué toro reproductor activo oficial de la finca
+           estaba en ese mismo potrero en esa fecha (Monta Natural a Campo).
+        """
+        # 1. Normalizar fecha de parto
+        if not fecha_parto:
+            d_parto = date.today()
+        elif isinstance(fecha_parto, date):
+            d_parto = fecha_parto
+        elif isinstance(fecha_parto, str):
+            try:
+                d_parto = date.fromisoformat(fecha_parto.strip()[:10])
+            except Exception:
+                d_parto = date.today()
+        else:
+            d_parto = date.today()
+
+        d_concepcion = d_parto - timedelta(days=283)
+        d_min = d_concepcion - timedelta(days=15)
+        d_max = d_concepcion + timedelta(days=15)
+        iso_parto = d_parto.isoformat()
+        iso_concepcion = d_concepcion.isoformat()
+        iso_min = d_min.isoformat()
+        iso_max = d_max.isoformat()
+
+        # 2. Resolver la vaca
+        if isinstance(vaca_tag_or_id, int):
+            vaca = self.query_one("SELECT id_animal, tag, nombre, potrero_id FROM animales WHERE id_animal = ?", (vaca_tag_or_id,))
+        else:
+            tag_limpio = str(vaca_tag_or_id).strip()
+            vaca = self.query_one("SELECT id_animal, tag, nombre, potrero_id FROM animales WHERE tag = ? OR UPPER(tag) = UPPER(?)", (tag_limpio, tag_limpio))
+
+        if not vaca:
+            return {
+                "ok": False,
+                "error": f"Vaca '{vaca_tag_or_id}' no encontrada",
+                "fecha_parto": iso_parto,
+                "fecha_concepcion_est": iso_concepcion,
+                "sugerencia": None,
+            }
+
+        vaca_id = vaca["id_animal"]
+        vaca_tag = vaca["tag"]
+
+        # 3. Prioridad 1: Buscar servicio registrado en la ventana de concepción
+        servicio = self.query_one("""
+            SELECT s.id, s.fecha, s.tipo_servicio, s.toro_pajilla, s.inseminador, s.estado
+            FROM servicios s
+            WHERE s.vaca_id = ? 
+              AND s.fecha BETWEEN ? AND ?
+              AND s.toro_pajilla IS NOT NULL AND TRIM(s.toro_pajilla) != ''
+            ORDER BY ABS(julianday(s.fecha) - julianday(?)) ASC
+            LIMIT 1
+        """, (vaca_id, iso_min, iso_max, iso_concepcion))
+
+        if servicio and servicio["toro_pajilla"]:
+            toro_tag = servicio["toro_pajilla"].strip()
+            toro_info = self.query_one("SELECT id_animal, tag, nombre, raza FROM animales WHERE tag = ? OR UPPER(tag) = UPPER(?)", (toro_tag, toro_tag))
+            toro_nom = toro_info["nombre"] if toro_info else ""
+            toro_raza = toro_info["raza"] if toro_info else ""
+
+            tipo_srv = (servicio["tipo_servicio"] or "IA").upper()
+            dias_gest = 283
+            try:
+                f_srv = date.fromisoformat(servicio["fecha"][:10])
+                dias_gest = (d_parto - f_srv).days
+            except Exception:
+                pass
+
+            es_monta = tipo_srv in ("MONTA", "MN", "MONTA_NATURAL")
+            nombre_metodo = "Monta Natural (Servicio)" if es_monta else f"Inseminación ({tipo_srv})"
+            explicacion = f"Servicio registrado de {nombre_metodo} con {toro_tag}"
+            if toro_nom:
+                explicacion += f" ({toro_nom})"
+            explicacion += f" el {servicio['fecha']} ({dias_gest} días de gestación)"
+
+            return {
+                "ok": True,
+                "vaca_tag": vaca_tag,
+                "fecha_parto": iso_parto,
+                "fecha_concepcion_est": iso_concepcion,
+                "dias_gestacion_est": dias_gest,
+                "sugerencia": {
+                    "toro_tag": toro_tag,
+                    "toro_nombre": toro_nom,
+                    "toro_raza": toro_raza,
+                    "metodo": "SERVICIO_REGISTRADO",
+                    "tipo_servicio": tipo_srv,
+                    "fecha_servicio": servicio["fecha"],
+                    "confianza": "MUY_ALTA",
+                    "explicacion": explicacion,
+                }
+            }
+
+        # 4. Prioridad 2: Buscar toro reproductor en el potrero compartido en la fecha de concepción
+        def _obtener_potrero_en_fecha(animal_id, potrero_fallback, target_fecha):
+            # Traslado previo más reciente
+            tr_prev = self.query_one("""
+                SELECT potrero_destino FROM traslados
+                WHERE animal_id = ? AND fecha <= ? AND potrero_destino IS NOT NULL
+                ORDER BY fecha DESC, id DESC LIMIT 1
+            """, (animal_id, target_fecha))
+            if tr_prev and tr_prev["potrero_destino"]:
+                return tr_prev["potrero_destino"]
+            # Primer traslado posterior (potrero_origen)
+            tr_post = self.query_one("""
+                SELECT potrero_origen FROM traslados
+                WHERE animal_id = ? AND fecha > ? AND potrero_origen IS NOT NULL
+                ORDER BY fecha ASC, id ASC LIMIT 1
+            """, (animal_id, target_fecha))
+            if tr_post and tr_post["potrero_origen"]:
+                return tr_post["potrero_origen"]
+            # Fallback a potrero maestro del animal
+            return potrero_fallback
+
+        pot_vaca_id = _obtener_potrero_en_fecha(vaca_id, vaca["potrero_id"], iso_concepcion)
+        if not pot_vaca_id:
+            return {
+                "ok": True,
+                "vaca_tag": vaca_tag,
+                "fecha_parto": iso_parto,
+                "fecha_concepcion_est": iso_concepcion,
+                "dias_gestacion_est": 283,
+                "sugerencia": None,
+                "mensaje": "No se encontró registro de potrero para la vaca durante la ventana de concepción.",
+            }
+
+        pot_vaca = self.query_one("SELECT id, nombre FROM potreros WHERE id = ?", (pot_vaca_id,))
+        pot_nombre = pot_vaca["nombre"] if pot_vaca else f"Potrero #{pot_vaca_id}"
+
+        toros = self.query("""
+            SELECT id_animal, tag, nombre, raza, potrero_id FROM animales
+            WHERE estado = 'ACTIVO' AND (
+                tag GLOB 'T[0-9]*'
+                OR UPPER(COALESCE(notas, '')) LIKE '%REPRODUCTOR%'
+                OR UPPER(COALESCE(notas, '')) LIKE '%TORO%'
+            )
+            ORDER BY CASE WHEN tag GLOB 'T[0-9]*' THEN 0 ELSE 1 END, tag ASC
+        """)
+
+        coincidencias = []
+        for t in toros:
+            pot_t_id = _obtener_potrero_en_fecha(t["id_animal"], t["potrero_id"], iso_concepcion)
+            if pot_t_id == pot_vaca_id:
+                coincidencias.append(t)
+
+        if coincidencias:
+            toro_elegido = coincidencias[0]
+            t_nom = toro_elegido["nombre"] or ""
+            nom_display = f" ({t_nom})" if t_nom else ""
+            explicacion = f"Toro {toro_elegido['tag']}{nom_display} estaba en el mismo potrero ('{pot_nombre}') durante la concepción (~283 días antes)"
+            if len(coincidencias) > 1:
+                otros = ", ".join([f"{c['tag']}" for c in coincidencias[1:]])
+                explicacion += f" (Otros toros en el potrero: {otros})"
+
+            return {
+                "ok": True,
+                "vaca_tag": vaca_tag,
+                "fecha_parto": iso_parto,
+                "fecha_concepcion_est": iso_concepcion,
+                "dias_gestacion_est": 283,
+                "sugerencia": {
+                    "toro_tag": toro_elegido["tag"],
+                    "toro_nombre": t_nom,
+                    "toro_raza": toro_elegido["raza"] or "",
+                    "metodo": "MONTA_NATURAL_POTRERO",
+                    "potrero_id": pot_vaca_id,
+                    "potrero_nombre": pot_nombre,
+                    "confianza": "ALTA" if len(coincidencias) == 1 else "MEDIA",
+                    "explicacion": explicacion,
+                    "otros_toros": [c["tag"] for c in coincidencias[1:]] if len(coincidencias) > 1 else [],
+                }
+            }
+
+        return {
+            "ok": True,
+            "vaca_tag": vaca_tag,
+            "fecha_parto": iso_parto,
+            "fecha_concepcion_est": iso_concepcion,
+            "dias_gestacion_est": 283,
+            "sugerencia": None,
+            "mensaje": f"La vaca estaba en potrero '{pot_nombre}', pero no se encontró un toro reproductor en ese potrero durante la fecha de concepción ({iso_concepcion}).",
+        }
 
     def registrar_muerte(self, animal_tag, fecha=None, causa_presunta=None,
                          notas=None, registrado_por=None) -> int:

@@ -371,8 +371,12 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
                 SELECT 'SERVICIO' AS tipo, s.fecha AS fecha, a.tag AS tag, a.nombre AS nombre,
                        '' AS detalle_tag,
                        '' AS detalle_label,
-                       COALESCE(s.tipo_servicio, 'Servicio/IA') ||
-                       CASE WHEN s.toro_pajilla IS NOT NULL THEN ' · ' || s.toro_pajilla ELSE '' END AS descripcion,
+                       CASE 
+                           WHEN UPPER(COALESCE(s.tipo_servicio, '')) IN ('MONTA', 'MN', 'MONTA_NATURAL') THEN 'Monta Natural'
+                           WHEN UPPER(COALESCE(s.tipo_servicio, '')) = 'IATF' THEN 'IATF'
+                           ELSE 'Inseminación (IA)'
+                       END ||
+                       CASE WHEN s.toro_pajilla IS NOT NULL AND TRIM(s.toro_pajilla) != '' THEN ' · ' || TRIM(s.toro_pajilla) ELSE '' END AS descripcion,
                        COALESCE(s.estado, '') AS notas, s.id AS id
                 FROM servicios s
                 JOIN animales a ON a.id_animal = s.vaca_id
