@@ -77,36 +77,38 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // v86: Animaciones contextuales en el header (vaca_echada en descanso nocturno y vaca_con_cria para fichas de paridas), easter egg interactivo con métricas en vivo y lluvia animada en header.
 // BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
 // __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
+// P1.4 (auditoría 2026-09-23): (a) no se cachean /api/grafico* ni URLs con
+// parámetro volátil t= (llenaban Cache Storage sin límite); (b) precache con
+// una URL canónica por asset (antes GIF/PNG duplicados con y sin ?v=) y match
+// con ignoreSearch; (c) precache asset por asset con Promise.allSettled manual
+// -- un fallo aislado ya no se traga todo en silencio y el install falla si el
+// app-shell queda incompleto. (b-banner de datos rancios: pendiente.)
 var CACHE = "pwa-ja-__PWA_VERSION__"; // token → hash SHA1(estáticos) al servir
+// (P1.4c) Una sola URL canónica por asset (antes cada GIF/PNG aparecía con y
+// sin ?v= → ~1.2 MB duplicados en el precache). El match en runtime usa
+// ignoreSearch, así que una entrada plana sirve tanto /x como /x?v=<hash>.
+// Caso real: app.js pide los GIFs en forma plana (window.__PWA_V__ no está
+// definido) mientras las plantillas piden css/js con ?v=.
 var PRECACHE = [
   "/",
   "/login",
   "/offline.html",
   "/manifest.json",
-  "/static/style.css?v=__PWA_VERSION__",
-  "/static/app.js?v=__PWA_VERSION__",
-  "/static/ja-core.js?v=__PWA_VERSION__",
-  "/static/sw-register.js?v=__PWA_VERSION__",
+  "/static/style.css",
+  "/static/app.js",
+  "/static/ja-core.js",
+  "/static/sw-register.js",
+  "/static/login.js",
   "/static/vaca_comiendo.gif",
-  "/static/vaca_comiendo.gif?v=__PWA_VERSION__",
   "/static/vaca_comiendo.png",
-  "/static/vaca_comiendo.png?v=__PWA_VERSION__",
   "/static/vaca_echada.gif",
-  "/static/vaca_echada.gif?v=__PWA_VERSION__",
   "/static/vaca_echada.png",
-  "/static/vaca_echada.png?v=__PWA_VERSION__",
   "/static/vaca_con_cria.gif",
-  "/static/vaca_con_cria.gif?v=__PWA_VERSION__",
   "/static/vaca_con_cria.png",
-  "/static/vaca_con_cria.png?v=__PWA_VERSION__",
   "/static/toro_reproductor.gif",
-  "/static/toro_reproductor.gif?v=__PWA_VERSION__",
   "/static/toro_reproductor.png",
-  "/static/toro_reproductor.png?v=__PWA_VERSION__",
   "/static/ternero.gif",
-  "/static/ternero.gif?v=__PWA_VERSION__",
   "/static/ternero.png",
-  "/static/ternero.png?v=__PWA_VERSION__",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",
   "/static/favicon.svg",
@@ -121,10 +123,32 @@ var PRECACHE = [
   "/static/fonts/geist-sans-latin-700-normal.woff2"
 ];
 
+// App-shell crítico: sin esto la PWA queda inutilizable offline. Si falla su
+// precache, el install DEBE fallar (el navegador conserva el SW anterior en
+// lugar de activar uno a medias).
+var APP_SHELL = ["/", "/static/style.css", "/static/app.js", "/static/ja-core.js"];
+
 self.addEventListener("install", function (e) {
+  // (P1.4d) Precarga asset por asset: un fallo aislado (p. ej. un GIF) ya no
+  // se traga el precache completo en silencio (antes c.addAll(...).catch(()=>{})).
   e.waitUntil(
     caches.open(CACHE).then(function (c) {
-      return c.addAll(PRECACHE).catch(function () { /* parcial ok */ });
+      return Promise.all(PRECACHE.map(function (url) {
+        return c.add(url).then(
+          function () { return { url: url, ok: true }; },
+          function (err) { return { url: url, ok: false, err: err }; }
+        );
+      }));
+    }).then(function (resultados) {
+      var fallidos = resultados.filter(function (r) { return !r.ok; });
+      if (fallidos.length) {
+        console.warn("[sw] precache parcial (" + fallidos.length + " fallo(s)): " +
+          fallidos.map(function (f) { return f.url; }).join(", "));
+      }
+      var shellRoto = fallidos.some(function (f) { return APP_SHELL.indexOf(f.url) !== -1; });
+      if (shellRoto) {
+        throw new Error("[sw] app-shell incompleto en precache; se cancela el install.");
+      }
     }).then(function () { return self.skipWaiting(); })
   );
 });
@@ -166,6 +190,25 @@ self.addEventListener("fetch", function (e) {
 
   // API y media: red primero con copia de respaldo.
   if (url.pathname.indexOf("/api/") === 0 || url.pathname.indexOf("/media/") === 0) {
+    // (P1.4a) Los gráficos (/api/grafico/...) llegan con ?t=<timestamp> único
+    // por render (ja-core.js): cachearlos llena Cache Storage sin límite y
+    // nunca se reutilizan. Igual cualquier URL con parámetro volátil t=.
+    // Estas URLs se sirven solo de red (sin escribir ni leer caché).
+    var volatil = url.pathname.indexOf("/api/grafico") === 0 || url.searchParams.has("t");
+    if (volatil) {
+      e.respondWith(
+        fetch(req).catch(function () {
+          if (url.pathname.indexOf("/api/") === 0) {
+            return new Response(JSON.stringify({
+              errores: { red: "Sin conexión: gráfico no disponible." },
+              _offline: true
+            }), { status: 503, headers: { "Content-Type": "application/json" } });
+          }
+          return new Response("", { status: 503 });
+        })
+      );
+      return;
+    }
     e.respondWith(
       fetch(req).then(function (r) { return guardarEnCache(req, r); })
         .catch(function () {
@@ -184,9 +227,12 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // Estáticos: cache-first.
+  // Estáticos: cache-first (con fallback ignoreSearch para que la entrada
+  // canónica sin ?v= sirva también las peticiones con ?v=<hash>).
   e.respondWith(
     caches.match(req).then(function (hit) {
+      return hit || caches.match(req, { ignoreSearch: true });
+    }).then(function (hit) {
       return hit || fetch(req).then(function (r) { return guardarEnCache(req, r); });
     })
   );
