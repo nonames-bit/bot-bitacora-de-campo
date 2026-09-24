@@ -160,24 +160,28 @@
     _vacaEstadoActual = nuevoEstado;
 
     var vParam = window.__PWA_V__ ? ("?v=" + encodeURIComponent(window.__PWA_V__)) : "";
+    // (P1.5) El header animado usa WebP (antes GIF: 763 KB -> ~263 KB). Si el
+    // usuario pidió reducir movimiento, se usa el PNG estático equivalente.
+    var reduVaca = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    function _assetVaca(base) { return "/static/" + base + (reduVaca ? ".png" : ".webp") + vParam; }
     if (nuevoEstado === "ternero") {
-      img.src = "/static/ternero.gif" + vParam;
+      img.src = _assetVaca("ternero");
       img.alt = "Ternero alegre en el potrero";
       img.title = "Ternero / Cría lactante · Toca para ver estado rápido";
     } else if (nuevoEstado === "toro") {
-      img.src = "/static/toro_reproductor.gif" + vParam;
+      img.src = _assetVaca("toro_reproductor");
       img.alt = "Toro reproductor en el potrero";
       img.title = "Toro reproductor / Padrote · Toca para ver estado rápido";
     } else if (nuevoEstado === "cria") {
-      img.src = "/static/vaca_con_cria.gif" + vParam;
+      img.src = _assetVaca("vaca_con_cria");
       img.alt = "Vaca con su cría en el potrero";
       img.title = "Vaca parida con cría al pie · Toca para ver estado rápido";
     } else if (nuevoEstado === "noche") {
-      img.src = "/static/vaca_echada.gif" + vParam;
+      img.src = _assetVaca("vaca_echada");
       img.alt = "Vaca descansando y rumiando";
       img.title = "Ganado en reposo nocturno · Toca para ver estado rápido";
     } else {
-      img.src = "/static/vaca_comiendo.gif" + vParam;
+      img.src = _assetVaca("vaca_comiendo");
       img.alt = "Vaca pastando forraje";
       img.title = "Vaca pastando en rotación Voisin · Toca para ver estado rápido";
     }
@@ -9929,7 +9933,9 @@
         + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
         + "</div>";
     } else {
-      var defaultAnim = esTernero ? "/static/ternero.gif" : (esToro ? "/static/toro_reproductor.gif" : (esParida ? "/static/vaca_con_cria.gif" : "/static/vaca_comiendo.gif"));
+      // (P1.5) Miniatura 60x32: PNG estático (no necesita animar y pesa ~10 KB
+      // frente a los cientos de KB del WebP/GIF animado).
+      var defaultAnim = esTernero ? "/static/ternero.png" : (esToro ? "/static/toro_reproductor.png" : (esParida ? "/static/vaca_con_cria.png" : "/static/vaca_comiendo.png"));
       var defaultTitle = esTernero ? "Ternero / Cría" : (esToro ? "Toro reproductor" : "Bovino");
       head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden;' title='" + defaultTitle + "'>"
         + "<img src='" + defaultAnim + "' alt='Ilustración' style='width:60px; height:32px; object-fit:contain; display:block;'>"

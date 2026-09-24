@@ -83,6 +83,9 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // con ignoreSearch; (c) precache asset por asset con Promise.allSettled manual
 // -- un fallo aislado ya no se traga todo en silencio y el install falla si el
 // app-shell queda incompleto. (b-banner de datos rancios: pendiente.)
+// P1.5 (auditoría 2026-09-24): el header animado pasó de GIF (763 KB eager) a
+// WebP animado (~263 KB) y usa PNG estático con prefers-reduced-motion reduce;
+// la miniatura de ficha usa PNG. Precache actualizado (webp + png; sin GIF).
 var CACHE = "pwa-ja-__PWA_VERSION__"; // token → hash SHA1(estáticos) al servir
 // (P1.4c) Una sola URL canónica por asset (antes cada GIF/PNG aparecía con y
 // sin ?v= → ~1.2 MB duplicados en el precache). El match en runtime usa
@@ -99,15 +102,15 @@ var PRECACHE = [
   "/static/ja-core.js",
   "/static/sw-register.js",
   "/static/login.js",
-  "/static/vaca_comiendo.gif",
+  "/static/vaca_comiendo.webp",
   "/static/vaca_comiendo.png",
-  "/static/vaca_echada.gif",
+  "/static/vaca_echada.webp",
   "/static/vaca_echada.png",
-  "/static/vaca_con_cria.gif",
+  "/static/vaca_con_cria.webp",
   "/static/vaca_con_cria.png",
-  "/static/toro_reproductor.gif",
+  "/static/toro_reproductor.webp",
   "/static/toro_reproductor.png",
-  "/static/ternero.gif",
+  "/static/ternero.webp",
   "/static/ternero.png",
   "/static/leaflet/leaflet.css",
   "/static/leaflet/leaflet.js",
