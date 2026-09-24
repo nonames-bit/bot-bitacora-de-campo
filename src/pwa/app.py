@@ -2730,6 +2730,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.post("/api/sync")
     def api_sync():
+        from datetime import datetime
+
         datos = request.get_json(silent=True) or {}
         eventos = datos.get("eventos", [])
         if not isinstance(eventos, list):
@@ -2749,7 +2751,26 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 payload = ev.get("payload") or {}
                 fecha = ev.get("fecha") or payload.get("fecha") or date.today().isoformat()
                 id_local = ev.get("id_local")
+                if not isinstance(id_local, str) or not id_local.strip():
+                    id_local = None
+                else:
+                    id_local = id_local.strip()[:128]
 
+                # Idempotencia (P0.1): si este id_local ya fue procesado, el
+                # reintento del cliente (respuesta perdida en conexion rural)
+                # NO debe volver a registrar el evento; se devuelve en ids_ok
+                # para que el cliente purgue la cola igual que la primera vez.
+                if id_local:
+                    ya_procesado = db_sync.query_one(
+                        "SELECT 1 AS ok FROM sync_ids_procesados WHERE id_local = ?",
+                        (id_local,),
+                    )
+                    if ya_procesado:
+                        ids_ok.append(id_local)
+                        procesados += 1
+                        continue
+
+                n_ids_previos = len(ids_ok)
                 try:
                     if tipo == "parto":
                         tipo_evento = str(payload.get("tipo_evento") or "PARTO").upper()
@@ -3062,9 +3083,32 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             ids_ok.append(id_local)
                     else:
                         errores.append(f"Tipo de evento no reconocido: {tipo}")
+
+                    # Idempotencia (P0.1): el evento se proceso bien en esta
+                    # pasada -> persistir su id_local para que un reintento
+                    # futuro (misma cola offline reenviada) no lo duplique.
+                    if id_local and len(ids_ok) > n_ids_previos:
+                        db_sync.execute(
+                            "INSERT OR IGNORE INTO sync_ids_procesados "
+                            "(id_local, user_id, tipo_evento, procesado_en) "
+                            "VALUES (?, ?, ?, ?)",
+                            (id_local, uid, tipo, datetime.now().isoformat(timespec="seconds")),
+                        )
                 except Exception as e:
                     logger.exception("Error al sincronizar evento %s: %s", id_local, e)
                     errores.append(f"Error en evento {id_local or tipo}: {str(e)}")
+
+            # Poda barata de la tabla de idempotencia: los reintentos del
+            # cliente ocurren a los minutos/horas, no a los meses. Ventana de
+            # 7 dias cubre cualquier cola offline larga sin crecimiento
+            # ilimitado en el SQLite del VPS.
+            try:
+                db_sync.execute(
+                    "DELETE FROM sync_ids_procesados "
+                    "WHERE procesado_en < datetime('now', '-7 days', 'localtime')"
+                )
+            except Exception:
+                pass
 
             return jsonify({
                 "ok": True,

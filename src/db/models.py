@@ -543,6 +543,22 @@ CREATE TABLE IF NOT EXISTS mensajes_equipo (
 );
 
 CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_creado ON mensajes_equipo(creado_en);
+
+-- Idempotencia de /api/sync (P0.1, auditoría 2026-09-23): el cliente offline
+-- genera un id_local único por evento encolado (app.js) y reintenta el POST si
+-- la respuesta se pierde (conexión rural intermitente). Sin esta tabla, un
+-- reintento tras un POST procesado pero sin respuesta leída duplicaría partos/
+-- pesajes/muertes/servicios. Cada id_local procesado se persiste aquí; si ya
+-- existe, el evento se devuelve en ids_ok (purgeable por el cliente) sin
+-- volver a registrarse en las tablas de dominio.
+CREATE TABLE IF NOT EXISTS sync_ids_procesados (
+    id_local TEXT PRIMARY KEY,
+    user_id INTEGER,
+    tipo_evento TEXT,
+    procesado_en TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_ids_procesado_en ON sync_ids_procesados(procesado_en);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -554,7 +570,7 @@ TABLAS = [
     "termo_nitrogeno", "pluviometria", "aforos_historico", "aforos_ronda", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
-    "precios_mercado", "mensajes_equipo",
+    "precios_mercado", "mensajes_equipo", "sync_ids_procesados",
 ]
 
 
