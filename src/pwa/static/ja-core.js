@@ -40,10 +40,18 @@
   // Chips semáforo por estado.
   function chipEstado(v) {
     var t = String(v == null ? "" : v);
-    if (/^🟢/.test(t)) return "<span class='chip verde'>" + t + "</span>";
-    if (/^🟡/.test(t)) return "<span class='chip ambar'>" + t + "</span>";
-    if (/^🔴/.test(t)) return "<span class='chip rojo'>" + t + "</span>";
-    if (/^⚪/.test(t)) return "<span class='chip gris'>" + t + "</span>";
+    // (P2.11) Se EXTRAE el emoji semáforo inicial y se escapa SIEMPRE el resto:
+    // antes se inyectaba crudo cualquier string que empezara con emoji, lo que
+    // abría una vía de inyección de HTML desde datos de la BD (p. ej. un
+    // resultado de diagnóstico manipulado).
+    var colores = [["🟢", "verde"], ["🟡", "ambar"], ["🔴", "rojo"], ["⚪", "gris"]];
+    for (var i = 0; i < colores.length; i++) {
+      var emoji = colores[i][0];
+      if (t.indexOf(emoji) === 0) {
+        var resto = t.slice(emoji.length).replace(/^\s+/, "");
+        return "<span class='chip " + colores[i][1] + "'>" + emoji + (resto ? " " + esc(resto) : "") + "</span>";
+      }
+    }
     return "<span class='chip gris'>" + esc(t) + "</span>";
   }
   function vacio(msg) { return "<p class='aviso'><span aria-hidden='true'>🌾</span> " + esc(msg || "Sin datos.") + "</p>"; }
