@@ -738,41 +738,58 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
 
 
 def formatear_genetica_panel(db: Database) -> str:
-    """Genera el reporte de distribución racial y cruces del hato."""
-    filas = db.query(
-        """
-        SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') as raza_norm, count(*) as total
-        FROM animales
-        WHERE estado = 'ACTIVO'
-        GROUP BY raza_norm
-        ORDER BY total DESC
-        """
-    )
-    total_activos = sum(r["total"] for r in filas)
+    """Genera el reporte zootécnico de distribución racial, pool genético y cruces del hato."""
+    from ..engine.dashboard_data import datos_genetica
+    d = datos_genetica(db)
+    total_act = d.get("total_activos", 0)
+    tipificados = d.get("tipificados", 0)
+    pct_tip = d.get("pct_tipificados", 0.0)
 
     lineas = [
         "🧬 <b>COMPOSICIÓN GENÉTICA & RAZAS</b>",
-        f"🏷️ <i>Hato Activo: {total_activos} Cabezas</i>",
+        f"🏷️ <i>Hato Activo: {total_act} cabezas ({tipificados} con desglose racial • {pct_tip}%)</i>",
         "────────────────────────────────────────",
     ]
 
-    nombres_razas = {
-        "I": "Holstein / Cruce Lechero",
-        "T": "Tricross / Cebú Comercial",
-        "C": "Cebú / Brahman / Gyr",
-        "M": "Mestizo / Doble Propósito",
-        "SIN RAZA": "Sin Clasificar",
-    }
+    # 1. Pool genético global del hato
+    pool = d.get("pool_racial", [])
+    if pool:
+        lineas.append("📊 <b>Pool Genético Global (% de Sangre en Hato):</b>")
+        for r in pool[:6]:
+            lineas.append(f"  • <b>{r['raza']}</b>: <code>{r['pct']:.1f}%</code> ({r['cabezas_portadoras']} portadores)")
+        lineas.append("")
 
-    for r in filas:
-        rz_cod = r["raza_norm"]
-        rz_nom = nombres_razas.get(rz_cod, rz_cod)
-        cnt = r["total"]
-        pct = (cnt / total_activos * 100.0) if total_activos > 0 else 0
-        lineas.append(f"• <b>{rz_nom}</b> (<code>{rz_cod}</code>): <b>{cnt}</b> ({pct:.1f}%)")
+    # 2. Grados de Sangre / Categorías
+    grados = d.get("grados_resumen", [])
+    if grados:
+        lineas.append("📐 <b>Distribución por Grados de Sangre:</b>")
+        iconos = {
+            "PURO": "🌟",
+            "F1_1_2": "🧬",
+            "3_4": "📐",
+            "5_8": "⚖️",
+            "7_8": "🎯",
+            "1_2": "🌿",
+            "MULTI": "🔄",
+            "INDET": "❓",
+        }
+        for g in grados:
+            if g.get("cabezas", 0) > 0:
+                ico = iconos.get(g["codigo"], "•")
+                lineas.append(f"  {ico} <b>{g['nombre']}</b>: <b>{g['cabezas']}</b> cabezas ({g['pct_hato']}%)")
+        lineas.append("")
+
+    # 3. Top líneas de cruces
+    patrones = d.get("patrones_cruces", [])
+    patrones_con_cruce = [p for p in patrones if p["grado_codigo"] not in ("INDET", "SIN_CLASIFICAR")][:6]
+    if patrones_con_cruce:
+        lineas.append("🏆 <b>Principales Familias de Cruces:</b>")
+        for p in patrones_con_cruce:
+            frac = p.get("fraccion", "")
+            lineas.append(f"  • [<b>{frac}</b>] {p['nombre']}: <b>{p['cabezas']}</b> cabezas")
 
     lineas.append("────────────────────────────────────────")
-    lineas.append("💡 <i>El registro incluye cruces de Holstein, Gyr, Ayrshire y Pardo Suizo.</i>")
+    lineas.append("💡 <i>Nomenclatura zootécnica: F1 (1/2), 3/4, 5/8, 7/8 y Puros calculados automáticamente.</i>")
     return "\n".join(lineas)
 
 

@@ -86,6 +86,10 @@ try:
         resolver_tag_flexible as _resolver_tag_flexible,
         datos_grafico as _datos_grafico,
     )
+    from ..engine.genetic_engine import (
+        generar_resumen_zootecnico as _generar_resumen_zootecnico,
+        CATALOGO_RAZAS_PREDEFINIDAS as _CATALOGO_RAZAS_PREDEFINIDAS,
+    )
 except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
 
@@ -110,6 +114,10 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
         datos_sanidad as _datos_sanidad,
         resolver_tag_flexible as _resolver_tag_flexible,
         datos_grafico as _datos_grafico,
+    )
+    from src.engine.genetic_engine import (  # type: ignore
+        generar_resumen_zootecnico as _generar_resumen_zootecnico,
+        CATALOGO_RAZAS_PREDEFINIDAS as _CATALOGO_RAZAS_PREDEFINIDAS,
     )
 
 logger = logging.getLogger(__name__)
@@ -2024,7 +2032,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
         db_a = _db(db_path)
         try:
-            from ..engine.genetic_engine import generar_resumen_zootecnico
             aid = db_a.animal_id(tag)
             if aid is None:
                 return jsonify({"ok": False, "error": f"No existe animal '{tag}'"}), 404
@@ -2037,7 +2044,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             if not ok:
                 return jsonify({"ok": False, "error": "No se pudo guardar la composición. Verifique porcentajes válidos."}), 400
             comp = db_a.obtener_composicion_racial(aid)
-            resumen = generar_resumen_zootecnico(comp)
+            resumen = _generar_resumen_zootecnico(comp)
             return jsonify({
                 "ok": True,
                 "tag": tag,
@@ -2207,7 +2214,6 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/api/genetica/catalogo-razas")
     def api_genetica_catalogo_razas():
         """Devuelve el catálogo de razas predefinidas unificado con las registradas en el hato."""
-        from ..engine.genetic_engine import CATALOGO_RAZAS_PREDEFINIDAS
         db_a = _db(db_path)
         try:
             filas = db_a.query("SELECT DISTINCT raza FROM composicion_racial WHERE raza IS NOT NULL AND raza != ''")
@@ -2218,10 +2224,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 val = (r["raza"] or "").strip()
                 if val and "+" not in val and "%" not in val and "/" not in val:
                     razas_db.append(val)
-            todas = list(dict.fromkeys(CATALOGO_RAZAS_PREDEFINIDAS + razas_db))
+            todas = list(dict.fromkeys(_CATALOGO_RAZAS_PREDEFINIDAS + razas_db))
             return jsonify({"ok": True, "razas": todas})
         except Exception:
-            return jsonify({"ok": True, "razas": CATALOGO_RAZAS_PREDEFINIDAS})
+            return jsonify({"ok": True, "razas": _CATALOGO_RAZAS_PREDEFINIDAS})
         finally:
             try:
                 db_a.close()

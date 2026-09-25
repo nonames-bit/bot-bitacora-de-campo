@@ -4299,14 +4299,139 @@
     return h;
   }
   function renderGenetica(d) {
-    var h = "<h3>" + icon("dna") + "Composición genética (razas)</h3>" + erroresHtml(d);
-    h += "<div class='kpis'>" + kpi(d.total, "Animales tipificados") + "</div>";
-    if (d.filas && d.filas.length) {
-      h += "<h4>" + icon("chartBar") + "Distribución por raza</h4>" + grafico("composicion_racial", "Composición genética (razas)");
-      h += "<h4>" + icon("chartLine") + "Detalle</h4>" + tabla(d.filas, [["raza_nombre", "Raza"], ["raza", "Código"], ["n", "Cabezas", "num"], ["pct", "% del hato"]], "Sin datos.");
-    } else {
-      h += vacio("Sin razas registradas en el hato activo.");
+    var h = "<h3>" + icon("dna") + "Composición Genética & Razas del Hato</h3>" + erroresHtml(d);
+
+    var totalAct = d.total_activos || d.total || 0;
+    var tip = d.tipificados || 0;
+    var pctTip = d.pct_tipificados || (totalAct ? ((tip / totalAct) * 100).toFixed(1) : 0);
+    var indet = d.indeterminados || 0;
+
+    // 1. Tarjetas KPIs principales
+    h += "<div class='kpis' style='margin-bottom:14px;'>"
+      + kpi(tip, "Con Desglose Racial (" + pctTip + "%)", "Tipificados con razas y cruces zootécnicos")
+      + kpi(totalAct, "Total Hato Activo", "Cabezas activas evaluadas")
+      + kpi(indet, "Base SG / Sin Desglose", "Importados sin desglose específico")
+      + "</div>";
+
+    // 2. Grados de Sangre (F1, 1/2, 3/4, 5/8, etc.) en chips táctiles
+    var grados = d.grados_resumen || [];
+    if (grados.length) {
+      h += "<div class='card' style='padding:12px 16px; margin-bottom:16px; border-left:4px solid var(--verde-marca);'>"
+        + "<b style='font-size:13.5px; display:flex; align-items:center; gap:6px; margin-bottom:8px;'>"
+        + icon("dna", 15) + "Distribución por Grados de Sangre Ganaderos</b>"
+        + "<div style='display:flex; flex-wrap:wrap; gap:8px;'>";
+      grados.forEach(function (g) {
+        var col = g.color || "gris";
+        h += "<div style='background:var(--superficie-hover); border:1px solid var(--borde); border-radius:8px; padding:6px 10px; display:flex; align-items:center; gap:8px;'>"
+          + "<span class='chip " + esc(col) + "' style='font-weight:700; font-size:11.5px;'>" + esc(g.chip) + "</span>"
+          + "<span style='font-size:12.5px; font-weight:600; color:var(--texto);'>" + esc(g.nombre) + ":</span>"
+          + "<b style='font-size:13.5px; color:var(--texto);'>" + esc(g.cabezas) + "</b>"
+          + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(g.pct_hato) + "%)</small>"
+          + "</div>";
+      });
+      h += "</div></div>";
     }
+
+    // 3. Pool Genético Global (% de sangre en el hato)
+    var pool = d.pool_racial || [];
+    if (pool.length) {
+      h += "<h4>" + icon("chartBar") + "Pool Genético Global del Hato (% de Sangre Real)</h4>";
+      h += "<div style='display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; margin-bottom:16px;'>"
+        + "<div style='flex:1; min-width:280px; max-width:480px;'>"
+        + grafico("composicion_racial", "Pool Genético (Razas)")
+        + "</div>"
+        + "<div style='flex:1; min-width:280px; display:flex; flex-direction:column; gap:8px;'>";
+
+      pool.forEach(function (p) {
+        var pCol = p.color || "var(--verde-marca)";
+        h += "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:8px 12px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;'>"
+          + "<span style='font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;'>"
+          + "<span style='display:inline-block; width:10px; height:10px; border-radius:50%; background:" + esc(pCol) + ";'></span>"
+          + esc(p.raza)
+          + "</span>"
+          + "<b>" + esc(p.pct) + "% <small style='color:var(--texto-suave); font-weight:normal;'>(" + esc(p.cabezas_portadoras) + " animales)</small></b>"
+          + "</div>"
+          + "<div style='width:100%; height:6px; background:var(--borde); border-radius:3px; overflow:hidden;'>"
+          + "<div style='width:" + Math.min(100, p.pct) + "%; height:100%; background:" + esc(pCol) + "; border-radius:3px;'></div>"
+          + "</div>"
+          + "</div>";
+      });
+
+      h += "</div></div>";
+    }
+
+    // 4. Familias de Cruces Zootécnicos (F1, 1/2, 3/4, 5/8, etc.)
+    var patrones = d.patrones_cruces || [];
+    if (patrones.length) {
+      h += "<h4>" + icon("dna") + "Familias de Cruce Zootécnico (F1, 1/2, 3/4, 5/8, 7/8, Puros)</h4>";
+
+      // Filtros táctiles rápidos
+      h += "<div style='display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 10px;'>"
+        + "<button type='button' class='chip btn-filtro-gen act' data-grado='TODOS' style='cursor:pointer; font-weight:700;'>Todos (" + patrones.length + " grupos)</button>"
+        + "<button type='button' class='chip morado btn-filtro-gen' data-grado='PURO' style='cursor:pointer;'>🌟 Puros</button>"
+        + "<button type='button' class='chip verde btn-filtro-gen' data-grado='F1_1_2' style='cursor:pointer;'>🧬 F1 (1/2)</button>"
+        + "<button type='button' class='chip azul btn-filtro-gen' data-grado='3_4' style='cursor:pointer;'>📐 3/4</button>"
+        + "<button type='button' class='chip ambar btn-filtro-gen' data-grado='5_8' style='cursor:pointer;'>⚖️ 5/8</button>"
+        + "<button type='button' class='chip cyan btn-filtro-gen' data-grado='7_8' style='cursor:pointer;'>🎯 7/8</button>"
+        + "<button type='button' class='chip lima btn-filtro-gen' data-grado='1_2' style='cursor:pointer;'>🌿 1/2 Multirracial</button>"
+        + "<button type='button' class='chip naranja btn-filtro-gen' data-grado='MULTI' style='cursor:pointer;'>🔄 Compuestos</button>"
+        + "<button type='button' class='chip gris btn-filtro-gen' data-grado='INDET' style='cursor:pointer;'>❓ Base SG</button>"
+        + "</div>";
+
+      // Buscador interactivo
+      h += "<div style='margin-bottom:12px;'>"
+        + "<input id='buscar-genetica-input' placeholder='🔍 Filtrar por nombre de cruce, raza o arete (ej: Girolando, 3/4, Gyr, JA45)...' style='width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; box-sizing:border-box;'>"
+        + "</div>";
+
+      // Tabla de patrones
+      h += "<div style='overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--borde); border-radius:8px; margin-bottom:16px;'>"
+        + "<table id='tabla-patrones-genetica' style='width:100%; border-collapse:collapse; font-size:13px; text-align:left;'>"
+        + "<thead style='background:var(--superficie-hover); border-bottom:1px solid var(--borde);'>"
+        + "<tr>"
+        + "<th style='padding:9px 12px; width:75px;'>Grado</th>"
+        + "<th style='padding:9px 12px;'>Línea / Cruce Zootécnico</th>"
+        + "<th style='padding:9px 12px; text-align:right; width:85px;'>Cabezas</th>"
+        + "<th style='padding:9px 12px; min-width:180px;'>Animales (Tag)</th>"
+        + "</tr>"
+        + "</thead>"
+        + "<tbody>";
+
+      patrones.forEach(function (p, idx) {
+        var col = p.chip_color || "gris";
+        var tags = p.animales || [];
+        var maxVisibles = 10;
+        var tagsVisibles = tags.slice(0, maxVisibles);
+        var ocultos = tags.slice(maxVisibles);
+
+        var chipsTagsHtml = tagsVisibles.map(function (tg) {
+          return "<button type='button' class='chip tag-chip-genetica' data-tag='" + esc(tg) + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600; margin:1px;' title='Ver ficha de " + esc(tg) + "'>" + esc(tg) + "</button>";
+        }).join(" ");
+
+        if (ocultos.length > 0) {
+          var idOcultos = "tags-ocultos-gen-" + idx;
+          var chipsOcultosHtml = ocultos.map(function (tg) {
+            return "<button type='button' class='chip tag-chip-genetica' data-tag='" + esc(tg) + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600; margin:1px;' title='Ver ficha de " + esc(tg) + "'>" + esc(tg) + "</button>";
+          }).join(" ");
+
+          chipsTagsHtml += " <span id='" + idOcultos + "' style='display:none;'>" + chipsOcultosHtml + "</span>"
+            + " <button type='button' class='btn-expandir-tags chip' data-target='" + idOcultos + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:700; background:var(--borde); color:var(--texto);'>+" + ocultos.length + " más...</button>";
+        }
+
+        h += "<tr class='fila-patron-gen' data-grado='" + esc(p.grado_codigo) + "' data-search='" + esc((p.nombre + " " + p.fraccion + " " + tags.join(" ")).toLowerCase()) + "' style='border-bottom:1px solid var(--borde);'>"
+          + "<td style='padding:8px 12px;'><span class='chip " + esc(col) + "' style='font-size:11px; font-weight:700;'>" + esc(p.fraccion) + "</span></td>"
+          + "<td style='padding:8px 12px; font-weight:600; color:var(--texto);'>" + esc(p.nombre) + "</td>"
+          + "<td style='padding:8px 12px; text-align:right;'><b style='font-size:13.5px;'>" + esc(p.cabezas) + "</b> <small style='color:var(--texto-suave); display:block; font-size:10.5px;'>" + esc(p.pct_hato) + "%</small></td>"
+          + "<td style='padding:8px 12px;'>" + chipsTagsHtml + "</td>"
+          + "</tr>";
+      });
+
+      h += "</tbody></table></div>";
+    } else {
+      h += vacio("Sin información genética registrada en el hato activo.");
+    }
+
+    // 5. Inventario de Pajuelas y Termo
     h += "<h4>" + icon("pajuelas") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
       + tabla(d.pajuelas_inventario, [
         ["codigo_toro", "Código Toro"], ["raza", "Raza"],
@@ -4317,13 +4442,75 @@
           return "<span class='chip " + c + "'>" + esc(n) + "</span>";
         }]
       ], "Sin inventario de pajuelas registrado.");
+
     h += "<h4>" + icon("snowflake") + "Recargas del Termo de Nitrógeno</h4>"
       + tabla(d.termo_nitrogeno, [
         ["fecha_recarga", "Última Recarga"],
         ["proxima_recarga", "Próxima Recarga", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
         ["dias_intervalo", "Intervalo (días)", "num"]
       ], "Sin historial de recargas de nitrógeno.");
+
     return h;
+  }
+
+  function bindGenetica(d) {
+    var botonesFiltro = qa(".btn-filtro-gen");
+    var filas = qa(".fila-patron-gen");
+    var inputBuscar = q("#buscar-genetica-input");
+
+    function aplicarFiltros() {
+      var btnAct = q(".btn-filtro-gen.act");
+      var gradoSel = (btnAct && btnAct.getAttribute("data-grado")) || "TODOS";
+      var txtBusq = ((inputBuscar && inputBuscar.value) || "").trim().toLowerCase();
+
+      filas.forEach(function (f) {
+        var g = f.getAttribute("data-grado") || "";
+        var searchData = f.getAttribute("data-search") || "";
+        var coincideGrado = (gradoSel === "TODOS" || g === gradoSel);
+        var coincideTexto = (!txtBusq || searchData.indexOf(txtBusq) !== -1);
+
+        if (coincideGrado && coincideTexto) {
+          f.style.display = "";
+        } else {
+          f.style.display = "none";
+        }
+      });
+    }
+
+    botonesFiltro.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        botonesFiltro.forEach(function (b) { b.classList.remove("act"); });
+        btn.classList.add("act");
+        aplicarFiltros();
+      });
+    });
+
+    if (inputBuscar) {
+      inputBuscar.addEventListener("input", aplicarFiltros);
+    }
+
+    qa(".btn-expandir-tags").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var targetId = btn.getAttribute("data-target");
+        var targetEl = document.getElementById(targetId);
+        if (targetEl) {
+          targetEl.style.display = "inline";
+          btn.style.display = "none";
+        }
+      });
+    });
+
+    qa(".tag-chip-genetica").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        var tag = chip.getAttribute("data-tag");
+        if (tag) {
+          irAVista("ficha");
+          var inTag = q("#f-tag");
+          if (inTag) inTag.value = tag;
+          cargar(true);
+        }
+      });
+    });
   }
   function renderAgenda(d) {
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
@@ -12461,6 +12648,7 @@
       if (actual === "finanzas") bindFinanzas();
       if (actual === "agenda") bindAgenda();
       if (actual === "sanidad") bindSanidad();
+      if (actual === "genetica") bindGenetica(d);
     }, animar ? vista : null);
   }
 

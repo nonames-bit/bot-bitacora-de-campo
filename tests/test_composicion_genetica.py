@@ -227,3 +227,79 @@ def test_api_rest_genetica(tmp_path):
     data_cat = resp_cat.get_json()
     assert "Brahman" in data_cat["razas"]
     assert "Romosinuano" in data_cat["razas"]
+
+
+def test_clasificacion_zootecnica():
+    """Valida la clasificación zootécnica de grados de sangre y patrones de cruce."""
+    from src.engine.genetic_engine import clasificar_animal_zootecnico
+
+    # 1. Puro
+    c_puro = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 100.0}])
+    assert c_puro["grado_codigo"] == "PURO"
+    assert c_puro["fraccion"] == "Puro"
+    assert "Gyr Puro" in c_puro["patron_formula"]
+
+    # 2. F1 Girolando (1/2 Gyr + 1/2 Holstein)
+    c_f1 = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 50.0}, {"raza": "Holstein", "porcentaje": 50.0}])
+    assert c_f1["grado_codigo"] == "F1_1_2"
+    assert c_f1["fraccion"] == "F1 1/2"
+    assert "F1 Girolando" in c_f1["patron_formula"]
+
+    # 3. Tres cuartos (3/4 Gyr + 1/4 Holstein)
+    c_34 = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 75.0}, {"raza": "Holstein", "porcentaje": 25.0}])
+    assert c_34["grado_codigo"] == "3_4"
+    assert c_34["fraccion"] == "3/4"
+    assert "3/4 Gyr" in c_34["patron_formula"]
+
+    # 4. Cinco octavos (5/8 Gyr + 3/8 Holstein)
+    c_58 = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 62.5}, {"raza": "Holstein", "porcentaje": 37.5}])
+    assert c_58["grado_codigo"] == "5_8"
+    assert c_58["fraccion"] == "5/8"
+    assert "5/8 Gyr" in c_58["patron_formula"]
+
+    # 5. Siete octavos (7/8)
+    c_78 = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 87.5}, {"raza": "Holstein", "porcentaje": 12.5}])
+    assert c_78["grado_codigo"] == "7_8"
+    assert c_78["fraccion"] == "7/8"
+
+    # 6. Indeterminado
+    c_ind = clasificar_animal_zootecnico([], "Indeterminado")
+    assert c_ind["grado_codigo"] == "INDET"
+    assert c_ind["es_tipificado"] is False
+
+
+def test_datos_genetica_resumen_panel(tmp_path):
+    """Valida que datos_genetica genere el pool racial, grados de sangre y familias de cruce."""
+    from src.engine.dashboard_data import datos_genetica
+
+    db_file = tmp_path / "test_resumen_panel.db"
+    db = Database(str(db_file)).create_tables()
+
+    # Animal 1: F1 Girolando
+    a1 = db.registrar_animal("JA01", sexo="Hembra", estado="ACTIVO")
+    db.guardar_composicion_racial(a1, [{"raza": "Gyr", "porcentaje": 50.0}, {"raza": "Holstein", "porcentaje": 50.0}])
+
+    # Animal 2: 3/4 Gyr
+    a2 = db.registrar_animal("JA02", sexo="Hembra", estado="ACTIVO")
+    db.guardar_composicion_racial(a2, [{"raza": "Gyr", "porcentaje": 75.0}, {"raza": "Holstein", "porcentaje": 25.0}])
+
+    # Animal 3: Indeterminado
+    db.registrar_animal("JA03", sexo="Hembra", raza="Indeterminado", estado="ACTIVO")
+
+    d = datos_genetica(db)
+    assert d["total_activos"] == 3
+    assert d["tipificados"] == 2
+    assert d["indeterminados"] == 1
+
+    # Pool racial: Gyr debe ser mayor que Holstein (50+75 = 125 puntos vs 50+25 = 75 puntos)
+    assert len(d["pool_racial"]) >= 2
+    gyr_pool = next(p for p in d["pool_racial"] if p["raza"] == "Gyr")
+    hol_pool = next(p for p in d["pool_racial"] if "Holstein" in p["raza"])
+    assert gyr_pool["pct"] > hol_pool["pct"]
+    assert gyr_pool["cabezas_portadoras"] == 2
+
+    # Patrones de cruce consolidados
+    assert any(p["fraccion"] == "F1 1/2" for p in d["patrones_cruces"])
+    assert any(p["fraccion"] == "3/4" for p in d["patrones_cruces"])
+    assert any(p["grado_codigo"] == "INDET" for p in d["patrones_cruces"])
+

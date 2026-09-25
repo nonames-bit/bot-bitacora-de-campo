@@ -163,6 +163,11 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "RS": "Romosinuano",
         "HOLSTEIN": "Holstein",
         "HOL": "Holstein",
+        "HOLSTEIN NEG": "Holstein Negro",
+        "HOLSTEIN NEGRO": "Holstein Negro",
+        "HOLSTEIN ROJO": "Holstein Rojo",
+        "HOLSTEIN R.": "Holstein Rojo",
+        "HOLSTEÍN R.": "Holstein Rojo",
         "JERSEY": "Jersey",
         "JER": "Jersey",
         "PARDO SUIZO": "Pardo Suizo",
@@ -180,6 +185,8 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "SANMARTINERO": "Sanmartinero",
         "HARTON DEL VALLE": "Hartón del Valle",
         "HARTÓN DEL VALLE": "Hartón del Valle",
+        "HARTON": "Hartón del Valle",
+        "HARTÓN": "Hartón del Valle",
         "BRANGUS": "Brangus",
         "ANGUS": "Angus",
         "CHAROLAIS": "Charolais",
@@ -187,6 +194,17 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "GIROLANDO": "Girolando",
         "MESTIZO": "Mestizo",
         "CRIOLLO": "Criollo",
+        "AYRSHIRE": "Ayrshire",
+        "AYR": "Ayrshire",
+        "GUZERAT": "Guzerá",
+        "SHORTON": "Shorthorn",
+        "SHORTHORN": "Shorthorn",
+        "HEREFORD": "Hereford",
+        "NORMANDO": "Normando",
+        "CEBÚ ROJO": "Cebú Rojo",
+        "CEBU ROJO": "Cebú Rojo",
+        "CEBÚ COMERC": "Cebú Comercial",
+        "CEBU COMERC": "Cebú Comercial",
         # Códigos de tipo de raza de Software Ganadero (SG)
         "T": "Taurino",
         "C": "Cebuino",
@@ -194,6 +212,330 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "M": "Mestizo",
     }
     return mapeo.get(r_up, r)
+
+
+def clasificar_animal_zootecnico(
+    comp: list[dict],
+    raza_str: Optional[str] = None,
+) -> dict:
+    """Clasifica un animal en una categoría zootécnica estándar según su composición racial o tipo.
+
+    Categorías:
+        - PURO: >= 96.0% de una sola raza (o puro por cruce)
+        - F1_1_2: Cruce de 2 razas al ~50% cada una (ej. F1 Girolando 1/2 Gyr + 1/2 Holstein)
+        - 3_4: Raza predominante ~75% (entre 70% y 80%)
+        - 5_8: Raza predominante ~62.5% (entre 58% y 67%)
+        - 7_8: Raza predominante ~87.5% (entre 84% y 92%)
+        - 1_2: Media sangre con componentes multirraciales (ej. 1/2 Gyr + 1/4 Holstein + 1/4 Ayrshire)
+        - MULTI: Sintéticos, multirraciales o trihíbridos
+        - INDET: Sin desglose específico de razas en Software Ganadero
+        - CEBU: Cebuino base sin porcentaje
+        - TAURINO: Taurino base sin porcentaje
+        - SIN_CLASIFICAR: Sin raza registrada
+    """
+    rz_str = str(raza_str or "").strip()
+    if not comp:
+        rz_up = rz_str.upper()
+        if rz_up in ("INDETERMINADO", "I"):
+            return {
+                "grado_codigo": "INDET",
+                "grado_nombre": "Indeterminados (Base SG)",
+                "fraccion": "Indeterminado",
+                "chip_color": "gris",
+                "patron_formula": "Indeterminado / Base SG",
+                "es_tipificado": False,
+            }
+        if rz_up in ("C", "CEBUINO", "CEBU"):
+            return {
+                "grado_codigo": "CEBU",
+                "grado_nombre": "Cebuino Base",
+                "fraccion": "Cebuino",
+                "chip_color": "ambar",
+                "patron_formula": "Cebuino Comercial (Base SG)",
+                "es_tipificado": False,
+            }
+        if rz_up in ("T", "TAURINO"):
+            return {
+                "grado_codigo": "TAURINO",
+                "grado_nombre": "Taurino Base",
+                "fraccion": "Taurino",
+                "chip_color": "azul",
+                "patron_formula": "Taurino (Base SG)",
+                "es_tipificado": False,
+            }
+        return {
+            "grado_codigo": "SIN_CLASIFICAR",
+            "grado_nombre": "Sin Clasificar",
+            "fraccion": "S/C",
+            "chip_color": "gris",
+            "patron_formula": "Sin Clasificar",
+            "es_tipificado": False,
+        }
+
+    # Normalizar componentes al 100%
+    suma = sum(float(c.get("porcentaje") or 0.0) for c in comp)
+    factor = 100.0 / suma if suma > 0 else 1.0
+    c_norm = []
+    for c in comp:
+        rz = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
+        pct = round(float(c.get("porcentaje") or 0.0) * factor, 2)
+        if pct > 0:
+            c_norm.append({"raza": rz, "porcentaje": pct})
+    c_norm.sort(key=lambda x: x["porcentaje"], reverse=True)
+
+    if not c_norm:
+        return {
+            "grado_codigo": "SIN_CLASIFICAR",
+            "grado_nombre": "Sin Clasificar",
+            "fraccion": "S/C",
+            "chip_color": "gris",
+            "patron_formula": "Sin Clasificar",
+            "es_tipificado": False,
+        }
+
+    max_c = c_norm[0]
+    max_p = max_c["porcentaje"]
+    r1 = max_c["raza"]
+
+    # 1. Puros o Puro por Cruce (>= 96.0%)
+    if len(c_norm) == 1 or max_p >= 96.0:
+        return {
+            "grado_codigo": "PURO",
+            "grado_nombre": "Puros & PC",
+            "fraccion": "Puro",
+            "chip_color": "morado",
+            "patron_formula": f"{r1} Puro",
+            "es_tipificado": True,
+        }
+
+    # 2. F1 verdadero (2 razas puras entre 44% y 56% cada una)
+    if len(c_norm) == 2 and abs(c_norm[0]["porcentaje"] - 50.0) <= 6.0 and abs(c_norm[1]["porcentaje"] - 50.0) <= 6.0:
+        r2 = c_norm[1]["raza"]
+        nombre_cruce = f"1/2 {r1} + 1/2 {r2}"
+        if ("Gyr" in (r1, r2) and ("Holstein" in r1 or "Holstein" in r2)) or ("Girolando" in (r1, r2)):
+            nombre_cruce = "F1 Girolando (1/2 Gyr + 1/2 Holstein)"
+        return {
+            "grado_codigo": "F1_1_2",
+            "grado_nombre": "F1 / Media Sangre (1/2)",
+            "fraccion": "F1 1/2",
+            "chip_color": "verde",
+            "patron_formula": nombre_cruce,
+            "es_tipificado": True,
+        }
+
+    # 3. Tres Cuartos (3/4) ~75% (entre 69.5% y 80.5%)
+    if abs(max_p - 75.0) <= 5.5:
+        r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
+        return {
+            "grado_codigo": "3_4",
+            "grado_nombre": "Tres Cuartos (3/4)",
+            "fraccion": "3/4",
+            "chip_color": "azul",
+            "patron_formula": f"3/4 {r1} + 1/4 {r2}",
+            "es_tipificado": True,
+        }
+
+    # 4. Cinco Octavos (5/8) ~62.5% (entre 58.0% y 67.5%)
+    if abs(max_p - 62.5) <= 5.0:
+        r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
+        return {
+            "grado_codigo": "5_8",
+            "grado_nombre": "Cinco Octavos (5/8)",
+            "fraccion": "5/8",
+            "chip_color": "ambar",
+            "patron_formula": f"5/8 {r1} + 3/8 {r2}",
+            "es_tipificado": True,
+        }
+
+    # 5. Siete Octavos (7/8) ~87.5% (entre 83.5% y 92.5%)
+    if abs(max_p - 87.5) <= 5.0:
+        r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
+        return {
+            "grado_codigo": "7_8",
+            "grado_nombre": "Siete Octavos (7/8)",
+            "fraccion": "7/8",
+            "chip_color": "cyan",
+            "patron_formula": f"7/8 {r1} + 1/8 {r2}",
+            "es_tipificado": True,
+        }
+
+    # 6. Media Sangre multirracial (~50% de la raza dominante)
+    if abs(max_p - 50.0) <= 6.0:
+        r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
+        return {
+            "grado_codigo": "1_2",
+            "grado_nombre": "Media Sangre (1/2)",
+            "fraccion": "1/2",
+            "chip_color": "lima",
+            "patron_formula": f"1/2 {r1} + 1/2 Cruce ({r2})",
+            "es_tipificado": True,
+        }
+
+    # 7. Multirracial / Compuesto / Trihíbrido
+    formula_res = generar_resumen_zootecnico(c_norm)
+    return {
+        "grado_codigo": "MULTI",
+        "grado_nombre": "Multirracial / Trihíbrido",
+        "fraccion": "Compuesto",
+        "chip_color": "naranja",
+        "patron_formula": formula_res,
+        "es_tipificado": True,
+    }
+
+
+def calcular_resumen_genetico_hato(
+    animales_activos: list[dict],
+    composicion_por_animal: dict[int, list[dict]],
+) -> dict:
+    """Calcula el pool genético consolidado y la agrupación de cruces del hato activo.
+
+    Args:
+        animales_activos: lista de dicts [{'id_animal': int, 'tag': str, 'raza': str, ...}]
+        composicion_por_animal: mapa de id_animal -> lista de componentes raciales.
+
+    Returns:
+        dict con kpis, pool_racial, grados_resumen, patrones_cruces y filas consolidadas.
+    """
+    total_activos = len(animales_activos)
+    tipificados = 0
+    puntos_raciales: dict[str, float] = {}
+    animales_por_raza: dict[str, set[str]] = {}
+
+    conteo_grados: dict[str, int] = {}
+    patrones_map: dict[tuple[str, str, str, str, str], list[str]] = {}
+
+    info_grados = {
+        "PURO": {"nombre": "Puros (100% / PC)", "chip": "Puro", "color": "morado", "orden": 1},
+        "F1_1_2": {"nombre": "F1 / Media Sangre (1/2)", "chip": "F1 1/2", "color": "verde", "orden": 2},
+        "3_4": {"nombre": "Tres Cuartos (3/4)", "chip": "3/4", "color": "azul", "orden": 3},
+        "5_8": {"nombre": "Cinco Octavos (5/8)", "chip": "5/8", "color": "ambar", "orden": 4},
+        "7_8": {"nombre": "Siete Octavos (7/8)", "chip": "7/8", "color": "cyan", "orden": 5},
+        "1_2": {"nombre": "Medias Sangres Multirracial", "chip": "1/2", "color": "lima", "orden": 6},
+        "MULTI": {"nombre": "Compuestos / Trihíbridos", "chip": "Compuesto", "color": "naranja", "orden": 7},
+        "CEBU": {"nombre": "Cebuino Base", "chip": "Cebuino", "color": "ambar", "orden": 8},
+        "TAURINO": {"nombre": "Taurino Base", "chip": "Taurino", "color": "azul", "orden": 9},
+        "INDET": {"nombre": "Indeterminados (Base SG)", "chip": "Indeterminado", "color": "gris", "orden": 10},
+        "SIN_CLASIFICAR": {"nombre": "Sin Clasificar", "chip": "S/C", "color": "gris", "orden": 11},
+    }
+
+    for a in animales_activos:
+        aid = a["id_animal"]
+        tag = a["tag"]
+        raza_str = a.get("raza") or ""
+        comp = composicion_por_animal.get(aid, [])
+
+        clasif = clasificar_animal_zootecnico(comp, raza_str)
+        gid = clasif["grado_codigo"]
+        gnom = clasif["grado_nombre"]
+        frac = clasif["fraccion"]
+        col = clasif["chip_color"]
+        pat = clasif["patron_formula"]
+
+        conteo_grados[gid] = conteo_grados.get(gid, 0) + 1
+
+        pkey = (gid, gnom, frac, col, pat)
+        if pkey not in patrones_map:
+            patrones_map[pkey] = []
+        patrones_map[pkey].append(tag)
+
+        if clasif["es_tipificado"] and comp:
+            tipificados += 1
+            # Acumular aporte en el pool genético (normalizado al 100% por animal)
+            suma_c = sum(float(c.get("porcentaje") or 0.0) for c in comp)
+            f_norm = 100.0 / suma_c if suma_c > 0 else 1.0
+            for c in comp:
+                nom_r = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
+                pct_r = float(c.get("porcentaje") or 0.0) * f_norm
+                puntos_raciales[nom_r] = puntos_raciales.get(nom_r, 0.0) + pct_r
+                if nom_r not in animales_por_raza:
+                    animales_por_raza[nom_r] = set()
+                animales_por_raza[nom_r].add(tag)
+
+    # 1. Grados resumen
+    grados_resumen = []
+    for gid, meta in sorted(info_grados.items(), key=lambda x: x[1]["orden"]):
+        n = conteo_grados.get(gid, 0)
+        if n > 0:
+            grados_resumen.append({
+                "codigo": gid,
+                "nombre": meta["nombre"],
+                "chip": meta["chip"],
+                "color": meta["color"],
+                "cabezas": n,
+                "pct_hato": round(n / total_activos * 100.0, 1) if total_activos else 0.0,
+                "pct_tipificados": round(n / tipificados * 100.0, 1) if tipificados and gid not in ("INDET", "SIN_CLASIFICAR", "CEBU", "TAURINO") else 0.0,
+            })
+
+    # 2. Pool racial global
+    total_puntos = sum(puntos_raciales.values())
+    pool_racial = []
+    colores_razas = {
+        "Gyr": "#2e7d32",
+        "Holstein Negro": "#1565c0",
+        "Ayrshire": "#c62828",
+        "Cebú Comercial": "#ef6c00",
+        "Pardo Suizo": "#6d4c41",
+        "Guzerá": "#00838f",
+        "Shorthorn": "#ad1457",
+        "Jersey": "#e65100",
+        "Girolando": "#2e7d32",
+        "Cebú Rojo": "#d84315",
+        "Holstein Rojo": "#0277bd",
+        "Hereford": "#b71c1c",
+        "Normando": "#4527a0",
+        "Hartón del Valle": "#558b2f",
+    }
+    for rz, pts in sorted(puntos_raciales.items(), key=lambda x: x[1], reverse=True):
+        pct_pool = round(pts / total_puntos * 100.0, 1) if total_puntos else 0.0
+        n_ani = len(animales_por_raza.get(rz, set()))
+        pool_racial.append({
+            "raza": rz,
+            "puntos": round(pts, 1),
+            "pct": pct_pool,
+            "cabezas_portadoras": n_ani,
+            "color": colores_razas.get(rz, "#546e7a"),
+        })
+
+    # 3. Patrones de cruce consolidados
+    patrones_cruces = []
+    for (gid, gnom, frac, col, pat), tag_list in sorted(patrones_map.items(), key=lambda x: len(x[1]), reverse=True):
+        cabs = len(tag_list)
+        patrones_cruces.append({
+            "grado_codigo": gid,
+            "grado_nombre": gnom,
+            "fraccion": frac,
+            "chip_color": col,
+            "nombre": pat,
+            "cabezas": cabs,
+            "pct_hato": round(cabs / total_activos * 100.0, 1) if total_activos else 0.0,
+            "pct_tipificados": round(cabs / tipificados * 100.0, 1) if tipificados and gid not in ("INDET", "SIN_CLASIFICAR", "CEBU", "TAURINO") else 0.0,
+            "animales": tag_list,
+        })
+
+    # 4. Filas compatibles hacia atrás
+    filas_compatibles = []
+    for pat in patrones_cruces:
+        filas_compatibles.append({
+            "raza": pat["fraccion"],
+            "raza_nombre": pat["nombre"],
+            "n": pat["cabezas"],
+            "pct": pat["pct_hato"],
+            "grado_codigo": pat["grado_codigo"],
+            "chip_color": pat["chip_color"],
+            "animales": pat["animales"][:8],
+        })
+
+    return {
+        "total": total_activos,
+        "total_activos": total_activos,
+        "tipificados": tipificados,
+        "pct_tipificados": round(tipificados / total_activos * 100.0, 1) if total_activos else 0.0,
+        "indeterminados": conteo_grados.get("INDET", 0),
+        "grados_resumen": grados_resumen,
+        "pool_racial": pool_racial,
+        "patrones_cruces": patrones_cruces,
+        "filas": filas_compatibles,
+    }
 
 
 def calcular_cruce_absorbente(

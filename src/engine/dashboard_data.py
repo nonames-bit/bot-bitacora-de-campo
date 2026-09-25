@@ -34,6 +34,7 @@ try:
         tramo_iep,
         tramo_del,
     )
+    from .genetic_engine import calcular_resumen_genetico_hato
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -50,6 +51,7 @@ except ImportError:  # ejecución directa
         tramo_iep,
         tramo_del,
     )
+    from src.engine.genetic_engine import calcular_resumen_genetico_hato  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -2931,42 +2933,41 @@ def datos_poblacion(db: Database) -> dict:
 
 
 def datos_genetica(db: Database) -> dict:
-    """Distribución racial (genética) del hato ACTIVO: raza -> cabezas + %.
-
-    Usa el MISMO mapa de nombres que el panel /genetica del bot de Telegram
-    (src/server/formatters.py ``formatear_genetica_panel``) para que los
-    códigos de 1 letra de Software Ganadero (I/T/C/M) se muestren igual en
-    la PWA y en Telegram.
+    """Distribución racial y zootécnica del hato ACTIVO: resumen por grados de sangre,
+    pool genético global y agrupación por familias de cruces (F1, 1/2, 3/4, 5/8, etc.).
     """
-    # Mapa canónico de códigos de raza SG (fuente única: formatters.py).
-    NOMBRES_RAZAS = {
-        "I": "Holstein / Cruce Lechero",
-        "T": "Tricross / Cebú Comercial",
-        "C": "Cebú / Brahman / Gyr",
-        "M": "Mestizo / Doble Propósito",
-        "SIN RAZA": "Sin Clasificar",
-    }
+    from collections import defaultdict
     errores: dict[str, str] = {}
-    filas: list[dict] = []
-    total = 0
+    resumen_gen: dict[str, Any] = {
+        "total": 0,
+        "total_activos": 0,
+        "tipificados": 0,
+        "pct_tipificados": 0.0,
+        "indeterminados": 0,
+        "grados_resumen": [],
+        "pool_racial": [],
+        "patrones_cruces": [],
+        "filas": [],
+    }
     try:
-        rows = db.query(
-            "SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') raza, COUNT(*) n "
-            "FROM animales WHERE estado = 'ACTIVO' GROUP BY raza ORDER BY n DESC"
+        animales_activos = _filas_dict(db.query(
+            "SELECT id_animal, tag, COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') as raza, nombre, sexo "
+            "FROM animales WHERE estado = 'ACTIVO' ORDER BY tag"
+        ))
+        rows_comp = db.query(
+            "SELECT animal_id, raza, porcentaje FROM composicion_racial ORDER BY animal_id, porcentaje DESC"
         )
-        total = sum(int(r["n"]) for r in rows)
-        for r in rows:
-            n = int(r["n"])
-            codigo = r["raza"]
-            filas.append({
-                "raza": codigo,
-                "raza_nombre": NOMBRES_RAZAS.get(codigo, codigo),
-                "n": n,
-                "pct": round(n / total * 100.0, 1) if total else 0.0,
+        comp_por_animal: dict[int, list[dict]] = defaultdict(list)
+        for r in rows_comp:
+            comp_por_animal[int(r["animal_id"])].append({
+                "raza": r["raza"],
+                "porcentaje": float(r["porcentaje"] or 0.0),
             })
+        resumen_gen = calcular_resumen_genetico_hato(animales_activos, comp_por_animal)
     except Exception as e:
         logger.error("seccion genetica fallo", exc_info=True)
         errores["genetica"] = str(e)
+
     try:
         pajuelas = _filas_dict(db.query(
             """SELECT codigo_toro, raza, procedencia, canastilla, cantidad FROM pajuelas_inventario
@@ -2976,6 +2977,7 @@ def datos_genetica(db: Database) -> dict:
         logger.error("seccion pajuelas_inventario fallo", exc_info=True)
         errores["pajuelas_inventario"] = str(e)
         pajuelas = []
+
     try:
         termos = _filas_dict(db.query(
             """SELECT fecha_recarga, proxima_recarga, dias_intervalo FROM termo_nitrogeno
@@ -2985,9 +2987,9 @@ def datos_genetica(db: Database) -> dict:
         logger.error("seccion termo_nitrogeno fallo", exc_info=True)
         errores["termo_nitrogeno"] = str(e)
         termos = []
+
     out: dict[str, Any] = {
-        "filas": filas,
-        "total": total,
+        **resumen_gen,
         "pajuelas_inventario": pajuelas,
         "termo_nitrogeno": termos,
     }
