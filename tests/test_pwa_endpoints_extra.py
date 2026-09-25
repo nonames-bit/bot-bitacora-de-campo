@@ -121,3 +121,42 @@ def test_manga_pesaje_calcula_gmd_con_pesaje_previo(client_owner, db_file):
     assert d["peso_anterior"] == 270.0
     assert d["dias_entre_pesajes"] == 30
     assert d["gmd_g_dia"] == 1000.0
+
+
+# --------------------------------------------------- catálogos / lecturas varias
+
+def test_cria_activa_sin_vaca_400(client_owner):
+    assert client_owner.get("/api/cria-activa").status_code == 400
+
+
+def test_cria_activa_vaca_sin_cria(client_owner):
+    r = client_owner.get("/api/cria-activa?vaca=T1")
+    assert r.status_code == 200
+    assert r.get_json()["encontrada"] is False
+
+
+def test_equipo_integrantes_lista_roles(client_owner):
+    r = client_owner.get("/api/equipo/integrantes")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert isinstance(d["integrantes"], list) and d["integrantes"]
+
+
+def test_toros_lista(client_owner):
+    r = client_owner.get("/api/toros")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True and isinstance(d["toros"], list)
+
+
+def test_termo_nitrogeno_lectura(client_owner):
+    r = client_owner.get("/api/termo-nitrogeno")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True and "termo" in d and "recargas" in d
+
+
+def test_termo_recarga_trabajador_403(client_trabajador):
+    r = client_trabajador.post("/api/termo-nitrogeno/recarga", json={"dias_intervalo": 21})
+    assert r.status_code == 403
