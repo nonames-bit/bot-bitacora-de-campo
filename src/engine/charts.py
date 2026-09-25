@@ -257,7 +257,7 @@ def generar_grafico_peso(db, tag, output_dir: str = "data/reportes",
     if usar_edad and animal["sexo"]:
         prom = _promedio_peso_hato_por_edad(db, animal["sexo"], aid)
         if prom:
-            xs_prom, ys_prom = zip(*prom)
+            xs_prom, ys_prom = zip(*prom, strict=False)
             ax.plot(xs_prom, ys_prom, color=_COLOR_PROMEDIO, linewidth=1.6, linestyle="--",
                    label="Promedio del hato (mismo sexo)")
 
@@ -421,7 +421,7 @@ def generar_grafico_lactancia(db, tag, output_dir: str = "data/reportes",
 
     prom = _promedio_leche_hato_por_del(db, aid)
     if prom:
-        xs_prom, ys_prom = zip(*prom)
+        xs_prom, ys_prom = zip(*prom, strict=False)
         ax.plot(xs_prom, ys_prom, color=_COLOR_PROMEDIO, linewidth=1.6, linestyle="--",
                 label="Promedio del hato")
 
@@ -901,7 +901,7 @@ def generar_grafico_peso_destete_por_raza(db, output_dir: str = "data/reportes",
     fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
     colores_barras = [_PALETA[i % len(_PALETA)] for i in range(len(razas))]
     barras = ax.bar(razas, promedios, color=colores_barras)
-    for barra, n in zip(barras, conteos):
+    for barra, n in zip(barras, conteos, strict=False):
         ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" n={n}",
                ha="center", va="bottom", fontsize=8, rotation=0)
     ax.set_ylabel("Peso promedio al destete (kg)")
@@ -957,7 +957,7 @@ def generar_grafico_rendimiento_padre(db, output_dir: str = "data/reportes",
     fig, ax = plt.subplots(figsize=(8, 5), dpi=dpi)
     colores_padres = [_PALETA[i % len(_PALETA)] for i in range(len(padres))]
     barras = ax.barh(padres, promedios, color=colores_padres)
-    for barra, n in zip(barras, conteos):
+    for barra, n in zip(barras, conteos, strict=False):
         ax.text(barra.get_width(), barra.get_y() + barra.get_height() / 2, f" n={n}",
                ha="left", va="center", fontsize=8)
     ax.set_xlabel("Peso promedio al nacer de sus crías (kg)")
@@ -1477,7 +1477,7 @@ def generar_grafico_dias_abiertos_km(db, output_dir: str = "data/reportes",
     # Días donde la curva cruza el 50% (mediana de días abiertos "vencidos"):
     # el primer tiempo en el que menos de la mitad del hato sigue abierta.
     mediana_dias = None
-    for t, p in zip(tiempos, porcentajes):
+    for t, p in zip(tiempos, porcentajes, strict=False):
         if p <= 50:
             mediana_dias = t
             break
@@ -1563,7 +1563,7 @@ def generar_grafico_leche_total_hato(db, semanas: int = 12, output_dir: str = "d
     # Tomamos los últimos dias_max días cronológicamente
     filas_recientes = filas[-dias_max:]
     fechas_dt = [to_date(f["fecha"]) for f in filas_recientes]
-    etiquetas = [d.strftime("%d-%b") if d else f["fecha"] for d, f in zip(fechas_dt, filas_recientes)]
+    etiquetas = [d.strftime("%d-%b") if d else f["fecha"] for d, f in zip(fechas_dt, filas_recientes, strict=False)]
     litros = [float(f["litros"]) for f in filas_recientes]
 
     total_litros = sum(litros)
@@ -1578,7 +1578,7 @@ def generar_grafico_leche_total_hato(db, semanas: int = 12, output_dir: str = "d
     ax.axhline(promedio, color="#D97706", linestyle="--", linewidth=1.8, label=f"Promedio: {promedio:.1f} L/día")
 
     # Etiquetas de valor encima de las barras
-    for i, (b, val) in enumerate(zip(barras, litros)):
+    for i, (b, val) in enumerate(zip(barras, litros, strict=False)):
         es_pico = (val == pico)
         txt_color = "#15803D" if es_pico else "#1F2937"
         peso = "bold" if es_pico else "normal"
@@ -1769,7 +1769,7 @@ def generar_grafico_estado_reproductivo_hato(db, output_dir: str = "data/reporte
     fig, ax = plt.subplots(figsize=(7, 5.5), dpi=dpi)
     barras = ax.bar(categorias, valores, color=colores)
     ax.set_ylim(0, max(valores) * 1.22)
-    for barra, v in zip(barras, valores):
+    for barra, v in zip(barras, valores, strict=False):
         ax.text(barra.get_x() + barra.get_width() / 2, barra.get_height(), f" {v}",
                 ha="center", va="bottom", fontsize=10)
     ax.set_ylabel("Hembras en edad reproductiva")
@@ -1937,7 +1937,7 @@ def generar_grafico_subastas_comparativa(db, output_dir: str = "data/reportes",
     rango = max_p - min_p if max_p > min_p else 1000
     ax.set_xlim(left=max(0, min_p - rango * 0.4), right=max_p + rango * 0.35)
 
-    for bar, txt, p in zip(bars, textos_valores, precios):
+    for bar, txt, p in zip(bars, textos_valores, precios, strict=False):
         ax.text(p + rango * 0.02, bar.get_y() + bar.get_height() / 2, txt,
                 va="center", ha="left", fontsize=9.5, fontweight="bold", color="#333333")
 

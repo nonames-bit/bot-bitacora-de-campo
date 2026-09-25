@@ -36,7 +36,7 @@ def _build_dbf_bytes(fields: list[tuple], records: list[list]) -> bytes:
     out += b"\x0d"
     for rec in records:
         out += b"\x20"
-        for (name, ftype, flen, fdec), val in zip(fields, rec):
+        for (name, ftype, flen, fdec), val in zip(fields, rec, strict=False):
             if ftype == "N":
                 out += str(val).encode("latin-1").rjust(flen, b" ")
             else:
