@@ -793,3 +793,22 @@ def test_import_animales_reactivado_en_sg_elimina_venta_obsoleta(db):
     assert ficha2["venta"] is None
 
 
+
+
+def test_import_pesajes_desordenados_calcula_gmd_con_el_anterior(tmp_path):
+    """Regresión: la GMD usa el pesaje cronológicamente anterior aunque el DBF venga desordenado."""
+    from datetime import date as _date
+    from src.db.database import Database as _DB
+    from src.importers.dbf_importer import import_pesajes
+    d = _DB(str(tmp_path / "p.db")).create_tables()
+    try:
+        registros = [
+            {"CODANI": "47", "FECHA": _date(2026, 3, 1), "PESO": 300.0},
+            {"CODANI": "47", "FECHA": _date(2026, 1, 1), "PESO": 240.0},
+        ]
+        import_pesajes(d, registros)
+        fila = d.query_one("SELECT gmd_calculada FROM pesajes WHERE fecha = '2026-03-01'")
+        assert fila["gmd_calculada"] is not None and fila["gmd_calculada"] > 0
+        assert d.query_one("SELECT gmd_calculada FROM pesajes WHERE fecha = '2026-01-01'")["gmd_calculada"] is None
+    finally:
+        d.close()

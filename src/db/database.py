@@ -112,7 +112,7 @@ class Database:
                 self.conn.execute("PRAGMA busy_timeout = 10000;")
                 self.conn.execute("PRAGMA synchronous = NORMAL;")
             except Exception:
-                pass
+                logger.warning("No se pudo activar WAL/busy_timeout en %s", path, exc_info=True)
             self._migrar_columnas_esenciales()
         try:
             self.conn.execute("PRAGMA foreign_keys = ON;")
@@ -262,12 +262,24 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza)")
         except Exception:
-            pass
+            logger.warning("Migración de tablas esenciales incompleta", exc_info=True)
 
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida y utilidades de bajo nivel
     # ------------------------------------------------------------------ #
+    def _asegurar_columna(self, tabla: str, columna: str, tipo: str) -> None:
+        """ALTER TABLE ADD COLUMN idempotente; un fallo queda en el log.
+
+        ``tabla``/``columna``/``tipo`` son constantes del código (nunca datos
+        de usuario), por eso se interpolan en el DDL."""
+        try:
+            cols = [r["name"] for r in self.conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
+            if cols and columna not in cols:
+                self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+        except Exception:
+            logger.warning("Migración: no se pudo añadir %s.%s", tabla, columna, exc_info=True)
+
     def create_tables(self) -> "Database":
         self._migrar_columnas_esenciales()
         self.conn.executescript(SCHEMA_SQL)
@@ -275,48 +287,24 @@ class Database:
             self.sembrar_inseminadores_iniciales()
             self.sembrar_protocolos_iatf_iniciales()
         except Exception:
-            pass
-        # Migración idempotente para columnas añadidas
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()]
-            if "hierro" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN hierro TEXT")
-            if "chip" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN chip TEXT")
-            if "color" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN color TEXT")
-        except Exception:
-            pass
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()]
-            if "ocr_text" not in cols:
-                self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
-        except Exception:
-            pass
+            logger.warning("No se pudieron sembrar inseminadores/protocolos IATF iniciales", exc_info=True)
+        # Migración idempotente para columnas añadidas. Cada columna va por
+        # separado y con log: antes un ALTER fallido saltaba en silencio los
+        # siguientes del mismo bloque.
+        for col in ("hierro", "chip", "color"):
+            self._asegurar_columna("animales", col, "TEXT")
+        self._asegurar_columna("fotos", "ocr_text", "TEXT")
         # Geometria real (WGS84) de potreros, importada desde el proyecto QGIS
         # de la finca (ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md, Fase B).
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(potreros)").fetchall()]
-            if "geom_wkt_4326" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN geom_wkt_4326 TEXT")
-            if "centroide_lat" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lat REAL")
-            if "centroide_lon" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lon REAL")
-        except Exception:
-            pass
+        self._asegurar_columna("potreros", "geom_wkt_4326", "TEXT")
+        self._asegurar_columna("potreros", "centroide_lat", "REAL")
+        self._asegurar_columna("potreros", "centroide_lon", "REAL")
         # Columnas de auditoría (quién y cuándo registró cada evento) para
         # poder listar y deshacer registros equivocados (comando /deshacer).
         # Las tablas creadas antes de esta migración no tenían estas columnas.
-        try:
-            for tabla in self.TABLAS_EVENTOS:
-                cols = [r["name"] for r in self.conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
-                if "creado_en" not in cols:
-                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN creado_en TEXT")
-                if "registrado_por" not in cols:
-                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN registrado_por INTEGER")
-        except Exception:
-            pass
+        for tabla in self.TABLAS_EVENTOS:
+            self._asegurar_columna(tabla, "creado_en", "TEXT")
+            self._asegurar_columna(tabla, "registrado_por", "INTEGER")
         # tipo_evento/grupo_parto_id: catálogo de tipo de evento reproductivo
         # (Parto/Gemelar/Aborto/Reabsorción/Momificación/Maceración/Muerte
         # fetal, ver TIPOS_EVENTO_PARTO). Backfill de filas preexistentes con
