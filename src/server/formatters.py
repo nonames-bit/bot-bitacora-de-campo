@@ -11,7 +11,7 @@ import sys
 from datetime import date
 from typing import Optional
 
-from ..db.database import Database, SQL_POTRERO_REAL
+from ..db.database import Database, POTRERO_VIGENTE_SUBQUERY, SQL_POTRERO_REAL
 from ..engine.query_engine import (
     QueryEngine,
     calcular_brackets_inventario_sg,
@@ -44,7 +44,7 @@ def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
         return f"❌ No se encontró el animal '{tag}' en los registros."
 
     tag_str = animal["tag"] or str(tag)
-    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    nom_txt = f" ({_esc(animal['nombre'])})" if animal["nombre"] else ""
     raza = animal["raza"] or "Indefinida"
 
     filas_p = db.query(
@@ -106,7 +106,7 @@ def formatear_pesajes_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
             g_val = r["gmd_calculada"] * 1000.0
             g_sig = "+" if g_val > 0 else ""
             g_item = f" ({g_sig}{g_val:.0f} g/d)"
-        pot = f" · 📍 {r['potrero_nom']}" if r["potrero_nom"] else ""
+        pot = f" · 📍 {_esc(r['potrero_nom'])}" if r["potrero_nom"] else ""
         lineas.append(f"• [{fec}] <b>{kilos} kg</b>{g_item}{ev}{pot}")
 
     return "\n".join(lineas)
@@ -124,7 +124,7 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
         return f"❌ No se encontró el animal '{tag}' en los registros."
 
     tag_str = animal["tag"] or str(tag)
-    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    nom_txt = f" ({_esc(animal['nombre'])})" if animal["nombre"] else ""
     es_hembra = str(animal["sexo"] or "").lower().startswith("h")
 
     lineas = [
@@ -152,8 +152,8 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
             lineas.append("\n👶 <b>Últimas Crías Registradas:</b>")
             for c in crias_macho:
                 f_n = c["fecha_nacimiento"] or "S/F"
-                c_nom = f" ({c['nombre']})" if c["nombre"] else ""
-                lineas.append(f"• [{f_n}] {c['sexo'] or 'Cría'} <b>{c['tag']}</b>{c_nom}")
+                c_nom = f" ({_esc(c['nombre'])})" if c["nombre"] else ""
+                lineas.append(f"• [{f_n}] {c['sexo'] or 'Cría'} <b>{_esc(c['tag'])}</b>{c_nom}")
         return "\n".join(lineas)
 
     partos = db.query(
@@ -206,7 +206,7 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
     if servicios:
         ult_s = servicios[0]
         tipo_s = ult_s["tipo_servicio"] or "IA"
-        toro_s = f" (Toro/Pajuela: {ult_s['toro_pajilla']})" if ult_s["toro_pajilla"] else ""
+        toro_s = f" (Toro/Pajuela: {_esc(ult_s['toro_pajilla'])})" if ult_s["toro_pajilla"] else ""
         lineas.append(f"• <b>Último Servicio:</b> [{ult_s['fecha']}] {tipo_s}{toro_s}")
         if ult_s["fep_calculada"]:
             lineas.append(f"• <b>FEP (Parto Estimado):</b> <b>{ult_s['fep_calculada']}</b>")
@@ -235,7 +235,7 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
         for s in servicios[:5]:
             fec = s["fecha"] or "S/F"
             tip = s["tipo_servicio"] or "IA"
-            tor = f" · Toro {s['toro_pajilla']}" if s["toro_pajilla"] else ""
+            tor = f" · Toro {_esc(s['toro_pajilla'])}" if s["toro_pajilla"] else ""
             lineas.append(f"• [{fec}] {tip}{tor}")
 
     return "\n".join(lineas)
@@ -253,7 +253,7 @@ def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = Non
         return f"❌ No se encontró el animal '{tag}' en los registros."
 
     tag_str = animal["tag"] or str(tag)
-    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    nom_txt = f" ({_esc(animal['nombre'])})" if animal["nombre"] else ""
     es_hembra = str(animal["sexo"] or "").lower().startswith("h")
 
     if not es_hembra:
@@ -268,7 +268,7 @@ def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = Non
 
     lineas = [
         "🥛 <b>PRODUCCIÓN LÁCTEA & ESTADO DE LACTANCIA</b>",
-        f"🐮 <b>Vaca:</b> {tag_str}{nom_txt} · <b>Raza:</b> {animal['raza'] or 'S/D'}",
+        f"🐮 <b>Vaca:</b> {tag_str}{nom_txt} · <b>Raza:</b> {_esc(animal['raza'] or 'S/D')}",
         "────────────────────────────────────────",
     ]
 
@@ -329,7 +329,7 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
         return f"❌ No se encontró el animal '{tag}' en los registros."
 
     tag_str = animal["tag"] or str(tag)
-    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    nom_txt = f" ({_esc(animal['nombre'])})" if animal["nombre"] else ""
 
     filas_t = db.query(
         """
@@ -373,7 +373,7 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
 
     lineas = [
         "💉 <b>SANIDAD ANIMAL & CONTROL DE RETIROS</b>",
-        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Estado:</b> {animal['estado'] or 'ACTIVO'}",
+        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Estado:</b> {animal['estado'] or 'SIN ESTADO'}",
         "────────────────────────────────────────",
     ]
 
@@ -400,7 +400,7 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
             med = r["producto"] or "Tratamiento"
             dos = f" ({r['dosis']})" if r["dosis"] else ""
             via = f" [{r['via']}]" if r["via"] else ""
-            diag = f" · Diag: {r['diagnostico']}" if r["diagnostico"] else ""
+            diag = f" · Diag: {_esc(r['diagnostico'])}" if r["diagnostico"] else ""
             lineas.append(f"• [{fec}] 💉 <b>{med}</b>{dos}{via}{diag}")
 
     lineas.append("\n💡 <i>Para aplicar un medicamento, envíe foto de la etiqueta o dicte: 'le apliqué 20ml de oxitetraciclina a la 47'.</i>")
@@ -417,7 +417,7 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
         return f"❌ No se encontró el animal '{tag}' en los registros."
 
     tag_str = animal["tag"] or str(tag)
-    nom_txt = f" ({animal['nombre']})" if animal["nombre"] else ""
+    nom_txt = f" ({_esc(animal['nombre'])})" if animal["nombre"] else ""
     raza = animal["raza"] or "S/D"
 
     padre_str = "Desconocido"
@@ -427,32 +427,32 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
     if animal["padre_id"]:
         p_row = db.get_animal(animal["padre_id"])
         if p_row:
-            p_nom = f" ({p_row['nombre']})" if p_row["nombre"] else ""
-            padre_str = f"{p_row['tag']}{p_nom} [{p_row['raza'] or 'S/D'}]"
+            p_nom = f" ({_esc(p_row['nombre'])})" if p_row["nombre"] else ""
+            padre_str = f"{_esc(p_row['tag'])}{p_nom} [{_esc(p_row['raza'] or 'S/D')}]"
             if p_row["padre_id"]:
                 ap = db.get_animal(p_row["padre_id"])
                 if ap:
-                    p_abuelo_p = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+                    p_abuelo_p = f"{_esc(ap['tag'])} [{_esc(ap['raza'] or 'S/D')}]"
                     if ap["padre_id"]:
                         bpp = db.get_animal(ap["padre_id"])
                         if bpp:
-                            bisabuelos_p.append(f"Bisabuelo Pat. (PP): {bpp['tag']} [{bpp['raza'] or 'S/D'}]")
+                            bisabuelos_p.append(f"Bisabuelo Pat. (PP): {_esc(bpp['tag'])} [{_esc(bpp['raza'] or 'S/D')}]")
                     if ap["madre_id"]:
                         bpm = db.get_animal(ap["madre_id"])
                         if bpm:
-                            bisabuelos_p.append(f"Bisabuela Pat. (PM): {bpm['tag']} [{bpm['raza'] or 'S/D'}]")
+                            bisabuelos_p.append(f"Bisabuela Pat. (PM): {_esc(bpm['tag'])} [{_esc(bpm['raza'] or 'S/D')}]")
             if p_row["madre_id"]:
                 am = db.get_animal(p_row["madre_id"])
                 if am:
-                    p_abuela_p = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+                    p_abuela_p = f"{_esc(am['tag'])} [{_esc(am['raza'] or 'S/D')}]"
                     if am["padre_id"]:
                         bmp = db.get_animal(am["padre_id"])
                         if bmp:
-                            bisabuelos_p.append(f"Bisabuelo Pat. (MP): {bmp['tag']} [{bmp['raza'] or 'S/D'}]")
+                            bisabuelos_p.append(f"Bisabuelo Pat. (MP): {_esc(bmp['tag'])} [{_esc(bmp['raza'] or 'S/D')}]")
                     if am["madre_id"]:
                         bmm = db.get_animal(am["madre_id"])
                         if bmm:
-                            bisabuelos_p.append(f"Bisabuela Pat. (MM): {bmm['tag']} [{bmm['raza'] or 'S/D'}]")
+                            bisabuelos_p.append(f"Bisabuela Pat. (MM): {_esc(bmm['tag'])} [{_esc(bmm['raza'] or 'S/D')}]")
 
     madre_str = "Desconocida"
     m_abuelo_m = "Desconocido"
@@ -461,32 +461,32 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
     if animal["madre_id"]:
         m_row = db.get_animal(animal["madre_id"])
         if m_row:
-            m_nom = f" ({m_row['nombre']})" if m_row["nombre"] else ""
-            madre_str = f"{m_row['tag']}{m_nom} [{m_row['raza'] or 'S/D'}]"
+            m_nom = f" ({_esc(m_row['nombre'])})" if m_row["nombre"] else ""
+            madre_str = f"{_esc(m_row['tag'])}{m_nom} [{_esc(m_row['raza'] or 'S/D')}]"
             if m_row["padre_id"]:
                 ap = db.get_animal(m_row["padre_id"])
                 if ap:
-                    m_abuelo_m = f"{ap['tag']} [{ap['raza'] or 'S/D'}]"
+                    m_abuelo_m = f"{_esc(ap['tag'])} [{_esc(ap['raza'] or 'S/D')}]"
                     if ap["padre_id"]:
                         bpp = db.get_animal(ap["padre_id"])
                         if bpp:
-                            bisabuelos_m.append(f"Bisabuelo Mat. (PP): {bpp['tag']} [{bpp['raza'] or 'S/D'}]")
+                            bisabuelos_m.append(f"Bisabuelo Mat. (PP): {_esc(bpp['tag'])} [{_esc(bpp['raza'] or 'S/D')}]")
                     if ap["madre_id"]:
                         bpm = db.get_animal(ap["madre_id"])
                         if bpm:
-                            bisabuelos_m.append(f"Bisabuela Mat. (PM): {bpm['tag']} [{bpm['raza'] or 'S/D'}]")
+                            bisabuelos_m.append(f"Bisabuela Mat. (PM): {_esc(bpm['tag'])} [{_esc(bpm['raza'] or 'S/D')}]")
             if m_row["madre_id"]:
                 am = db.get_animal(m_row["madre_id"])
                 if am:
-                    m_abuela_m = f"{am['tag']} [{am['raza'] or 'S/D'}]"
+                    m_abuela_m = f"{_esc(am['tag'])} [{_esc(am['raza'] or 'S/D')}]"
                     if am["padre_id"]:
                         bmp = db.get_animal(am["padre_id"])
                         if bmp:
-                            bisabuelos_m.append(f"Bisabuelo Mat. (MP): {bmp['tag']} [{bmp['raza'] or 'S/D'}]")
+                            bisabuelos_m.append(f"Bisabuelo Mat. (MP): {_esc(bmp['tag'])} [{_esc(bmp['raza'] or 'S/D')}]")
                     if am["madre_id"]:
                         bmm = db.get_animal(am["madre_id"])
                         if bmm:
-                            bisabuelos_m.append(f"Bisabuela Mat. (MM): {bmm['tag']} [{bmm['raza'] or 'S/D'}]")
+                            bisabuelos_m.append(f"Bisabuela Mat. (MM): {_esc(bmm['tag'])} [{_esc(bmm['raza'] or 'S/D')}]")
 
     crias = db.query(
         """
@@ -548,7 +548,7 @@ def formatear_genealogia_animal_tab(db: Database, tag: str) -> str:
         lineas.append(f"🍼 <b>Descendencia / Crías Registradas ({len(todas_crias)} {plural_partos}):</b>")
         for c in todas_crias[:8]:
             c_tag = c["tag"] or "Sin arete"
-            c_nom = f" ({c['nombre']})" if c["nombre"] else ""
+            c_nom = f" ({_esc(c['nombre'])})" if c["nombre"] else ""
             c_sx = f" · {c['sexo'].lower()}" if c["sexo"] else ""
             fec = c["fecha"] or c["fecha_nacimiento"]
             c_f = f" [{fec}]" if fec else ""
@@ -650,7 +650,8 @@ def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
 
     alertas_db = db.query(
         "SELECT a.*, an.tag FROM alertas a LEFT JOIN animales an ON an.id_animal = a.animal_id "
-        "WHERE a.estado = 'PENDIENTE' ORDER BY a.fecha_programada ASC LIMIT 10"
+        "WHERE a.estado = 'PENDIENTE' AND (a.animal_id IS NULL OR an.estado = 'ACTIVO') "
+        "ORDER BY a.fecha_programada ASC LIMIT 10"
     )
 
     total_alertas = len(partos_prox) + len(vacas_secar) + len(crias_destete) + len(perdiendo_peso) + len(en_retiro) + len(alertas_db)
@@ -756,7 +757,7 @@ def formatear_genetica_panel(db: Database) -> str:
     if pool:
         lineas.append("📊 <b>Pool Genético Global (% de Sangre en Hato):</b>")
         for r in pool[:6]:
-            lineas.append(f"  • <b>{r['raza']}</b>: <code>{r['pct']:.1f}%</code> ({r['cabezas_portadoras']} portadores)")
+            lineas.append(f"  • <b>{_esc(r['raza'])}</b>: <code>{r['pct']:.1f}%</code> ({r['cabezas_portadoras']} portadores)")
         lineas.append("")
 
     # 2. Grados de Sangre / Categorías
@@ -769,6 +770,10 @@ def formatear_genetica_panel(db: Database) -> str:
             "3_4": "📐",
             "5_8": "⚖️",
             "7_8": "🎯",
+            "15_16": "🏅",
+            "13_16": "📐",
+            "11_16": "📐",
+            "9_16": "📐",
             "1_2": "🌿",
             "MULTI": "🔄",
             "INDET": "❓",
@@ -776,7 +781,7 @@ def formatear_genetica_panel(db: Database) -> str:
         for g in grados:
             if g.get("cabezas", 0) > 0:
                 ico = iconos.get(g["codigo"], "•")
-                lineas.append(f"  {ico} <b>{g['nombre']}</b>: <b>{g['cabezas']}</b> cabezas ({g['pct_hato']}%)")
+                lineas.append(f"  {ico} <b>{_esc(g['nombre'])}</b>: <b>{g['cabezas']}</b> cabezas ({g['pct_hato']}%)")
         lineas.append("")
 
     # 3. Top líneas de cruces
@@ -786,7 +791,7 @@ def formatear_genetica_panel(db: Database) -> str:
         lineas.append("🏆 <b>Principales Familias de Cruces:</b>")
         for p in patrones_con_cruce:
             frac = p.get("fraccion", "")
-            lineas.append(f"  • [<b>{frac}</b>] {p['nombre']}: <b>{p['cabezas']}</b> cabezas")
+            lineas.append(f"  • [<b>{frac}</b>] {_esc(p['nombre'])}: <b>{p['cabezas']}</b> cabezas")
 
     lineas.append("────────────────────────────────────────")
     lineas.append("💡 <i>Nomenclatura zootécnica: F1 (1/2), 3/4, 5/8, 7/8 y Puros calculados automáticamente.</i>")
@@ -800,7 +805,7 @@ def formatear_alertas(db: Database, limite: int = 20) -> str:
         SELECT a.id, a.tipo_alerta, a.fecha_programada, a.descripcion, an.tag
         FROM alertas a
         LEFT JOIN animales an ON an.id_animal = a.animal_id
-        WHERE a.estado = 'PENDIENTE'
+        WHERE a.estado = 'PENDIENTE' AND (a.animal_id IS NULL OR an.estado = 'ACTIVO')
         ORDER BY a.fecha_programada ASC
         LIMIT ?
         """,
@@ -814,7 +819,7 @@ def formatear_alertas(db: Database, limite: int = 20) -> str:
         tag = r["tag"] or "?"
         fec = r["fecha_programada"] or "sin fecha"
         tipo = r["tipo_alerta"] or "ALERTA"
-        desc = f" ({r['descripcion']})" if r["descripcion"] else ""
+        desc = f" ({_esc(r['descripcion'])})" if r["descripcion"] else ""
         lineas.append(f"• [{fec}] Tag {tag} - {tipo}{desc}")
     return "\n".join(lineas)
 
@@ -959,18 +964,16 @@ def formatear_status(
     )
     n_destetes_30d = int(row_destetes["n"]) if row_destetes else 0
 
-    # Potrero con más animales activos (conteo por potrero_id o último traslado)
+    # Potrero con más animales activos, con la misma regla de potrero vigente
+    # que el resto del sistema (POTRERO_VIGENTE_SUBQUERY: potrero_id y, si
+    # falta, el último traslado). Antes aquí el traslado tenía prioridad y
+    # el tablero podía contradecir al inventario de la PWA.
     animales = db.query(
-        "SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'"
+        f"SELECT {POTRERO_VIGENTE_SUBQUERY} AS pid FROM animales a WHERE a.estado = 'ACTIVO'"
     )
     conteo_potreros: dict[int, int] = {}
     for a in animales:
-        aid = a["id_animal"]
-        ult = db.query_one(
-            "SELECT potrero_destino FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
-            (aid,),
-        )
-        pid = ult["potrero_destino"] if ult and ult["potrero_destino"] is not None else a["potrero_id"]
+        pid = a["pid"]
         if pid is not None:
             conteo_potreros[pid] = conteo_potreros.get(pid, 0) + 1
 
@@ -997,7 +1000,10 @@ def formatear_status(
     else:
         pot_mas_reposo_str = "Ninguno"
 
-    row_alertas = db.query_one("SELECT COUNT(*) as n FROM alertas WHERE estado = 'PENDIENTE'")
+    row_alertas = db.query_one(
+        "SELECT COUNT(*) as n FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+        "WHERE al.estado = 'PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO')"
+    )
     n_alertas = int(row_alertas["n"]) if row_alertas else 0
 
     size_str = "en memoria"
@@ -1094,7 +1100,8 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
 
     # Partos 7d
     filas_partos = db.query(
-        "SELECT sexo_cria FROM partos WHERE fecha >= ? AND fecha <= ?",
+        "SELECT e.sexo_cria FROM partos e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?",
         (fecha_7d, fecha_hoy),
     )
     n_partos_7d = len(filas_partos)
@@ -1103,15 +1110,23 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     partos_det = f" ({h_partos} ♀ / {m_partos} ♂)" if n_partos_7d > 0 else ""
 
     # Celos 7d
-    r_celos = db.query_one("SELECT COUNT(*) as n FROM celos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    # Novedades de 7 días restringidas al hato ACTIVO, igual que la PWA
+    # (dashboard_data._cnt): antes el bot y la PWA mostraban cifras distintas.
+    r_celos = db.query_one(
+        "SELECT COUNT(*) as n FROM celos e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_celos_7d = int(r_celos["n"]) if r_celos else 0
 
     # Servicios 7d
-    r_serv = db.query_one("SELECT COUNT(*) as n FROM servicios WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_serv = db.query_one(
+        "SELECT COUNT(*) as n FROM servicios e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_serv_7d = int(r_serv["n"]) if r_serv else 0
 
     # Tratamientos 7d y retiros activos
-    r_trat = db.query_one("SELECT COUNT(*) as n FROM tratamientos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_trat = db.query_one(
+        "SELECT COUNT(*) as n FROM tratamientos e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_trat_7d = int(r_trat["n"]) if r_trat else 0
 
     filas_retiro = db.query(
@@ -1128,13 +1143,17 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     trat_det = f" ({n_en_retiro} en retiro activo)" if n_en_retiro > 0 else ""
 
     # Pesajes 7d y GMD
-    filas_pesajes = db.query("SELECT peso_kg, gmd_calculada FROM pesajes WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    filas_pesajes = db.query(
+        "SELECT e.peso_kg, e.gmd_calculada FROM pesajes e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_pesajes_7d = len(filas_pesajes)
     gmds = [float(p["gmd_calculada"]) for p in filas_pesajes if p["gmd_calculada"] is not None]
     gmd_prom_str = f" · GMD prom: {sum(gmds)/len(gmds):.0f} g/d" if gmds else ""
 
     # Traslados 7d
-    r_trasl = db.query_one("SELECT COUNT(*) as n FROM traslados WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_trasl = db.query_one(
+        "SELECT COUNT(*) as n FROM traslados e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_trasl_7d = int(r_trasl["n"]) if r_trasl else 0
 
     # Muertes 7d
@@ -1144,7 +1163,9 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     # 3. Alertas próximas 7 días
     limite_alertas = iso(add_days(hoy, 7))
     alertas_pendientes = db.query(
-        "SELECT tipo_alerta FROM alertas WHERE estado = 'PENDIENTE' AND fecha_programada <= ?",
+        "SELECT al.tipo_alerta FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+        "WHERE al.estado = 'PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO') "
+        "AND al.fecha_programada <= ?",
         (limite_alertas,),
     )
     cnt_eco = sum(1 for a in alertas_pendientes if "ECO" in str(a["tipo_alerta"]).upper())
@@ -2011,7 +2032,8 @@ def formatear_panel_medicamentos(db: Database) -> str:
         """
         SELECT t.*, a.tag, a.nombre
         FROM tratamientos t
-        LEFT JOIN animales a ON a.id_animal = t.animal_id
+        JOIN animales a ON a.id_animal = t.animal_id
+        WHERE a.estado = 'ACTIVO'
         ORDER BY t.fecha DESC, t.id DESC LIMIT 8
         """
     )
@@ -2913,6 +2935,8 @@ def formatear_ronda_voisin(ronda: dict | None) -> str | None:
         detalle = f"⚠️ Solo <b>{dias_txt} días</b> — considerar rotación pronto ({ms_txt} kg MS/ha)"
     else:
         detalle = f"🔴 <b>CRÍTICO: {dias_txt} días</b> — rotar INMEDIATAMENTE ({ms_txt} kg MS/ha)"
+    if ronda.get("puntos_insuficientes"):
+        detalle += f"\n⚠️ Solo {n_pts} puntos de aforo: tome al menos 10-15 al azar para un dato confiable."
     return f"{linea}\n{detalle}"
 
 

@@ -953,7 +953,9 @@ def construir_application(
             try:
                 cantidad = int(args[1])
             except ValueError:
-                await update.message.reply_text("❌ La cantidad debe ser un número entero (ej. 10).")
+                cantidad = 0
+            if cantidad <= 0:
+                await update.message.reply_text("❌ La cantidad debe ser un número entero mayor a 0 (ej. 10).")
                 return
 
             raza = args[2].strip() if len(args) >= 3 else None
@@ -975,13 +977,13 @@ def construir_application(
 
             msg = (
                 f"✅ <b>Pajuelas Registradas con Éxito</b>\n"
-                f"• Toro: <b>{codigo_toro}</b>\n"
+                f"• Toro: <b>{html.escape(codigo_toro)}</b>\n"
                 f"• Cantidad ingresada: <b>+{cantidad} unidades</b>\n"
             )
             if raza:
-                msg += f"• Raza: {raza}\n"
+                msg += f"• Raza: {html.escape(raza)}\n"
             if canastilla:
-                msg += f"• Canastilla: {canastilla}\n"
+                msg += f"• Canastilla: {html.escape(canastilla)}\n"
             if costo > 0:
                 msg += f"• Costo unitario: ${_fmt_es_co(costo)}\n"
 
@@ -3235,8 +3237,9 @@ def construir_application(
                     """
                     SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nombre
                     FROM tratamientos t
-                    LEFT JOIN animales a ON a.id_animal = t.animal_id
+                    JOIN animales a ON a.id_animal = t.animal_id
                     LEFT JOIN potreros p ON p.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO'
                     ORDER BY t.fecha DESC, t.id DESC LIMIT 10
                     """
                 )
@@ -3408,6 +3411,12 @@ def construir_application(
                         toro_code = partes[-2]
                         cant_paj = int(partes[-1])
 
+                    # El callback_data viaja por el cliente: nunca aceptar
+                    # cantidades negativas o nulas (restarían stock).
+                    if toro_code and cant_paj <= 0:
+                        toro_code = None
+                        if query.message:
+                            await query.message.edit_text("❌ Cantidad de pajuelas inválida. No se modificó el inventario.")
                     if toro_code:
                         db.registrar_pajuela(
                             codigo_toro=toro_code,
@@ -3419,7 +3428,7 @@ def construir_application(
                         msg_confirmado = (
                             f"✅ <b>Stock de Pajuelas Actualizado</b>\n\n"
                             f"Se cargaron <b>+{cant_paj} pajuelas</b> del toro <b>{html.escape(str(toro_code))}</b> al termo criogénico.\n"
-                            f"• Stock actual de {toro_code}: <b>{stock_actual} unidades</b>.\n\n"
+                            f"• Stock actual de {html.escape(str(toro_code))}: <b>{stock_actual} unidades</b>.\n\n"
                             f"💡 <i>Use <code>/pajuela_stock</code> para ver el banco completo.</i>"
                         )
                         if query.message:
@@ -3635,6 +3644,10 @@ def correr(
             logging.StreamHandler(sys.stdout),
         ],
     )
+    # httpx registra en INFO cada URL de la Bot API, que incluye el token
+    # (https://api.telegram.org/bot<TOKEN>/...): no debe quedar en bot.log.
+    for _ruidoso in ("httpx", "httpcore"):
+        logging.getLogger(_ruidoso).setLevel(logging.WARNING)
 
     db_dir = os.path.dirname(os.path.abspath(db_path))
     if db_dir and not os.path.exists(db_dir):

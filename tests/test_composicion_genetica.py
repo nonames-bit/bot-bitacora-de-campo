@@ -191,8 +191,9 @@ def test_api_rest_genetica(tmp_path):
     client = app.test_client()
     client.post("/login", data={"password": "clave-de-prueba"})
 
+    # Sin user_id: el rol se resolvería contra el users.json real del equipo
+    # (ausente en CI). La contraseña maestra ya deja la sesión como OWNER.
     with client.session_transaction() as sess:
-        sess["user_id"] = 1
         sess["rol"] = "OWNER"
 
     # 1. Guardar composición manual vía POST

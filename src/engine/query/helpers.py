@@ -35,9 +35,11 @@ def buscar_foto_animal(db: Database, tag_or_name: str | int, media_dir: str = "m
     if not os.path.exists(media_dir):
         return None
 
-    # Probar candidatos en disco
+    # Probar candidatos en disco. El tag llega tal cual del usuario de
+    # Telegram (/fotos <tag>): un candidato con separadores o ".." podría
+    # salirse de media/ y hacer que el bot envíe cualquier imagen del servidor.
     for cand in tags_probar:
-        if not cand:
+        if not cand or "/" in cand or "\\" in cand or ".." in cand or os.path.isabs(cand):
             continue
         c_clean = cand.lower().strip()
         for ext in (".jpg", ".jpeg", ".png"):

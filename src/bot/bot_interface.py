@@ -48,6 +48,14 @@ class Bot:
                 if len(eventos) == 1:
                     return "No pude interpretar ese mensaje. Intente una nota como " \
                            "'pario la 47, ternero macho' o una pregunta."
+            elif ev.tipo == "diagnostico_gestacion" and not ev.datos.get("resultado"):
+                # Sin resultado explícito no se registra nada: asumir PREÑADA
+                # generaba gestaciones falsas (y FEP/secados) en vacas vacías.
+                tag_d = ev.animal_tag or "la vaca"
+                respuestas.append(
+                    f"⚠️ No registré el diagnóstico de {tag_d}: indique el resultado, "
+                    f"por ejemplo 'palpé la {ev.animal_tag or '47'}, preñada' o '..., vacía'."
+                )
             else:
                 self._registrar(ev, user_id, grupo_gemelar)
                 self._generar_alertas(ev)

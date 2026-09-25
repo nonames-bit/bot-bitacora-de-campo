@@ -84,6 +84,26 @@ FRACCIONES_ESTANDAR: list[tuple[float, str, bool]] = [
 ]
 
 
+# Tipos de raza de SG que no identifican una raza concreta.
+_NO_RAZAS = {"Mestizo", "Taurino", "Cebuino", "Indeterminado", "Desconocida", "Sin Raza"}
+_TIPOS_SG_SIN_RAZA = {"I", "C", "T", "INDETERMINADO", "CEBUINO", "CEBU", "TAURINO"}
+
+# (porcentaje nominal, código, fracción, color, tolerancia): grados del cruce
+# absorbente que no cubren las bandas 1/2, 5/8, 3/4, 7/8 y Puro.
+_GRADOS_DIECISEISAVOS = [
+    (93.75, "15_16", "15/16", "morado", 2.0),
+    (81.25, "13_16", "13/16", "azul", 1.0),
+    (68.75, "11_16", "11/16", "ambar", 1.0),
+    (56.25, "9_16", "9/16", "lima", 1.0),
+]
+_NOMBRES_DIECISEISAVOS = {
+    "15_16": "Quince Dieciseisavos",
+    "13_16": "Trece Dieciseisavos",
+    "11_16": "Once Dieciseisavos",
+    "9_16": "Nueve Dieciseisavos",
+}
+
+
 def porcentaje_a_fraccion(porcentaje: float, tolerancia: float = 0.6) -> str:
     """Traduce un porcentaje decimal a la fracción o nomenclatura estándar zootécnica.
 
@@ -163,11 +183,13 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "RS": "Romosinuano",
         "HOLSTEIN": "Holstein",
         "HOL": "Holstein",
-        "HOLSTEIN NEG": "Holstein Negro",
-        "HOLSTEIN NEGRO": "Holstein Negro",
-        "HOLSTEIN ROJO": "Holstein Rojo",
-        "HOLSTEIN R.": "Holstein Rojo",
-        "HOLSTEÍN R.": "Holstein Rojo",
+        # Variedades de color de una misma raza: para la composición genética
+        # son la misma raza (Holstein x Holstein Negro es Holstein puro, no F1).
+        "HOLSTEIN NEG": "Holstein",
+        "HOLSTEIN NEGRO": "Holstein",
+        "HOLSTEIN ROJO": "Holstein",
+        "HOLSTEIN R.": "Holstein",
+        "HOLSTEÍN R.": "Holstein",
         "JERSEY": "Jersey",
         "JER": "Jersey",
         "PARDO SUIZO": "Pardo Suizo",
@@ -189,11 +211,19 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "HARTÓN": "Hartón del Valle",
         "BRANGUS": "Brangus",
         "ANGUS": "Angus",
+        "ANGUS NEGRO": "Angus",
+        "ANGUS ROJO": "Angus",
+        "BRAHMAN ROJO": "Brahman",
+        "BRAHMAN GRIS": "Brahman",
+        "BRAHMAN BLANCO": "Brahman",
+        "BRANGUS ROJO": "Brangus",
+        "BRANGUS NEGRO": "Brangus",
         "CHAROLAIS": "Charolais",
         "CHAR": "Charolais",
         "GIROLANDO": "Girolando",
         "MESTIZO": "Mestizo",
         "CRIOLLO": "Criollo",
+        "CRIOLLA": "Criollo",
         "AYRSHIRE": "Ayrshire",
         "AYR": "Ayrshire",
         "GUZERAT": "Guzerá",
@@ -234,6 +264,11 @@ def clasificar_animal_zootecnico(
         - SIN_CLASIFICAR: Sin raza registrada
     """
     rz_str = str(raza_str or "").strip()
+    if not comp and rz_str and rz_str.upper() not in _TIPOS_SG_SIN_RAZA:
+        # Animal sin filas en composicion_racial pero con raza en texto
+        # ("Brahman", "3/4 Gyr + 1/4 Holstein"): mismo fallback que
+        # obtener_composicion_racial, en vez de "Sin Clasificar".
+        comp = [c for c in parsear_texto_raza(rz_str) if c.get("raza")]
     if not comp:
         rz_up = rz_str.upper()
         if rz_up in ("INDETERMINADO", "I"):
@@ -275,12 +310,11 @@ def clasificar_animal_zootecnico(
     # Normalizar componentes al 100%
     suma = sum(float(c.get("porcentaje") or 0.0) for c in comp)
     factor = 100.0 / suma if suma > 0 else 1.0
-    c_norm = []
+    agregados: dict[str, float] = {}
     for c in comp:
         rz = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
-        pct = round(float(c.get("porcentaje") or 0.0) * factor, 2)
-        if pct > 0:
-            c_norm.append({"raza": rz, "porcentaje": pct})
+        agregados[rz] = agregados.get(rz, 0.0) + float(c.get("porcentaje") or 0.0) * factor
+    c_norm = [{"raza": rz, "porcentaje": round(p, 2)} for rz, p in agregados.items() if round(p, 2) > 0]
     c_norm.sort(key=lambda x: x["porcentaje"], reverse=True)
 
     if not c_norm:
@@ -297,6 +331,20 @@ def clasificar_animal_zootecnico(
     max_p = max_c["porcentaje"]
     r1 = max_c["raza"]
 
+    # Tipos genéricos de SG que no son razas: un 100% "Mestizo" no es puro.
+    if max_p >= 96.0 and r1 in _NO_RAZAS:
+        base = {"Cebuino": "C", "Taurino": "T", "Indeterminado": "I"}.get(r1)
+        if base:
+            return clasificar_animal_zootecnico([], base)
+        return {
+            "grado_codigo": "MULTI",
+            "grado_nombre": "Multirracial / Compuesto",
+            "fraccion": "Compuesto",
+            "chip_color": "naranja",
+            "patron_formula": r1,
+            "es_tipificado": False,
+        }
+
     # 1. Puros o Puro por Cruce (>= 96.0%)
     if len(c_norm) == 1 or max_p >= 96.0:
         return {
@@ -309,7 +357,8 @@ def clasificar_animal_zootecnico(
         }
 
     # 2. F1 verdadero (2 razas puras entre 44% y 56% cada una)
-    if len(c_norm) == 2 and abs(c_norm[0]["porcentaje"] - 50.0) <= 6.0 and abs(c_norm[1]["porcentaje"] - 50.0) <= 6.0:
+    if (len(c_norm) == 2 and abs(c_norm[0]["porcentaje"] - 50.0) <= 6.0 and abs(c_norm[1]["porcentaje"] - 50.0) <= 6.0
+            and not any(c["raza"] in _NO_RAZAS for c in c_norm)):
         r2 = c_norm[1]["raza"]
         nombre_cruce = f"1/2 {r1} + 1/2 {r2}"
         if ("Gyr" in (r1, r2) and ("Holstein" in r1 or "Holstein" in r2)) or ("Girolando" in (r1, r2)):
@@ -322,6 +371,22 @@ def clasificar_animal_zootecnico(
             "patron_formula": nombre_cruce,
             "es_tipificado": True,
         }
+
+    # 2b. Grados intermedios del cruce absorbente (x/16): 15/16 es el paso
+    # previo al Puro por Cruce. Antes caían en los huecos entre bandas y se
+    # clasificaban como "Multirracial / Trihíbrido".
+    for nominal, codigo, frac_txt, color, tol in _GRADOS_DIECISEISAVOS:
+        if abs(max_p - nominal) <= tol:
+            r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
+            num = frac_txt.split("/")[0]
+            return {
+                "grado_codigo": codigo,
+                "grado_nombre": f"{_NOMBRES_DIECISEISAVOS[codigo]} ({frac_txt})",
+                "fraccion": frac_txt,
+                "chip_color": color,
+                "patron_formula": f"{frac_txt} {r1} + {16 - int(num)}/16 {r2}",
+                "es_tipificado": True,
+            }
 
     # 3. Tres Cuartos (3/4) ~75% (entre 69.5% y 80.5%)
     if abs(max_p - 75.0) <= 5.5:
@@ -410,6 +475,10 @@ def calcular_resumen_genetico_hato(
         "3_4": {"nombre": "Tres Cuartos (3/4)", "chip": "3/4", "color": "azul", "orden": 3},
         "5_8": {"nombre": "Cinco Octavos (5/8)", "chip": "5/8", "color": "ambar", "orden": 4},
         "7_8": {"nombre": "Siete Octavos (7/8)", "chip": "7/8", "color": "cyan", "orden": 5},
+        "15_16": {"nombre": "Quince Dieciseisavos (15/16)", "chip": "15/16", "color": "morado", "orden": 5.1},
+        "13_16": {"nombre": "Trece Dieciseisavos (13/16)", "chip": "13/16", "color": "azul", "orden": 5.2},
+        "11_16": {"nombre": "Once Dieciseisavos (11/16)", "chip": "11/16", "color": "ambar", "orden": 5.3},
+        "9_16": {"nombre": "Nueve Dieciseisavos (9/16)", "chip": "9/16", "color": "lima", "orden": 5.4},
         "1_2": {"nombre": "Medias Sangres Multirracial", "chip": "1/2", "color": "lima", "orden": 6},
         "MULTI": {"nombre": "Compuestos / Trihíbridos", "chip": "Compuesto", "color": "naranja", "orden": 7},
         "CEBU": {"nombre": "Cebuino Base", "chip": "Cebuino", "color": "ambar", "orden": 8},
@@ -584,14 +653,16 @@ def calcular_cruce_absorbente(
     if not aportes:
         return []
 
-    # Ajustar para asegurar que la suma dé 100.0 si ambos progenitores aportaron
+    # Progenitor sin composición conocida: su 50% queda como "Desconocida".
+    # Antes se reescalaba al 100% y la cría salía copia del otro progenitor
+    # (madre Brahman x padre desconocido = "Brahman Puro").
     suma_total = sum(aportes.values())
-    if abs(suma_total - 100.0) > 0.01 and suma_total > 0:
-        factor_ajuste = 100.0 / suma_total
-        aportes = {r: p * factor_ajuste for r, p in aportes.items()}
+    if suma_total < 99.99:
+        aportes["Desconocida"] = aportes.get("Desconocida", 0.0) + (100.0 - suma_total)
 
     # Verificar si es un F1 verdadero (exactamente 2 razas al 50% cada una)
-    es_f1 = (len(aportes) == 2 and all(abs(p - 50.0) <= 0.5 for p in aportes.values()))
+    es_f1 = (len(aportes) == 2 and all(abs(p - 50.0) <= 0.5 for p in aportes.values())
+             and "Desconocida" not in aportes)
 
     # Convertir a lista y ordenar de mayor a menor porcentaje
     resultado = []
@@ -676,6 +747,7 @@ def parsear_texto_raza(texto: Optional[str]) -> list[dict]:
     tokens = re.split(r"[+,;\n]| y ", t)
     resultado = []
     total_pct = 0.0
+    sin_pct: list[str] = []
 
     for tok in tokens:
         tok = tok.strip()
@@ -714,6 +786,20 @@ def parsear_texto_raza(texto: Optional[str]) -> list[dict]:
                 "etiqueta": formatear_raza_etiqueta(norm_raza, pct_red),
             })
             total_pct += pct_val
+        elif raza_str:
+            sin_pct.append(norm_raza)
+
+    # "3/4 Gyr + Holstein": la parte sin fracción recibe el resto hasta 100
+    # (antes se descartaba y quedaba solo Gyr 75%).
+    if resultado and sin_pct and total_pct < 99.99:
+        resto = round((100.0 - total_pct) / len(sin_pct), 2)
+        for rz in sin_pct:
+            resultado.append({
+                "raza": rz,
+                "porcentaje": resto,
+                "fraccion": porcentaje_a_fraccion(resto),
+                "etiqueta": formatear_raza_etiqueta(rz, resto),
+            })
 
     if resultado:
         # Si la suma de los porcentajes no da 100 y faltan razas o hay desajuste

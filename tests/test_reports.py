@@ -65,7 +65,7 @@ def test_recolectar_datos_incluye_spi_sequia(db):
 
 
 def test_recolectar_datos_alertas_hasta_hoy_mas_7(db):
-    db.registrar_animal("47")
+    db.registrar_animal("47", estado="ACTIVO")
     db.registrar_alerta("47", "ECOGRAFIA", "2026-08-29", descripcion="Ecografía día 35")
     db.registrar_alerta("47", "PALPACION", "2026-09-05", descripcion="Palpación rectal")
 

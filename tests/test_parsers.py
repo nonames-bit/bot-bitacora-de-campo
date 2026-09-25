@@ -1,8 +1,11 @@
 """Pruebas del parser de eventos y del motor NLU."""
+from datetime import date
+
 import pytest
 
 from src.parsers.event_parser import EventParser
 from src.parsers import nlp_engine as nlu
+from src.utils import parse_fecha, to_date
 
 
 @pytest.fixture
@@ -320,3 +323,80 @@ def test_parse_diagnostico_gestacion_3_meses(parser):
     assert ev.datos["dias_gestacion"] == 90
 
 
+
+
+# ---------------------------------------------------------------------------
+# Regresiones de la revisión integral (fechas, retiros, diagnóstico)
+# ---------------------------------------------------------------------------
+_HOY = date(2026, 9, 25)
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("la 47 entro en celo en la manana", None),      # franja del día, no "mañana"
+    ("celo esta manana", None),
+    ("celo por la manana", None),
+    ("palpar la 47 manana", date(2026, 9, 26)),
+    ("pasado manana", date(2026, 9, 27)),
+    ("la 47 en celo anoche", date(2026, 9, 24)),
+    ("servicio el 31/02/2026", None),                # fecha imposible no revienta
+])
+def test_parse_fecha_regresiones(texto, esperado):
+    assert parse_fecha(texto, _HOY) == esperado
+
+
+def test_celo_en_la_manana_es_hoy_am():
+    ev = EventParser(hoy=_HOY).parse("la 47 entro en celo en la manana")
+    assert ev.fecha == "2026-09-25"
+    assert ev.datos["am_pm"] == "AM"
+
+
+def test_celo_anoche_es_ayer_pm():
+    ev = EventParser(hoy=_HOY).parse("la 47 entro en celo anoche")
+    assert ev.fecha == "2026-09-24"
+    assert ev.datos["am_pm"] == "PM"
+
+
+def test_to_date_acepta_hora():
+    assert to_date("2026-09-25 10:00:00") == date(2026, 9, 25)
+    assert to_date("2026-09-25T10:00") == date(2026, 9, 25)
+    assert to_date("2026-02-31") is None
+
+
+@pytest.mark.parametrize("texto, leche, carne", [
+    ("ivermectina retiro leche 3 dias carne 28 dias", 3, 28),
+    ("retiro de 28 dias en carne y 3 dias en leche", 3, 28),
+    ("leche: 4 días, carne: 30 días", 4, 30),
+    ("retiro leche y carne 10 dias", 10, 10),
+    ("oxitetraciclina 5 dias de retiro leche", 5, None),
+    ("retiro 21 dias", None, 21),
+])
+def test_retiro_leche_carne_por_producto(texto, leche, carne):
+    r = nlu.retiro_leche_carne(texto, nlu.extraer_dias_retiro(texto))
+    assert (r["dias_retiro_leche"], r["dias_retiro_carne"]) == (leche, carne)
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("palpe la 47 no quedo prenada", "VACIA"),
+    ("la 47 no esta prenada", "VACIA"),
+    ("la 47 esta prenada", "PREÑADA"),
+    ("palpe la 47", None),
+])
+def test_resultado_diagnostico(texto, esperado):
+    assert nlu.extraer_resultado_diagnostico(texto) == esperado
+
+
+def test_bot_no_registra_diagnostico_sin_resultado(tmp_path):
+    from src.bot.bot_interface import Bot
+    from src.db.database import Database
+    db = Database(str(tmp_path / "b.db")).create_tables()
+    try:
+        db.registrar_animal("47", sexo="Hembra")
+        bot = Bot(db, hoy=_HOY)
+        resp = bot.procesar_texto("palpe la 47")
+        assert "No registré" in resp
+        assert db.query_one("SELECT COUNT(*) AS n FROM diagnosticos_gestacion")["n"] == 0
+        bot.procesar_texto("palpe la 47 no quedo prenada")
+        fila = db.query_one("SELECT resultado FROM diagnosticos_gestacion")
+        assert fila["resultado"] in ("VACIA", "VACÍA")
+    finally:
+        db.close()

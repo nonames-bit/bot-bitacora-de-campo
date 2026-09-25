@@ -917,6 +917,27 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return str(rol_sesion).strip().upper()
         return None
 
+    def _bloqueo_gestion_usuario(mi_rol: Optional[str], objetivo: Optional[dict]) -> Optional[str]:
+        """Regla de jerarquía al modificar un usuario existente (PIN, rol, datos).
+
+        ``objetivo`` debe resolverse con ``Auth.obtener_usuario`` (que busca por
+        user_id Y por telegram_id): comparar solo ``user_id`` dejaba que un ADMIN
+        llegara al OWNER usando su telegram_id. Devuelve el mensaje de error o None.
+        """
+        if not objetivo or mi_rol == "OWNER":
+            return None
+        rol_obj = str(objetivo.get("rol", "")).strip().upper()
+        if rol_obj == "OWNER":
+            return "Un ADMIN no puede modificar a un usuario OWNER (Level 1)."
+        if rol_obj in ("ADMIN", "ADMINISTRADOR"):
+            try:
+                mi_uid = int(session.get("user_id")) if session.get("user_id") is not None else None
+            except (TypeError, ValueError):
+                mi_uid = None
+            if mi_uid is None or mi_uid not in (objetivo.get("user_id"), objetivo.get("telegram_id")):
+                return "Un ADMIN solo puede modificar su propio usuario o usuarios TRABAJADOR."
+        return None
+
     def _usuario_actual() -> dict[str, Any]:
         if session is None:
             return {"autenticado": False, "rol": None, "nombre": None, "user_id": None}
@@ -1103,6 +1124,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/logout")
     def logout():
+        # Logout-CSRF: un enlace desde otro sitio no debe cerrar la sesión.
+        # Los navegadores modernos marcan esa navegación con Sec-Fetch-Site.
+        if request.headers.get("Sec-Fetch-Site") == "cross-site":
+            return redirect("/")
         session.clear()
         resp = redirect("/login")
         # Respaldo del lado del servidor al borrado de caché en JS (app.js):
@@ -1467,6 +1492,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/finanzas")
     def api_finanzas():
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
         desde = request.args.get("desde") or None
         hasta = request.args.get("hasta") or None
         out = datos_finanzas(db_path, desde=desde, hasta=hasta)
@@ -1569,6 +1596,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.post("/api/finanzas")
     def api_finanzas_crear():
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"ok": False, "error": "Permisos insuficientes"}), 403
         datos = request.get_json(silent=True) or {}
         fecha = datos.get("fecha") or date.today().isoformat()
         tipo = str(datos.get("tipo") or "").strip().upper()
@@ -1606,7 +1635,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         os.makedirs(media_dir_abs, exist_ok=True)
                         ts = int(time.time())
                         rnd = uuid.uuid4().hex[:6]
-                        fname = f"gasto_{categoria.lower()}_{ts}_{rnd}.jpg"
+                        cat_arch = re.sub(r"[^a-z0-9_]", "", categoria.lower())[:40] or "otro"
+                        fname = f"gasto_{cat_arch}_{ts}_{rnd}.jpg"
                         with open(os.path.join(media_dir_abs, fname), "wb") as f:
                             f.write(raw_bytes)
                         foto_ruta = os.path.join("media", fname).replace("\\", "/")
@@ -2850,11 +2880,16 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 ids_existentes = [int(u.get("user_id", 0)) for u in usuarios if isinstance(u.get("user_id"), int) and int(u.get("user_id", 0)) < 1000000]
                 uid = (max(ids_existentes) + 1) if ids_existentes else 1
 
-            # Si es ADMIN y está editando un usuario existente, no puede editar a un OWNER
-            if mi_rol != "OWNER":
+            # Jerarquía: un ADMIN no puede editar a un OWNER ni a otro ADMIN.
+            bloqueo = _bloqueo_gestion_usuario(mi_rol, auth_inst.obtener_usuario(uid))
+            if bloqueo:
+                return jsonify({"error": bloqueo}), 403
+            # Un telegram_id solo puede pertenecer a un usuario: si no, las
+            # búsquedas por telegram_id resolverían al usuario equivocado.
+            if tg_id is not None:
                 for u in usuarios:
-                    if u.get("user_id") == uid and str(u.get("rol", "")).strip().upper() == "OWNER":
-                        return jsonify({"error": "Un ADMIN no puede modificar a un usuario OWNER (Level 1)."}), 403
+                    if u.get("telegram_id") == tg_id and u.get("user_id") != uid:
+                        return jsonify({"error": "Ese ID de Telegram ya está asignado a otro usuario."}), 400
 
             # Verificar que el PIN no esté en colisión con OTRO usuario. Los
             # PIN se guardan hasheados, así que no se puede comparar por
@@ -2910,13 +2945,15 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except (ImportError, ValueError):
                 from src.server.auth import Auth  # type: ignore
             auth_inst = Auth(users_file)
-            usuarios = auth_inst.listar_usuarios()
 
-            # Si es ADMIN, no puede cambiarle el PIN a un OWNER
-            if mi_rol != "OWNER":
-                for u in usuarios:
-                    if u.get("user_id") == target_uid and str(u.get("rol", "")).strip().upper() == "OWNER":
-                        return jsonify({"error": "Un ADMIN no puede modificar el PIN de un OWNER."}), 403
+            # Jerarquía: resolver por user_id o telegram_id, igual que asignar_pin.
+            objetivo = auth_inst.obtener_usuario(target_uid)
+            if objetivo is None:
+                return _error_interno(400, con_ok=False)
+            bloqueo = _bloqueo_gestion_usuario(mi_rol, objetivo)
+            if bloqueo:
+                return jsonify({"error": bloqueo}), 403
+            target_uid = int(objetivo.get("user_id"))
 
             # Verificar colisión de PIN (contra cada hash, ver usuario_con_pin).
             # Genérico a propósito: no revela el PIN ni a quién pertenece.
@@ -3045,6 +3082,36 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             logger.exception("Error al guardar foto adjunta de captura: %s", err)
             return None
 
+    # Tipos de /api/sync restringidos por rol. Se alinean con lo que la UI
+    # ofrece a cada rol: la Captura Rápida del TRABAJADOR incluye pajuelas,
+    # nitrógeno y gastos (EGRESO), pero IATF e inseminadores solo existen en
+    # la vista de Reproducción (OWNER/ADMIN) y sus endpoints dedicados los
+    # prohíben a roles de campo. Sin este mapa, /api/sync era una puerta
+    # trasera a esas acciones.
+    _ROLES_GESTION = ("OWNER", "ADMIN", "MAYORDOMO")
+    _ROLES_SYNC = {
+        "inseminador": _ROLES_GESTION,
+        "nuevo_inseminador": _ROLES_GESTION,
+        "iatf_paso": _ROLES_GESTION,
+        "droga_iatf": _ROLES_GESTION,
+        "iatf_inseminar": _ROLES_GESTION,
+        "lote_iatf_inseminar": _ROLES_GESTION,
+    }
+
+    def _foto_media_existente(db_inst, ruta: Any) -> Optional[str]:
+        """Acepta la ruta de foto que envía el cliente solo si es una foto ya
+        registrada por el servidor directamente dentro de media/ (lo que
+        devuelve /api/finanzas/analizar-factura). Cualquier otra ruta
+        (absoluta, con "..", subcarpetas o no registrada) se descarta."""
+        ruta = str(ruta or "").strip().replace("\\", "/")
+        if not ruta.startswith("media/"):
+            return None
+        nombre = ruta[len("media/"):]
+        if not nombre or "/" in nombre or nombre.startswith("."):
+            return None
+        fila = db_inst.query_one("SELECT 1 AS ok FROM fotos WHERE ruta = ? LIMIT 1", (ruta,))
+        return ruta if fila else None
+
     @app.post("/api/sync")
     @_limite_api("sync")
     def api_sync():
@@ -3060,6 +3127,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         errores = []
         ids_ok = []
         uid = session.get("user_id")
+        rol_sync = _rol_actual()
 
         try:
             for ev in eventos:
@@ -3087,6 +3155,13 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         ids_ok.append(id_local)
                         procesados += 1
                         continue
+
+                # Mismos permisos que los endpoints dedicados: /api/sync no
+                # puede ser una puerta trasera para roles de campo.
+                roles_req = _ROLES_SYNC.get(tipo)
+                if roles_req and rol_sync not in roles_req:
+                    errores.append(f"Permisos insuficientes para '{tipo}' ({id_local or tipo})")
+                    continue
 
                 n_ids_previos = len(ids_ok)
                 try:
@@ -3258,9 +3333,20 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         if id_local:
                             ids_ok.append(id_local)
                     elif tipo == "gasto":
+                        tipo_fin = str(payload.get("tipo_finanza") or "EGRESO").strip().upper()
+                        try:
+                            monto_ok = float(payload.get("monto")) > 0
+                        except (TypeError, ValueError):
+                            monto_ok = False
+                        if tipo_fin not in ("INGRESO", "EGRESO") or not monto_ok:
+                            errores.append(f"Gasto inválido ({id_local or tipo}): tipo INGRESO/EGRESO y monto > 0")
+                            continue
+                        if tipo_fin == "INGRESO" and rol_sync not in ("OWNER", "ADMIN"):
+                            errores.append(f"Permisos insuficientes para registrar INGRESO ({id_local or tipo})")
+                            continue
                         fid_finanza = db_sync.registrar_finanza(
                             fecha=fecha,
-                            tipo=payload.get("tipo_finanza") or "EGRESO",
+                            tipo=tipo_fin,
                             categoria=payload.get("categoria"),
                             concepto=payload.get("concepto"),
                             monto=payload.get("monto"),
@@ -3271,7 +3357,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                             notas=payload.get("notas"),
                             registrado_por=uid,
                         )
-                        foto_ruta_directa = (payload.get("foto_ruta") or "").strip() or None
+                        foto_ruta_directa = _foto_media_existente(db_sync, payload.get("foto_ruta"))
                         if foto_ruta_directa:
                             # La foto ya se guardó al analizar la factura con IA
                             # (ver /api/finanzas/analizar-factura) -- solo se
@@ -4618,6 +4704,11 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     @app.get("/media/<path:rel>")
     def media(rel):
         # send_from_directory ya previene path traversal (rechaza "..").
+        # Soportes financieros (facturas, recibos de leche, gastos) solo para
+        # OWNER/ADMIN: son evidencia de pagos y no se muestran a roles de campo.
+        nombre_arch = os.path.basename(rel).lower()
+        if nombre_arch.startswith(("gasto_", "factura_", "recibo_leche_")) and _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Permisos insuficientes"}), 403
         media_root = os.path.join(RAIZ_PROYECTO, MEDIA_DIR_DEFAULT)
         return send_from_directory(media_root, rel)
 

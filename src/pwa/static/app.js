@@ -456,7 +456,7 @@
     var climaHtml;
     if (clima) {
       climaHtml = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
-        + "<b style='font-size:15px;'>" + esc(Math.round(clima.temp_max_c)) + "° / " + esc(Math.round(clima.temp_min_c)) + "°</b>"
+        + "<b style='font-size:15px;'>" + esc(Math.round(clima.temp_max_c)) + "° / " + esc(clima.temp_min_c == null ? "—" : Math.round(clima.temp_min_c)) + "°</b>"
         + htmlClimaMm(clima)
         + "</div>";
     } else {
@@ -1273,7 +1273,7 @@
         var alerta = lluvia >= 8 ? "ambar" : "verde";
         h += "<div class='card' style='min-width:110px; flex-shrink:0; padding:10px; text-align:center;'>"
           + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase;'>" + esc(fechaCorta(dd.fecha)) + "</div>"
-          + "<div style='font-size:13px; font-weight:700; margin:4px 0;'>" + esc(Math.round(dd.temp_max_c)) + "° / " + esc(Math.round(dd.temp_min_c)) + "°</div>"
+          + "<div style='font-size:13px; font-weight:700; margin:4px 0;'>" + esc(Math.round(dd.temp_max_c)) + "° / " + esc(dd.temp_min_c == null ? "—" : Math.round(dd.temp_min_c)) + "°</div>"
           + "<span class='chip " + alerta + "' style='font-size:11px;'>" + icon("droplet", 11) + esc(lluvia.toFixed(1)) + " mm</span>"
           + (prob != null ? "<div style='font-size:10.5px; color:var(--texto-suave); margin-top:4px;'>" + esc(Math.round(prob)) + "% prob. del día</div>" : "")
           + "</div>";
@@ -9206,7 +9206,9 @@
     // 3. Extraer enlaces seguros <a href="...">...</a>
     var links = [];
     str = str.replace(/<a\s+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function (_, url, texto) {
-      var safeUrl = /^https?:\/\//i.test(url) || url.charAt(0) === "/" ? esc(url) : "#";
+      // Rutas internas "/x" sí; "//dominio" (protocol-relative) y "/\\" no.
+      var esInterna = url.charAt(0) === "/" && url.charAt(1) !== "/" && url.charAt(1) !== "\\";
+      var safeUrl = /^https?:\/\//i.test(url) || esInterna ? esc(url) : "#";
       links.push("<a href='" + safeUrl + "' target='_blank' rel='noopener noreferrer'>" + esc(texto) + "</a>");
       return "___LINK_BLOCK_" + (links.length - 1) + "___";
     });
