@@ -12,7 +12,6 @@ import sys
 import zipfile
 
 from src.db.database import Database
-from src.engine.genetic_engine import generar_resumen_zootecnico
 from src.importers.dbf_importer import DBFReader
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
@@ -136,14 +135,20 @@ def migrar_composicion_desde_zip(db: Database, zip_path: str = "docs/Datos202608
                         comp.append({"raza": nom_raza, "porcentaje": pct})
 
             if comp:
-                db.guardar_composicion_racial(aid, comp)
-                resumen = generar_resumen_zootecnico(comp)
-                db.execute("UPDATE animales SET raza = ? WHERE id_animal = ?", (resumen, aid))
-                actualizados_comp += 1
+                # guardar_composicion_racial normaliza nombres, agrupa
+                # variedades y actualiza animales.raza con el resumen; no se
+                # vuelve a pisar con los componentes crudos del DBF.
+                if db.guardar_composicion_racial(aid, comp):
+                    actualizados_comp += 1
+                else:
+                    logger.warning("Composición SG inválida para %s (suma > 105%%): %s", tag, comp)
             else:
                 tipo_raza = str(r.get("TIPORAZA") or "").strip().upper()
                 if tipo_raza == "T":
-                    db.execute("UPDATE animales SET raza = 'Taurino' WHERE id_animal = ? AND (raza IS NULL OR raza IN ('T', 'C', 'I', 'Tricross Cebú', 'Cebú Comercial'))", (aid,))
+                    # Solo reemplaza marcadores genéricos: una raza cebuina ya
+                    # registrada ('Cebú Comercial', 'Tricross Cebú') no se
+                    # relabela como Taurino.
+                    db.execute("UPDATE animales SET raza = 'Taurino' WHERE id_animal = ? AND (raza IS NULL OR raza IN ('T', 'C', 'I'))", (aid,))
                     actualizados_tipo += 1
                 elif tipo_raza == "C":
                     db.execute("UPDATE animales SET raza = 'Cebuino' WHERE id_animal = ? AND (raza IS NULL OR raza IN ('T', 'C', 'I'))", (aid,))

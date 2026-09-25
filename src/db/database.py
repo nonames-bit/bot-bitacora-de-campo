@@ -831,21 +831,29 @@ class Database:
         if aid is None or not composicion:
             return False
 
-        # Validar y normalizar razas y porcentajes
-        suma = sum(float(c.get("porcentaje") or 0.0) for c in composicion)
-        if suma <= 0:
+        # Agrupar por raza normalizada ("Holstein" + "Holstein Negro" = una fila)
+        agregada: dict[str, float] = {}
+        for c in composicion:
+            raza = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
+            agregada[raza] = agregada.get(raza, 0.0) + float(c.get("porcentaje") or 0.0)
+        suma = sum(agregada.values())
+        if suma <= 0 or suma > 105.0:
             return False
 
-        # Si la suma está cerca de 100 (entre 95 y 105), normalizar a 100
-        factor = 100.0 / suma if abs(suma - 100.0) > 0.01 else 1.0
+        # Solo se reescala un redondeo (95-105). Una suma menor (ej. SG con
+        # 4 casillas que suman 75%) no se infla: el faltante es "Desconocida".
+        if suma >= 95.0:
+            factor = 100.0 / suma if abs(suma - 100.0) > 0.01 else 1.0
+        else:
+            factor = 1.0
+            agregada["Desconocida"] = agregada.get("Desconocida", 0.0) + (100.0 - suma)
 
         ahora = self._ahora()
         with self.transaccion():
             self.execute("DELETE FROM composicion_racial WHERE animal_id = ?", (aid,))
             limpias = []
-            for c in composicion:
-                raza = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
-                pct_norm = round(float(c.get("porcentaje") or 0.0) * factor, 2)
+            for raza, pct in sorted(agregada.items(), key=lambda x: x[1], reverse=True):
+                pct_norm = round(pct * factor, 2)
                 if pct_norm > 0:
                     self.execute(
                         "INSERT INTO composicion_racial (animal_id, raza, porcentaje, creado_en, registrado_por) "
@@ -867,34 +875,56 @@ class Database:
     ) -> tuple[list[dict], str]:
         """Calcula el cruce absorbente entre madre y padre/pajuela."""
         comp_m = self.obtener_composicion_racial(madre_tag_or_id) if madre_tag_or_id else []
-        comp_p = []
-
-        if padre_tag_or_id_o_codigo:
-            # Buscar primero si es un animal del hato
-            pid = self.resolve_animal(padre_tag_or_id_o_codigo)
-            if pid is not None:
-                comp_p = self.obtener_composicion_racial(pid)
-            else:
-                # Buscar en inventario de pajuelas por código de toro
-                row_paj = self.query_one(
-                    "SELECT raza FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
-                    (str(padre_tag_or_id_o_codigo).strip(),)
-                )
-                if row_paj and row_paj["raza"]:
-                    comp_p = parsear_texto_raza(row_paj["raza"])
-                else:
-                    # Parsear el texto directamente como raza pura o cruce
-                    comp_p = parsear_texto_raza(str(padre_tag_or_id_o_codigo).strip())
-
+        comp_p = self._composicion_padre(padre_tag_or_id_o_codigo)
         comp_cria = calcular_cruce_absorbente(comp_m, comp_p)
         resumen = generar_resumen_zootecnico(comp_cria)
         return comp_cria, resumen
+
+    def _pajuela_raza(self, codigo: Any) -> Optional[str]:
+        """Raza registrada en el inventario de pajuelas para un código de toro."""
+        if codigo is None or not str(codigo).strip():
+            return None
+        row = self.query_one(
+            "SELECT raza FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+            (str(codigo).strip(),),
+        )
+        return row["raza"] if row and row["raza"] else None
+
+    def _es_codigo_pajuela(self, codigo: Any) -> bool:
+        """True si el código es una pajuela del inventario y NO un animal del hato."""
+        if codigo is None or not str(codigo).strip():
+            return False
+        if self.resolve_animal(codigo) is not None:
+            return False
+        return self.query_one(
+            "SELECT 1 AS ok FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+            (str(codigo).strip(),),
+        ) is not None
+
+    def _composicion_padre(self, padre: Any) -> list[dict]:
+        """Composición del padre: animal del hato (con su composición o raza) y,
+        si no la tiene, la raza de la pajuela con ese código; si no es ni
+        animal ni pajuela, el texto se interpreta como raza ("Brahman")."""
+        if padre is None or not str(padre).strip():
+            return []
+        pid = self.resolve_animal(padre)
+        if pid is not None:
+            comp = self.obtener_composicion_racial(pid)
+            if comp:
+                return comp
+            fila = self.get_animal(pid)
+            raza_paj = self._pajuela_raza(fila["tag"] if fila else padre)
+            return parsear_texto_raza(raza_paj) if raza_paj else []
+        raza_paj = self._pajuela_raza(padre)
+        if raza_paj:
+            return parsear_texto_raza(raza_paj)
+        return parsear_texto_raza(str(padre).strip())
 
     def _aplicar_cruce_absorbente_cria(
         self,
         id_cria: int,
         madre_id: Optional[int],
-        padre_id: Optional[int],
+        padre_id: Any,  # id del toro o código de pajuela
         registrado_por: Optional[int] = None,
     ) -> None:
         """Si la cría no tiene composición racial registrada en composicion_racial,
@@ -907,7 +937,13 @@ class Database:
         if existentes:
             return
 
-        comp_cria, _ = self.calcular_composicion_cruce_animales(madre_id, padre_id)
+        # Solo con ambos progenitores de composición conocida: con uno solo,
+        # la mitad de la cría sería "Desconocida" y es mejor no inventarla.
+        comp_m = self.obtener_composicion_racial(madre_id) if madre_id else []
+        comp_p = self._composicion_padre(padre_id)
+        if not comp_m or not comp_p:
+            return
+        comp_cria = calcular_cruce_absorbente(comp_m, comp_p)
         if comp_cria:
             self.guardar_composicion_racial(id_cria, comp_cria, registrado_por=registrado_por)
 
@@ -970,7 +1006,14 @@ class Database:
 
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
-        padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
+        # Una pajuela (código del inventario de semen, sin animal con ese tag)
+        # no es un toro del hato: crearla como macho ACTIVO sin raza inflaba
+        # el inventario y perdía la raza para la composición de la cría.
+        padre_codigo = None
+        if padre_tag and self._es_codigo_pajuela(padre_tag):
+            padre_id, padre_codigo = None, str(padre_tag).strip()
+        else:
+            padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
 
         # Si no se pasó padre explícito pero hay cría y vaca, sugerir y asociar automáticamente
         # según servicio previo registrado o toro en el potrero durante la concepción (~283d)
@@ -979,12 +1022,16 @@ class Database:
                 sug_padre = self.sugerir_padre_parto(vaca_id, fecha)
                 if sug_padre and sug_padre.get("ok") and sug_padre.get("sugerencia"):
                     t_tag = sug_padre["sugerencia"].get("toro_tag")
-                    if t_tag:
+                    if t_tag and self._es_codigo_pajuela(t_tag):
+                        padre_codigo = str(t_tag).strip()
+                        if not padre_tag:
+                            padre_tag = t_tag
+                    elif t_tag:
                         padre_id = self.resolve_animal(t_tag, crear=True, sexo="Macho")
                         if not padre_tag:
                             padre_tag = t_tag
             except Exception:
-                pass
+                logger.warning("No se pudo sugerir el padre del parto de %s", vaca_tag, exc_info=True)
 
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
             return None
@@ -1015,7 +1062,8 @@ class Database:
                 )
             # Herencia y cruces absorbentes automáticos de la cría
             try:
-                self._aplicar_cruce_absorbente_cria(id_cria, vaca_id, padre_id, registrado_por=registrado_por)
+                self._aplicar_cruce_absorbente_cria(id_cria, vaca_id, padre_id or padre_codigo,
+                                                    registrado_por=registrado_por)
             except Exception:
                 logger.exception("Error calculando cruce absorbente para cria %s", id_cria)
             if sexo_cria:
