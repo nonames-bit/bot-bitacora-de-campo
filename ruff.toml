@@ -9,12 +9,13 @@
 # S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
 # DTZ (~196 date.today/datetime.now naive). Ver auditoría P2.10.
 # Ya habilitados por bajo riesgo y cero/limpieza aplicada: B033 (set/dict con
-# valor duplicado), B905 (zip sin strict=) y B006 (default mutable; src/ y tests/
-# están limpios).
+# valor duplicado), B905 (zip sin strict=), B006 (default mutable; src/ y tests/
+# están limpios) y S105/S106 (contraseñas hardcodeadas; scripts/ y tests/ usan
+# claves de prueba a propósito).
 line-length = 160
 
 [lint]
-select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905"]
+select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905", "S105", "S106"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
@@ -23,8 +24,11 @@ select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905"]
 "src/server/telegram_bot.py" = ["F401"]
 "src/engine/query_engine.py" = ["F401"]
 "src/engine/query/__init__.py" = ["F401"]
-# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto.
-"tests/*" = ["F841"]
+# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto, y
+# usar contraseñas/PIN de prueba.
+"tests/*" = ["F841", "S105", "S106"]
+# Los scripts de verificación usan una contraseña/centinela de prueba deliberada.
+"scripts/*" = ["S105", "S106"]
 # El harness de verificación visual usa un default mutable A PROPÓSITO como
 # contador del protocolo CDP (`msg_id=[1]`, la misma lista persiste entre
 # llamadas). Es una herramienta local, no código de producción.
