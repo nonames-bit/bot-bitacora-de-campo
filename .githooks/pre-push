@@ -41,6 +41,19 @@ if ! "$PYTHON_CMD" -m compileall -q src/; then
   exit 1
 fi
 
+echo "[pre-push] Corriendo ruff (mismo lint que exige el CI)..."
+if "$PYTHON_CMD" -m ruff --version >/dev/null 2>&1; then
+  if ! "$PYTHON_CMD" -m ruff check .; then
+    echo "[pre-push] ABORTADO: ruff encontro errores (el CI tambien fallara)."
+    echo "[pre-push] Corrige con 'ruff check .' (y 'ruff check . --fix' cuando aplique)."
+    echo "[pre-push] La causa mas comun de CI en rojo son imports sin usar (F401)."
+    exit 1
+  fi
+else
+  echo "[pre-push] AVISO: ruff no instalado; se omite el lint local (el CI si lo corre)."
+  echo "[pre-push]   Instalalo con: pip install -r requirements-dev.txt"
+fi
+
 echo "[pre-push] Validando que no haya handlers inline en templates (CSP)..."
 if ! "$PYTHON_CMD" scripts/verificar_csp_templates.py; then
   echo "[pre-push] ABORTADO: hay onclick/onX inline en src/pwa/templates/*.html."
