@@ -560,6 +560,7 @@ class Database:
             with self.transaccion():
                 self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (tag_nv, aid_origen))
                 self.execute("UPDATE fotos SET tag = ? WHERE animal_id = ? OR tag = ?", (tag_nv, aid_origen, tag_act))
+                self.execute("UPDATE lote_iatf_animales SET tag = ? WHERE animal_id = ?", (tag_nv, aid_origen))
                 nota_rect = f"\n[Rectificación arete: {tag_act} -> {tag_nv} (usuario {usuario_id or 'OWNER'})]"
                 self.execute("UPDATE animales SET notas = COALESCE(notas, '') || ? WHERE id_animal = ?", (nota_rect, aid_origen))
             return {
@@ -585,6 +586,8 @@ class Database:
                 ("pesajes", "animal_id"), ("movimientos", "animal_id"),
                 ("condicion_corporal", "animal_id"), ("produccion_leche", "animal_id"),
                 ("diagnosticos_gestacion", "vaca_id"), ("alertas", "animal_id"),
+                ("lote_iatf_animales", "animal_id"), ("pausas_ordeno", "animal_id"),
+                ("finanzas", "animal_id"),
             ]
             for tabla, col in tablas_cols:
                 try:
@@ -652,6 +655,21 @@ class Database:
             self.execute("UPDATE fotos SET animal_id = ?, tag = ? WHERE animal_id = ? OR tag = ?", (aid_destino, tag_nv, aid_origen, tag_act))
             self.execute("UPDATE animales SET madre_id = ? WHERE madre_id = ?", (aid_destino, aid_origen))
             self.execute("UPDATE animales SET padre_id = ? WHERE padre_id = ?", (aid_destino, aid_origen))
+            # lote_iatf_animales tiene FK sin CASCADE: sin reasignarla, el
+            # DELETE final fallaba (foreign_keys=ON) si el animal estuvo en
+            # un lote IATF y la fusión entera se revertía.
+            self.execute("UPDATE lote_iatf_animales SET animal_id = ?, tag = ? WHERE animal_id = ?",
+                         (aid_destino, tag_nv, aid_origen))
+            self.execute("UPDATE pausas_ordeno SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE finanzas SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            # Composición racial (FK con CASCADE): se conserva la del origen
+            # solo si el destino no tiene una propia; si no, se perdía en el DELETE.
+            tiene_comp = self.query_one(
+                "SELECT 1 AS ok FROM composicion_racial WHERE animal_id = ? LIMIT 1", (aid_destino,)
+            )
+            if not tiene_comp:
+                self.execute("UPDATE composicion_racial SET animal_id = ? WHERE animal_id = ?",
+                             (aid_destino, aid_origen))
             try:
                 self.execute("DELETE FROM consultas_animal WHERE animal_id = ?", (aid_origen,))
             except Exception:
@@ -2949,8 +2967,30 @@ class Database:
             except Exception as e_cc:
                 logger.warning("No se pudo registrar condición corporal asociada al diagnóstico: %s", e_cc)
 
-        # Actualizar estado del servicio más reciente de la vaca
+        # Un positivo antes del día 50 del último servicio (la ecografía del
+        # día 35) es provisional: cierra la alerta de ECOGRAFIA pero deja
+        # pendiente la palpación de confirmación del día 60.
+        provisional = False
         if res_norm == "PREÑADA":
+            ult_serv = self.query_one(
+                "SELECT fecha FROM servicios WHERE vaca_id = ? AND fecha <= ? ORDER BY fecha DESC LIMIT 1",
+                (vaca_id, f),
+            )
+            f_serv = to_date(ult_serv["fecha"]) if ult_serv else None
+            f_diag = to_date(f)
+            provisional = bool(f_serv and f_diag and (f_diag - f_serv).days < 50)
+
+        # Actualizar estado del servicio más reciente de la vaca
+        if res_norm == "PREÑADA" and provisional:
+            self.execute(
+                """
+                UPDATE alertas
+                SET estado = 'CUMPLIDA', fecha_cumplida = ?
+                WHERE animal_id = ? AND tipo_alerta = 'ECOGRAFIA' AND estado = 'PENDIENTE'
+                """,
+                (f, vaca_id),
+            )
+        elif res_norm == "PREÑADA":
             f_date = to_date(f)
             fep_diag = iso(add_days(f_date, 283 - dias_g)) if (dias_g and dias_g > 0 and f_date) else None
             if toro_pajuela:
@@ -4400,13 +4440,26 @@ class Database:
         hoy_iso = date.today().isoformat()
         alertas = []
 
-        # 1. Retiros sanitarios activos
+        # 1. Retiros sanitarios activos (solo animales del hato presente)
         try:
-            retiros = self.retiros_activos()
+            retiros = self.query(
+                """
+                SELECT a.tag,
+                       MAX(CASE WHEN t.fecha_fin_retiro_leche >= ? THEN 1 ELSE 0 END) AS leche,
+                       MAX(CASE WHEN t.fecha_fin_retiro_carne >= ? THEN 1 ELSE 0 END) AS carne
+                FROM tratamientos t
+                JOIN animales a ON a.id_animal = t.animal_id
+                WHERE a.estado = 'ACTIVO' AND t.fecha <= ?
+                  AND (t.fecha_fin_retiro_leche >= ? OR t.fecha_fin_retiro_carne >= ?)
+                GROUP BY a.id_animal, a.tag
+                ORDER BY a.tag
+                """,
+                (hoy_iso, hoy_iso, hoy_iso, hoy_iso, hoy_iso),
+            )
             if retiros:
-                c_carne = sum(1 for r in retiros if r.get("dias_carne", 0) > 0)
-                c_leche = sum(1 for r in retiros if r.get("dias_leche", 0) > 0)
-                tags_str = ", ".join(r["tag"] for r in retiros[:3])
+                c_carne = sum(1 for r in retiros if r["carne"])
+                c_leche = sum(1 for r in retiros if r["leche"])
+                tags_str = ", ".join(str(r["tag"]) for r in retiros[:3])
                 if len(retiros) > 3:
                     tags_str += f" (+{len(retiros)-3})"
                 alertas.append({
@@ -4420,20 +4473,31 @@ class Database:
                     "urgencia": "alta",
                 })
         except Exception as e:
-            logger.debug("Error obteniendo retiros para push: %s", e)
+            logger.warning("Error obteniendo retiros para push: %s", e)
 
-        # 2. Celos detectados para inseminar hoy (Regla AM-PM)
+        # 2. Vacas a inseminar hoy según la regla AM-PM: celo AM de hoy ->
+        # hoy en la tarde; celo PM de ayer -> hoy en la mañana. Antes esta
+        # consulta usaba columnas inexistentes en `celos` y nunca notificaba.
         try:
+            ayer_iso = (date.today() - timedelta(days=1)).isoformat()
             celos_hoy = self.query(
-                "SELECT c.id, c.hora, c.momento, a.tag FROM celos c "
-                "JOIN animales a ON a.id_animal = c.animal_id "
-                "WHERE c.fecha = ? ORDER BY c.hora DESC LIMIT 5",
-                (hoy_iso,)
+                """
+                SELECT c.id, c.fecha, UPPER(COALESCE(c.am_pm, 'AM')) AS am_pm, a.tag
+                FROM celos c
+                JOIN animales a ON a.id_animal = c.vaca_id
+                WHERE a.estado = 'ACTIVO'
+                  AND ((c.fecha = ? AND UPPER(COALESCE(c.am_pm, 'AM')) != 'PM')
+                       OR (c.fecha = ? AND UPPER(c.am_pm) = 'PM'))
+                ORDER BY c.fecha DESC, c.id DESC LIMIT 5
+                """,
+                (hoy_iso, ayer_iso),
             )
             for ch in celos_hoy:
                 tag_vaca = ch["tag"]
-                momento = (ch["momento"] or "manana").lower()
-                turno = "en la tarde de hoy (16:00-18:00)" if "man" in momento else "en la mañana siguiente (06:00-08:00)"
+                if ch["am_pm"] == "PM":
+                    momento, turno = "tarde de ayer", "hoy en la mañana (06:00-08:00)"
+                else:
+                    momento, turno = "mañana de hoy", "hoy en la tarde (16:00-18:00)"
                 alertas.append({
                     "id": f"celo-{ch['id']}",
                     "tipo": "REPRO",
@@ -4445,7 +4509,7 @@ class Database:
                     "urgencia": "alta",
                 })
         except Exception as e:
-            logger.debug("Error obteniendo celos para push: %s", e)
+            logger.warning("Error obteniendo celos para push: %s", e)
 
         # 3. Potreros con sobrepastoreo Voisin (> 3 días ocupados)
         try:

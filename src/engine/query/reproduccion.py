@@ -5,7 +5,7 @@ import re
 from typing import Optional
 
 from ...utils import add_days, iso, to_date
-from ..reproductive_engine import fecha_palpacion, fecha_secado
+from ..reproductive_engine import GESTACION_DIAS, fecha_palpacion, fecha_secado
 
 
 class ReproduccionQueryMixin:
@@ -97,28 +97,49 @@ class ReproduccionQueryMixin:
             return f"🌳 <b>Genealogía de {tag_str}{nombre}</b>\n• Registro disponible en ficha zootécnica."
 
     def _palpacion_pendiente(self) -> str:
+        """Vacas activas cuyo último servicio espera la palpación del día 60.
+
+        Incluye las atrasadas (antes se descartaban las de fecha pasada y
+        desaparecían de la lista justo cuando más urgían). Una ecografía
+        PREÑADA del día 35 NO cierra la palpación de confirmación; sí la
+        cierra un diagnóstico VACÍA en cualquier momento o uno PREÑADA desde
+        el día 50. Servicios antiguos reemplazados por uno nuevo no cuentan,
+        y pasada la FEP el caso pasa a "partos atrasados".
+        """
         hoy = self.hoy
         servicios = self.db.query(
             """
             SELECT s.* FROM servicios s
             JOIN animales a ON a.id_animal = s.vaca_id
             WHERE a.estado = 'ACTIVO' AND s.fecha IS NOT NULL
-            ORDER BY s.fecha
+            ORDER BY s.fecha DESC, s.id DESC
             """
         )
+        vistas: set = set()
         pendientes = []
         for s in servicios:
+            if s["vaca_id"] in vistas:
+                continue
+            vistas.add(s["vaca_id"])  # solo el servicio más reciente de cada vaca
             estado_s = s["estado"] if "estado" in s.keys() else None
             if (estado_s or "").upper() in ("CONFIRMADA", "FALLIDO", "VACIA", "VACÍA", "PREÑADA", "PRENADA"):
                 continue
+            palp = fecha_palpacion(s["fecha"])
+            if palp is None:
+                continue
+            f_serv = to_date(s["fecha"])
+            if f_serv is None or (hoy - f_serv).days > GESTACION_DIAS:
+                continue
             diag = self.db.query_one(
-                "SELECT id FROM diagnosticos_gestacion WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
-                (s["vaca_id"], s["fecha"]),
+                """
+                SELECT id FROM diagnosticos_gestacion
+                WHERE vaca_id = ? AND fecha >= ?
+                  AND (UPPER(COALESCE(resultado, '')) IN ('VACIA', 'VACÍA') OR fecha >= ?)
+                LIMIT 1
+                """,
+                (s["vaca_id"], s["fecha"], iso(add_days(f_serv, 50))),
             )
             if diag:
-                continue
-            palp = fecha_palpacion(s["fecha"])
-            if palp is None or palp < hoy:
                 continue
             confirmado = self.db.query_one(
                 "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
@@ -127,10 +148,15 @@ class ReproduccionQueryMixin:
             if confirmado:
                 continue
             tag = self._tag_de(s["vaca_id"])
-            pendientes.append(f"{tag} (palpación el {iso(palp)})")
+            atraso = (hoy - palp).days
+            if atraso > 0:
+                pendientes.append((palp, f"{tag} (⚠️ palpación atrasada {atraso} días, era el {iso(palp)})"))
+            else:
+                pendientes.append((palp, f"{tag} (palpación el {iso(palp)})"))
         if not pendientes:
             return "No hay vacas con palpación pendiente."
-        return "Vacas con palpación pendiente: " + "; ".join(pendientes) + "."
+        pendientes.sort(key=lambda x: x[0])
+        return "Vacas con palpación pendiente: " + "; ".join(t for _, t in pendientes) + "."
 
     def _inseminacion_programada(self) -> str:
         alertas = self.db.query(
@@ -249,20 +275,56 @@ class ReproduccionQueryMixin:
         plural = "machos" if sexo_norm == "macho" else "hembras"
         return f"🐮 Crías {plural} nacidas{etiqueta_periodo}: <b>{len(crias)}</b>."
 
-    def _vacas_proximas_parir(self, dias: int = 30) -> str:
-        """Vacas activas con servicio vigente cuya FEP cae dentro de los próximos N días."""
-        limite = iso(add_days(self.hoy, dias))
-        hoy_iso = iso(self.hoy)
-        servicios = self.db.query(
+    def _servicio_vigente(self, s) -> bool:
+        """True si el servicio sigue siendo una gestación en curso: no está
+        marcado fallido/vacía, no hay un diagnóstico VACÍA posterior y no hay
+        un parto registrado desde entonces."""
+        estado_s = (s["estado"] if "estado" in s.keys() else None) or ""
+        if estado_s.upper() in ("FALLIDO", "VACIA", "VACÍA"):
+            return False
+        vacia = self.db.query_one(
+            "SELECT id FROM diagnosticos_gestacion WHERE vaca_id = ? AND fecha >= ? "
+            "AND UPPER(COALESCE(resultado, '')) IN ('VACIA', 'VACÍA') LIMIT 1",
+            (s["vaca_id"], s["fecha"]),
+        )
+        if vacia:
+            return False
+        parto = self.db.query_one(
+            "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
+            (s["vaca_id"], s["fecha"]),
+        )
+        return parto is None
+
+    def _ultimos_servicios_activos(self) -> list:
+        """Último servicio (con FEP) de cada hembra activa."""
+        filas = self.db.query(
             """
             SELECT s.*, a.tag, a.nombre
             FROM servicios s
             JOIN animales a ON a.id_animal = s.vaca_id
-            WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL
-              AND s.fep_calculada >= ? AND s.fep_calculada <= ?
-            ORDER BY s.fep_calculada ASC
-            """,
-            (hoy_iso, limite),
+            WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL AND s.fecha IS NOT NULL
+            ORDER BY s.fecha DESC, s.id DESC
+            """
+        )
+        vistas: set = set()
+        ultimos = []
+        for s in filas:
+            if s["vaca_id"] in vistas:
+                continue
+            vistas.add(s["vaca_id"])
+            ultimos.append(s)
+        return ultimos
+
+    def _vacas_proximas_parir(self, dias: int = 30) -> str:
+        """Vacas activas con servicio vigente cuya FEP cae dentro de los próximos N días."""
+        limite = iso(add_days(self.hoy, dias))
+        hoy_iso = iso(self.hoy)
+        # Solo el último servicio de cada vaca y si sigue vigente (sin
+        # vacía, fallo ni parto posterior).
+        servicios = sorted(
+            (s for s in self._ultimos_servicios_activos()
+             if hoy_iso <= s["fep_calculada"] <= limite and self._servicio_vigente(s)),
+            key=lambda s: s["fep_calculada"],
         )
         if not servicios:
             return f"No hay vacas con parto próximo en los siguientes {dias} días."
@@ -280,27 +342,12 @@ class ReproduccionQueryMixin:
         ('Hembras que debían haber parido'). Solo se considera el servicio
         más reciente de cada vaca."""
         hoy_iso = iso(self.hoy)
-        servicios = self.db.query(
-            """
-            SELECT s.*, a.tag, a.nombre
-            FROM servicios s
-            JOIN animales a ON a.id_animal = s.vaca_id
-            WHERE a.estado = 'ACTIVO' AND s.fep_calculada IS NOT NULL AND s.fep_calculada < ?
-            ORDER BY s.fecha DESC
-            """,
-            (hoy_iso,),
-        )
-        vistas: set = set()
         atrasadas = []
-        for s in servicios:
-            if s["vaca_id"] in vistas:
-                continue
-            vistas.add(s["vaca_id"])
-            parto = self.db.query_one(
-                "SELECT id FROM partos WHERE vaca_id = ? AND fecha >= ? LIMIT 1",
-                (s["vaca_id"], s["fecha"]),
-            )
-            if parto:
+        # Primero el último servicio de cada vaca y LUEGO el filtro de FEP
+        # vencida: al revés, un servicio fallido viejo aparecía como "debía
+        # haber parido" aunque la vaca tuviera un servicio nuevo en curso.
+        for s in self._ultimos_servicios_activos():
+            if s["fep_calculada"] >= hoy_iso or not self._servicio_vigente(s):
                 continue
             fep_date = to_date(s["fep_calculada"])
             dias_atraso = (self.hoy - fep_date).days if fep_date else 0
