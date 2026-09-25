@@ -1,10 +1,17 @@
-# Configuración mínima de ruff: solo errores reales (E9) y pyflakes (F) —
-# nada de estilo/formato, para no generar ruido en un repo que no usa ruff
-# como formateador. Ver .github/workflows/tests.yml para el paso de CI.
+# Configuración de ruff. Base: errores reales (E9) y pyflakes (F).
+# (P2.10) Se agregan familias que hoy tienen CERO hallazgos en el repo, para
+# endurecer el lint a futuro sin cleanup:
+#   A   = shadowing de builtins (id, type, list…)
+#   PLE = errores de pylint (variables/atributos inexistentes, etc.)
+#   EXE = shebangs/permisos de ejecución
+#   FA  = futuro `from __future__ import annotations`
+# Pendiente de una limpieza dedicada (con fallout real hoy): B (bugbear: 36),
+# S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
+# DTZ (~196 date.today/datetime.now naive). Ver auditoría P2.10.
 line-length = 160
 
 [lint]
-select = ["E9", "F"]
+select = ["E9", "F", "A", "PLE", "EXE", "FA"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
