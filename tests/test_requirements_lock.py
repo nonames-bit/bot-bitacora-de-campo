@@ -48,3 +48,11 @@ def test_requirements_dev_pinnea_pytest_y_ruff():
 def test_ci_instala_lock_y_deps_de_dev():
     assert "-r requirements.txt" in CI
     assert "-r requirements-dev.txt" in CI
+
+
+def test_ci_mide_cobertura_con_piso():
+    """P2.10: el CI debe medir cobertura y fallar bajo el piso."""
+    assert "--cov=src" in CI
+    assert "--cov-fail-under=" in CI
+    dev = (RAIZ / "requirements-dev.txt").read_text(encoding="utf-8")
+    assert "pytest-cov==" in dev, "pytest-cov debe estar en el lock de dev"

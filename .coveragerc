@@ -1,0 +1,13 @@
+# Cobertura de pruebas (auditoría P2.10, 2026-09-24).
+#
+# Medición inicial: 67% global sobre src/ (21.901 statements, 7.126 sin cubrir).
+# El piso se aplica en CI con `--cov-fail-under=60` (bajo a propósito, para no
+# romper por código nuevo sin probar de otros frentes; subir gradualmente).
+# Mayor hueco hoy: src/server/telegram_bot.py (~6%).
+
+[run]
+source = src
+
+[report]
+show_missing = True
+skip_covered = True

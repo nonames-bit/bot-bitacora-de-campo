@@ -45,6 +45,12 @@ Desktop.ini
 npm-debug.log*
 yarn-debug.log*
 
+# Artefactos de pruebas (cobertura, caché de pytest)
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
 # Datos locales, multimedia y backups
 data/
 media/
