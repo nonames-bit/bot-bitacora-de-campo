@@ -2931,6 +2931,8 @@ def formatear_ronda_voisin(ronda: dict | None) -> str | None:
         detalle = f"⚠️ Solo <b>{dias_txt} días</b> — considerar rotación pronto ({ms_txt} kg MS/ha)"
     else:
         detalle = f"🔴 <b>CRÍTICO: {dias_txt} días</b> — rotar INMEDIATAMENTE ({ms_txt} kg MS/ha)"
+    if ronda.get("puntos_insuficientes"):
+        detalle += f"\n⚠️ Solo {n_pts} puntos de aforo: tome al menos 10-15 al azar para un dato confiable."
     return f"{linea}\n{detalle}"
 
 

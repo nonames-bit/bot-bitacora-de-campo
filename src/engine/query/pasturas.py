@@ -5,7 +5,7 @@ import html
 import re
 from typing import Optional
 
-from ...db.database import SQL_POTRERO_REAL, es_potrero_real
+from ...db.database import POTRERO_VIGENTE_SUBQUERY, SQL_POTRERO_REAL, es_potrero_real
 from ...utils import normalizar, to_date
 from .helpers import (
     REPOSO_LISTO_DIAS,
@@ -179,10 +179,23 @@ class PasturasQueryMixin:
     def _potreros_listos(self) -> str:
         # Solo potreros reales (los legacy nunca se listan como presente).
         potreros = self.db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
+        ocupados = {
+            r["pid"] for r in self.db.query(
+                f"SELECT DISTINCT {POTRERO_VIGENTE_SUBQUERY} AS pid FROM animales a WHERE a.estado = 'ACTIVO'"
+            ) if r["pid"] is not None
+        }
         listos = []
         for p in potreros:
             # 1ª Ley de Voisin (reposo): exige reposo suficiente Y oferta forrajera.
-            reposo = p["dias_reposo"]
+            # El reposo se calcula hoy desde la última salida: dias_reposo se
+            # guardó al importar y quedaba congelado. Un potrero con animales
+            # ACTIVOS o con entrada posterior a la salida está ocupado.
+            if p["id"] in ocupados:
+                continue
+            f_ent, f_sal = to_date(p["fecha_entrada"]), to_date(p["fecha_salida"])
+            if f_sal and f_ent and f_ent > f_sal:
+                continue
+            reposo = (self.hoy - f_sal).days if f_sal else p["dias_reposo"]
             aforo = p["aforo_kg_m2"]
             if (reposo is not None and reposo >= REPOSO_LISTO_DIAS) and aforo:
                 listos.append(p["nombre"] or p["codigo"] or str(p["id"]))
@@ -557,11 +570,15 @@ class PasturasQueryMixin:
         demanda_diaria_ms = total_ugg * 12.6  # 12.6 kg MS/UGG/día (2.8% PV)
 
         # 2. Oferta total de potreros
-        potreros = self.db.query("SELECT * FROM potreros WHERE area_has IS NOT NULL AND area_has > 0")
+        # Solo potreros reales (los legacy/abandonados no aportan forraje) y
+        # un aforo medido en 0 se respeta: solo el aforo ausente usa 1.2.
+        potreros = self.db.query(
+            f"SELECT * FROM potreros WHERE area_has IS NOT NULL AND area_has > 0 AND {SQL_POTRERO_REAL}"
+        )
         total_has = sum(float(p["area_has"] or 0) for p in potreros)
         oferta_neta_ms_total = 0.0
         for p in potreros:
-            aforo = float(p["aforo_kg_m2"] or 1.2)
+            aforo = float(p["aforo_kg_m2"]) if p["aforo_kg_m2"] is not None else 1.2
             has = float(p["area_has"] or 0)
             oferta_neta_ms_total += PastureEngine.kg_ms_disponibles(aforo, has) * f_clima
 

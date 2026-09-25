@@ -40,7 +40,7 @@ def _ruta_cache() -> Path:
     return raiz / "data" / "pronostico_cache.json"
 
 
-def _a_float(valor: object, default: float = 0.0) -> float:
+def _a_float(valor: object, default: Optional[float] = 0.0) -> Optional[float]:
     """Convierte un valor a float de forma tolerante (None/inválido -> default)."""
     try:
         if valor is None:
@@ -104,7 +104,10 @@ def _parsear_respuesta_open_meteo(payload: dict, lat: float = 0.0, lon: float = 
             {
                 "fecha": fecha,
                 "temp_max_c": _a_float(tmax[i] if i < len(tmax) else None),
-                "temp_min_c": _a_float(tmin[i] if i < len(tmin) else None),
+                # Sin dato queda None (no 0.0): un 0 °C falso disparaba la
+                # alerta de "noches frías" cuando la API no traía la mínima.
+                "temp_min_c": (None if i >= len(tmin) or tmin[i] is None
+                               else _a_float(tmin[i], default=None)),
                 "lluvia_mm": _a_float(lluv[i] if i < len(lluv) else None),
                 "prob_lluvia_pct": p,
             }
@@ -337,7 +340,7 @@ def interpretar_pronostico(pron: dict) -> list[str]:
         )
 
     # 6. Frío para crías: mín <= 8 °C.
-    frias = [d for d in dias if _a_float(d.get("temp_min_c")) <= 8]
+    frias = [d for d in dias if d.get("temp_min_c") is not None and _a_float(d.get("temp_min_c")) <= 8]
     if frias:
         pico_f = min(frias, key=lambda d: _a_float(d.get("temp_min_c")))
         recs.append(
