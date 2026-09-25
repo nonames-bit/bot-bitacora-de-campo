@@ -176,7 +176,8 @@ class EventParser:
                 if llm_res is not None:
                     return llm_res
             except Exception:
-                pass  # Fallback silencioso a Capa 1 (regex)
+                # Fallback a Capa 1 (regex), pero dejando rastro del fallo.
+                logger.warning("Parser LLM falló; se usa el parser local", exc_info=True)
 
         # Capa 1: Regex local rápida
         if intento is None:
@@ -244,6 +245,11 @@ class EventParser:
     def _parse_diagnostico_gestacion(self, ev: ParsedEvent, t: str) -> None:
         resultado = nlu.extraer_resultado_diagnostico(t)
         dias = nlu.extraer_dias_gestacion(t)
+        # "palpé la 47, 90 días" sin la palabra preñada: los días de
+        # gestación ya implican preñez. Sin resultado ni días queda None y
+        # el bot pide confirmar en vez de asumir PREÑADA.
+        if resultado is None and dias:
+            resultado = "PREÑADA"
         ev.datos["resultado"] = resultado
         ev.datos["dias_gestacion"] = dias
         ev.datos["responsable"] = nlu.extraer_responsable(t)

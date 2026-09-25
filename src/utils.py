@@ -30,15 +30,21 @@ def to_date(valor) -> date | None:
     if isinstance(valor, date):
         return valor
     s = str(valor).strip()
-    m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})", s)
-    if m:
-        return date(int(m[1]), int(m[2]), int(m[3]))
-    m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})", s)
-    if m:
-        return date(int(m[1]), int(m[2]), int(m[3]))
-    m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
-    if m:
-        return date(int(m[3]), int(m[2]), int(m[1]))
+    try:
+        # ISO con o sin hora ("2026-09-25", "2026-09-25 10:00:00",
+        # "2026-09-25T10:00"): antes la hora hacía que la fila se descartara
+        # en silencio de retiros, FEP y días abiertos.
+        m = re.fullmatch(r"(\d{4})-(\d{2})-(\d{2})(?:[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?", s)
+        if m:
+            return date(int(m[1]), int(m[2]), int(m[3]))
+        m = re.fullmatch(r"(\d{4})(\d{2})(\d{2})", s)
+        if m:
+            return date(int(m[1]), int(m[2]), int(m[3]))
+        m = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", s)
+        if m:
+            return date(int(m[3]), int(m[2]), int(m[1]))
+    except ValueError:  # fecha imposible (ej. 2026-02-31)
+        return None
     return None
 
 
@@ -55,7 +61,7 @@ def add_days(valor, dias: int) -> date | None:
 
 
 def hoy() -> date:
-    """Fecha de hoy."""
+    """Fecha de hoy (zona horaria de la finca, fijada al importar ``src``)."""
     return date.today()
 
 
@@ -70,17 +76,29 @@ def parse_fecha(texto: str, base: date | None = None) -> date | None:
         return base - timedelta(days=1)
     if re.search(r"\banteayer\b", s):
         return base - timedelta(days=2)
-    if re.search(r"\bmanana\b", s):
+    if re.search(r"\bpasado manana\b", s):
+        return base + timedelta(days=2)
+    # "anoche" = la noche de ayer (celo PM de ayer -> se insemina hoy AM).
+    if re.search(r"\banoche\b", s):
+        return base - timedelta(days=1)
+    # "mañana" es el día siguiente solo cuando no es la franja del día:
+    # "en/por/de la mañana", "esta mañana" o "hoy en la mañana" son HOY.
+    # Antes "entró en celo en la mañana" quedaba fechado mañana y la
+    # inseminación salía un día tarde.
+    if re.search(r"(?<!\bla )(?<!\besta )\bmanana\b", s):
         return base + timedelta(days=1)
-    m = re.search(r"(\d{4})-(\d{2})-(\d{2})", s)
-    if m:
-        return date(int(m[1]), int(m[2]), int(m[3]))
-    m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", s)
-    if m:
-        dia, mes, anio = int(m[1]), int(m[2]), int(m[3])
-        if anio < 100:
-            anio += 2000
-        return date(anio, mes, dia)
+    try:
+        m = re.search(r"(\d{4})-(\d{2})-(\d{2})", s)
+        if m:
+            return date(int(m[1]), int(m[2]), int(m[3]))
+        m = re.search(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", s)
+        if m:
+            dia, mes, anio = int(m[1]), int(m[2]), int(m[3])
+            if anio < 100:
+                anio += 2000
+            return date(anio, mes, dia)
+    except ValueError:  # fecha imposible (ej. 31/02/2026)
+        return None
     return None
 
 
