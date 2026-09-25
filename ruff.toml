@@ -9,11 +9,12 @@
 # S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
 # DTZ (~196 date.today/datetime.now naive). Ver auditoría P2.10.
 # Ya habilitados por bajo riesgo y cero/limpieza aplicada: B033 (set/dict con
-# valor duplicado) y B905 (zip sin strict=).
+# valor duplicado), B905 (zip sin strict=) y B006 (default mutable; src/ y tests/
+# están limpios).
 line-length = 160
 
 [lint]
-select = ["E9", "F", "A", "PLE", "EXE", "FA", "B033", "B905"]
+select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
@@ -24,3 +25,7 @@ select = ["E9", "F", "A", "PLE", "EXE", "FA", "B033", "B905"]
 "src/engine/query/__init__.py" = ["F401"]
 # En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto.
 "tests/*" = ["F841"]
+# El harness de verificación visual usa un default mutable A PROPÓSITO como
+# contador del protocolo CDP (`msg_id=[1]`, la misma lista persiste entre
+# llamadas). Es una herramienta local, no código de producción.
+"scripts/verify_*.py" = ["B006"]
