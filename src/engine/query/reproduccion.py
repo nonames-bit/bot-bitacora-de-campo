@@ -97,7 +97,20 @@ class ReproduccionQueryMixin:
             return f"🌳 <b>Genealogía de {tag_str}{nombre}</b>\n• Registro disponible en ficha zootécnica."
 
     def _palpacion_pendiente(self) -> str:
+        pendientes = self._palpaciones_pendientes_lista()
+        if not pendientes:
+            return "No hay vacas con palpación pendiente."
+        textos = []
+        for p in pendientes:
+            if p["atraso"] > 0:
+                textos.append(f"{p['tag']} (⚠️ palpación atrasada {p['atraso']} días, era el {p['fecha']})")
+            else:
+                textos.append(f"{p['tag']} (palpación el {p['fecha']})")
+        return "Vacas con palpación pendiente: " + "; ".join(textos) + "."
+
+    def _palpaciones_pendientes_lista(self) -> list[dict]:
         """Vacas activas cuyo último servicio espera la palpación del día 60.
+        Devuelve [{tag, servicio, fecha, atraso}] ordenado por fecha de palpación.
 
         Incluye las atrasadas (antes se descartaban las de fecha pasada y
         desaparecían de la lista justo cuando más urgían). Una ecografía
@@ -147,16 +160,14 @@ class ReproduccionQueryMixin:
             )
             if confirmado:
                 continue
-            tag = self._tag_de(s["vaca_id"])
-            atraso = (hoy - palp).days
-            if atraso > 0:
-                pendientes.append((palp, f"{tag} (⚠️ palpación atrasada {atraso} días, era el {iso(palp)})"))
-            else:
-                pendientes.append((palp, f"{tag} (palpación el {iso(palp)})"))
-        if not pendientes:
-            return "No hay vacas con palpación pendiente."
-        pendientes.sort(key=lambda x: x[0])
-        return "Vacas con palpación pendiente: " + "; ".join(t for _, t in pendientes) + "."
+            pendientes.append({
+                "tag": self._tag_de(s["vaca_id"]),
+                "servicio": s["fecha"],
+                "fecha": iso(palp),
+                "atraso": (hoy - palp).days,
+            })
+        pendientes.sort(key=lambda x: x["fecha"])
+        return pendientes
 
     def _inseminacion_programada(self) -> str:
         alertas = self.db.query(
