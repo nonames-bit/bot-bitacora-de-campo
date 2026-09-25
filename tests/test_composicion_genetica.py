@@ -9,13 +9,10 @@ Reglas:
 """
 from __future__ import annotations
 
-import pytest
 from src.db.database import Database
 from src.engine.genetic_engine import (
     calcular_cruce_absorbente,
-    formatear_raza_etiqueta,
     generar_resumen_zootecnico,
-    normalizar_nombre_raza,
     parsear_texto_raza,
     porcentaje_a_fraccion,
 )

@@ -30,7 +30,7 @@ Cría[raza] = 0.5 * Madre[raza] + 0.5 * Padre[raza]
 from __future__ import annotations
 
 import re
-from typing import Any, Optional
+from typing import Optional
 
 # Catálogo canónico de razas bovinas comunes en el trópico y software ganadero
 CATALOGO_RAZAS_PREDEFINIDAS = [
