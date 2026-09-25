@@ -11,11 +11,12 @@
 # Ya habilitados por bajo riesgo y cero/limpieza aplicada: B033 (set/dict con
 # valor duplicado), B905 (zip sin strict=), B006 (default mutable; src/ y tests/
 # están limpios) y S105/S106 (contraseñas hardcodeadas; scripts/ y tests/ usan
-# claves de prueba a propósito).
+# claves de prueba a propósito) y S101 (assert; no debe haber en src/ porque
+# python -O los elimina).
 line-length = 160
 
 [lint]
-select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905", "S105", "S106"]
+select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905", "S101", "S105", "S106"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
@@ -24,11 +25,12 @@ select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905", "S105", "S
 "src/server/telegram_bot.py" = ["F401"]
 "src/engine/query_engine.py" = ["F401"]
 "src/engine/query/__init__.py" = ["F401"]
-# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto, y
-# usar contraseñas/PIN de prueba.
-"tests/*" = ["F841", "S105", "S106"]
-# Los scripts de verificación usan una contraseña/centinela de prueba deliberada.
-"scripts/*" = ["S105", "S106"]
+# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto,
+# usar contraseñas/PIN de prueba y usar assert.
+"tests/*" = ["F841", "S101", "S105", "S106"]
+# Los scripts de verificación usan contraseña/centinela de prueba a propósito y
+# assert para sus comprobaciones.
+"scripts/*" = ["S101", "S105", "S106"]
 # El harness de verificación visual usa un default mutable A PROPÓSITO como
 # contador del protocolo CDP (`msg_id=[1]`, la misma lista persiste entre
 # llamadas). Es una herramienta local, no código de producción.
