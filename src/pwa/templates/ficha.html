@@ -51,9 +51,9 @@
         <span><b>Asistente IA</b> · Ganadería JA</span>
       </div>
       <div class="chat-dock-controles">
-        <button type="button" id="btn-limpiar-chat" class="chat-btn-min" title="Limpiar conversación">🧹</button>
-        <button type="button" id="btn-colapsar-chat" class="chat-btn-min" title="Minimizar">▼</button>
-        <button type="button" id="btn-cerrar-chat" class="chat-btn-min" title="Cerrar" style="display:none">✕</button>
+        <button type="button" id="btn-limpiar-chat" class="chat-btn-min" title="Limpiar conversación" aria-label="Limpiar conversación">🧹</button>
+        <button type="button" id="btn-colapsar-chat" class="chat-btn-min" title="Minimizar" aria-label="Minimizar chat">▼</button>
+        <button type="button" id="btn-cerrar-chat" class="chat-btn-min" title="Cerrar" aria-label="Cerrar chat" style="display:none">✕</button>
       </div>
     </div>
 
@@ -127,8 +127,8 @@
   </div>
   <datalist id="dl-tags"></datalist>
 </main>
-<script src="/static/ja-core.js?v={{ pwa_v or 'dev' }}" defer></script>
-<script src="/static/app.js?v={{ pwa_v or 'dev' }}" defer></script>
+<script src="/static/ja-core.js?v={{ pwa_v or 'dev' }}"></script>
+<script src="/static/app.js?v={{ pwa_v or 'dev' }}"></script>
 <script src="/static/sw-register.js?v={{ pwa_v or 'dev' }}" defer></script>
 </body>
 </html>

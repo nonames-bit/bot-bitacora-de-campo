@@ -140,7 +140,7 @@
   --borde-fuerte: #333333;
 
   --texto: #E1E1E1;
-  --texto-suave: #888888;
+  --texto-suave: #9A9A9A; /* (P2.15) antes #888888: ~4.3:1, borderline AA en etiquetas de 11px; ahora ~6.0:1 */
   
   --verde-marca: #66BB6A; /* Accento verde brillante para modo oscuro */
   --verde-marca-hover: #4CAF50;
@@ -2706,7 +2706,10 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   user-select: none;
   cursor: pointer;
 }
-.vaca-pista { display: inline-flex; align-items: flex-end; position: relative; }
+/* La vaquita va DELANTE del cielo (sol/luna/nubes en z 1-2): antes las
+   nubes y la luna la tapaban en el celular. La lluvia (z 4) sí cae encima,
+   como debe ser, y el globo (z 2000) queda intacto. */
+.vaca-pista { display: inline-flex; align-items: flex-end; position: relative; z-index: 3; }
 .vaca-ambula { display: inline-flex; align-items: flex-end; }
 .vaca-pasta { display: inline-flex; align-items: flex-end; }
 .vaca-img {
@@ -4275,5 +4278,23 @@ body.modo-campo #vista { font-size: 15px; }
 }
 .btn-menu-logout:hover {
   filter: brightness(0.95);
+}
+
+/* (P2.15) Área táctil mínima 44×44 px en móvil (AGENTS.md / Apple HIG): los
+   botones globales eran de 36 px y los controles del chat minimizado de ~24 px,
+   difíciles de pulsar con guantes o manos sucias en el corral. Va al final para
+   ganar por orden de cascada sin tocar los bloques existentes. */
+@media (max-width: 640px) {
+  button,
+  .tema-btn,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]),
+  .chat-btn-min {
+    min-height: 44px;
+  }
+  .chat-btn-min {
+    min-width: 44px;
+    padding: 6px 10px;
+  }
 }
 

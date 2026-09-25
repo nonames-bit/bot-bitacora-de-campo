@@ -5324,6 +5324,7 @@
         + "<label>Toro / Padre de la cría (opcional): <select id='cap-toro-padre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>-- Sin especificar (opcional) --</option></select></label>"
         + "<div id='cap-toro-sugerido-hint' style='font-size:12px; margin:4px 0 6px 2px; min-height:18px;'></div>"
         + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajuela...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
+        + "<div id='cap-cruce-cria-preview' style='display:none; margin:4px 0 8px; padding:6px 10px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:6px; font-size:12px; color:var(--texto); line-height:1.4;'></div>"
         + "</div>"
         + "<div id='cap-gemelo2-wrap' style='display:none; padding:10px; border:1px dashed var(--borde-fuerte); border-radius:8px;'>"
         + "<p class='aviso' style='margin:2px 0 8px;'>Segunda cría (gemelo/a):</p>"
@@ -5845,9 +5846,43 @@
       if (!fMadre || !selToro) return;
 
       var _toroModificadoManualmente = false;
+      var boxCrucePreview = document.getElementById("cap-cruce-cria-preview");
+
+      function actualizarPreviewCruce() {
+        if (!boxCrucePreview) return;
+        var vm = (fMadre.value || "").trim();
+        var vt = (selToro.value || "").trim();
+        if (vt === "OTRO") {
+          var inOtro = document.getElementById("cap-toro-otro");
+          vt = (inOtro && inOtro.value || "").trim();
+        }
+        if (!vm || !vt) {
+          boxCrucePreview.style.display = "none";
+          boxCrucePreview.innerHTML = "";
+          return;
+        }
+        fetchJSON("/api/genetica/simular-cruce?madre=" + encodeURIComponent(vm) + "&padre=" + encodeURIComponent(vt), function (res) {
+          if (!boxCrucePreview) return;
+          if (res && res.ok && res.cria_resumen) {
+            boxCrucePreview.style.display = "block";
+            boxCrucePreview.innerHTML = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
+              + "<span style='font-weight:700; color:var(--verde-marca);'>" + icon("dna", 13) + " Genética estimada cría:</span> "
+              + "<b>" + esc(res.cria_resumen) + "</b>"
+              + "</div>";
+          } else {
+            boxCrucePreview.style.display = "none";
+          }
+        });
+      }
+
       selToro.addEventListener("change", function () {
         _toroModificadoManualmente = true;
+        actualizarPreviewCruce();
       });
+      var inToroOtro = document.getElementById("cap-toro-otro");
+      if (inToroOtro) {
+        inToroOtro.addEventListener("input", actualizarPreviewCruce);
+      }
 
       var _timerSugPadre = null;
       var _ultVacaConsultada = "";
@@ -5907,6 +5942,7 @@
                 }
                 var wrapOtro = document.getElementById("cap-toro-otro-wrap");
                 if (wrapOtro) wrapOtro.style.display = "none";
+                actualizarPreviewCruce();
               }
 
               var btnAplicar = hintToro.querySelector(".btn-aplicar-toro-sug");
@@ -10694,6 +10730,48 @@
       h += "</div></div>";
     }
 
+    // 3.1 Bloque visual de Composición Genética Multi-Raza
+    var compRacial = (f.composicion_racial && f.composicion_racial.length) ? f.composicion_racial : [];
+    var rolActual = window.__usuarioActual && window.__usuarioActual.rol;
+    var esAdminOwer = (rolActual === "OWNER" || rolActual === "ADMIN");
+
+    h += "<div style='margin-top:14px; padding-top:12px; border-top:1px solid var(--borde);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<div style='font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; color:var(--texto);'>"
+      + icon("dna", 16) + "Composición Genética Multi-Raza</div>"
+      + (esAdminOwer ? ("<button type='button' id='btn-editar-composicion-raza' data-tag='" + esc(f.tag) + "' class='chip ambar' style='cursor:pointer; font-weight:600; padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:5px; border:none;'>" + icon("pencil", 12) + "Editar Razas</button>") : "")
+      + "</div>";
+
+    if (compRacial.length > 0) {
+      // Barra apilada multicolor
+      h += "<div style='display:flex; width:100%; height:18px; border-radius:9px; overflow:hidden; background:var(--borde); margin-bottom:10px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);'>";
+      compRacial.forEach(function (cr) {
+        var col = colorDeRaza(cr.raza);
+        var ancho = Math.max(cr.porcentaje, 1);
+        h += "<div style='width:" + ancho + "%; background:" + col + "; height:100%;' title='" + esc(cr.raza) + ": " + cr.porcentaje + "% (" + esc(cr.fraccion) + ")'></div>";
+      });
+      h += "</div>";
+
+      // Chips con fracciones y porcentajes
+      h += "<div style='display:flex; flex-wrap:wrap; gap:6px;'>";
+      compRacial.forEach(function (cr) {
+        var col = colorDeRaza(cr.raza);
+        var fLabel = cr.fraccion || porcentajeAFraccionGanadera(cr.porcentaje);
+        h += "<span class='chip' style='background:rgba(0,0,0,0.04); border:1px solid " + col + "; color:var(--texto); font-size:12px; padding:3px 8px; font-weight:600; display:inline-flex; align-items:center; gap:5px;'>"
+          + "<span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:" + col + ";'></span>"
+          + "<b>" + esc(cr.raza) + "</b> <span style='color:var(--verde-marca); font-weight:700;'>" + esc(fLabel) + "</span> (" + esc(cr.porcentaje) + "%)"
+          + "</span>";
+      });
+      h += "</div>";
+    } else {
+      var rzTxt = f.raza || "Sin clasificar";
+      h += "<div style='display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12.5px; color:var(--texto-suave);'>"
+        + "<span>Raza registrada: <b>" + esc(rzTxt) + "</b> (sin desglose de porcentajes).</span>"
+        + (esAdminOwer ? ("<button type='button' class='chip verde' data-accion='editar-composicion-raza' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("plus", 11) + "Definir Multi-Raza</button>") : "")
+        + "</div>";
+    }
+    h += "</div>";
+
     h += "</div>";
     // 4. Traslados de potrero recientes
     if (f.traslados && f.traslados.length) {
@@ -11186,6 +11264,13 @@
       window.abrirTabFicha(elTab.getAttribute("data-ir-tab"));
       return;
     }
+    var elBtnComp = e.target.closest("#btn-editar-composicion-raza");
+    if (elBtnComp) {
+      e.preventDefault();
+      var tagComp = elBtnComp.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+      mostrarModalComposicionRacial(tagComp);
+      return;
+    }
     var elAcc = e.target.closest("[data-accion]");
     if (elAcc) {
       var acc = elAcc.getAttribute("data-accion");
@@ -11204,6 +11289,10 @@
       else if (acc === "rectificar-tag") {
         var tTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
         mostrarModalRectificarTag(tTag);
+      }
+      else if (acc === "editar-composicion-raza") {
+        var cTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+        mostrarModalComposicionRacial(cTag);
       }
       else if (acc === "copiar-arbol") {
         var card = elAcc.closest(".card");
@@ -11319,6 +11408,7 @@
       + "🐂 ¿Es Reproductor / Toro activo de la finca?"
       + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
+      + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
       + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
@@ -11352,6 +11442,14 @@
         var t = (f && f.tag) || "";
         cerrarModal();
         mostrarModalRectificarTag(t);
+      });
+    }
+    var btnIrComp = document.getElementById("btn-ir-comp-desde-form");
+    if (btnIrComp) {
+      btnIrComp.addEventListener("click", function () {
+        var t = (f && f.tag) || "";
+        cerrarModal();
+        mostrarModalComposicionRacial(t);
       });
     }
     ov.addEventListener("click", function (e) { if (e.target === ov) cerrarModal(); });
@@ -11512,7 +11610,351 @@
       });
     });
   }
+
+  function porcentajeAFraccionGanadera(pct) {
+    if (pct === null || pct === undefined || isNaN(pct)) return "S/D";
+    var p = Number(pct);
+    if (p <= 0) return "0%";
+    if (p >= 99.5) return "Puro";
+    if (p >= 96.5) return "Puro por Cruce (PC)";
+    var tabla = [
+      [100.0, "Puro"],
+      [96.875, "Puro por Cruce (PC)"],
+      [93.75, "15/16"],
+      [87.5, "7/8"],
+      [81.25, "13/16"],
+      [75.0, "3/4"],
+      [68.75, "11/16"],
+      [66.667, "2/3"],
+      [62.5, "5/8"],
+      [56.25, "9/16"],
+      [50.0, "1/2"],
+      [43.75, "7/16"],
+      [37.5, "3/8"],
+      [33.333, "1/3"],
+      [31.25, "5/16"],
+      [25.0, "1/4"],
+      [18.75, "3/16"],
+      [12.5, "1/8"],
+      [6.25, "1/16"],
+      [3.125, "1/32"]
+    ];
+    for (var i = 0; i < tabla.length; i++) {
+      if (Math.abs(p - tabla[i][0]) <= 0.6) {
+        return tabla[i][1];
+      }
+    }
+    if (Math.abs(p - Math.round(p)) < 0.05) return Math.round(p) + "%";
+    return p.toFixed(1) + "%";
+  }
+
+  var COLORES_RAZA = {
+    "Brahman": "#10b981",
+    "Gyr": "#3b82f6",
+    "Romosinuano": "#f59e0b",
+    "Holstein": "#6366f1",
+    "Jersey": "#ec4899",
+    "Guzerá": "#8b5cf6",
+    "Nelore": "#06b6d4",
+    "Pardo Suizo": "#84cc16",
+    "Simmental": "#ef4444",
+    "Simbrah": "#f97316",
+    "Senepol": "#dc2626",
+    "Blanco Orejinegro (BON)": "#14b8a6",
+    "Costeño con Cuernos (CCC)": "#d97706",
+    "Sanmartinero": "#b45309",
+    "Hartón del Valle": "#a16207",
+    "Brangus": "#334155",
+    "Angus": "#1e293b",
+    "Charolais": "#94a3b8",
+    "Girolando": "#0284c7",
+    "Cebú Comercial": "#059669",
+    "Mestizo": "#64748b",
+    "Criollo": "#78716c"
+  };
+  function colorDeRaza(raza) {
+    if (!raza) return "#64748b";
+    for (var k in COLORES_RAZA) {
+      if (raza.toLowerCase().indexOf(k.toLowerCase()) !== -1) return COLORES_RAZA[k];
+    }
+    return "#64748b";
+  }
+
+  function mostrarModalComposicionRacial(tagActual, compPrevia) {
+    window.mostrarModalComposicionRacial = mostrarModalComposicionRacial;
+    if (!tagActual) {
+      tagActual = (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+    }
+    if (!tagActual) return;
+
+    var overlay = document.getElementById("comp-racial-modal");
+    if (overlay) overlay.remove();
+
+    var iniciales = [];
+    if (Array.isArray(compPrevia) && compPrevia.length) {
+      iniciales = JSON.parse(JSON.stringify(compPrevia));
+    } else if (window.__ultimaFicha && window.__ultimaFicha.tag === tagActual && Array.isArray(window.__ultimaFicha.composicion_racial) && window.__ultimaFicha.composicion_racial.length) {
+      iniciales = JSON.parse(JSON.stringify(window.__ultimaFicha.composicion_racial));
+    } else if (window.__ultimaFicha && window.__ultimaFicha.tag === tagActual && window.__ultimaFicha.raza) {
+      iniciales = [{ raza: window.__ultimaFicha.raza, porcentaje: 100.0 }];
+    } else {
+      iniciales = [{ raza: "Brahman", porcentaje: 50.0 }, { raza: "Romosinuano", porcentaje: 50.0 }];
+    }
+
+    var html = "<div id='comp-racial-modal' class='modal-overlay' style='display:flex; align-items:center; justify-content:center;'>"
+      + "<div class='modal-contenido' style='max-width:480px; width:94%; max-height:85vh; display:flex; flex-direction:column;'>"
+      + "<div class='modal-header'>"
+      + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("dna", 16) + "Composición Genética · Arete " + esc(tagActual) + "</b>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-comp-modal'>✕</button>"
+      + "</div>"
+      + "<form id='form-comp-racial' style='padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex:1;'>"
+      + "<div class='aviso' style='font-size:12.5px; line-height:1.4; margin:0;'>"
+      + "🧬 <b>Ingreso multi-raza & cruces zootécnicos</b><br>"
+      + "Seleccione las razas del animal e ingrese los porcentajes. El sistema traducirá automáticamente a fracciones estándar (1/2, 3/4, 7/8, PC). La suma total debe ser <b>100%</b>."
+      + "</div>"
+      + "<datalist id='dl-catalogo-razas'></datalist>"
+      + "<div id='comp-filas-wrap' style='display:flex; flex-direction:column; gap:8px;'></div>"
+      + "<div>"
+      + "<button type='button' id='btn-add-raza-fila' class='tema-btn' style='font-size:12px; padding:6px 12px; background:rgba(34,197,94,0.1); color:var(--verde-marca); border:1px dashed var(--verde-marca); border-radius:6px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+      + icon("plus", 13) + "Añadir Raza"
+      + "</button>"
+      + "</div>"
+      + "<div id='comp-totales-bar' style='padding:10px 12px; border-radius:8px; border:1px solid var(--borde); background:var(--superficie); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;'>"
+      + "<div id='comp-suma-badge'></div>"
+      + "<div id='comp-resumen-preview' style='font-size:12px; color:var(--texto-suave); font-weight:600;'></div>"
+      + "</div>"
+      + "<p id='comp-form-error' class='aviso' style='display:none; color:var(--color-rojo-txt);'></p>"
+      + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:4px;'>"
+      + "<button type='button' id='btn-cancelar-comp' class='tema-btn' style='padding:8px 14px;'>Cancelar</button>"
+      + "<button type='submit' id='btn-guardar-comp' class='tema-btn' style='padding:8px 16px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+      + icon("check", 14) + "Guardar Composición"
+      + "</button>"
+      + "</div>"
+      + "</form>"
+      + "</div>"
+      + "</div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("comp-racial-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-comp-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    var btnCanc = document.getElementById("btn-cancelar-comp");
+    if (btnCanc) btnCanc.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var dl = document.getElementById("dl-catalogo-razas");
+    fetchJSON("/api/genetica/catalogo-razas", function (res) {
+      if (res && res.razas && dl) {
+        dl.innerHTML = res.razas.map(function (r) {
+          return "<option value='" + esc(r) + "'>";
+        }).join("");
+      }
+    });
+
+    var filasWrap = document.getElementById("comp-filas-wrap");
+    var sumaBadge = document.getElementById("comp-suma-badge");
+    var resumenPrev = document.getElementById("comp-resumen-preview");
+    var errEl = document.getElementById("comp-form-error");
+
+    function recalcularTotales() {
+      var inputsPct = filasWrap.querySelectorAll(".comp-pct-input");
+      var inputsRaza = filasWrap.querySelectorAll(".comp-raza-input");
+      var suma = 0;
+      var partesResumen = [];
+
+      for (var i = 0; i < inputsPct.length; i++) {
+        var v = parseFloat(inputsPct[i].value) || 0;
+        suma += v;
+        var rVal = (inputsRaza[i] && inputsRaza[i].value.trim()) || "Sin Raza";
+        var badgeF = inputsPct[i].closest(".comp-fila").querySelector(".comp-frac-badge");
+        var fr = porcentajeAFraccionGanadera(v);
+        if (badgeF) {
+          badgeF.textContent = v > 0 ? (v + "% → " + fr) : "0%";
+          badgeF.className = "comp-frac-badge chip " + (v > 0 ? "verde" : "gris");
+        }
+        if (v > 0) {
+          var fCorta = fr;
+          if (fCorta.indexOf("1/2") !== -1) fCorta = "1/2";
+          else if (fCorta.indexOf("PC") !== -1 || fCorta.indexOf("Puro por Cruce") !== -1) fCorta = "PC";
+          partesResumen.push(fCorta + " " + rVal);
+        }
+      }
+
+      suma = Math.round(suma * 100) / 100;
+      if (Math.abs(suma - 100) <= 0.2) {
+        sumaBadge.innerHTML = "<span class='chip verde' style='font-size:12.5px; font-weight:700;'>Suma: 100% ✅</span>";
+      } else if (suma < 100) {
+        var falta = Math.round((100 - suma) * 100) / 100;
+        sumaBadge.innerHTML = "<span class='chip ambar' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Faltan " + falta + "%) ⚠️</span> "
+          + "<button type='button' id='btn-autocompletar-comp' class='chip' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600;'>Completar 100%</button>";
+        var btnAuto = document.getElementById("btn-autocompletar-comp");
+        if (btnAuto) {
+          btnAuto.addEventListener("click", function () {
+            if (inputsPct.length > 0) {
+              var lastInput = inputsPct[inputsPct.length - 1];
+              var lastVal = parseFloat(lastInput.value) || 0;
+              lastInput.value = Math.round((lastVal + falta) * 100) / 100;
+              recalcularTotales();
+            }
+          });
+        }
+      } else {
+        var exceso = Math.round((suma - 100) * 100) / 100;
+        sumaBadge.innerHTML = "<span class='chip rojo' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Excede por " + exceso + "%) ❌</span>";
+      }
+
+      if (resumenPrev) {
+        resumenPrev.textContent = partesResumen.length ? ("Vista previa: " + partesResumen.join(" + ")) : "";
+      }
+    }
+
+    function crearFilaHtml(razaVal, pctVal) {
+      var row = document.createElement("div");
+      row.className = "comp-fila";
+      row.style.cssText = "display:flex; gap:8px; align-items:center; background:var(--superficie); padding:8px 10px; border-radius:8px; border:1px solid var(--borde-fuerte);";
+
+      row.innerHTML = "<div style='flex:3; min-width:110px;'>"
+        + "<input class='comp-raza-input' list='dl-catalogo-razas' placeholder='Raza (ej. Brahman)' value='" + esc(razaVal || "") + "' required style='width:100%; padding:7px; border-radius:6px; border:1px solid var(--borde); font-weight:600; box-sizing:border-box;'>"
+        + "</div>"
+        + "<div style='flex:2; min-width:80px; position:relative;'>"
+        + "<input type='number' step='any' min='0' max='100' class='comp-pct-input' placeholder='%' value='" + (pctVal !== undefined ? pctVal : "") + "' required style='width:100%; padding:7px 20px 7px 7px; border-radius:6px; border:1px solid var(--borde); font-weight:700; box-sizing:border-box;'>"
+        + "<span style='position:absolute; right:7px; top:8px; font-size:12px; color:var(--texto-suave); font-weight:bold;'>%</span>"
+        + "</div>"
+        + "<div style='flex:2; text-align:center; min-width:85px;'>"
+        + "<span class='comp-frac-badge chip gris' style='font-size:11px; padding:3px 6px; display:inline-block;'>—</span>"
+        + "</div>"
+        + "<div>"
+        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza'>🗑️</button>"
+        + "</div>";
+
+      var inPct = row.querySelector(".comp-pct-input");
+      var inRz = row.querySelector(".comp-raza-input");
+      var btnDel = row.querySelector(".btn-del-raza-fila");
+
+      inPct.addEventListener("input", recalcularTotales);
+      inRz.addEventListener("input", recalcularTotales);
+      btnDel.addEventListener("click", function () {
+        var totalRows = filasWrap.querySelectorAll(".comp-fila").length;
+        if (totalRows <= 1) {
+          inPct.value = "";
+          inRz.value = "";
+          recalcularTotales();
+          return;
+        }
+        row.remove();
+        recalcularTotales();
+      });
+
+      return row;
+    }
+
+    iniciales.forEach(function (c) {
+      filasWrap.appendChild(crearFilaHtml(c.raza, c.porcentaje));
+    });
+    if (!iniciales.length) {
+      filasWrap.appendChild(crearFilaHtml("", ""));
+    }
+    recalcularTotales();
+
+    var btnAdd = document.getElementById("btn-add-raza-fila");
+    if (btnAdd) {
+      btnAdd.addEventListener("click", function () {
+        var inputsPct = filasWrap.querySelectorAll(".comp-pct-input");
+        var suma = 0;
+        inputsPct.forEach(function (i) { suma += parseFloat(i.value) || 0; });
+        var resto = Math.max(0, Math.round((100 - suma) * 100) / 100);
+        filasWrap.appendChild(crearFilaHtml("", resto > 0 ? resto : ""));
+        recalcularTotales();
+        var newInp = filasWrap.lastElementChild.querySelector(".comp-raza-input");
+        if (newInp) newInp.focus();
+      });
+    }
+
+    var form = document.getElementById("form-comp-racial");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      errEl.style.display = "none";
+
+      var inputsRaza = filasWrap.querySelectorAll(".comp-raza-input");
+      var inputsPct = filasWrap.querySelectorAll(".comp-pct-input");
+      var compPayload = [];
+      var suma = 0;
+
+      for (var i = 0; i < inputsRaza.length; i++) {
+        var rVal = inputsRaza[i].value.trim();
+        var pVal = parseFloat(inputsPct[i].value) || 0;
+        if (!rVal) {
+          errEl.textContent = "Por favor ingrese el nombre de cada raza.";
+          errEl.style.display = "block";
+          inputsRaza[i].focus();
+          return;
+        }
+        if (pVal <= 0) {
+          errEl.textContent = "Cada porcentaje debe ser mayor a 0%.";
+          errEl.style.display = "block";
+          inputsPct[i].focus();
+          return;
+        }
+        suma += pVal;
+        compPayload.push({ raza: rVal, porcentaje: pVal });
+      }
+
+      if (compPayload.length === 0) {
+        errEl.textContent = "Debe añadir al menos una raza.";
+        errEl.style.display = "block";
+        return;
+      }
+
+      if (Math.abs(suma - 100) > 1.0) {
+        errEl.textContent = "La suma de los porcentajes debe ser 100% (actualmente es " + suma.toFixed(1) + "%).";
+        errEl.style.display = "block";
+        return;
+      }
+
+      var btnG = document.getElementById("btn-guardar-comp");
+      if (btnG) { btnG.disabled = true; btnG.textContent = "Guardando..."; }
+
+      fetch("/api/animal/" + encodeURIComponent(tagActual) + "/composicion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ composicion: compPayload })
+      }).then(function (r) {
+        return r.json().then(function (d) { return { status: r.status, ok: r.ok, body: d }; });
+      }).then(function (res) {
+        if (btnG) { btnG.disabled = false; btnG.innerHTML = icon("check", 14) + " Guardar Composición"; }
+        if (res.ok && res.body && res.body.ok) {
+          cerrar();
+          if (window.__ultimaFicha && window.__ultimaFicha.tag === tagActual) {
+            window.__ultimaFicha.composicion_racial = res.body.composicion;
+            window.__ultimaFicha.raza = res.body.resumen;
+          }
+          if (typeof abrirFicha === "function") {
+            var target = document.getElementById("ficha-body") || document.getElementById("vista-ficha");
+            if (target) abrirFicha(tagActual, target, false, false);
+          }
+          if (typeof window.mostrarAviso === "function") {
+            window.mostrarAviso("🧬 Composición genética actualizada: " + (res.body.resumen || ""));
+          } else {
+            alert("Composición genética guardada: " + (res.body.resumen || ""));
+          }
+        } else {
+          errEl.textContent = (res.body && res.body.error) || "Error al guardar composición.";
+          errEl.style.display = "block";
+        }
+      }).catch(function (err) {
+        if (btnG) { btnG.disabled = false; btnG.innerHTML = icon("check", 14) + " Guardar Composición"; }
+        errEl.textContent = "Error de red: " + (err.message || err);
+        errEl.style.display = "block";
+      });
+    });
+  }
+
   function abrirFicha(tag, target, showIdent, animar, tabId) {
+
     if (animar === undefined) animar = true;
     if (animar) skeleton(target, "ficha");
     fetchJSON("/api/ficha/" + encodeURIComponent(tag), function (f) {

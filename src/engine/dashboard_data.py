@@ -2086,6 +2086,12 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             "notas": an.get("notas"),
             "qr_payload": f"JA://animal/{an['tag']}", "qr_url": f"/ficha/{an['tag']}"}
     try:
+        base["composicion_racial"] = db.obtener_composicion_racial(aid)
+    except Exception as e:
+        logger.error("seccion composicion_racial fallo", exc_info=True)
+        errores["composicion_racial"] = str(e)
+        base["composicion_racial"] = []
+    try:
         base["ultimo_parto"] = dict(db.ultimo_parto(aid)) if db.ultimo_parto(aid) else None
     except Exception as e:
         logger.error("seccion ultimo_parto fallo", exc_info=True)

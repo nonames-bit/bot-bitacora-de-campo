@@ -627,6 +627,20 @@ CREATE TABLE IF NOT EXISTS lote_iatf_animales (
 
 CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_lote ON lote_iatf_animales(lote_id);
 CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_tag ON lote_iatf_animales(tag);
+
+-- Composición genética multi-raza y cruces absorbentes por animal
+CREATE TABLE IF NOT EXISTS composicion_racial (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER NOT NULL,
+    raza TEXT NOT NULL,
+    porcentaje REAL NOT NULL,
+    creado_en TEXT,
+    registrado_por INTEGER,
+    FOREIGN KEY (animal_id) REFERENCES animales(id_animal) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id);
+CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -640,7 +654,9 @@ TABLAS = [
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
     "precios_mercado", "mensajes_equipo", "sync_ids_procesados",
     "inseminadores", "protocolos_iatf", "lotes_iatf", "lote_iatf_animales",
+    "composicion_racial",
 ]
+
 
 
 # Catálogo de tipos de evento reproductivo para `partos.tipo_evento`
@@ -914,6 +930,16 @@ class Finanza:
     contraparte: Optional[str] = None
     foto_ruta: Optional[str] = None
     notas: Optional[str] = None
+    creado_en: Optional[str] = None
+    registrado_por: Optional[int] = None
+    id: Optional[int] = None
+
+
+@dataclass
+class ComposicionRacial:
+    animal_id: int
+    raza: str
+    porcentaje: float
     creado_en: Optional[str] = None
     registrado_por: Optional[int] = None
     id: Optional[int] = None

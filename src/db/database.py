@@ -12,6 +12,14 @@ from typing import Any, Optional
 from ..utils import add_days, iso, to_date
 from ..integrations.mercado_semilla import FECHAS_SEMILLA_MERCADO, PRECIOS_SEMILLA_HISTORICO
 from .models import SCHEMA_SQL, TIPOS_EVENTO_PARTO, TIPOS_EVENTO_SIN_CRIA
+from ..engine.genetic_engine import (
+    calcular_cruce_absorbente,
+    formatear_raza_etiqueta,
+    generar_resumen_zootecnico,
+    normalizar_nombre_raza,
+    parsear_texto_raza,
+    porcentaje_a_fraccion,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -238,8 +246,24 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lotes_iatf_estado ON lotes_iatf(estado)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_lote ON lote_iatf_animales(lote_id)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_lote_iatf_animales_tag ON lote_iatf_animales(tag)")
+
+            # Composición genética multi-raza y cruces absorbentes
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS composicion_racial (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    animal_id INTEGER NOT NULL,
+                    raza TEXT NOT NULL,
+                    porcentaje REAL NOT NULL,
+                    creado_en TEXT,
+                    registrado_por INTEGER,
+                    FOREIGN KEY (animal_id) REFERENCES animales(id_animal) ON DELETE CASCADE
+                )
+            """)
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id)")
+            self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza)")
         except Exception:
             pass
+
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida y utilidades de bajo nivel
@@ -739,6 +763,136 @@ class Database:
             return existente
         return self.insert("animales", {"tag": tag_str, **campos})
 
+    # ------------------------------------------------------------------ #
+    # Composición genética, multi-raza y cruces absorbentes
+    # ------------------------------------------------------------------ #
+    def obtener_composicion_racial(self, tag_or_id: Any) -> list[dict]:
+        """Obtiene la lista de razas y porcentajes de un animal con su fracción zootécnica.
+        Si no tiene registros en la tabla composicion_racial, infiere desde animales.raza."""
+        aid = self.resolve_animal(tag_or_id)
+        if aid is None:
+            return []
+        filas = self.query(
+            "SELECT raza, porcentaje FROM composicion_racial WHERE animal_id = ? ORDER BY porcentaje DESC",
+            (aid,)
+        )
+        if filas:
+            res = []
+            es_f1 = (len(filas) == 2 and all(abs(float(r["porcentaje"]) - 50.0) <= 0.5 for r in filas))
+            for r in filas:
+                pct = float(r["porcentaje"])
+                raza = r["raza"]
+                frac = porcentaje_a_fraccion(pct)
+                if frac == "1/2" and es_f1:
+                    frac = "1/2 o F1"
+                res.append({
+                    "raza": raza,
+                    "porcentaje": pct,
+                    "fraccion": frac,
+                    "etiqueta": formatear_raza_etiqueta(raza, pct, es_f1=es_f1),
+                })
+            return res
+
+        # Si no hay filas en composicion_racial, mirar animales.raza
+        row_an = self.query_one("SELECT raza FROM animales WHERE id_animal = ?", (aid,))
+        if row_an and row_an["raza"]:
+            return parsear_texto_raza(row_an["raza"])
+        return []
+
+    def guardar_composicion_racial(
+        self,
+        tag_or_id: Any,
+        composicion: list[dict],
+        registrado_por: Optional[int] = None,
+        actualizar_string_raza: bool = True,
+    ) -> bool:
+        """Guarda la composición racial de un animal.
+        Reemplaza los registros previos en composicion_racial y actualiza animales.raza
+        con la nomenclatura zootécnica estándar (ej: '1/2 Brahman + 1/2 Romosinuano')."""
+        aid = self.resolve_animal(tag_or_id)
+        if aid is None or not composicion:
+            return False
+
+        # Validar y normalizar razas y porcentajes
+        suma = sum(float(c.get("porcentaje") or 0.0) for c in composicion)
+        if suma <= 0:
+            return False
+
+        # Si la suma está cerca de 100 (entre 95 y 105), normalizar a 100
+        factor = 100.0 / suma if abs(suma - 100.0) > 0.01 else 1.0
+
+        ahora = self._ahora()
+        with self.transaccion():
+            self.execute("DELETE FROM composicion_racial WHERE animal_id = ?", (aid,))
+            limpias = []
+            for c in composicion:
+                raza = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
+                pct_norm = round(float(c.get("porcentaje") or 0.0) * factor, 2)
+                if pct_norm > 0:
+                    self.execute(
+                        "INSERT INTO composicion_racial (animal_id, raza, porcentaje, creado_en, registrado_por) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (aid, raza, pct_norm, ahora, registrado_por)
+                    )
+                    limpias.append({"raza": raza, "porcentaje": pct_norm})
+
+            if actualizar_string_raza and limpias:
+                resumen = generar_resumen_zootecnico(limpias)
+                self.execute("UPDATE animales SET raza = ? WHERE id_animal = ?", (resumen, aid))
+
+        return True
+
+    def calcular_composicion_cruce_animales(
+        self,
+        madre_tag_or_id: Any,
+        padre_tag_or_id_o_codigo: Any,
+    ) -> tuple[list[dict], str]:
+        """Calcula el cruce absorbente entre madre y padre/pajuela."""
+        comp_m = self.obtener_composicion_racial(madre_tag_or_id) if madre_tag_or_id else []
+        comp_p = []
+
+        if padre_tag_or_id_o_codigo:
+            # Buscar primero si es un animal del hato
+            pid = self.resolve_animal(padre_tag_or_id_o_codigo)
+            if pid is not None:
+                comp_p = self.obtener_composicion_racial(pid)
+            else:
+                # Buscar en inventario de pajuelas por código de toro
+                row_paj = self.query_one(
+                    "SELECT raza FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+                    (str(padre_tag_or_id_o_codigo).strip(),)
+                )
+                if row_paj and row_paj["raza"]:
+                    comp_p = parsear_texto_raza(row_paj["raza"])
+                else:
+                    # Parsear el texto directamente como raza pura o cruce
+                    comp_p = parsear_texto_raza(str(padre_tag_or_id_o_codigo).strip())
+
+        comp_cria = calcular_cruce_absorbente(comp_m, comp_p)
+        resumen = generar_resumen_zootecnico(comp_cria)
+        return comp_cria, resumen
+
+    def _aplicar_cruce_absorbente_cria(
+        self,
+        id_cria: int,
+        madre_id: Optional[int],
+        padre_id: Optional[int],
+        registrado_por: Optional[int] = None,
+    ) -> None:
+        """Si la cría no tiene composición racial registrada en composicion_racial,
+        calcula la herencia a partir de los padres y la guarda automáticamente."""
+        if not id_cria:
+            return
+        existentes = self.query_one(
+            "SELECT id FROM composicion_racial WHERE animal_id = ? LIMIT 1", (id_cria,)
+        )
+        if existentes:
+            return
+
+        comp_cria, _ = self.calcular_composicion_cruce_animales(madre_id, padre_id)
+        if comp_cria:
+            self.guardar_composicion_racial(id_cria, comp_cria, registrado_por=registrado_por)
+
     def registrar_potrero(self, nombre=None, codigo=None, area_has=None,
                           tipo_pasto=None, aforo_kg_m2=None, fecha_entrada=None,
                           fecha_salida=None, dias_reposo=None,
@@ -841,6 +995,11 @@ class Database:
                 self.execute(
                     "UPDATE animales SET padre_id = COALESCE(padre_id, ?) WHERE id_animal = ? AND (padre_id IS NULL OR padre_id != ?)", (padre_id, id_cria, id_cria)
                 )
+            # Herencia y cruces absorbentes automáticos de la cría
+            try:
+                self._aplicar_cruce_absorbente_cria(id_cria, vaca_id, padre_id, registrado_por=registrado_por)
+            except Exception:
+                logger.exception("Error calculando cruce absorbente para cria %s", id_cria)
             if sexo_cria:
                 self.execute(
                     "UPDATE animales SET sexo = COALESCE(sexo, ?) WHERE id_animal = ?", (sexo_cria, id_cria)

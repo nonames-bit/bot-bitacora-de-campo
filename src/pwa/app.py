@@ -1986,6 +1986,74 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.get("/api/animal/<tag>/composicion")
+    def api_animal_composicion_get(tag):
+        """Devuelve la composición racial y fracciones zootécnicas de un animal."""
+        db_a = _db(db_path)
+        try:
+            from ..engine.genetic_engine import generar_resumen_zootecnico
+            aid = db_a.animal_id(tag)
+            if aid is None:
+                return jsonify({"ok": False, "error": f"No existe animal '{tag}'"}), 404
+            comp = db_a.obtener_composicion_racial(aid)
+            resumen = generar_resumen_zootecnico(comp)
+            return jsonify({
+                "ok": True,
+                "tag": tag,
+                "composicion": comp,
+                "resumen": resumen,
+            })
+        except Exception as e:
+            logger.exception("Error al consultar composicion de %s: %s", tag, e)
+            return _error_interno(500)
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
+    @app.post("/api/animal/<tag>/composicion")
+    def api_animal_composicion_post(tag):
+        """Guarda la composición racial manual (multi-raza con porcentajes) de un animal."""
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+        datos = request.get_json(silent=True) or {}
+        comp_lista = datos.get("composicion") or []
+        if not comp_lista:
+            return jsonify({"ok": False, "error": "Debe especificar al menos una raza con porcentaje."}), 400
+
+        db_a = _db(db_path)
+        try:
+            from ..engine.genetic_engine import generar_resumen_zootecnico
+            aid = db_a.animal_id(tag)
+            if aid is None:
+                return jsonify({"ok": False, "error": f"No existe animal '{tag}'"}), 404
+            ok = db_a.guardar_composicion_racial(
+                aid,
+                comp_lista,
+                registrado_por=session.get("user_id"),
+                actualizar_string_raza=True,
+            )
+            if not ok:
+                return jsonify({"ok": False, "error": "No se pudo guardar la composición. Verifique porcentajes válidos."}), 400
+            comp = db_a.obtener_composicion_racial(aid)
+            resumen = generar_resumen_zootecnico(comp)
+            return jsonify({
+                "ok": True,
+                "tag": tag,
+                "composicion": comp,
+                "resumen": resumen,
+                "mensaje": "Composición genética actualizada correctamente.",
+            })
+        except Exception as e:
+            logger.exception("Error al guardar composicion de %s: %s", tag, e)
+            return _error_interno(500)
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
     @app.post("/api/animal/<tag>/pausa-ordeno")
     def api_animal_pausa_ordeno(tag):
         """Marca que la vaca <tag> dejó de ordeñarse TEMPORALMENTE (ej. se
@@ -2109,6 +2177,56 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         out = datos_genetica(db_path)
         out["rol"] = _rol_actual()
         return jsonify(out)
+
+    @app.get("/api/genetica/simular-cruce")
+    def api_genetica_simular_cruce():
+        """Simula la composición genética de la cría resultante de cruzar una madre y un padre/pajuela."""
+        madre = request.args.get("madre")
+        padre = request.args.get("padre")
+        if not madre or not padre:
+            return jsonify({"ok": False, "error": "Se requieren parámetros 'madre' y 'padre'."}), 400
+        db_a = _db(db_path)
+        try:
+            comp_cria, resumen = db_a.calcular_composicion_cruce_animales(madre, padre)
+            return jsonify({
+                "ok": True,
+                "madre": madre,
+                "padre": padre,
+                "cria_composicion": comp_cria,
+                "cria_resumen": resumen,
+            })
+        except Exception as e:
+            logger.exception("Error al simular cruce genético: %s", e)
+            return _error_interno(500)
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
+    @app.get("/api/genetica/catalogo-razas")
+    def api_genetica_catalogo_razas():
+        """Devuelve el catálogo de razas predefinidas unificado con las registradas en el hato."""
+        from ..engine.genetic_engine import CATALOGO_RAZAS_PREDEFINIDAS
+        db_a = _db(db_path)
+        try:
+            filas = db_a.query("SELECT DISTINCT raza FROM composicion_racial WHERE raza IS NOT NULL AND raza != ''")
+            razas_db = [r["raza"] for r in filas]
+            # También razas de animales
+            filas_an = db_a.query("SELECT DISTINCT raza FROM animales WHERE raza IS NOT NULL AND raza != ''")
+            for r in filas_an:
+                val = (r["raza"] or "").strip()
+                if val and "+" not in val and "%" not in val and "/" not in val:
+                    razas_db.append(val)
+            todas = list(dict.fromkeys(CATALOGO_RAZAS_PREDEFINIDAS + razas_db))
+            return jsonify({"ok": True, "razas": todas})
+        except Exception:
+            return jsonify({"ok": True, "razas": CATALOGO_RAZAS_PREDEFINIDAS})
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
 
     @app.get("/api/agenda")
     def api_agenda():
