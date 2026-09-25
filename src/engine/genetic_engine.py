@@ -187,11 +187,11 @@ def normalizar_nombre_raza(nombre_raza: str) -> str:
         "GIROLANDO": "Girolando",
         "MESTIZO": "Mestizo",
         "CRIOLLO": "Criollo",
-        # Códigos de 1 letra de SG
-        "C": "Cebú Comercial",
-        "I": "Holstein",
+        # Códigos de tipo de raza de Software Ganadero (SG)
+        "T": "Taurino",
+        "C": "Cebuino",
+        "I": "Indeterminado",
         "M": "Mestizo",
-        "T": "Tricross Cebú",
     }
     return mapeo.get(r_up, r)
 

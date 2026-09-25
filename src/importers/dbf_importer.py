@@ -20,6 +20,7 @@ from typing import Iterator, Optional
 from ..db.database import Database
 from ..db.models import TIPOS_EVENTO_PARTO
 from ..engine.growth_engine import gmd
+from ..engine.genetic_engine import generar_resumen_zootecnico
 from ..engine.reproductive_engine import fecha_estimada_parto
 from ..utils import hoy, iso, to_date
 
@@ -29,8 +30,64 @@ DBF_REQUERIDOS = [
     "hoja.dbf", "partos.dbf", "celos.dbf", "iamn.dbf",
     "pesos.dbf", "potrero.dbf", "traslado.dbf", "causas.dbf",
     "tactos.dbf", "leche.dbf", "destete.dbf", "condcorp.dbf",
-    "semen.dbf", "termos.dbf",
+    "semen.dbf", "termos.dbf", "raza.dbf",
 ]
+
+CATALOGO_RAZAS_SG_DEFECTO = {
+    "01": "Cebú Comercial",
+    "02": "Pardo Suizo",
+    "03": "Holstein Negro",
+    "04": "Gyr",
+    "05": "Guzerá",
+    "06": "Brahman Gris",
+    "07": "Hartón del Valle",
+    "08": "Holstein Rojo",
+    "09": "Santa Gertrudis",
+    "10": "Costeño con Cuernos (CCC)",
+    "11": "Jersey",
+    "12": "Ayrshire",
+    "13": "Angus Rojo",
+    "14": "Angus Negro",
+    "15": "Simmental",
+    "16": "Criolla",
+    "17": "Blanco Orejinegro (BON)",
+    "18": "Normando",
+    "19": "Pardo Colombiano",
+    "20": "Sahiwal",
+    "21": "Rubio Alemán",
+    "22": "Shorthorn",
+    "23": "Lucerna",
+    "24": "Sanmartinero",
+    "25": "Limonero",
+    "26": "Velásquez",
+    "27": "M.A.Z",
+    "28": "Casanare",
+    "29": "Nelore",
+    "30": "Indubrasil",
+    "31": "Brahman Rojo",
+    "32": "Chino Santandereano",
+    "33": "Romosinuano",
+    "34": "Charolais",
+    "35": "Cebú Rojo",
+    "36": "Limousin",
+    "37": "Chianina",
+    "38": "Beefmaster",
+    "39": "Guernsey",
+    "40": "Carora",
+    "41": "Piamontés",
+    "42": "Hereford",
+    "43": "Gelbvieh",
+    "44": "Belga Azul",
+    "45": "Mono Pinteño",
+    "46": "Búfalo",
+    "47": "Simmental Americano",
+    "48": "Pardo Americano",
+    "49": "Pardo Colombiano",
+    "50": "Simmental Alemán",
+    "51": "Montbéliarde",
+    "52": "Girolando",
+    "53": "7 Colores",
+}
 
 # Marcas de campo de Visual FoxPro.
 TIPO_FECHA = "D"
@@ -303,13 +360,15 @@ def _entero(v) -> Optional[int]:
         return None
 
 
-def import_animales(db: Database, records, causas: dict) -> dict:
+def import_animales(db: Database, records, causas: dict, catalogo_razas: Optional[dict] = None) -> dict:
     """Siembra animales y muertes; devuelve conteos con nuevos y duplicados."""
     tags = []  # para segunda pasada de madre/padre
     nuevos_animales = 0
     duplicados_animales = 0
     traslados_detectados = 0
     fecha_import_hoy = iso(hoy())
+    cat = catalogo_razas or CATALOGO_RAZAS_SG_DEFECTO
+
     for r in records:
         tag = (r.get("CODANI") or "").strip()
         if not tag:
@@ -339,17 +398,48 @@ def import_animales(db: Database, records, causas: dict) -> dict:
         codpot = (r.get("CODPOT") or "").strip() or None
         estado_nuevo = _estado_desde_tipo(r.get("TIPO"), codpot=codpot)
         hierro = (r.get("HIE") or "").strip() or None
-        db.registrar_animal(
+
+        # Extracción de composición racial de Software Ganadero
+        comp_sg = []
+        for i in range(1, 5):
+            cod_g = str(r.get(f"CODGR{i}") or "").strip()
+            por_g = r.get(f"PORGR{i}")
+            if cod_g and por_g is not None:
+                try:
+                    pct_g = float(por_g)
+                except (ValueError, TypeError):
+                    pct_g = 0.0
+                if pct_g > 0.0:
+                    nom_r = cat.get(cod_g) or f"Raza {cod_g}"
+                    comp_sg.append({"raza": nom_r, "porcentaje": pct_g})
+
+        if comp_sg:
+            raza_val = generar_resumen_zootecnico(comp_sg)
+        else:
+            tipo_rz = str(r.get("TIPORAZA") or "").strip().upper()
+            if tipo_rz == "T":
+                raza_val = "Taurino"
+            elif tipo_rz == "C":
+                raza_val = "Cebuino"
+            elif tipo_rz == "I":
+                raza_val = "Indeterminado"
+            else:
+                raza_val = (r.get("TIPORAZA") or "").strip() or None
+
+        aid = db.registrar_animal(
             tag=tag,
             nombre=(r.get("NOMANI") or "").strip() or None,
             sexo=sexo,
-            raza=(r.get("TIPORAZA") or "").strip() or None,
+            raza=raza_val,
             fecha_nacimiento=r.get("FECNACE"),
             potrero=codpot,
             estado=estado_nuevo,
             notas=(r.get("OBS") or "").strip() or None,
             hierro=hierro,
         )
+
+        if comp_sg and aid is not None:
+            db.guardar_composicion_racial(aid, comp_sg)
         # hoja.dbf (este archivo) solo trae el potrero ACTUAL del animal, sin
         # fecha ni historial -- si el mayordomo lo mueve en SG sin pasar por
         # la pantalla de Traslados (traslado.dbf, importado aparte en
@@ -1174,10 +1264,18 @@ def import_dbfs(
     conteos: dict = {}
 
     causas = import_causas(db, lectores["causas.dbf"].records()) if "causas.dbf" in lectores else {}
+    cat_razas = dict(CATALOGO_RAZAS_SG_DEFECTO)
+    if "raza.dbf" in lectores:
+        for rz in lectores["raza.dbf"].records():
+            c_rz = str(rz.get("CODRAZA") or "").strip()
+            n_rz = str(rz.get("RAZA") or "").strip()
+            if c_rz and n_rz:
+                cat_razas[c_rz] = n_rz
+
     if "potrero.dbf" in lectores:
         conteos["potreros"] = import_potreros(db, lectores["potrero.dbf"].records())
     if "hoja.dbf" in lectores:
-        conteos.update(import_animales(db, lectores["hoja.dbf"].records(), causas))
+        conteos.update(import_animales(db, lectores["hoja.dbf"].records(), causas, catalogo_razas=cat_razas))
     if "partos.dbf" in lectores:
         conteos["partos"] = import_partos(db, lectores["partos.dbf"].records())
     if "celos.dbf" in lectores:
