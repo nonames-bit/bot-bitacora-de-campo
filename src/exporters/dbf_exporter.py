@@ -76,7 +76,7 @@ class DBFWriter:
         # Registros
         for rec in self.records:
             out += b"\x20"  # 0x20 = registro activo (no borrado)
-            for (name, ftype, flen, fdec), val in zip(self.fields, rec):
+            for (name, ftype, flen, fdec), val in zip(self.fields, rec, strict=False):
                 out += self._format_value(val, ftype, flen, fdec)
 
         # Fin de archivo dBASE (0x1A)

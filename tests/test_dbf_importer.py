@@ -31,7 +31,7 @@ def build_dbf(fields, records):
     out += b"\x0d"
     for rec in records:
         out += b"\x20"  # registro activo
-        for (name, ftype, flen, fdec), val in zip(fields, rec):
+        for (name, ftype, flen, fdec), val in zip(fields, rec, strict=False):
             if ftype == "N":
                 # Datos en latin-1 (convención DBF), igual que decodifica DBFReader.
                 out += str(val).encode("latin-1").rjust(flen, b" ")

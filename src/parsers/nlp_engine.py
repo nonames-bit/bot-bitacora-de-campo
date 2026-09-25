@@ -137,7 +137,7 @@ PALABRAS_NO_TAG = {
     "el", "la", "los", "las", "un", "una", "unos", "unas", "tiempo", "retiro",
     "pario", "peso", "insemine", "insemino", "inseminada", "inseminaron", "servida", "servio", "sirvio", "sirvieron",
     "murio", "puso", "aplico", "toco", "toca", "cubrio", "monto",
-    "movio", "movieron", "traslado", "trasladaron", "cambio", "cambiaron", "entro", "entraron", "paso", "pasaron",
+    "movio", "movieron", "trasladaron", "cambio", "cambiaron", "entro", "entraron", "paso", "pasaron",
     "debo", "debe", "deben", "debemos", "tengo", "tiene", "tienen", "tenemos", "hay", "les", "le", "me", "te", "se", "nos",
     "servir", "inseminar", "inseminacion", "inseminaciones", "servicios", "palpacion", "palpaciones",
     "palpe", "palpar", "diagnostico", "diagnosticos", "gestacion", "gestaciones", "ecografia", "ecografias",

@@ -8,10 +8,12 @@
 # Pendiente de una limpieza dedicada (con fallout real hoy): B (bugbear: 36),
 # S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
 # DTZ (~196 date.today/datetime.now naive). Ver auditoría P2.10.
+# Ya habilitados por bajo riesgo y cero/limpieza aplicada: B033 (set/dict con
+# valor duplicado) y B905 (zip sin strict=).
 line-length = 160
 
 [lint]
-select = ["E9", "F", "A", "PLE", "EXE", "FA"]
+select = ["E9", "F", "A", "PLE", "EXE", "FA", "B033", "B905"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a

@@ -71,7 +71,7 @@ STOP_WORDS_TAG = {
     # Artículos y preposiciones frecuentes en español que no son prefijos de arete
     "la", "el", "le", "les", "lo", "los", "las", "a", "al", "de", "del",
     "en", "con", "por", "para", "y", "o", "que", "un", "una", "unos", "unas",
-    "se", "su", "sus", "es", "son", "fue", "era", "esta", "este", "esta",
+    "se", "su", "sus", "es", "son", "fue", "era", "esta", "este",
 }
 
 
