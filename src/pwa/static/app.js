@@ -9206,7 +9206,9 @@
     // 3. Extraer enlaces seguros <a href="...">...</a>
     var links = [];
     str = str.replace(/<a\s+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi, function (_, url, texto) {
-      var safeUrl = /^https?:\/\//i.test(url) || url.charAt(0) === "/" ? esc(url) : "#";
+      // Rutas internas "/x" sí; "//dominio" (protocol-relative) y "/\\" no.
+      var esInterna = url.charAt(0) === "/" && url.charAt(1) !== "/" && url.charAt(1) !== "\\";
+      var safeUrl = /^https?:\/\//i.test(url) || esInterna ? esc(url) : "#";
       links.push("<a href='" + safeUrl + "' target='_blank' rel='noopener noreferrer'>" + esc(texto) + "</a>");
       return "___LINK_BLOCK_" + (links.length - 1) + "___";
     });
