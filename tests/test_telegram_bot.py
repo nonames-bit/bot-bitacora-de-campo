@@ -30,7 +30,7 @@ def test_formatear_alertas_vacio(db):
 
 
 def test_formatear_alertas_con_datos(db):
-    db.registrar_animal(tag="47")
+    db.registrar_animal(tag="47", estado="ACTIVO")
     db.registrar_alerta("47", "ECOGRAFIA", "2026-09-15", descripcion="Ecografía día 35")
     db.registrar_alerta("47", "PALPACION", "2026-10-15", descripcion="Palpación rectal")
 

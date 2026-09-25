@@ -3237,8 +3237,9 @@ def construir_application(
                     """
                     SELECT t.*, a.tag, a.nombre, p.nombre AS potrero_nombre
                     FROM tratamientos t
-                    LEFT JOIN animales a ON a.id_animal = t.animal_id
+                    JOIN animales a ON a.id_animal = t.animal_id
                     LEFT JOIN potreros p ON p.id = a.potrero_id
+                    WHERE a.estado = 'ACTIVO'
                     ORDER BY t.fecha DESC, t.id DESC LIMIT 10
                     """
                 )

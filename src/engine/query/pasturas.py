@@ -33,7 +33,7 @@ class PasturasQueryMixin:
 
         tag_str = animal["tag"] or str(tag)
         nombre = f" ({animal['nombre']})" if animal["nombre"] else ""
-        estado = animal["estado"] or "ACTIVO"
+        estado = animal["estado"] or "SIN ESTADO"
 
         potrero_nom = None
         lote_str = ""
@@ -137,7 +137,7 @@ class PasturasQueryMixin:
             f"🚚 <b>Último traslado de {tag_str}{nombre}:</b>\n"
             f"• Fecha: <b>{fec}</b>\n"
             f"• Movido a: <b>{p_dest_nom}</b>{orig_str}{lote_str}\n"
-            f"• Estado: {animal['estado'] or 'ACTIVO'}{dias_str}"
+            f"• Estado: {animal['estado'] or 'SIN ESTADO'}{dias_str}"
         )
         return resp
 

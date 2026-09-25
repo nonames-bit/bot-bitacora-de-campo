@@ -163,6 +163,7 @@ class ReproduccionQueryMixin:
             "SELECT a.fecha_programada, a.descripcion, a.animal_id, an.tag AS tag "
             "FROM alertas a LEFT JOIN animales an ON an.id_animal = a.animal_id "
             "WHERE a.tipo_alerta = 'INSEMINACION_PROGRAMADA' AND a.estado = 'PENDIENTE' "
+            "AND an.estado = 'ACTIVO' "
             "ORDER BY a.fecha_programada"
         )
         pendientes = []

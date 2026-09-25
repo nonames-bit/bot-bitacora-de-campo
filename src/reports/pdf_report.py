@@ -221,6 +221,7 @@ def recolectar_datos(db, dias: int, hoy: Optional[date] = None) -> dict:
         "FROM alertas a "
         "LEFT JOIN animales an ON an.id_animal = a.animal_id "
         "WHERE a.estado = 'PENDIENTE' AND a.fecha_programada <= ? "
+        "AND (a.animal_id IS NULL OR an.estado = 'ACTIVO') "
         "ORDER BY a.fecha_programada ASC",
         (limite_alertas,),
     )

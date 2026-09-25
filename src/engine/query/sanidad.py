@@ -92,6 +92,7 @@ class SanidadQueryMixin:
         tratamientos = self.db.query(
             "SELECT t.*, a.tag, a.nombre FROM tratamientos t "
             "JOIN animales a ON a.id_animal = t.animal_id "
+            "WHERE a.estado = 'ACTIVO' "
             "ORDER BY t.fecha DESC LIMIT ?",
             (limite,),
         )

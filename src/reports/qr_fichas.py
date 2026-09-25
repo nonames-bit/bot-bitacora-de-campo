@@ -528,7 +528,7 @@ def generar_ficha_qr_individual(
     if animal is None:
         raise ValueError(f"No se encontró ningún animal con el identificador '{tag_clean}'.")
     an_tag = str(animal["tag"] or tag_clean)
-    estado_animal = str(animal["estado"] or "ACTIVO").upper()
+    estado_animal = str(animal["estado"] or "SIN ESTADO").upper()
 
     ficha = datos_ficha_animal(db, an_tag)
     payload, url = qr_payload(an_tag)
@@ -792,7 +792,7 @@ def generar_ficha_qr_individual(
     c.setFillColor(colors.HexColor(COLOR_GRIS))
     c.setFont("Helvetica-Bold", 7)
     c.drawString(col_der_x + 2 * cw4 + 8, y_pos - 34, "ESTADO:")
-    st_an = str(ficha.get("estado") or "ACTIVO").upper()
+    st_an = str(ficha.get("estado") or "SIN ESTADO").upper()
     pill_x = col_der_x + 2 * cw4 + 54
     if st_an == "VENDIDO":
         v_fec = ficha.get("venta", {}).get("fecha") if ficha.get("venta") else None

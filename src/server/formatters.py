@@ -11,7 +11,7 @@ import sys
 from datetime import date
 from typing import Optional
 
-from ..db.database import Database, SQL_POTRERO_REAL
+from ..db.database import Database, POTRERO_VIGENTE_SUBQUERY, SQL_POTRERO_REAL
 from ..engine.query_engine import (
     QueryEngine,
     calcular_brackets_inventario_sg,
@@ -373,7 +373,7 @@ def formatear_sanidad_animal_tab(db: Database, tag: str, hoy: Optional[date] = N
 
     lineas = [
         "💉 <b>SANIDAD ANIMAL & CONTROL DE RETIROS</b>",
-        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Estado:</b> {animal['estado'] or 'ACTIVO'}",
+        f"🐮 <b>Animal:</b> {tag_str}{nom_txt} · <b>Estado:</b> {animal['estado'] or 'SIN ESTADO'}",
         "────────────────────────────────────────",
     ]
 
@@ -650,7 +650,8 @@ def formatear_alertas_panel(db: Database, hoy: Optional[date] = None) -> str:
 
     alertas_db = db.query(
         "SELECT a.*, an.tag FROM alertas a LEFT JOIN animales an ON an.id_animal = a.animal_id "
-        "WHERE a.estado = 'PENDIENTE' ORDER BY a.fecha_programada ASC LIMIT 10"
+        "WHERE a.estado = 'PENDIENTE' AND (a.animal_id IS NULL OR an.estado = 'ACTIVO') "
+        "ORDER BY a.fecha_programada ASC LIMIT 10"
     )
 
     total_alertas = len(partos_prox) + len(vacas_secar) + len(crias_destete) + len(perdiendo_peso) + len(en_retiro) + len(alertas_db)
@@ -800,7 +801,7 @@ def formatear_alertas(db: Database, limite: int = 20) -> str:
         SELECT a.id, a.tipo_alerta, a.fecha_programada, a.descripcion, an.tag
         FROM alertas a
         LEFT JOIN animales an ON an.id_animal = a.animal_id
-        WHERE a.estado = 'PENDIENTE'
+        WHERE a.estado = 'PENDIENTE' AND (a.animal_id IS NULL OR an.estado = 'ACTIVO')
         ORDER BY a.fecha_programada ASC
         LIMIT ?
         """,
@@ -959,18 +960,16 @@ def formatear_status(
     )
     n_destetes_30d = int(row_destetes["n"]) if row_destetes else 0
 
-    # Potrero con más animales activos (conteo por potrero_id o último traslado)
+    # Potrero con más animales activos, con la misma regla de potrero vigente
+    # que el resto del sistema (POTRERO_VIGENTE_SUBQUERY: potrero_id y, si
+    # falta, el último traslado). Antes aquí el traslado tenía prioridad y
+    # el tablero podía contradecir al inventario de la PWA.
     animales = db.query(
-        "SELECT id_animal, potrero_id FROM animales WHERE estado = 'ACTIVO'"
+        f"SELECT {POTRERO_VIGENTE_SUBQUERY} AS pid FROM animales a WHERE a.estado = 'ACTIVO'"
     )
     conteo_potreros: dict[int, int] = {}
     for a in animales:
-        aid = a["id_animal"]
-        ult = db.query_one(
-            "SELECT potrero_destino FROM traslados WHERE animal_id = ? ORDER BY fecha DESC, id DESC LIMIT 1",
-            (aid,),
-        )
-        pid = ult["potrero_destino"] if ult and ult["potrero_destino"] is not None else a["potrero_id"]
+        pid = a["pid"]
         if pid is not None:
             conteo_potreros[pid] = conteo_potreros.get(pid, 0) + 1
 
@@ -997,7 +996,10 @@ def formatear_status(
     else:
         pot_mas_reposo_str = "Ninguno"
 
-    row_alertas = db.query_one("SELECT COUNT(*) as n FROM alertas WHERE estado = 'PENDIENTE'")
+    row_alertas = db.query_one(
+        "SELECT COUNT(*) as n FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+        "WHERE al.estado = 'PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO')"
+    )
     n_alertas = int(row_alertas["n"]) if row_alertas else 0
 
     size_str = "en memoria"
@@ -1094,7 +1096,8 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
 
     # Partos 7d
     filas_partos = db.query(
-        "SELECT sexo_cria FROM partos WHERE fecha >= ? AND fecha <= ?",
+        "SELECT e.sexo_cria FROM partos e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?",
         (fecha_7d, fecha_hoy),
     )
     n_partos_7d = len(filas_partos)
@@ -1103,15 +1106,23 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     partos_det = f" ({h_partos} ♀ / {m_partos} ♂)" if n_partos_7d > 0 else ""
 
     # Celos 7d
-    r_celos = db.query_one("SELECT COUNT(*) as n FROM celos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    # Novedades de 7 días restringidas al hato ACTIVO, igual que la PWA
+    # (dashboard_data._cnt): antes el bot y la PWA mostraban cifras distintas.
+    r_celos = db.query_one(
+        "SELECT COUNT(*) as n FROM celos e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_celos_7d = int(r_celos["n"]) if r_celos else 0
 
     # Servicios 7d
-    r_serv = db.query_one("SELECT COUNT(*) as n FROM servicios WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_serv = db.query_one(
+        "SELECT COUNT(*) as n FROM servicios e JOIN animales a ON a.id_animal = e.vaca_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_serv_7d = int(r_serv["n"]) if r_serv else 0
 
     # Tratamientos 7d y retiros activos
-    r_trat = db.query_one("SELECT COUNT(*) as n FROM tratamientos WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_trat = db.query_one(
+        "SELECT COUNT(*) as n FROM tratamientos e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_trat_7d = int(r_trat["n"]) if r_trat else 0
 
     filas_retiro = db.query(
@@ -1128,13 +1139,17 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     trat_det = f" ({n_en_retiro} en retiro activo)" if n_en_retiro > 0 else ""
 
     # Pesajes 7d y GMD
-    filas_pesajes = db.query("SELECT peso_kg, gmd_calculada FROM pesajes WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    filas_pesajes = db.query(
+        "SELECT e.peso_kg, e.gmd_calculada FROM pesajes e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_pesajes_7d = len(filas_pesajes)
     gmds = [float(p["gmd_calculada"]) for p in filas_pesajes if p["gmd_calculada"] is not None]
     gmd_prom_str = f" · GMD prom: {sum(gmds)/len(gmds):.0f} g/d" if gmds else ""
 
     # Traslados 7d
-    r_trasl = db.query_one("SELECT COUNT(*) as n FROM traslados WHERE fecha >= ? AND fecha <= ?", (fecha_7d, fecha_hoy))
+    r_trasl = db.query_one(
+        "SELECT COUNT(*) as n FROM traslados e JOIN animales a ON a.id_animal = e.animal_id "
+        "WHERE a.estado = 'ACTIVO' AND e.fecha >= ? AND e.fecha <= ?", (fecha_7d, fecha_hoy))
     n_trasl_7d = int(r_trasl["n"]) if r_trasl else 0
 
     # Muertes 7d
@@ -1144,7 +1159,9 @@ def formatear_tablero_finca(db: Database, hoy: Optional[date] = None) -> str:
     # 3. Alertas próximas 7 días
     limite_alertas = iso(add_days(hoy, 7))
     alertas_pendientes = db.query(
-        "SELECT tipo_alerta FROM alertas WHERE estado = 'PENDIENTE' AND fecha_programada <= ?",
+        "SELECT al.tipo_alerta FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+        "WHERE al.estado = 'PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO') "
+        "AND al.fecha_programada <= ?",
         (limite_alertas,),
     )
     cnt_eco = sum(1 for a in alertas_pendientes if "ECO" in str(a["tipo_alerta"]).upper())
@@ -2011,7 +2028,8 @@ def formatear_panel_medicamentos(db: Database) -> str:
         """
         SELECT t.*, a.tag, a.nombre
         FROM tratamientos t
-        LEFT JOIN animales a ON a.id_animal = t.animal_id
+        JOIN animales a ON a.id_animal = t.animal_id
+        WHERE a.estado = 'ACTIVO'
         ORDER BY t.fecha DESC, t.id DESC LIMIT 8
         """
     )

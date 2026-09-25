@@ -108,3 +108,22 @@ def test_fusion_chapeta_con_lote_iatf_y_composicion(db):
     assert db.query_one("SELECT animal_id, tag FROM lote_iatf_animales")["animal_id"] == aid
     comp = db.obtener_composicion_racial(aid)
     assert [c["raza"] for c in comp] == ["Gyr"]
+
+
+def test_alertas_excluyen_animales_inactivos_y_conservan_generales(db):
+    from src.server.formatters import formatear_alertas
+    from src.engine.dashboard_data import datos_badges
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_animal("99", sexo="Hembra", estado="MUERTO")
+    manana = (date.today() + timedelta(days=1)).isoformat()
+    db.registrar_alerta("47", "PALPACION", manana, descripcion="Palpación 47")
+    db.registrar_alerta("99", "PALPACION", manana, descripcion="Palpación 99")
+    db.execute(
+        "INSERT INTO alertas (animal_id, tipo_alerta, fecha_programada, descripcion, estado) "
+        "VALUES (NULL, 'TERMO', ?, 'Recarga N2', 'PENDIENTE')", (manana,),
+    )
+    txt = formatear_alertas(db)
+    assert "Alertas pendientes (2)" in txt
+    assert "Palpación 99" not in txt and "Recarga N2" in txt
+    badges = datos_badges(db)
+    assert badges["repro"] >= 1
