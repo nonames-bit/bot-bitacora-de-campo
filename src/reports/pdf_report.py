@@ -9,28 +9,36 @@ pie con línea.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from datetime import date, timedelta
 from typing import Any, Optional
 
+from .pdf_secciones import (
+    SECCIONES,
+    ContextoReporte,
+    graficos_clave,
+    seccion_finanzas,
+    seccion_inventario,
+    seccion_leche,
+    seccion_pasturas,
+    seccion_reproduccion,
+    seccion_sanidad,
+    tablero_ejecutivo,
+)
 from .estilo_ja import (
-    COLOR_BORDE_SUAVE,
     COLOR_GRIS,
     COLOR_LINEA,
     COLOR_MARCA,
     COLOR_MARCA_ZEBRA,
-    COLOR_ROJO_ALERTA,
     COLOR_TOTALES_BG,
-    COLOR_VERDE_OK,
     buscar_logo_path,
     crear_bloque_kpis,
     dibujar_fondo_pagina,
     dibujar_running_footer,
     dibujar_running_header,
     estilo_normal,
-    estilo_subseccion_grafico,
-    banda_seccion,
     SeccionFlowable,
     tabla_encabezado_franja,
     tabla_pie,
@@ -38,6 +46,9 @@ from .estilo_ja import (
     tabla_style_moderna,
     tabla_style_potreros,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 # --------------------------------------------------------------------------- #
@@ -320,10 +331,8 @@ def generar_pdf(
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import mm
-    from reportlab.lib.utils import ImageReader
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.platypus import (
-        Image,
         Paragraph,
         SimpleDocTemplate,
         Spacer,
@@ -331,20 +340,7 @@ def generar_pdf(
         TableStyle,
     )
 
-    from ..engine.charts import (
-        generar_grafico_categorias,
-        generar_grafico_estado_reproductivo_hato,
-        generar_grafico_evolucion_rebano,
-        generar_grafico_ocupacion_potreros,
-        graficos_disponibles,
-    )
-
-    def _imagen_ajustada(ruta: str, ancho_mm: float) -> Image:
-        """Flowable Image escalada a ``ancho_mm`` preservando la proporción
-        real del PNG (evita estirar/achatar los gráficos de matplotlib)."""
-        iw, ih = ImageReader(ruta).getSize()
-        alto_mm = ancho_mm * (ih / iw)
-        return Image(ruta, width=ancho_mm * mm, height=alto_mm * mm)
+    from ..engine.charts import graficos_disponibles
 
     datos = recolectar_datos(db, dias, hoy)
     fecha_hoy = hoy if hoy is not None else date.today()
@@ -365,7 +361,7 @@ def generar_pdf(
         """En páginas 2+, dibuja fondo de hoja ejecutivo, cabecera compacta y pie institucional."""
         dibujar_fondo_pagina(c, doc.pagesize[0], doc.pagesize[1], incluir_marco=True, incluir_marca_agua=True)
         p_str = f"Período: {datos['periodo']['desde']} al {datos['periodo']['hasta']}  ·  Emisión: {fecha_hoy.isoformat()}"
-        dibujar_running_header(c, doc, "GANADERÍA JA · INFORME ZOOTÉCNICO DE CAMPO", p_str)
+        dibujar_running_header(c, doc, titulo_doc.upper(), p_str)
         dibujar_running_footer(c, doc, "Ganadería JA · Bitácora Zootécnica Oficial · Documento Certificado")
 
     doc = SimpleDocTemplate(
@@ -378,7 +374,6 @@ def generar_pdf(
         title="Reporte de campo — Ganadería JA",
     )
 
-    est_seccion_graf = estilo_subseccion_grafico()
     est_normal = estilo_normal()
 
     logo_path = buscar_logo_path()
@@ -431,257 +426,228 @@ def generar_pdf(
         tabla.setStyle(tabla_style_moderna())
         return tabla
 
-    # Resumen Ejecutivo e Inventario (Tarjetas KPI)
-    inv = datos["inventario"]
-    activos = inv.get("activos", 0)
-    hembras = inv.get("hembras", 0)
-    machos = inv.get("machos", 0)
-    pct_h = f"{(hembras / activos * 100):.1f}% del hato" if activos > 0 else ""
-    pct_m = f"{(machos / activos * 100):.1f}% del hato" if activos > 0 else ""
+    def _bloque_inventario() -> None:
+        # Resumen Ejecutivo e Inventario (Tarjetas KPI)
+        inv = datos["inventario"]
+        activos = inv.get("activos", 0)
+        hembras = inv.get("hembras", 0)
+        machos = inv.get("machos", 0)
+        pct_h = f"{(hembras / activos * 100):.1f}% del hato" if activos > 0 else ""
+        pct_m = f"{(machos / activos * 100):.1f}% del hato" if activos > 0 else ""
 
-    # Solo datos actuales del hato activo -- el acumulado histórico (todos
-    # los registros desde que se empezó a importar Software Ganadero, sin
-    # importar si siguen activos) confundía al usuario haciéndole pensar que
-    # había 1.141 animales en la finca hoy, en vez de los 328 reales.
-    kpis_bloque = [
-        (str(activos), "Hato Activo", "Cabezas en finca", COLOR_MARCA),
-        (str(hembras), "Hembras", pct_h or "Vacas / Novillas", "#047857"),
-        (str(machos), "Machos", pct_m or "Toros / Levante", "#1D4ED8"),
-    ]
-    story.append(SeccionFlowable("RESUMEN EJECUTIVO & INVENTARIO (HATO ACTIVO)", width=ANCHO_UTIL))
-    story.append(Spacer(1, 3))
-    story.append(crear_bloque_kpis(kpis_bloque, ancho_total=ANCHO_UTIL))
-    story.append(Spacer(1, 6))
-
-    # Existencias por potrero
-    potreros_sg = datos.get("potreros_sg", [])
-    if potreros_sg:
-        story.append(SeccionFlowable("EXISTENCIAS POR POTRERO (DISTRIBUCIÓN ZOOTÉCNICA)", width=ANCHO_UTIL))
-        story.append(Spacer(1, 3))
-        tabla_pot_datos = [["Potrero", "CH", "HL", "NV", "VP", "VS", "CM", "ML", "MC", "Rep", "Total"]]
-        for p in potreros_sg:
-            def v(n: int) -> str: return str(n) if n > 0 else "-"
-            tabla_pot_datos.append([
-                p["display"][:18],
-                v(p["ch"]), v(p["hl"]), v(p["nv"]), v(p["vp"]), v(p["vs"]),
-                v(p["cm"]), v(p["ml"]), v(p["mc"]), v(p["rep"]),
-                str(p["total"]),
-            ])
-        tot_ch = sum(p["ch"] for p in potreros_sg)
-        tot_hl = sum(p["hl"] for p in potreros_sg)
-        tot_nv = sum(p["nv"] for p in potreros_sg)
-        tot_vp = sum(p["vp"] for p in potreros_sg)
-        tot_vs = sum(p["vs"] for p in potreros_sg)
-        tot_cm = sum(p["cm"] for p in potreros_sg)
-        tot_ml = sum(p["ml"] for p in potreros_sg)
-        tot_mc = sum(p["mc"] for p in potreros_sg)
-        tot_rep = sum(p["rep"] for p in potreros_sg)
-        tot_gen = sum(p["total"] for p in potreros_sg)
-        def vt(n: int) -> str: return str(n) if n > 0 else "-"
-        tabla_pot_datos.append([
-            "Totales Generales",
-            vt(tot_ch), vt(tot_hl), vt(tot_nv), vt(tot_vp), vt(tot_vs),
-            vt(tot_cm), vt(tot_ml), vt(tot_mc), vt(tot_rep),
-            str(tot_gen),
-        ])
-
-        tabla_p = Table(
-            tabla_pot_datos,
-            colWidths=[44 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm],
-            repeatRows=1,
-        )
-        tabla_p.setStyle(tabla_style_potreros())
-        tabla_p.setStyle(TableStyle([
-            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
-            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor(COLOR_TOTALES_BG)),
-            ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor(COLOR_MARCA)),
-            ("LINEABOVE", (0, -1), (-1, -1), 1.0, colors.HexColor(COLOR_MARCA)),
-        ]))
-        story.append(tabla_p)
-
-        # Glosario técnico explicativo de categorías
-        est_glosario = ParagraphStyle(
-            "JA_Glosario", parent=getSampleStyleSheet()["Normal"], fontName="Helvetica",
-            fontSize=6.8, leading=8.5, textColor=colors.HexColor(COLOR_GRIS), alignment=1
-        )
-        txt_glosario = (
-            "<b>Glosario SG:</b> "
-            "<b>CH:</b> Cría Hembra · <b>HL:</b> Hembra Levante · <b>NV:</b> Novilla Vientre · "
-            "<b>VP:</b> Vaca Parida · <b>VS:</b> Vaca Seca · <b>CM:</b> Cría Macho · "
-            "<b>ML:</b> Macho Levante · <b>MC:</b> Macho Ceba · <b>Rep:</b> Reproductor"
-        )
-        story.append(Spacer(1, 2))
-        story.append(Table([[Paragraph(txt_glosario, est_glosario)]], colWidths=[ANCHO_UTIL],
-                           style=[("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(COLOR_MARCA_ZEBRA)),
-                                  ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor(COLOR_LINEA)),
-                                  ("TOPPADDING", (0, 0), (-1, -1), 3),
-                                  ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-        story.append(Spacer(1, 5))
-
-    # Finanzas del período (ingresos/egresos/utilidad + indicadores de
-    # rentabilidad ya calculados en la PWA -- Fase 2 de Finanzas).
-    def _fmt_moneda(n) -> str:
-        try:
-            return "$" + f"{round(float(n or 0)):,}".replace(",", ".")
-        except (TypeError, ValueError):
-            return "—"
-
-    fin = datos.get("finanzas") or {}
-    resumen_fin = fin.get("resumen")
-    kpis_fin = fin.get("kpis")
-    if resumen_fin and (resumen_fin.get("total_ingresos") or resumen_fin.get("total_egresos")):
-        story.append(SeccionFlowable("FINANZAS: INGRESOS, EGRESOS Y UTILIDAD DEL PERÍODO", width=ANCHO_UTIL))
-        story.append(Spacer(1, 3))
-        margen = kpis_fin.get("margen_utilidad_pct") if kpis_fin else None
-        costo_litro = kpis_fin.get("costo_por_litro_leche") if kpis_fin else None
-        util = resumen_fin.get("utilidad", 0)
-        col_util = COLOR_VERDE_OK if util >= 0 else COLOR_ROJO_ALERTA
-        kpis_fin_bloque = [
-            (_fmt_moneda(resumen_fin.get("total_ingresos")), "Ingresos", "Del período", COLOR_MARCA),
-            (_fmt_moneda(resumen_fin.get("total_egresos")), "Egresos", "Del período", "#B45309"),
-            (_fmt_moneda(util), "Utilidad", f"Margen: {margen}%" if margen is not None else "", col_util),
-            (_fmt_moneda(costo_litro) if costo_litro is not None else "—", "Costo x Litro Leche", "Egresos / litros producidos", COLOR_GRIS),
+        # Solo datos actuales del hato activo -- el acumulado histórico (todos
+        # los registros desde que se empezó a importar Software Ganadero, sin
+        # importar si siguen activos) confundía al usuario haciéndole pensar que
+        # había 1.141 animales en la finca hoy, en vez de los 328 reales.
+        kpis_bloque = [
+            (str(activos), "Hato Activo", "Cabezas en finca", COLOR_MARCA),
+            (str(hembras), "Hembras", pct_h or "Vacas / Novillas", "#047857"),
+            (str(machos), "Machos", pct_m or "Toros / Levante", "#1D4ED8"),
         ]
-        story.append(crear_bloque_kpis(kpis_fin_bloque, ancho_total=ANCHO_UTIL))
+        story.append(SeccionFlowable("RESUMEN EJECUTIVO & INVENTARIO (HATO ACTIVO)", width=ANCHO_UTIL))
+        story.append(Spacer(1, 3))
+        story.append(crear_bloque_kpis(kpis_bloque, ancho_total=ANCHO_UTIL))
         story.append(Spacer(1, 6))
 
-    # Gráficos (opcionales: si matplotlib no está disponible en el servidor,
-    # el reporte se genera igual, solo sin esta sección).
-    tmp_charts_dir = None
-    if graficos_disponibles():
-        tmp_charts_dir = tempfile.mkdtemp(prefix="bitacora_reporte_charts_")
-        candidatos = [
-            ("Distribución del Hato", lambda: generar_grafico_categorias(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
-            ("Evolución del Rebaño (6m)", lambda: generar_grafico_evolucion_rebano(db, meses=6, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
-            ("Ocupación de Potreros (Voisin)", lambda: generar_grafico_ocupacion_potreros(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
-            ("Estado Reproductivo", lambda: generar_grafico_estado_reproductivo_hato(db, output_dir=tmp_charts_dir, hoy=fecha_hoy, dpi=130)),
-        ]
-        graficos_embebidos = []
-        for tit_cand, fn_cand in candidatos:
-            if len(graficos_embebidos) >= 4:
-                break
-            try:
-                ruta_cand = fn_cand()
-                if ruta_cand and os.path.exists(ruta_cand):
-                    graficos_embebidos.append((tit_cand, ruta_cand))
-            except Exception:
-                pass
-
-        if graficos_embebidos:
-            story.append(SeccionFlowable("GRÁFICOS DE GESTIÓN & INDICADORES CLAVE", width=ANCHO_UTIL))
+        # Existencias por potrero
+        potreros_sg = datos.get("potreros_sg", [])
+        if potreros_sg:
+            story.append(SeccionFlowable("EXISTENCIAS POR POTRERO (DISTRIBUCIÓN ZOOTÉCNICA)", width=ANCHO_UTIL))
             story.append(Spacer(1, 3))
-            if len(graficos_embebidos) == 1:
-                story.append(banda_seccion(graficos_embebidos[0][0], ancho=ANCHO_UTIL))
-                story.append(_imagen_ajustada(graficos_embebidos[0][1], 168))
-                story.append(Spacer(1, 4))
-            else:
-                filas_tabla_graficos = []
-                for i in range(0, len(graficos_embebidos), 2):
-                    par = graficos_embebidos[i : i + 2]
-                    celda_izq = [
-                        Paragraph(par[0][0], est_seccion_graf),
-                        _imagen_ajustada(par[0][1], 83),
-                    ]
-                    if len(par) > 1:
-                        celda_der = [
-                            Paragraph(par[1][0], est_seccion_graf),
-                            _imagen_ajustada(par[1][1], 83),
-                        ]
-                    else:
-                        celda_der = ""
-                    filas_tabla_graficos.append([celda_izq, celda_der])
-
-                tabla_g = Table(filas_tabla_graficos, colWidths=[87 * mm, 87 * mm])
-                tabla_g.setStyle(TableStyle([
-                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                    ("BACKGROUND", (0, 0), (-1, -1), colors.white),
-                    ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor(COLOR_BORDE_SUAVE)),
-                    ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor(COLOR_BORDE_SUAVE)),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 4),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ]))
-                story.append(tabla_g)
-                story.append(Spacer(1, 4))
-
-    # Clima: pronóstico Open-Meteo (recomendaciones prácticas) + Alerta
-    # Temprana de Sequía (SPI 30/60/90d vs climatología histórica CHIRPS).
-    clima = datos.get("clima") or {}
-    recs_clima = clima.get("recomendaciones") or []
-    spi_rows = datos.get("spi_sequia") or []
-    if recs_clima or spi_rows:
-        story.append(SeccionFlowable("CLIMA & ALERTA TEMPRANA DE SEQUÍA", width=ANCHO_UTIL))
-        story.append(Spacer(1, 3))
-        if recs_clima:
-            for r in recs_clima:
-                r_clean = re.sub(r"[\U00010000-\U0010ffff\u2600-\u26ff\u2700-\u27bf\ufe0f\u25a0\u25aa\u25b6]", "", str(r)).strip()
-                story.append(Paragraph(f"• {r_clean}", est_normal))
-            story.append(Spacer(1, 3))
-        if spi_rows:
-            tabla_spi_datos = [["Ventana", "SPI", "Clasificación", "Lluvia acumulada"]]
-            for s in spi_rows:
-                spi_v = s.get("spi_valor")
-                tabla_spi_datos.append([
-                    f"{s.get('dias_ventana')} días",
-                    f"{spi_v:.2f}" if spi_v is not None else "—",
-                    s.get("clasificacion") or "Sin datos",
-                    f"{s.get('mm_actual')} mm" if s.get("mm_actual") is not None else "—",
+            tabla_pot_datos = [["Potrero", "CH", "HL", "NV", "VP", "VS", "CM", "ML", "MC", "Rep", "Total"]]
+            for p in potreros_sg:
+                def v(n: int) -> str: return str(n) if n > 0 else "-"
+                tabla_pot_datos.append([
+                    p["display"][:18],
+                    v(p["ch"]), v(p["hl"]), v(p["nv"]), v(p["vp"]), v(p["vs"]),
+                    v(p["cm"]), v(p["ml"]), v(p["mc"]), v(p["rep"]),
+                    str(p["total"]),
                 ])
-            story.append(_tabla_evento(tabla_spi_datos, [28 * mm, 22 * mm, 60 * mm, 40 * mm]))
-        story.append(Spacer(1, 5))
-
-    # Tablas por evento (cada una con su banda de sección).
-    for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
-        filas = datos["eventos"].get(clave)
-        if not filas:
-            continue
-        story.append(SeccionFlowable(f"REGISTRO DE {_ETIQUETAS_EVENTOS[clave].upper()} EN EL PERÍODO", width=ANCHO_UTIL))
-        story.append(Spacer(1, 2))
-        tabla_datos = [["Fecha", "Animal", "Detalle"]]
-        for f in filas:
-            tabla_datos.append([
-                f["fecha"],
-                Paragraph(f"<b>{f['tag']}</b>", est_normal),
-                Paragraph(str(f["resumen"] or ""), est_normal),
+            tot_ch = sum(p["ch"] for p in potreros_sg)
+            tot_hl = sum(p["hl"] for p in potreros_sg)
+            tot_nv = sum(p["nv"] for p in potreros_sg)
+            tot_vp = sum(p["vp"] for p in potreros_sg)
+            tot_vs = sum(p["vs"] for p in potreros_sg)
+            tot_cm = sum(p["cm"] for p in potreros_sg)
+            tot_ml = sum(p["ml"] for p in potreros_sg)
+            tot_mc = sum(p["mc"] for p in potreros_sg)
+            tot_rep = sum(p["rep"] for p in potreros_sg)
+            tot_gen = sum(p["total"] for p in potreros_sg)
+            def vt(n: int) -> str: return str(n) if n > 0 else "-"
+            tabla_pot_datos.append([
+                "Totales Generales",
+                vt(tot_ch), vt(tot_hl), vt(tot_nv), vt(tot_vp), vt(tot_vs),
+                vt(tot_cm), vt(tot_ml), vt(tot_mc), vt(tot_rep),
+                str(tot_gen),
             ])
-        story.append(_tabla_evento(tabla_datos, [28 * mm, 26 * mm, 120 * mm]))
+
+            tabla_p = Table(
+                tabla_pot_datos,
+                colWidths=[44 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm, 13 * mm],
+                repeatRows=1,
+            )
+            tabla_p.setStyle(tabla_style_potreros())
+            tabla_p.setStyle(TableStyle([
+                ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+                ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor(COLOR_TOTALES_BG)),
+                ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor(COLOR_MARCA)),
+                ("LINEABOVE", (0, -1), (-1, -1), 1.0, colors.HexColor(COLOR_MARCA)),
+            ]))
+            story.append(tabla_p)
+
+            # Glosario técnico explicativo de categorías
+            est_glosario = ParagraphStyle(
+                "JA_Glosario", parent=getSampleStyleSheet()["Normal"], fontName="Helvetica",
+                fontSize=6.8, leading=8.5, textColor=colors.HexColor(COLOR_GRIS), alignment=1
+            )
+            txt_glosario = (
+                "<b>Glosario SG:</b> "
+                "<b>CH:</b> Cría Hembra · <b>HL:</b> Hembra Levante · <b>NV:</b> Novilla Vientre · "
+                "<b>VP:</b> Vaca Parida · <b>VS:</b> Vaca Seca · <b>CM:</b> Cría Macho · "
+                "<b>ML:</b> Macho Levante · <b>MC:</b> Macho Ceba · <b>Rep:</b> Reproductor"
+            )
+            story.append(Spacer(1, 2))
+            story.append(Table([[Paragraph(txt_glosario, est_glosario)]], colWidths=[ANCHO_UTIL],
+                               style=[("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(COLOR_MARCA_ZEBRA)),
+                                      ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor(COLOR_LINEA)),
+                                      ("TOPPADDING", (0, 0), (-1, -1), 3),
+                                      ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
+            story.append(Spacer(1, 5))
+
+
+    def _bloque_clima() -> None:
+        # Clima: pronóstico Open-Meteo (recomendaciones prácticas) + Alerta
+        # Temprana de Sequía (SPI 30/60/90d vs climatología histórica CHIRPS).
+        clima = datos.get("clima") or {}
+        recs_clima = clima.get("recomendaciones") or []
+        spi_rows = datos.get("spi_sequia") or []
+        if recs_clima or spi_rows:
+            story.append(SeccionFlowable("CLIMA & ALERTA TEMPRANA DE SEQUÍA", width=ANCHO_UTIL))
+            story.append(Spacer(1, 3))
+            if recs_clima:
+                for r in recs_clima:
+                    r_clean = re.sub(r"[\U00010000-\U0010ffff\u2600-\u26ff\u2700-\u27bf\ufe0f\u25a0\u25aa\u25b6]", "", str(r)).strip()
+                    story.append(Paragraph(f"• {r_clean}", est_normal))
+                story.append(Spacer(1, 3))
+            if spi_rows:
+                tabla_spi_datos = [["Ventana", "SPI", "Clasificación", "Lluvia acumulada"]]
+                for s in spi_rows:
+                    spi_v = s.get("spi_valor")
+                    tabla_spi_datos.append([
+                        f"{s.get('dias_ventana')} días",
+                        f"{spi_v:.2f}" if spi_v is not None else "—",
+                        s.get("clasificacion") or "Sin datos",
+                        f"{s.get('mm_actual')} mm" if s.get("mm_actual") is not None else "—",
+                    ])
+                story.append(_tabla_evento(tabla_spi_datos, [28 * mm, 22 * mm, 60 * mm, 40 * mm]))
+            story.append(Spacer(1, 5))
+
+
+    def _bloque_eventos(claves: Optional[set] = None) -> None:
+        # Tablas por evento (cada una con su banda de sección).
+        for clave, _tabla, _col, _fn in _TABLAS_EVENTOS:
+            filas = datos["eventos"].get(clave)
+            if not filas or (claves is not None and clave not in claves):
+                continue
+            story.append(SeccionFlowable(f"REGISTRO DE {_ETIQUETAS_EVENTOS[clave].upper()} EN EL PERÍODO", width=ANCHO_UTIL))
+            story.append(Spacer(1, 2))
+            tabla_datos = [["Fecha", "Animal", "Detalle"]]
+            for f in filas:
+                tabla_datos.append([
+                    f["fecha"],
+                    Paragraph(f"<b>{f['tag']}</b>", est_normal),
+                    Paragraph(str(f["resumen"] or ""), est_normal),
+                ])
+            story.append(_tabla_evento(tabla_datos, [28 * mm, 26 * mm, 120 * mm]))
+            story.append(Spacer(1, 3))
+
+
+    def _bloque_alertas(tipos: Optional[tuple] = None) -> None:
+        # Alertas próximas 7 días (tratamiento ficha: header de alerta).
+        story.append(SeccionFlowable("ALERTAS Y COMPROMISOS PRÓXIMOS 7 DÍAS", alerta=True, width=ANCHO_UTIL))
         story.append(Spacer(1, 3))
+        alertas = [a for a in datos["alertas"]
+                   if tipos is None or any(t in str(a["tipo"]).upper() for t in tipos)]
+        if alertas:
+            tabla_datos = [["Fecha", "Animal", "Tipo"]]
+            for a in alertas:
+                tabla_datos.append([
+                    a["fecha"],
+                    Paragraph(f"<b>{a['tag']}</b>", est_normal),
+                    Paragraph(str(a["tipo"] or ""), est_normal),
+                ])
+            tabla = Table(tabla_datos, colWidths=[28 * mm, 26 * mm, 120 * mm], repeatRows=1)
+            tabla.setStyle(tabla_style_alertas())
+            story.append(tabla)
+        else:
+            est_alerta_ok = ParagraphStyle(
+                "JA_AlertOk", parent=est_normal, fontName="Helvetica-Bold",
+                fontSize=8.5, leading=11, textColor=colors.HexColor("#065F46")
+            )
+            callout_ok = Table([[
+                Paragraph("✓ SIN ALERTAS PENDIENTES: no hay compromisos programados para los próximos 7 días.", est_alerta_ok)
+            ]], colWidths=[ANCHO_UTIL])
+            callout_ok.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
+                ("LINEBEFORE", (0, 0), (0, -1), 3.5, colors.HexColor("#10B981")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#A7F3D0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ]))
+            story.append(callout_ok)
 
-    # Alertas próximas 7 días (tratamiento ficha: header de alerta).
-    story.append(SeccionFlowable("ALERTAS Y COMPROMISOS PRÓXIMOS 7 DÍAS", alerta=True, width=ANCHO_UTIL))
-    story.append(Spacer(1, 3))
-    alertas = datos["alertas"]
-    if alertas:
-        tabla_datos = [["Fecha", "Animal", "Tipo"]]
-        for a in alertas:
-            tabla_datos.append([
-                a["fecha"],
-                Paragraph(f"<b>{a['tag']}</b>", est_normal),
-                Paragraph(str(a["tipo"] or ""), est_normal),
-            ])
-        tabla = Table(tabla_datos, colWidths=[28 * mm, 26 * mm, 120 * mm], repeatRows=1)
-        tabla.setStyle(tabla_style_alertas())
-        story.append(tabla)
+
+    # Directorio temporal para los gráficos (se borra al terminar el PDF).
+    tmp_charts_dir = tempfile.mkdtemp(prefix="bitacora_reporte_charts_") if graficos_disponibles() else None
+    ctx = ContextoReporte(
+        db=db, hoy=fecha_hoy, desde=date.fromisoformat(datos["periodo"]["desde"]),
+        hasta=date.fromisoformat(datos["periodo"]["hasta"]), dias=dias, tmp_dir=tmp_charts_dir, ancho=ANCHO_UTIL,
+    )
+
+    def _seguro(fn, *args, **kw) -> list:
+        """Una sección que falla no tumba el informe: se omite y queda en el log."""
+        try:
+            return fn(*args, **kw)
+        except Exception:
+            logger.exception("Sección del PDF omitida por error: %s", getattr(fn, "__name__", fn))
+            return []
+
+    constructor = SECCIONES.get(sec_clean)
+    if constructor is not None:
+        # Informe de una sección: su contenido específico completo.
+        if constructor is seccion_inventario:
+            _bloque_inventario()
+        story.extend(_seguro(constructor, ctx))
+        eventos_por_seccion = {
+            seccion_leche: set(),
+            seccion_reproduccion: {"partos", "celos", "servicios"},
+            seccion_sanidad: {"tratamientos", "muertes"},
+            seccion_pasturas: {"traslados"},
+            seccion_inventario: {"partos", "muertes", "movimientos", "pesajes"},
+            seccion_finanzas: set(),
+        }
+        alertas_por_seccion = {
+            seccion_leche: ("SECADO", "RETIRO_LECHE"),
+            seccion_reproduccion: ("ECOGRAFIA", "PALPACION", "INSEMINACION", "PARTO", "SECADO"),
+            seccion_sanidad: ("RETIRO", "VACUNA", "TRATAMIENTO"),
+        }
+        if constructor is seccion_pasturas:
+            _bloque_clima()
+        _bloque_eventos(eventos_por_seccion.get(constructor, set()))
+        if constructor in alertas_por_seccion:
+            _bloque_alertas(alertas_por_seccion[constructor])
     else:
-        est_alerta_ok = ParagraphStyle(
-            "JA_AlertOk", parent=est_normal, fontName="Helvetica-Bold",
-            fontSize=8.5, leading=11, textColor=colors.HexColor("#065F46")
-        )
-        callout_ok = Table([[
-            Paragraph("✓ SIN ALERTAS PENDIENTES: No se registran periodos de retiro sanitario ni eventos críticos vencidos en los próximos 7 días.", est_alerta_ok)
-        ]], colWidths=[ANCHO_UTIL])
-        callout_ok.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#ECFDF5")),
-            ("LINEBEFORE", (0, 0), (0, -1), 3.5, colors.HexColor("#10B981")),
-            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#A7F3D0")),
-            ("TOPPADDING", (0, 0), (-1, -1), 6),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING", (0, 0), (-1, -1), 8),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ]))
-        story.append(callout_ok)
+        # Informe general: tablero ejecutivo + resumen de cada área + detalle.
+        _bloque_inventario()
+        story.extend(_seguro(tablero_ejecutivo, ctx))
+        for fn in (seccion_leche, seccion_reproduccion, seccion_sanidad, seccion_pasturas, seccion_finanzas):
+            story.extend(_seguro(fn, ctx, compacto=True))
+        story.extend(_seguro(graficos_clave, ctx))
+        _bloque_clima()
+        _bloque_eventos()
+        _bloque_alertas()
 
     # Pie institucional de cierre
     story.append(Spacer(1, 8))
