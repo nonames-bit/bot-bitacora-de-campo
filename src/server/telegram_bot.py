@@ -3615,7 +3615,7 @@ def correr(
         pass
 
     token = token or os.getenv("TELEGRAM_TOKEN")
-    if not token or token == "pegar_aqui_el_token_del_botfather":
+    if not token or token == "pegar_aqui_el_token_del_botfather":  # noqa: S105 - centinela de placeholder (no es un secreto)
         raise ValueError(
             "TELEGRAM_TOKEN no configurado. Define la variable de entorno o en el archivo .env."
         )
