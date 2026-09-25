@@ -164,10 +164,25 @@ self.addEventListener("activate", function (e) {
   );
 });
 
-function guardarEnCache(request, response) {
+function guardarEnCache(request, response, sellarTiempo) {
   if (response && response.ok && request.method === "GET") {
-    var clon = response.clone();
-    caches.open(CACHE).then(function (c) { c.put(request, clon); });
+    var paraCache = response.clone();
+    if (sellarTiempo) {
+      // (P1.4b) Marca de frescura: al guardar una respuesta /api/* se le añade
+      // X-SW-Stored-At. Si luego se sirve desde la caché (sin señal), la UI
+      // puede avisar "datos de hace X h" en vez de mostrarlos como si fueran
+      // de ahora (riesgo real: decidir sobre inventario rancio).
+      try {
+        var headers = new Headers(paraCache.headers);
+        headers.set("X-SW-Stored-At", new Date().toISOString());
+        paraCache = new Response(paraCache.body, {
+          status: paraCache.status,
+          statusText: paraCache.statusText,
+          headers: headers
+        });
+      } catch (e) { /* si no se puede reconstruir, se cachea sin sello */ }
+    }
+    caches.open(CACHE).then(function (c) { c.put(request, paraCache).catch(function () {}); });
   }
   return response;
 }
@@ -213,7 +228,9 @@ self.addEventListener("fetch", function (e) {
       return;
     }
     e.respondWith(
-      fetch(req).then(function (r) { return guardarEnCache(req, r); })
+      // Para /api/* se sella la hora de guardado (P1.4b): si luego se sirve de
+      // la caché, la UI avisa de la antigüedad de los datos.
+      fetch(req).then(function (r) { return guardarEnCache(req, r, true); })
         .catch(function () {
           return caches.match(req).then(function (hit) {
             if (hit) return hit;

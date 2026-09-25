@@ -13391,6 +13391,56 @@
     setupHeaderAyuda();
     actualizarBadges();
     actualizarContadorSync();
+    // (P1.4b) Aviso de datos servidos desde la caché del Service Worker. El SW
+    // marca con X-SW-Stored-At cada respuesta /api/* que guarda; si una
+    // respuesta llega con esa marca (típico sin señal) se muestra la antigüedad
+    // y se oculta al llegar una fresca de red.
+    function instalarAvisoDatosRancios() {
+      if (!window.fetch || window.__avisoRanciosInstalado) return;
+      window.__avisoRanciosInstalado = true;
+      var fetchOriginal = window.fetch;
+      window.fetch = function () {
+        var args = arguments;
+        return fetchOriginal.apply(window, args).then(function (resp) {
+          try {
+            if (resp && resp.headers && resp.headers.get) {
+              actualizarAvisoRancios(resp.headers.get("X-SW-Stored-At"));
+            }
+          } catch (e) { /* respuesta opaca o sin headers */ }
+          return resp;
+        });
+      };
+    }
+    function actualizarAvisoRancios(selloIso) {
+      var el = document.getElementById("aviso-datos-rancios");
+      if (!selloIso) {
+        if (el) el.style.display = "none";
+        return;
+      }
+      var ms = Date.now() - new Date(selloIso).getTime();
+      if (!isFinite(ms) || ms < 0) ms = 0;
+      var horas = Math.floor(ms / 3600000);
+      var texto = horas >= 1
+        ? ("datos de hace " + horas + " h")
+        : "datos guardados hace unos minutos";
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "aviso-datos-rancios";
+        el.setAttribute("role", "status");
+        el.style.cssText = "position:fixed; left:0; right:0; bottom:0; z-index:9998; " +
+          "background:#8a6d00; color:#fff; font-size:12px; text-align:center; " +
+          "padding:6px 10px; box-shadow:0 -1px 4px rgba(0,0,0,0.25);";
+        document.body.appendChild(el);
+      }
+      el.textContent = "⚠️ Sin conexión: " + texto + ". Algunos datos pueden estar desactualizados.";
+      el.style.display = "";
+    }
+    instalarAvisoDatosRancios();
+    // Hook de verificación (no funcional): CDP no emula "offline" en el contexto
+    // del Service Worker, así que los scripts de verificación ejercitan la lógica
+    // del banner directamente con un sello de tiempo.
+    window.__actualizarAvisoRancios = actualizarAvisoRancios;
+
     fetch("/api/heartbeat", { method: "POST" }).catch(function () {});
     enviarTelemetriaSilenciosa("apertura_app");
     setInterval(function () {
@@ -13421,6 +13471,8 @@
     window.addEventListener("online", function () {
       actualizarBadges();
       sincronizarColaOffline(false);
+      // Al volver la señal se oculta el aviso de datos rancios (llegarán frescos).
+      actualizarAvisoRancios(null);
     });
     cargarUsuario().finally(function () {
       arrancarDesdeUrl();
