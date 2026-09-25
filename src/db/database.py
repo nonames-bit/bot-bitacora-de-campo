@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -32,7 +33,17 @@ logger = logging.getLogger(__name__)
 # presente. El potrero vigente de un animal es su último traslado (por
 # fecha, desempate por id) o, si no tiene, su potrero_id estático.
 # ---------------------------------------------------------------------------
-SQL_POTRERO_REAL = "(geom_wkt_4326 IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
+# (P2.12) El fallback "sin polígonos" (… OR NOT EXISTS (… geom …)) existe para
+# tests y entornos limpios. Si se dejara por FORMA DE DATOS, una DB de producción
+# que perdiera todos los polígonos (restore/import malo) resucitaría todos los
+# códigos legacy del DBF como potreros presentes. Se gatea por env explícito:
+# solo los tests (conftest) activan BITACORA_TEST_MODE=1.
+_MODO_TEST = os.environ.get("BITACORA_TEST_MODE") == "1"
+_FALLBACK_SIN_GEOM = (
+    " OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL)"
+    if _MODO_TEST else ""
+)
+SQL_POTRERO_REAL = f"(geom_wkt_4326 IS NOT NULL{_FALLBACK_SIN_GEOM})"
 SIN_POTRERO_LABEL = "Sin potrero"
 ULT_TRASLADO_CTE = (
     "ult_traslado AS ("
@@ -57,15 +68,18 @@ def potreros_reales_where(alias: str | None = None) -> str:
     """Condición SQL de potrero real, con o sin alias de tabla.
     En producción (con polígonos WGS84 cargados), filtra estrictamente por
     geom_wkt_4326 IS NOT NULL para excluir potreros legacy del DBF.
-    En bases de prueba o entornos limpios sin geometrías, no excluye ninguno."""
+    En bases de prueba o entornos limpios (BITACORA_TEST_MODE=1) sin geometrías,
+    no excluye ninguno (fallback explícito, no por forma de datos — P2.12)."""
     col = f"{alias}.geom_wkt_4326" if alias else "geom_wkt_4326"
-    return f"({col} IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
+    if _MODO_TEST:
+        return f"({col} IS NOT NULL OR NOT EXISTS (SELECT 1 FROM potreros WHERE geom_wkt_4326 IS NOT NULL))"
+    return f"({col} IS NOT NULL)"
 
 
 def es_potrero_real(db: "Database", fila_potrero) -> bool:
     """Replica a nivel de fila la semántica de ``SQL_POTRERO_REAL``: real si
-    ``geom_wkt_4326`` no es NULL, o si en la BD no existe ningún potrero con
-    geometría (fallback de entornos limpios/tests sin polígonos cargados)."""
+    ``geom_wkt_4326`` no es NULL o, solo en modo test, si en la BD no existe
+    ningún potrero con geometría (fallback explícito — P2.12)."""
     if fila_potrero is None:
         return False
     try:
@@ -77,6 +91,8 @@ def es_potrero_real(db: "Database", fila_potrero) -> bool:
             return False
     if geom is not None:
         return True
+    if not _MODO_TEST:
+        return False
     try:
         hay_geo = db.query_one("SELECT 1 AS x FROM potreros WHERE geom_wkt_4326 IS NOT NULL")
     except Exception:

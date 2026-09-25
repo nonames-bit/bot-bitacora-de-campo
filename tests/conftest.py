@@ -7,6 +7,10 @@ import pytest
 # Garantiza que el paquete ``src`` sea importable desde la raíz.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+# (P2.12) Activa el fallback de "potrero real sin polígonos" SOLO en tests. Debe
+# fijarse ANTES de importar src.db.database (el flag se lee en import-time).
+os.environ.setdefault("BITACORA_TEST_MODE", "1")
+
 from src.bot.bot_interface import Bot  # noqa: E402
 from src.db.database import Database  # noqa: E402
 
