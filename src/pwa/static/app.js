@@ -4212,6 +4212,33 @@
     h += "</div>";
     return h;
   }
+  // "Animales sin…" (calidad de datos, estilo Software Ganadero): cuántos
+  // animales activos no tienen cada dato. Tocar una fila abre la lista con el
+  // mismo modal de los grupos de inventario (tipo "sin").
+  function renderAnimalesSin(as) {
+    if (!as || !as.filas || !as.filas.length) return "";
+    var h = "<h4>" + icon("clipboard") + "Animales sin…</h4>";
+    h += "<p class='aviso' style='margin:0 0 6px;'>Datos que faltan en los " + esc(as.total_activos) + " animales activos. Toque una fila para ver cuáles son y complételos desde la ficha o la Captura.</p>";
+    h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Sin…</th><th class='col-cab' style='text-align:center;'>Animales</th><th class='col-pct' style='text-align:right;'>%</th></tr>";
+    as.filas.forEach(function (f) {
+      var n = Number(f.total) || 0;
+      if (n === 0) {
+        h += "<tr><td class='col-cat' title='" + esc(f.ayuda) + "'>" + esc(f.etiqueta) + "</td>"
+          + "<td class='col-cab' style='text-align:center;'><span class='chip verde' style='padding:2px 6px; font-size:11px;'>✓ 0</span></td>"
+          + "<td class='col-pct' style='text-align:right; color:var(--texto-suave, #64748b);'>0%</td></tr>";
+        return;
+      }
+      var attrs = " data-grupo-tipo='sin' data-grupo-valor='" + esc(f.clave) + "' data-grupo-titulo='" + esc("Animales sin: " + f.etiqueta) + "'";
+      var chipCls = f.pct >= 50 ? "rojo" : (f.pct >= 10 ? "ambar" : "gris");
+      h += "<tr class='fila-grupo-inventario'" + attrs + " style='cursor:pointer;'>"
+        + "<td class='col-cat' title='" + esc(f.ayuda) + "'><a href='#' class='link-grupo-inventario'" + attrs + " style='font-weight:700; color:var(--verde-marca); text-decoration:none;'>" + esc(f.etiqueta) + "</a></td>"
+        + "<td class='col-cab' style='text-align:center;'><span class='chip " + chipCls + "' style='font-weight:700; padding:2px 6px; font-size:11px;'>" + esc(n) + "</span></td>"
+        + "<td class='col-pct' style='text-align:right; font-weight:500;'>" + esc(f.pct) + "%</td></tr>";
+    });
+    h += "</table></div>";
+    return h;
+  }
+
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
     var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
@@ -4251,6 +4278,7 @@
       h += "</table></div>";
       h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
     }
+    h += renderAnimalesSin(d.animales_sin);
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
     h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;' title='Distribución porcentual'>% Dist.</th><th class='col-acum' style='text-align:right;' title='Porcentaje acumulado'>% Acum.</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
     (d.filas || []).forEach(function (f) {
