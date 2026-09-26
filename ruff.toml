@@ -3,7 +3,6 @@
 # endurecer el lint a futuro sin cleanup:
 #   A   = shadowing de builtins (id, type, list…)
 #   PLE = errores de pylint (variables/atributos inexistentes, etc.)
-#   EXE = shebangs/permisos de ejecución
 #   FA  = futuro `from __future__ import annotations`
 # Pendiente de una limpieza dedicada (con fallout real hoy): B (bugbear: 36),
 # S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
@@ -13,10 +12,13 @@
 # están limpios) y S105/S106 (contraseñas hardcodeadas; scripts/ y tests/ usan
 # claves de prueba a propósito) y S101 (assert; no debe haber en src/ porque
 # python -O los elimina).
+# Nota: NO se habilita EXE (shebang/bit ejecutable) porque el bit de ejecución de
+# git se comporta distinto por plataforma (local Windows pasaba, CI Linux fallaba
+# con EXE001); los scripts se invocan con `python script.py`.
 line-length = 160
 
 [lint]
-select = ["E9", "F", "A", "PLE", "EXE", "FA", "B006", "B033", "B905", "S101", "S105", "S106"]
+select = ["E9", "F", "A", "PLE", "FA", "B006", "B033", "B905", "S101", "S105", "S106"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
