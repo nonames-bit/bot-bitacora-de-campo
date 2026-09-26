@@ -386,17 +386,59 @@ def extraer_dias_retiro(texto: str) -> Optional[int]:
     return None
 
 
+def _dias_retiro_por_producto(t: str) -> dict:
+    """Asigna cada "N días" del texto normalizado a 'leche' o 'carne'.
+
+    Un número pertenece al producto que lo sigue con preposición ("28 días
+    en carne", "3 días de retiro en leche") o, si no, al producto mencionado
+    justo antes ("leche 3 días", "leche: 4 días", "leche y carne 10 días"
+    asigna 10 a ambos). Devuelve {'leche': int|None, 'carne': int|None}.
+    """
+    res: dict = {"leche": None, "carne": None}
+    for m in re.finditer(r"\b(\d+)\s*d[ií]as?\b", t):
+        n = int(m.group(1))
+        despues = re.match(
+            r"\s+(?:(?:de\s+)?retiro\s+(?:en\s+|de\s+|para\s+)?|(?:en|de|para)\s+)(leche|carne)\b",
+            t[m.end():],
+        )
+        if despues:
+            res[despues.group(1)] = res[despues.group(1)] if res[despues.group(1)] is not None else n
+            continue
+        antes = t[max(0, m.start() - 30):m.start()]
+        cercanos = list(re.finditer(r"\b(leche|carne)\b", antes))
+        if not cercanos:
+            continue
+        ultimo = cercanos[-1]
+        # "leche y carne 10 días": ambos productos comparten el número.
+        duenos = [ultimo.group(1)]
+        if len(cercanos) >= 2 and re.fullmatch(r"\s+(?:y|e|o)\s+", antes[cercanos[-2].end():ultimo.start()]):
+            duenos.append(cercanos[-2].group(1))
+        # Solo conectores cortos entre el producto y el número.
+        if len(antes) - ultimo.end() > 20:
+            continue
+        for d in duenos:
+            if res[d] is None:
+                res[d] = n
+    return res
+
+
 def retiro_leche_carne(texto: str, dias: Optional[int]) -> dict:
     """Desglosa los días de retiro en leche/carne.
 
-    Regla zootécnica (skill ``@plan-sanitario``): si no se menciona "leche"
-    explícitamente, el retiro aplica a carne por defecto, sin bloquear leche.
+    Si la nota da días distintos a cada producto ("leche 3 días carne 28
+    días") se respeta cada valor; antes se aplicaba el primer número a ambos
+    y la carne se liberaba semanas antes. Regla zootécnica (skill
+    ``@plan-sanitario``): si no se menciona "leche" explícitamente, el
+    retiro aplica a carne por defecto, sin bloquear leche.
     """
     t = normalizar(texto)
     menciona_leche = re.search(r"\bleche\b", t) is not None
     menciona_carne = re.search(r"\bcarne\b", t) is not None
-    leche = dias if menciona_leche else None
-    carne = dias if (menciona_carne or not menciona_leche) else None
+    por_producto = _dias_retiro_por_producto(t)
+    leche_exp = por_producto["leche"]
+    carne_exp = por_producto["carne"]
+    leche = leche_exp if leche_exp is not None else (dias if menciona_leche else None)
+    carne = carne_exp if carne_exp is not None else (dias if (menciona_carne or not menciona_leche) else None)
     return {"dias_retiro_leche": leche, "dias_retiro_carne": carne}
 
 
@@ -453,19 +495,24 @@ def extraer_am_pm(texto: str) -> Optional[str]:
     t = normalizar(texto)
     if re.search(r"\b(?:am|manana|madrugada)\b", t):
         return "AM"
-    if re.search(r"\b(?:pm|tarde|noche)\b", t):
+    if re.search(r"\b(?:pm|tarde|noche|anoche)\b", t):
         return "PM"
     return None
 
 
-def extraer_resultado_diagnostico(texto: str) -> str:
-    """Extrae el resultado del diagnóstico: 'PREÑADA' o 'VACIA'."""
+def extraer_resultado_diagnostico(texto: str) -> Optional[str]:
+    """Extrae el resultado del diagnóstico: 'PREÑADA', 'VACIA' o None.
+
+    La negación admite hasta dos palabras intermedias ("no quedó preñada",
+    "no está preñada"). Sin palabra de resultado devuelve None: registrar
+    PREÑADA por defecto daba gestaciones falsas y ocultaba vacías.
+    """
     t = normalizar(texto)
-    if re.search(r"\b(?:vac[ií]a|abierta|negativa|no\s+pre[nñ]ad[oa])\b", t):
+    if re.search(r"\b(?:vac[ií]a|abierta|negativa|no\s+(?:\w+\s+){0,2}pre[nñ]ad[oa])\b", t):
         return "VACIA"
     if re.search(r"\b(?:pre[nñ]ad[oa]|gestante|positiva|confirmad[oa]|pre[nñ]ez)\b", t):
         return "PREÑADA"
-    return "PREÑADA"
+    return None
 
 
 _NUMS_TEXTO = {

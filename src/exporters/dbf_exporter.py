@@ -27,6 +27,8 @@ from typing import Any, Optional, Sequence
 
 from ..db.database import Database
 from ..db.models import TABLAS
+from ..engine.genetic_engine import normalizar_nombre_raza
+from ..importers.dbf_importer import CATALOGO_RAZAS_SG_DEFECTO
 from ..utils import to_date
 
 
@@ -122,6 +124,42 @@ class DBFWriter:
 # Mapeo y exportación por tabla
 # ---------------------------------------------------------------------------
 
+# Raza normalizada -> código SG (CODGR). El primero del catálogo gana
+# (ej. Holstein -> "03", aunque "08" Holstein Rojo normalice igual).
+_CODIGO_RAZA_SG: dict[str, str] = {}
+for _cod, _nom in sorted(CATALOGO_RAZAS_SG_DEFECTO.items()):
+    _CODIGO_RAZA_SG.setdefault(normalizar_nombre_raza(_nom), _cod)
+_TIPO_RAZA_SG = {"Taurino": "T", "Cebuino": "C", "Indeterminado": "I"}
+
+
+def _campos_raza_sg(db: Database, a) -> tuple[str, list]:
+    """TIPORAZA + 4 pares CODGR/PORGR desde composicion_racial.
+
+    Antes se escribía el texto "1/2 Gyr + 1/2 Holstein" truncado a 10
+    caracteres en TIPORAZA y al reimportar la composición quedaba como
+    "Gyr 50%" (y 100% Gyr en los cruces). Las razas sin código SG (ej.
+    "Desconocida") no se exportan: al reimportar su parte vuelve como
+    Desconocida."""
+    raza_txt = (a["raza"] or "").strip()
+    comp = db.query(
+        "SELECT raza, porcentaje FROM composicion_racial WHERE animal_id = ? ORDER BY porcentaje DESC",
+        (a["id_animal"],),
+    )
+    pares: list = []
+    for c in comp:
+        cod = _CODIGO_RAZA_SG.get(normalizar_nombre_raza(c["raza"] or ""))
+        if cod and len(pares) < 4:
+            pares.append((cod, float(c["porcentaje"] or 0)))
+    celdas: list = []
+    for i in range(4):
+        cod, pct = pares[i] if i < len(pares) else ("", "")
+        celdas.extend([cod, pct])
+    tipo = _TIPO_RAZA_SG.get(raza_txt)
+    if tipo is None:
+        tipo = (comp[0]["raza"] if comp else raza_txt) or ""
+    return tipo, celdas
+
+
 def export_hoja_dbf(db: Database) -> bytes:
     """Exporta tabla de animales a hoja.dbf."""
     fields = [
@@ -139,6 +177,10 @@ def export_hoja_dbf(db: Database) -> bytes:
         ("FECMUERTE", "D", 8, 0),
         ("CAU", "C", 5, 0),
         ("MOTIVO", "C", 30, 0),
+        ("CODGR1", "C", 3, 0), ("PORGR1", "N", 6, 2),
+        ("CODGR2", "C", 3, 0), ("PORGR2", "N", 6, 2),
+        ("CODGR3", "C", 3, 0), ("PORGR3", "N", 6, 2),
+        ("CODGR4", "C", 3, 0), ("PORGR4", "N", 6, 2),
     ]
     w = DBFWriter(fields)
     animales = db.query("SELECT * FROM animales ORDER BY id_animal")
@@ -173,11 +215,12 @@ def export_hoja_dbf(db: Database) -> bytes:
         if muerte and not tipo:
             tipo = "M"
 
+        tipo_raza, celdas_raza = _campos_raza_sg(db, a)
         w.add_record([
             a["tag"] or "",
             a["nombre"] or "",
             sexo,
-            a["raza"] or "",
+            tipo_raza,
             a["fecha_nacimiento"] or "",
             potrero,
             "",  # ESTADO SG suele estar vacío
@@ -188,6 +231,7 @@ def export_hoja_dbf(db: Database) -> bytes:
             fec_muerte or "",
             cau or "",
             motivo or "",
+            *celdas_raza,
         ])
     return w.write_bytes()
 

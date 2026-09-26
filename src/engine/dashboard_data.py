@@ -241,7 +241,7 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
 
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
     """Inventario presente: solo potreros reales (geom WGS84), solo ACTIVOS,
-    por potrero vigente (último traslado). Añade "Sin potrero" solo si hay
+    por potrero vigente (potrero_id y, si falta, último traslado: POTRERO_ACTUAL_EXPR). Añade "Sin potrero" solo si hay
     activos sin potrero vigente (NULL o legacy). Misma base que Pasturas."""
     try:
         cond_real = potreros_reales_where("p")
@@ -699,9 +699,11 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         diags = []
     try:
         pendientes = _filas_dict(db.query(
-            "SELECT tipo_alerta, fecha_programada, descripcion FROM alertas "
-            "WHERE estado = 'PENDIENTE' AND tipo_alerta IN ('ECOGRAFIA','PALPACION') "
-            "ORDER BY fecha_programada LIMIT 30"))
+            "SELECT al.tipo_alerta, al.fecha_programada, al.descripcion FROM alertas al "
+            "LEFT JOIN animales an ON an.id_animal = al.animal_id "
+            "WHERE al.estado = 'PENDIENTE' AND al.tipo_alerta IN ('ECOGRAFIA','PALPACION') "
+            "AND (al.animal_id IS NULL OR an.estado = 'ACTIVO') "
+            "ORDER BY al.fecha_programada LIMIT 30"))
     except Exception as e:
         logger.error("seccion eco_palp_pendientes fallo", exc_info=True)
         errores["eco_palp_pendientes"] = str(e)
@@ -1316,8 +1318,8 @@ def _enriquecer_rotacion_potreros(
 
     Compartido por ``datos_pasturas`` y el gráfico ``mapa_potreros`` para que
     ambos reporten exactamente el mismo universo y los mismos días de rotación
-    (el conteo usa el potrero vigente por último traslado, no el ``potrero_id``
-    estático). Muta y devuelve la lista recibida.
+    (el conteo usa el potrero vigente: ``potrero_id`` y, si falta, el último
+    traslado, igual que POTRERO_ACTUAL_EXPR). Muta y devuelve la lista recibida.
     """
     hoy_date = hoy_date or date.today()
     from ..utils import to_date
@@ -3566,6 +3568,7 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                       an.tag AS animal_tag
                FROM alertas a LEFT JOIN animales an ON an.id_animal = a.animal_id
                WHERE a.estado = 'PENDIENTE'
+                 AND (a.animal_id IS NULL OR an.estado = 'ACTIVO')
                  AND a.fecha_programada IS NOT NULL
                  AND a.fecha_programada >= ? AND a.fecha_programada <= ?
                ORDER BY a.fecha_programada, a.id LIMIT 80""",
@@ -3738,8 +3741,9 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
 
     try:
         r = db.query_one(
-            "SELECT COUNT(*) n FROM alertas WHERE estado='PENDIENTE' "
-            "AND fecha_programada IS NOT NULL AND fecha_programada >= ? AND fecha_programada <= ?",
+            "SELECT COUNT(*) n FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+            "WHERE al.estado='PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO') "
+            "AND al.fecha_programada IS NOT NULL AND al.fecha_programada >= ? AND al.fecha_programada <= ?",
             (hoy_iso, lim),
         )
         alertas = int(r["n"]) if r else 0
@@ -3775,8 +3779,9 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
             (hoy_iso, lim30),
         )
         r2 = db.query_one(
-            "SELECT COUNT(*) n FROM alertas WHERE estado='PENDIENTE' "
-            "AND tipo_alerta IN ('ECOGRAFIA','PALPACION') AND fecha_programada >= ? AND fecha_programada <= ?",
+            "SELECT COUNT(*) n FROM alertas al LEFT JOIN animales an ON an.id_animal = al.animal_id "
+            "WHERE al.estado='PENDIENTE' AND (al.animal_id IS NULL OR an.estado = 'ACTIVO') "
+            "AND al.tipo_alerta IN ('ECOGRAFIA','PALPACION') AND al.fecha_programada >= ? AND al.fecha_programada <= ?",
             (hoy_iso, lim),
         )
         repro = int(r1["n"]) if r1 else 0

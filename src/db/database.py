@@ -128,7 +128,7 @@ class Database:
                 self.conn.execute("PRAGMA busy_timeout = 10000;")
                 self.conn.execute("PRAGMA synchronous = NORMAL;")
             except Exception:
-                pass
+                logger.warning("No se pudo activar WAL/busy_timeout en %s", path, exc_info=True)
             self._migrar_columnas_esenciales()
         try:
             self.conn.execute("PRAGMA foreign_keys = ON;")
@@ -278,12 +278,24 @@ class Database:
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza)")
         except Exception:
-            pass
+            logger.warning("Migración de tablas esenciales incompleta", exc_info=True)
 
 
     # ------------------------------------------------------------------ #
     # Ciclo de vida y utilidades de bajo nivel
     # ------------------------------------------------------------------ #
+    def _asegurar_columna(self, tabla: str, columna: str, tipo: str) -> None:
+        """ALTER TABLE ADD COLUMN idempotente; un fallo queda en el log.
+
+        ``tabla``/``columna``/``tipo`` son constantes del código (nunca datos
+        de usuario), por eso se interpolan en el DDL."""
+        try:
+            cols = [r["name"] for r in self.conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
+            if cols and columna not in cols:
+                self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {columna} {tipo}")
+        except Exception:
+            logger.warning("Migración: no se pudo añadir %s.%s", tabla, columna, exc_info=True)
+
     def create_tables(self) -> "Database":
         self._migrar_columnas_esenciales()
         self.conn.executescript(SCHEMA_SQL)
@@ -291,48 +303,24 @@ class Database:
             self.sembrar_inseminadores_iniciales()
             self.sembrar_protocolos_iatf_iniciales()
         except Exception:
-            pass
-        # Migración idempotente para columnas añadidas
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(animales)").fetchall()]
-            if "hierro" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN hierro TEXT")
-            if "chip" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN chip TEXT")
-            if "color" not in cols:
-                self.conn.execute("ALTER TABLE animales ADD COLUMN color TEXT")
-        except Exception:
-            pass
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(fotos)").fetchall()]
-            if "ocr_text" not in cols:
-                self.conn.execute("ALTER TABLE fotos ADD COLUMN ocr_text TEXT")
-        except Exception:
-            pass
+            logger.warning("No se pudieron sembrar inseminadores/protocolos IATF iniciales", exc_info=True)
+        # Migración idempotente para columnas añadidas. Cada columna va por
+        # separado y con log: antes un ALTER fallido saltaba en silencio los
+        # siguientes del mismo bloque.
+        for col in ("hierro", "chip", "color"):
+            self._asegurar_columna("animales", col, "TEXT")
+        self._asegurar_columna("fotos", "ocr_text", "TEXT")
         # Geometria real (WGS84) de potreros, importada desde el proyecto QGIS
         # de la finca (ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md, Fase B).
-        try:
-            cols = [r["name"] for r in self.conn.execute("PRAGMA table_info(potreros)").fetchall()]
-            if "geom_wkt_4326" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN geom_wkt_4326 TEXT")
-            if "centroide_lat" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lat REAL")
-            if "centroide_lon" not in cols:
-                self.conn.execute("ALTER TABLE potreros ADD COLUMN centroide_lon REAL")
-        except Exception:
-            pass
+        self._asegurar_columna("potreros", "geom_wkt_4326", "TEXT")
+        self._asegurar_columna("potreros", "centroide_lat", "REAL")
+        self._asegurar_columna("potreros", "centroide_lon", "REAL")
         # Columnas de auditoría (quién y cuándo registró cada evento) para
         # poder listar y deshacer registros equivocados (comando /deshacer).
         # Las tablas creadas antes de esta migración no tenían estas columnas.
-        try:
-            for tabla in self.TABLAS_EVENTOS:
-                cols = [r["name"] for r in self.conn.execute(f"PRAGMA table_info({tabla})").fetchall()]
-                if "creado_en" not in cols:
-                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN creado_en TEXT")
-                if "registrado_por" not in cols:
-                    self.conn.execute(f"ALTER TABLE {tabla} ADD COLUMN registrado_por INTEGER")
-        except Exception:
-            pass
+        for tabla in self.TABLAS_EVENTOS:
+            self._asegurar_columna(tabla, "creado_en", "TEXT")
+            self._asegurar_columna(tabla, "registrado_por", "INTEGER")
         # tipo_evento/grupo_parto_id: catálogo de tipo de evento reproductivo
         # (Parto/Gemelar/Aborto/Reabsorción/Momificación/Maceración/Muerte
         # fetal, ver TIPOS_EVENTO_PARTO). Backfill de filas preexistentes con
@@ -576,6 +564,7 @@ class Database:
             with self.transaccion():
                 self.execute("UPDATE animales SET tag = ? WHERE id_animal = ?", (tag_nv, aid_origen))
                 self.execute("UPDATE fotos SET tag = ? WHERE animal_id = ? OR tag = ?", (tag_nv, aid_origen, tag_act))
+                self.execute("UPDATE lote_iatf_animales SET tag = ? WHERE animal_id = ?", (tag_nv, aid_origen))
                 nota_rect = f"\n[Rectificación arete: {tag_act} -> {tag_nv} (usuario {usuario_id or 'OWNER'})]"
                 self.execute("UPDATE animales SET notas = COALESCE(notas, '') || ? WHERE id_animal = ?", (nota_rect, aid_origen))
             return {
@@ -601,6 +590,8 @@ class Database:
                 ("pesajes", "animal_id"), ("movimientos", "animal_id"),
                 ("condicion_corporal", "animal_id"), ("produccion_leche", "animal_id"),
                 ("diagnosticos_gestacion", "vaca_id"), ("alertas", "animal_id"),
+                ("lote_iatf_animales", "animal_id"), ("pausas_ordeno", "animal_id"),
+                ("finanzas", "animal_id"),
             ]
             for tabla, col in tablas_cols:
                 try:
@@ -668,6 +659,21 @@ class Database:
             self.execute("UPDATE fotos SET animal_id = ?, tag = ? WHERE animal_id = ? OR tag = ?", (aid_destino, tag_nv, aid_origen, tag_act))
             self.execute("UPDATE animales SET madre_id = ? WHERE madre_id = ?", (aid_destino, aid_origen))
             self.execute("UPDATE animales SET padre_id = ? WHERE padre_id = ?", (aid_destino, aid_origen))
+            # lote_iatf_animales tiene FK sin CASCADE: sin reasignarla, el
+            # DELETE final fallaba (foreign_keys=ON) si el animal estuvo en
+            # un lote IATF y la fusión entera se revertía.
+            self.execute("UPDATE lote_iatf_animales SET animal_id = ?, tag = ? WHERE animal_id = ?",
+                         (aid_destino, tag_nv, aid_origen))
+            self.execute("UPDATE pausas_ordeno SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            self.execute("UPDATE finanzas SET animal_id = ? WHERE animal_id = ?", (aid_destino, aid_origen))
+            # Composición racial (FK con CASCADE): se conserva la del origen
+            # solo si el destino no tiene una propia; si no, se perdía en el DELETE.
+            tiene_comp = self.query_one(
+                "SELECT 1 AS ok FROM composicion_racial WHERE animal_id = ? LIMIT 1", (aid_destino,)
+            )
+            if not tiene_comp:
+                self.execute("UPDATE composicion_racial SET animal_id = ? WHERE animal_id = ?",
+                             (aid_destino, aid_origen))
             try:
                 self.execute("DELETE FROM consultas_animal WHERE animal_id = ?", (aid_origen,))
             except Exception:
@@ -829,21 +835,29 @@ class Database:
         if aid is None or not composicion:
             return False
 
-        # Validar y normalizar razas y porcentajes
-        suma = sum(float(c.get("porcentaje") or 0.0) for c in composicion)
-        if suma <= 0:
+        # Agrupar por raza normalizada ("Holstein" + "Holstein Negro" = una fila)
+        agregada: dict[str, float] = {}
+        for c in composicion:
+            raza = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
+            agregada[raza] = agregada.get(raza, 0.0) + float(c.get("porcentaje") or 0.0)
+        suma = sum(agregada.values())
+        if suma <= 0 or suma > 105.0:
             return False
 
-        # Si la suma está cerca de 100 (entre 95 y 105), normalizar a 100
-        factor = 100.0 / suma if abs(suma - 100.0) > 0.01 else 1.0
+        # Solo se reescala un redondeo (95-105). Una suma menor (ej. SG con
+        # 4 casillas que suman 75%) no se infla: el faltante es "Desconocida".
+        if suma >= 95.0:
+            factor = 100.0 / suma if abs(suma - 100.0) > 0.01 else 1.0
+        else:
+            factor = 1.0
+            agregada["Desconocida"] = agregada.get("Desconocida", 0.0) + (100.0 - suma)
 
         ahora = self._ahora()
         with self.transaccion():
             self.execute("DELETE FROM composicion_racial WHERE animal_id = ?", (aid,))
             limpias = []
-            for c in composicion:
-                raza = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
-                pct_norm = round(float(c.get("porcentaje") or 0.0) * factor, 2)
+            for raza, pct in sorted(agregada.items(), key=lambda x: x[1], reverse=True):
+                pct_norm = round(pct * factor, 2)
                 if pct_norm > 0:
                     self.execute(
                         "INSERT INTO composicion_racial (animal_id, raza, porcentaje, creado_en, registrado_por) "
@@ -865,34 +879,56 @@ class Database:
     ) -> tuple[list[dict], str]:
         """Calcula el cruce absorbente entre madre y padre/pajuela."""
         comp_m = self.obtener_composicion_racial(madre_tag_or_id) if madre_tag_or_id else []
-        comp_p = []
-
-        if padre_tag_or_id_o_codigo:
-            # Buscar primero si es un animal del hato
-            pid = self.resolve_animal(padre_tag_or_id_o_codigo)
-            if pid is not None:
-                comp_p = self.obtener_composicion_racial(pid)
-            else:
-                # Buscar en inventario de pajuelas por código de toro
-                row_paj = self.query_one(
-                    "SELECT raza FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
-                    (str(padre_tag_or_id_o_codigo).strip(),)
-                )
-                if row_paj and row_paj["raza"]:
-                    comp_p = parsear_texto_raza(row_paj["raza"])
-                else:
-                    # Parsear el texto directamente como raza pura o cruce
-                    comp_p = parsear_texto_raza(str(padre_tag_or_id_o_codigo).strip())
-
+        comp_p = self._composicion_padre(padre_tag_or_id_o_codigo)
         comp_cria = calcular_cruce_absorbente(comp_m, comp_p)
         resumen = generar_resumen_zootecnico(comp_cria)
         return comp_cria, resumen
+
+    def _pajuela_raza(self, codigo: Any) -> Optional[str]:
+        """Raza registrada en el inventario de pajuelas para un código de toro."""
+        if codigo is None or not str(codigo).strip():
+            return None
+        row = self.query_one(
+            "SELECT raza FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+            (str(codigo).strip(),),
+        )
+        return row["raza"] if row and row["raza"] else None
+
+    def _es_codigo_pajuela(self, codigo: Any) -> bool:
+        """True si el código es una pajuela del inventario y NO un animal del hato."""
+        if codigo is None or not str(codigo).strip():
+            return False
+        if self.resolve_animal(codigo) is not None:
+            return False
+        return self.query_one(
+            "SELECT 1 AS ok FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) LIMIT 1",
+            (str(codigo).strip(),),
+        ) is not None
+
+    def _composicion_padre(self, padre: Any) -> list[dict]:
+        """Composición del padre: animal del hato (con su composición o raza) y,
+        si no la tiene, la raza de la pajuela con ese código; si no es ni
+        animal ni pajuela, el texto se interpreta como raza ("Brahman")."""
+        if padre is None or not str(padre).strip():
+            return []
+        pid = self.resolve_animal(padre)
+        if pid is not None:
+            comp = self.obtener_composicion_racial(pid)
+            if comp:
+                return comp
+            fila = self.get_animal(pid)
+            raza_paj = self._pajuela_raza(fila["tag"] if fila else padre)
+            return parsear_texto_raza(raza_paj) if raza_paj else []
+        raza_paj = self._pajuela_raza(padre)
+        if raza_paj:
+            return parsear_texto_raza(raza_paj)
+        return parsear_texto_raza(str(padre).strip())
 
     def _aplicar_cruce_absorbente_cria(
         self,
         id_cria: int,
         madre_id: Optional[int],
-        padre_id: Optional[int],
+        padre_id: Any,  # id del toro o código de pajuela
         registrado_por: Optional[int] = None,
     ) -> None:
         """Si la cría no tiene composición racial registrada en composicion_racial,
@@ -905,7 +941,13 @@ class Database:
         if existentes:
             return
 
-        comp_cria, _ = self.calcular_composicion_cruce_animales(madre_id, padre_id)
+        # Solo con ambos progenitores de composición conocida: con uno solo,
+        # la mitad de la cría sería "Desconocida" y es mejor no inventarla.
+        comp_m = self.obtener_composicion_racial(madre_id) if madre_id else []
+        comp_p = self._composicion_padre(padre_id)
+        if not comp_m or not comp_p:
+            return
+        comp_cria = calcular_cruce_absorbente(comp_m, comp_p)
         if comp_cria:
             self.guardar_composicion_racial(id_cria, comp_cria, registrado_por=registrado_por)
 
@@ -968,7 +1010,14 @@ class Database:
 
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
         id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
-        padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
+        # Una pajuela (código del inventario de semen, sin animal con ese tag)
+        # no es un toro del hato: crearla como macho ACTIVO sin raza inflaba
+        # el inventario y perdía la raza para la composición de la cría.
+        padre_codigo = None
+        if padre_tag and self._es_codigo_pajuela(padre_tag):
+            padre_id, padre_codigo = None, str(padre_tag).strip()
+        else:
+            padre_id = self.resolve_animal(padre_tag, crear=True, sexo="Macho") if padre_tag else None
 
         # Si no se pasó padre explícito pero hay cría y vaca, sugerir y asociar automáticamente
         # según servicio previo registrado o toro en el potrero durante la concepción (~283d)
@@ -977,12 +1026,16 @@ class Database:
                 sug_padre = self.sugerir_padre_parto(vaca_id, fecha)
                 if sug_padre and sug_padre.get("ok") and sug_padre.get("sugerencia"):
                     t_tag = sug_padre["sugerencia"].get("toro_tag")
-                    if t_tag:
+                    if t_tag and self._es_codigo_pajuela(t_tag):
+                        padre_codigo = str(t_tag).strip()
+                        if not padre_tag:
+                            padre_tag = t_tag
+                    elif t_tag:
                         padre_id = self.resolve_animal(t_tag, crear=True, sexo="Macho")
                         if not padre_tag:
                             padre_tag = t_tag
             except Exception:
-                pass
+                logger.warning("No se pudo sugerir el padre del parto de %s", vaca_tag, exc_info=True)
 
         if id_cria is not None and vaca_id is not None and id_cria == vaca_id:
             return None
@@ -1013,7 +1066,8 @@ class Database:
                 )
             # Herencia y cruces absorbentes automáticos de la cría
             try:
-                self._aplicar_cruce_absorbente_cria(id_cria, vaca_id, padre_id, registrado_por=registrado_por)
+                self._aplicar_cruce_absorbente_cria(id_cria, vaca_id, padre_id or padre_codigo,
+                                                    registrado_por=registrado_por)
             except Exception:
                 logger.exception("Error calculando cruce absorbente para cria %s", id_cria)
             if sexo_cria:
@@ -2965,8 +3019,30 @@ class Database:
             except Exception as e_cc:
                 logger.warning("No se pudo registrar condición corporal asociada al diagnóstico: %s", e_cc)
 
-        # Actualizar estado del servicio más reciente de la vaca
+        # Un positivo antes del día 50 del último servicio (la ecografía del
+        # día 35) es provisional: cierra la alerta de ECOGRAFIA pero deja
+        # pendiente la palpación de confirmación del día 60.
+        provisional = False
         if res_norm == "PREÑADA":
+            ult_serv = self.query_one(
+                "SELECT fecha FROM servicios WHERE vaca_id = ? AND fecha <= ? ORDER BY fecha DESC LIMIT 1",
+                (vaca_id, f),
+            )
+            f_serv = to_date(ult_serv["fecha"]) if ult_serv else None
+            f_diag = to_date(f)
+            provisional = bool(f_serv and f_diag and (f_diag - f_serv).days < 50)
+
+        # Actualizar estado del servicio más reciente de la vaca
+        if res_norm == "PREÑADA" and provisional:
+            self.execute(
+                """
+                UPDATE alertas
+                SET estado = 'CUMPLIDA', fecha_cumplida = ?
+                WHERE animal_id = ? AND tipo_alerta = 'ECOGRAFIA' AND estado = 'PENDIENTE'
+                """,
+                (f, vaca_id),
+            )
+        elif res_norm == "PREÑADA":
             f_date = to_date(f)
             fep_diag = iso(add_days(f_date, 283 - dias_g)) if (dias_g and dias_g > 0 and f_date) else None
             if toro_pajuela:
@@ -4416,13 +4492,26 @@ class Database:
         hoy_iso = date.today().isoformat()
         alertas = []
 
-        # 1. Retiros sanitarios activos
+        # 1. Retiros sanitarios activos (solo animales del hato presente)
         try:
-            retiros = self.retiros_activos()
+            retiros = self.query(
+                """
+                SELECT a.tag,
+                       MAX(CASE WHEN t.fecha_fin_retiro_leche >= ? THEN 1 ELSE 0 END) AS leche,
+                       MAX(CASE WHEN t.fecha_fin_retiro_carne >= ? THEN 1 ELSE 0 END) AS carne
+                FROM tratamientos t
+                JOIN animales a ON a.id_animal = t.animal_id
+                WHERE a.estado = 'ACTIVO' AND t.fecha <= ?
+                  AND (t.fecha_fin_retiro_leche >= ? OR t.fecha_fin_retiro_carne >= ?)
+                GROUP BY a.id_animal, a.tag
+                ORDER BY a.tag
+                """,
+                (hoy_iso, hoy_iso, hoy_iso, hoy_iso, hoy_iso),
+            )
             if retiros:
-                c_carne = sum(1 for r in retiros if r.get("dias_carne", 0) > 0)
-                c_leche = sum(1 for r in retiros if r.get("dias_leche", 0) > 0)
-                tags_str = ", ".join(r["tag"] for r in retiros[:3])
+                c_carne = sum(1 for r in retiros if r["carne"])
+                c_leche = sum(1 for r in retiros if r["leche"])
+                tags_str = ", ".join(str(r["tag"]) for r in retiros[:3])
                 if len(retiros) > 3:
                     tags_str += f" (+{len(retiros)-3})"
                 alertas.append({
@@ -4436,20 +4525,31 @@ class Database:
                     "urgencia": "alta",
                 })
         except Exception as e:
-            logger.debug("Error obteniendo retiros para push: %s", e)
+            logger.warning("Error obteniendo retiros para push: %s", e)
 
-        # 2. Celos detectados para inseminar hoy (Regla AM-PM)
+        # 2. Vacas a inseminar hoy según la regla AM-PM: celo AM de hoy ->
+        # hoy en la tarde; celo PM de ayer -> hoy en la mañana. Antes esta
+        # consulta usaba columnas inexistentes en `celos` y nunca notificaba.
         try:
+            ayer_iso = (date.today() - timedelta(days=1)).isoformat()
             celos_hoy = self.query(
-                "SELECT c.id, c.hora, c.momento, a.tag FROM celos c "
-                "JOIN animales a ON a.id_animal = c.animal_id "
-                "WHERE c.fecha = ? ORDER BY c.hora DESC LIMIT 5",
-                (hoy_iso,)
+                """
+                SELECT c.id, c.fecha, UPPER(COALESCE(c.am_pm, 'AM')) AS am_pm, a.tag
+                FROM celos c
+                JOIN animales a ON a.id_animal = c.vaca_id
+                WHERE a.estado = 'ACTIVO'
+                  AND ((c.fecha = ? AND UPPER(COALESCE(c.am_pm, 'AM')) != 'PM')
+                       OR (c.fecha = ? AND UPPER(c.am_pm) = 'PM'))
+                ORDER BY c.fecha DESC, c.id DESC LIMIT 5
+                """,
+                (hoy_iso, ayer_iso),
             )
             for ch in celos_hoy:
                 tag_vaca = ch["tag"]
-                momento = (ch["momento"] or "manana").lower()
-                turno = "en la tarde de hoy (16:00-18:00)" if "man" in momento else "en la mañana siguiente (06:00-08:00)"
+                if ch["am_pm"] == "PM":
+                    momento, turno = "tarde de ayer", "hoy en la mañana (06:00-08:00)"
+                else:
+                    momento, turno = "mañana de hoy", "hoy en la tarde (16:00-18:00)"
                 alertas.append({
                     "id": f"celo-{ch['id']}",
                     "tipo": "REPRO",
@@ -4461,7 +4561,7 @@ class Database:
                     "urgencia": "alta",
                 })
         except Exception as e:
-            logger.debug("Error obteniendo celos para push: %s", e)
+            logger.warning("Error obteniendo celos para push: %s", e)
 
         # 3. Potreros con sobrepastoreo Voisin (> 3 días ocupados)
         try:

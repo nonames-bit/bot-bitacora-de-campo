@@ -191,6 +191,8 @@ def test_api_rest_genetica(tmp_path):
     client = app.test_client()
     client.post("/login", data={"password": "clave-de-prueba"})
 
+    # Sin user_id: el rol se resolvería contra el users.json real del equipo
+    # (ausente en CI). La contraseña maestra ya deja la sesión como OWNER.
     with client.session_transaction() as sess:
         # El guard de /api/* exige session["autenticado"]; se fija explícitamente
         # para no depender del resultado del POST /login (backoff por IP) y que la

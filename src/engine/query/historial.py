@@ -23,7 +23,7 @@ class HistorialQueryMixin:
         tag_str = animal["tag"] or str(tag)
         raza = animal["raza"] or "Sin especificar"
         sexo_raw = animal["sexo"] or ""
-        estado = animal["estado"] or "ACTIVO"
+        estado = animal["estado"] or "SIN ESTADO"
 
         potrero_nom = "No asignado"
         if animal["potrero_id"]:

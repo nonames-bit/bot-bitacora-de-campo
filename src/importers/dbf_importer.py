@@ -810,6 +810,13 @@ def import_pesajes(db: Database, records) -> dict:
     nuevos = 0
     duplicados = 0
     ultimo: dict[int, tuple[Optional[str], float]] = {}
+    # La GMD se calcula contra el pesaje anterior del mismo animal: si el DBF
+    # no viene ordenado, el "anterior" podía ser uno posterior. Se ordena por
+    # animal y fecha (sin fecha al final).
+    records = sorted(
+        records,
+        key=lambda r: (str(r.get("CODANI") or "").strip(), iso(r.get("FECHA")) is None, iso(r.get("FECHA")) or ""),
+    )
     for r in records:
         tag = (r.get("CODANI") or "").strip()
         peso = r.get("PESO")

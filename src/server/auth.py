@@ -7,7 +7,13 @@ import os
 import re
 import tempfile
 import threading
-from typing import Any, Optional
+from contextlib import contextmanager
+from typing import Any, Iterator, Optional
+
+try:  # POSIX: candado entre procesos (bot + PWA comparten users.json)
+    import fcntl
+except ImportError:  # pragma: no cover - Windows
+    fcntl = None  # type: ignore[assignment]
 
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -35,8 +41,8 @@ def _hash_pin(pin: str) -> str:
 # Candado de módulo que serializa toda mutación + persistencia de users.json.
 # python-telegram-bot atiende los handlers en hilos (dos /agregar_usuario a la
 # vez pueden llegar concurrentes) y sin candado la reescritura del JSON tiene
-# una carrera que puede corromper el archivo. No se usa fcntl: no existe en
-# Windows (la escritura atómica con os.replace sí es segura en ambos SO).
+# una carrera que puede corromper el archivo. Entre procesos (el bot y la PWA
+# comparten users.json) se añade fcntl.flock donde existe (ver _mutacion).
 _LOCK = threading.Lock()
 
 
@@ -113,6 +119,44 @@ class Auth:
                             self._cargar_sin_lock()
         except Exception as e:
             logger.debug("Error comprobando mtime de users.json: %s", e)
+
+    @contextmanager
+    def _mutacion(self) -> Iterator[None]:
+        """Sección crítica para leer-modificar-escribir users.json.
+
+        Toma el candado de hilos y, en POSIX, un flock sobre ``<users>.lock``
+        para excluir a otros procesos. Antes de mutar recarga el archivo si
+        otro proceso lo cambió: sin esto, el bot (que mantiene su lista en
+        memoria toda la vida del proceso) reescribía una copia vieja y
+        resucitaba usuarios revocados desde la PWA.
+        """
+        with _LOCK:
+            fh = None
+            if fcntl is not None:
+                try:
+                    dir_padre = os.path.dirname(os.path.abspath(self.users_file))
+                    os.makedirs(dir_padre, exist_ok=True)
+                    fh = open(self.users_file + ".lock", "a")
+                    fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
+                except OSError as e:
+                    logger.warning("No se pudo tomar el candado de %s: %s", self.users_file, e)
+                    if fh is not None:
+                        fh.close()
+                    fh = None
+            try:
+                try:
+                    if os.path.exists(self.users_file) and \
+                            getattr(self, "_ultimo_mtime", None) != os.path.getmtime(self.users_file):
+                        self._cargar_sin_lock()
+                except OSError as e:
+                    logger.warning("No se pudo recargar %s antes de modificarlo: %s", self.users_file, e)
+                yield
+            finally:
+                if fh is not None:
+                    try:
+                        fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+                    finally:
+                        fh.close()
 
     def guardar(self) -> None:
         """Persiste la lista actual de usuarios en el archivo JSON (bajo candado)."""
@@ -259,7 +303,7 @@ class Auth:
 
     def asignar_pin(self, user_id: int, pin: str) -> None:
         """Asigna o actualiza el PIN de acceso de un usuario."""
-        with _LOCK:
+        with self._mutacion():
             try:
                 uid = int(user_id)
             except (ValueError, TypeError) as e:
@@ -310,7 +354,7 @@ class Auth:
         """Agrega o actualiza un usuario y persiste los cambios."""
         # Mutación + persistencia como una sola unidad crítica bajo el candado
         # de módulo (ver _LOCK): evita perder actualizaciones entre hilos.
-        with _LOCK:
+        with self._mutacion():
             try:
                 uid = int(user_id)
             except (ValueError, TypeError) as e:
@@ -359,7 +403,7 @@ class Auth:
     def quitar_usuario(self, user_id: int) -> None:
         """Elimina un usuario del sistema si no es el último OWNER."""
         # Mutación + persistencia bajo el candado de módulo (ver _LOCK).
-        with _LOCK:
+        with self._mutacion():
             try:
                 uid = int(user_id)
             except (ValueError, TypeError) as e:

@@ -1,7 +1,7 @@
 """Mixin de consultas sanitarias: retiros de leche/carne por tratamiento."""
 from __future__ import annotations
 
-from ...utils import to_date
+from ...utils import iso, to_date
 
 
 class SanidadQueryMixin:
@@ -17,20 +17,27 @@ class SanidadQueryMixin:
         tag_str = animal["tag"] if animal else str(tag)
         nombre = f" ({animal['nombre']})" if animal and animal["nombre"] else ""
 
-        tratamientos = self.db.query(
-            "SELECT * FROM tratamientos WHERE animal_id = ? ORDER BY fecha DESC LIMIT 5", (aid,)
-        )
-        if not tratamientos:
+        hay_trat = self.db.query_one("SELECT 1 AS ok FROM tratamientos WHERE animal_id = ? LIMIT 1", (aid,))
+        if not hay_trat:
             return f"✅ {tag_str}{nombre} no tiene tratamientos registrados. Está libre de retiro."
 
         hoy = self.hoy
+        # Todos los tratamientos con retiro aún vigente, sin límite: con
+        # LIMIT 5 un retiro largo de carne quedaba oculto tras 5 tratamientos
+        # más recientes y el animal salía "libre para consumo".
+        tratamientos = self.db.query(
+            "SELECT * FROM tratamientos WHERE animal_id = ? "
+            "AND (fecha_fin_retiro_leche >= ? OR fecha_fin_retiro_carne >= ?) ORDER BY fecha DESC",
+            (aid, iso(hoy), iso(hoy)),
+        )
         bloqueos = []
         for t in tratamientos:
+            f_trat = to_date(t["fecha"])
             for tipo, fin in (
                 ("leche", t["fecha_fin_retiro_leche"]),
                 ("carne", t["fecha_fin_retiro_carne"]),
             ):
-                if fin and to_date(fin) and to_date(t["fecha"]) <= hoy <= to_date(fin):
+                if fin and to_date(fin) and f_trat and f_trat <= hoy <= to_date(fin):
                     dias_rest = (to_date(fin) - hoy).days
                     prod = t["producto"] or "Fármaco"
                     bloqueos.append(f"⚠️ Retiro de {tipo} por {prod} hasta el {fin} (faltan {dias_rest} días)")
@@ -92,6 +99,7 @@ class SanidadQueryMixin:
         tratamientos = self.db.query(
             "SELECT t.*, a.tag, a.nombre FROM tratamientos t "
             "JOIN animales a ON a.id_animal = t.animal_id "
+            "WHERE a.estado = 'ACTIVO' "
             "ORDER BY t.fecha DESC LIMIT ?",
             (limite,),
         )

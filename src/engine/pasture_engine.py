@@ -100,6 +100,9 @@ def consumo_diario_ms(peso_vivo_kg: float, pct_pv: float = PCT_CONSUMO_PV) -> fl
     return float(peso_vivo_kg) * (float(pct_pv) / 100.0)
 
 
+MIN_PUNTOS_AFORO = 10
+
+
 def evaluar_ronda_voisin(mediciones: list[float], area_has: float,
                          num_animales: int = 1) -> dict | None:
     """Evalúa una ronda Voisin de aforo (D2): promedia los puntos (kg MV/m²),
@@ -129,6 +132,9 @@ def evaluar_ronda_voisin(mediciones: list[float], area_has: float,
             "dias_disponibles": round(dias, 1),
             "semaforo": semaforo,
             "num_puntos": len(vals),
+            # Metodología de aforo: mínimo 10-15 puntos aleatorios por potrero.
+            # Con menos, el promedio no es representativo: se avisa sin bloquear.
+            "puntos_insuficientes": len(vals) < MIN_PUNTOS_AFORO,
         }
     except (TypeError, ValueError):
         return None
