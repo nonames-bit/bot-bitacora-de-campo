@@ -385,6 +385,16 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Hook local `.githooks/pre-push` (activar una vez por clon con `git config core.hooksPath .githooks`): corta sintaxis JS/Python inválida antes de dejar pushear.
   - Branch protection real en `main` (bloquear push directo sin PR+CI verde) evaluado pero no disponible: GitHub lo requiere plan Pro en repos privados; queda pendiente si se actualiza el plan.
   - Droplet de producción redimensionado de 1 GB a 2 GB de RAM (quedaba con ~130 MB libres bajo carga normal).
+- [x] **Módulo Carne (5 reportes estilo Software Ganadero), Agenda Única y Gaps de Reproducción/Genética en la PWA (2026-09-26)**:
+  - **Nueva vista `Carne` (`data-v="carne"`)**: pestaña en la barra inferior e ítem en el sheet "Más módulos", servida por `GET /api/carne` → `dashboard_data.datos_carne()` (fuente única de datos, sin duplicar SQL).
+    - *Agenda de pesaje única agrupada por potrero*: unifica nunca pesados, vencidos (>60d) y próximos a pesar por categoría de edad (crías <8m cada 30d, levantes 8-18m cada 60d, adultos >18m cada 90d), con filtros interactivos, edad legible y sin omitir animales sin fecha de nacimiento.
+    - *Destete / Índice productivo*: destetes de los últimos 12 meses con peso ajustado a 205d (`growth_engine.peso_ajustado_destete`) y GMD pre-destete; índice productivo por vaca (% vs promedio del hato).
+    - *Proyección de destetes*: vacas preñadas (diagnóstico vigente o servicio sin diagnóstico negativo) → FEP + 205d, tabla por vaca y resumen por mes.
+    - *Prueba de comportamiento*: ranking GMD de machos activos con ≥2 pesajes, con filtro de rango de fechas (default 90 días) y GMD promedio del lote.
+  - **Gaps del menú Reproducción** (`datos_reproduccion`, tarjetas en `renderRepro`): *hembras que debían haber parido* (FEP vencida sin parto ni diagnóstico negativo), *hembras sin programar* (abiertas >60d sin IA programada), *proyección de celos* (+21d, próximos 30 días), *servicios realizados* (ventana configurable, default 30d, con resultado de diagnóstico), *novillas entoradas* (primer parto en 12 meses con edad al primer parto) y *reproductores en servicio/descanso* (monta natural en últimos 60d).
+  - **Vista Genética refinada**: familias de cruce agrupadas por grado en acordeones, pool de sangre en barras, grados en barra apilada, genealogía desconocida tipificada y catálogo SG para nombres de razas de pajuelas.
+  - Regla Fundamental de Inventario respetada: todos los listados filtran `estado='ACTIVO'` (el reporte histórico de destetes muestra la cría aunque ya no esté activa, por ser producción pasada).
+  - Pruebas `tests/test_carne_data.py`, `tests/test_genetica_regresiones.py` + estructura de API en `tests/test_pwa_api.py`; `ruff` limpio y `node --check` en la PWA.
 
 ### ⏳ En Progreso / Calibración Continua
 - [x] **Header Móvil Compacto, Menú Desplegable al tocar el Logo y Auto-Ocultado de la Barra Inferior (2026-09-17)**:
