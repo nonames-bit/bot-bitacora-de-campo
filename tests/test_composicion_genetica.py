@@ -198,7 +198,6 @@ def test_api_rest_genetica(tmp_path):
         # para no depender del resultado del POST /login (backoff por IP) y que la
         # prueba sea determinista en CI.
         sess["autenticado"] = True
-        sess["user_id"] = 1
         sess["rol"] = "OWNER"
 
     # 1. Guardar composición manual vía POST
