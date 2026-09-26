@@ -1,10 +1,24 @@
-# Configuración mínima de ruff: solo errores reales (E9) y pyflakes (F) —
-# nada de estilo/formato, para no generar ruido en un repo que no usa ruff
-# como formateador. Ver .github/workflows/tests.yml para el paso de CI.
+# Configuración de ruff. Base: errores reales (E9) y pyflakes (F).
+# (P2.10) Se agregan familias que hoy tienen CERO hallazgos en el repo, para
+# endurecer el lint a futuro sin cleanup:
+#   A   = shadowing de builtins (id, type, list…)
+#   PLE = errores de pylint (variables/atributos inexistentes, etc.)
+#   FA  = futuro `from __future__ import annotations`
+# Pendiente de una limpieza dedicada (con fallout real hoy): B (bugbear: 36),
+# S (bandit: ~285 con los patrones intencionales), ASYNC (~89 en telegram_bot),
+# DTZ (~196 date.today/datetime.now naive). Ver auditoría P2.10.
+# Ya habilitados por bajo riesgo y cero/limpieza aplicada: B033 (set/dict con
+# valor duplicado), B905 (zip sin strict=), B006 (default mutable; src/ y tests/
+# están limpios) y S105/S106 (contraseñas hardcodeadas; scripts/ y tests/ usan
+# claves de prueba a propósito) y S101 (assert; no debe haber en src/ porque
+# python -O los elimina).
+# Nota: NO se habilita EXE (shebang/bit ejecutable) porque el bit de ejecución de
+# git se comporta distinto por plataforma (local Windows pasaba, CI Linux fallaba
+# con EXE001); los scripts se invocan con `python script.py`.
 line-length = 160
 
 [lint]
-select = ["E9", "F"]
+select = ["E9", "F", "A", "PLE", "FA", "B006", "B033", "B905", "S101", "S105", "S106"]
 
 [lint.per-file-ignores]
 # telegram_bot.py y query_engine.py son fachadas: reexportan nombres a
@@ -13,5 +27,13 @@ select = ["E9", "F"]
 "src/server/telegram_bot.py" = ["F401"]
 "src/engine/query_engine.py" = ["F401"]
 "src/engine/query/__init__.py" = ["F401"]
-# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto.
-"tests/*" = ["F841"]
+# En tests es normal registrar datos (ej. un potrero) sin usar el id devuelto,
+# usar contraseñas/PIN de prueba y usar assert.
+"tests/*" = ["F841", "S101", "S105", "S106"]
+# Los scripts de verificación usan contraseña/centinela de prueba a propósito y
+# assert para sus comprobaciones.
+"scripts/*" = ["S101", "S105", "S106"]
+# El harness de verificación visual usa un default mutable A PROPÓSITO como
+# contador del protocolo CDP (`msg_id=[1]`, la misma lista persiste entre
+# llamadas). Es una herramienta local, no código de producción.
+"scripts/verify_*.py" = ["B006"]

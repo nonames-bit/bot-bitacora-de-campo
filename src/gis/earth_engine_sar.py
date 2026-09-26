@@ -149,7 +149,7 @@ def _sar_region_sentinel1(
         try:
             orbit_pass = str(imagen.get("orbitProperties_pass").getInfo() or "UNKNOWN")
         except Exception:
-            orbit_pass = "UNKNOWN"
+            orbit_pass = "UNKNOWN"  # noqa: S105 - centinela de dirección orbital (ASCENDING/DESCENDING), no un secreto
 
         return {
             "rvi": round(rvi_val, 3),

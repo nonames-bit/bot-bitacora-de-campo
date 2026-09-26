@@ -64,7 +64,7 @@ def test_bug3_import_zip_con_fotos_zip_corrupta(db, tmp_path):
         out += b"\x0d"
         for rec in records:
             out += b"\x20"
-            for (name, ftype, flen, fdec), val in zip(fields, rec):
+            for (name, ftype, flen, fdec), val in zip(fields, rec, strict=False):
                 out += str(val).encode("latin-1").ljust(flen, b" ")
         return bytes(out)
 
