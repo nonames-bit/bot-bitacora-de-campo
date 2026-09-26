@@ -4338,3 +4338,10 @@ body.modo-campo #vista { font-size: 15px; }
 @media (max-width: 480px) {
   .gen-pool-fila { grid-template-columns: 88px 1fr 44px 46px; gap: 6px; font-size: 12.5px; }
 }
+
+/* ---- Carne: agenda de pesaje ---- */
+.fila-pes { padding: 8px 10px 8px 14px; margin-left: 6px; border-left: 2px solid var(--borde-fuerte); font-size: 13px; }
+.fila-pes[hidden], .pes-grupo[hidden] { display: none !important; }
+.fila-pes-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 3px; }
+.fila-pes-cab small, .fila-pes small { color: var(--texto-suave); }
+.fila-pes-cab > small { flex: none; }

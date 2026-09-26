@@ -1021,6 +1021,7 @@ def datos_carne(db: Database, desde: Optional[str] = None, hasta: Optional[str] 
     sin_pesar_vencidos: list[dict] = []
     a_pesar_edad: list[dict] = []
     sin_fecha_nacimiento_n = 0
+    filas_pes: list[dict] = []
     try:
         filas_pes = _filas_dict(db.query(f"""
             WITH {ULT_TRASLADO_CTE}
@@ -1048,22 +1049,26 @@ def datos_carne(db: Database, desde: Optional[str] = None, hasta: Optional[str] 
                 sin_pesar_nunca.append(base)
             elif dias_sin is not None and dias_sin > DIAS_SIN_PESAR:
                 sin_pesar_vencidos.append(base)
+            # Sin fecha de nacimiento: frecuencia de adulto, para que no
+            # desaparezca de la agenda de pesaje.
             if edad_dias is None:
                 sin_fecha_nacimiento_n += 1
+                freq, categoria = FREQ_PESAJE_ADULTO_DIAS, "SIN_EDAD"
+            elif edad_dias < EDAD_CRIA_DIAS:
+                freq, categoria = FREQ_PESAJE_CRIA_DIAS, "CRIA"
+            elif edad_dias < EDAD_LEVANTE_DIAS:
+                freq, categoria = FREQ_PESAJE_LEVANTE_DIAS, "LEVANTE"
             else:
-                if edad_dias < EDAD_CRIA_DIAS:
-                    freq = FREQ_PESAJE_CRIA_DIAS
-                elif edad_dias < EDAD_LEVANTE_DIAS:
-                    freq = FREQ_PESAJE_LEVANTE_DIAS
-                else:
-                    freq = FREQ_PESAJE_ADULTO_DIAS
-                if ult is None or (dias_sin is not None and dias_sin > freq):
-                    a_pesar_edad.append({
-                        **base, "frecuencia_dias": freq,
-                        "proximo_pesaje": (ult + timedelta(days=freq)).isoformat() if ult else None,
-                    })
+                freq, categoria = FREQ_PESAJE_ADULTO_DIAS, "ADULTO"
+            if ult is None or (dias_sin is not None and dias_sin > freq):
+                a_pesar_edad.append({
+                    **base, "frecuencia_dias": freq, "categoria": categoria,
+                    "estado_pesaje": "NUNCA" if ult is None else "VENCIDO",
+                    "dias_vencido": (dias_sin - freq) if ult else None,
+                    "proximo_pesaje": (ult + timedelta(days=freq)).isoformat() if ult else None,
+                })
         sin_pesar_vencidos.sort(key=lambda x: x["dias_sin_pesar"] or 0, reverse=True)
-        a_pesar_edad.sort(key=lambda x: (x["frecuencia_dias"], -(x["edad_dias"] or 0)))
+        a_pesar_edad.sort(key=lambda x: (x["frecuencia_dias"], x["edad_dias"] is None, -(x["edad_dias"] or 0)))
     except Exception as e:
         logger.error("datos_carne seccion sin_pesar/a_pesar fallo", exc_info=True)
         errores["pesajes"] = str(e)
@@ -1252,6 +1257,7 @@ def datos_carne(db: Database, desde: Optional[str] = None, hasta: Optional[str] 
             "sin_pesar_nunca": len(sin_pesar_nunca),
             "sin_pesar_vencidos": len(sin_pesar_vencidos),
             "a_pesar_edad": len(a_pesar_edad),
+            "activos": len(filas_pes),
             "destetes_12m": len(destetes),
             "proyeccion_destetes": len(proyeccion_destetes),
             "prueba_n": len(prueba_animales),
