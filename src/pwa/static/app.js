@@ -809,6 +809,11 @@
     h += "</div>";
     return h;
   }
+  function enlaceFicha(tag, opts) {
+    var t = esc(tag);
+    var chip = (opts && opts.chip) ? (" chip " + opts.chip) : "";
+    return "<a href='#' class='ficha-link" + chip + "' data-ir-ficha='" + t + "' style='font-weight:700; text-decoration:none;'>" + t + "</a>";
+  }
   function renderRepro(d) {
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
@@ -1140,8 +1145,223 @@
         ["valor", "Condición CC", "text", function (v) { return "<span class='chip rojo'>" + esc(v) + "</span>"; }],
         ["notas", "Observaciones"]
       ], "Ningún animal con condición corporal crítica registrada. 🎉");
+
+    // --- Gaps estilo Software Ganadero (menú Reproducción) ---
+    var debieron = d.debieron_parir || [];
+    h += "<h4>" + icon("alert") + "Hembras que debían haber parido (FEP vencida)</h4>"
+      + tabla(debieron, [
+        ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["fecha_servicio", "Servicio"],
+        ["toro_pajilla", "Toro / Pajuela"],
+        ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
+        ["dias_atraso", "Atraso", "text", function (v) { return "<span class='chip rojo'><b>" + esc(v) + " d</b></span>"; }]
+      ], "Ninguna vaca con FEP vencida sin parto registrado. 🎉");
+
+    var sinProg = d.sin_programar || [];
+    h += "<h4>" + icon("calendar") + "Hembras sin programar (abiertas &gt; 60 días)</h4>"
+      + tabla(sinProg, [
+        ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["ultimo_parto", "Último parto", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["dias_abiertos", "Días abiertos", "text", function (v) { return "<span class='chip " + (v > 150 ? "rojo" : "ambar") + "'><b>" + esc(v) + " d</b></span>"; }]
+      ], "Todas las vacas abiertas están programadas o dentro del periodo voluntario. 🎉");
+
+    var celosProx = d.proyeccion_celos || [];
+    h += "<h4>" + icon("flame") + "Proyección de celos (próximos 30 días)</h4>"
+      + tabla(celosProx, [
+        ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["fuente", "Base"],
+        ["fecha_base", "Fecha base", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["proximo_celo", "Próximo celo", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
+        ["en_dias", "En", "text", function (v) { return esc(v) + " d"; }]
+      ], "Sin celos proyectados en los próximos 30 días.");
+
+    var rangoServ = d.servicios_rango || {};
+    var servs = d.servicios_realizados || [];
+    h += "<div class='card' style='padding:14px 16px; margin:12px 0; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<div style='font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("clipboard", 16) + "Servicios realizados</div>"
+      + "<form id='form-repro-rango-serv' style='display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;'>"
+      + "<label style='font-size:11.5px; font-weight:600;'>Desde<br><input id='repro-serv-desde' type='date' value='" + esc(rangoServ.desde || "") + "' style='padding:6px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label style='font-size:11.5px; font-weight:600;'>Hasta<br><input id='repro-serv-hasta' type='date' value='" + esc(rangoServ.hasta || "") + "' style='padding:6px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<button type='submit' class='tema-btn' style='padding:6px 12px; font-weight:700; border-radius:6px;'>Filtrar</button>"
+      + "</form></div>"
+      + tabla(servs, [
+        ["fecha", "Fecha", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["tipo_servicio", "Tipo"],
+        ["toro_pajilla", "Toro / Pajuela"],
+        ["inseminador", "Técnico"],
+        ["resultado_diag", "Resultado", "text", function (v) { return v ? chipEstado(v) : "—"; }]
+      ], "Sin servicios registrados en el rango.")
+      + "</div>";
+
+    var entoradas = d.novillas_entoradas || [];
+    h += "<h4>" + icon("cow") + "Novillas entoradas (primer parto, últimos 12 meses)</h4>"
+      + tabla(entoradas, [
+        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["primer_parto", "Primer parto", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["edad_primer_parto_meses", "Edad 1er parto", "text", function (v) { return v != null ? (esc(v) + " m") : "—"; }],
+        ["estado_reproductivo", "Estado actual"]
+      ], "Sin novillas entoradas en los últimos 12 meses.");
+
+    var torosEstado = d.reproductores_estado || [];
+    h += "<h4>" + icon("cow") + "Reproductores en servicio / descanso</h4>"
+      + tabla(torosEstado, [
+        ["tag", "Toro", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["raza", "Raza"],
+        ["ultima_monta", "Última monta", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
+        ["estado", "Estado", "text", function (v) { return v === "EN_SERVICIO" ? "<span class='chip verde'><b>En servicio</b></span>" : "<span class='chip gris'>En descanso</span>"; }]
+      ], "Sin reproductores registrados.");
     return h;
   }
+  // Rangos de fecha de la prueba de comportamiento (Carne) y de servicios
+  // realizados (Repro). null = usar el default del servidor.
+  var _carneRango = { desde: null, hasta: null };
+  var _reproRango = { desde: null, hasta: null };
+
+  function renderCarne(d) {
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
+      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("scale", 22) + "Carne (Pesajes, Destete &amp; Comportamiento)</h3>"
+      + "</div>" + erroresHtml(d);
+
+    var k = d.kpis || {};
+    h += "<div class='kpis' style='margin-bottom:14px;'>"
+      + kpi(esc(k.sin_pesar_nunca || 0), "Nunca pesados", (k.sin_pesar_nunca > 0 ? "alerta" : "ok"))
+      + kpi(esc(k.sin_pesar_vencidos || 0), "Sin pesar &gt; 60d", (k.sin_pesar_vencidos > 0 ? "alerta" : "ok"))
+      + kpi(esc(k.a_pesar_edad || 0), "A pesar por edad")
+      + kpi(esc(k.destetes_12m || 0), "Destetes (12m)")
+      + kpi(esc(k.proyeccion_destetes || 0), "Destetes proyectados")
+      + kpi(esc(k.prueba_n || 0), "En prueba")
+      + "</div>";
+
+    // 1) Animales sin pesar
+    var spNunca = (d.sin_pesar && d.sin_pesar.nunca) || [];
+    var spVenc = (d.sin_pesar && d.sin_pesar.vencidos) || [];
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("scale", 16) + "Animales sin pesar</div>"
+      + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin:6px 0 4px; text-transform:uppercase;'>Nunca pesados (" + spNunca.length + ")</div>"
+      + tabla(spNunca, [
+        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
+        ["potrero", "Potrero"],
+        ["ultimo_pesaje", "Último pesaje", "text", function () { return "Nunca"; }]
+      ], "Todos los animales activos tienen al menos un pesaje.")
+      + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin:12px 0 4px; text-transform:uppercase;'>Último pesaje &gt; 60 días (" + spVenc.length + ")</div>"
+      + tabla(spVenc, [
+        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
+        ["potrero", "Potrero"],
+        ["ultimo_pesaje", "Último pesaje", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["dias_sin_pesar", "Días sin pesar", "text", function (v) { return "<span class='chip ambar'><b>" + esc(v) + " d</b></span>"; }]
+      ], "Ningún animal activo supera los 60 días sin pesarse. 🎉")
+      + "</div>";
+
+    // 2) Animales a pesar por edad
+    var aPesar = d.a_pesar_edad || [];
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--ambar-marca, #D97706);'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("weight", 16) + "Animales a pesar por edad</div>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:8px;'>Frecuencia: crías &lt;8m cada 30d · levantes 8-18m cada 60d · adultos &gt;18m cada 90d. "
+      + "Excluidos sin fecha de nacimiento: <b>" + esc(d.sin_fecha_nacimiento_n || 0) + "</b>.</div>"
+      + tabla(aPesar, [
+        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
+        ["frecuencia_dias", "Frecuencia", "text", function (v) { return esc(v) + " d"; }],
+        ["ultimo_pesaje", "Último pesaje", "text", function (v) { return v ? esc(fechaCorta(v)) : "Nunca"; }],
+        ["proximo_pesaje", "Próximo", "text", function (v) { return v ? esc(fechaCorta(v)) : "Hoy"; }],
+        ["potrero", "Potrero"]
+      ], "Ningún animal activo tiene su pesaje vencido por edad. 🎉")
+      + "</div>";
+
+    // 3) Destete / Índice productivo
+    var destetes = d.destetes || [];
+    var indices = d.indice_productivo || [];
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--verde-marca);'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("calf", 16) + "Destete / Índice productivo (últimos 12 meses)</div>"
+      + tabla(destetes, [
+        ["fecha", "Destete", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["tag", "Cría", "text", function (v) { return enlaceFicha(v); }],
+        ["madre", "Madre", "text", function (v) { return v ? enlaceFicha(v) : "—"; }],
+        ["edad_destete_dias", "Edad (d)", "text", function (v) { return v != null ? esc(v) : "—"; }],
+        ["peso_kg", "Peso real", "text", function (v) { return v != null ? (esc(v) + " kg") : "—"; }],
+        ["peso_ajustado_205", "Ajustado 205d", "text", function (v) { return v != null ? ("<b>" + esc(v) + " kg</b>") : "<span class='chip gris'>sin ajuste</span>"; }],
+        ["gmd_predestete_g_dia", "GMD pre-destete", "text", function (v) { return v != null ? (esc(v) + " g/d") : "—"; }]
+      ], "Sin destetes en los últimos 12 meses.")
+      + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin:12px 0 4px; text-transform:uppercase;'>Índice productivo por vaca (% vs promedio del hato)</div>"
+      + tabla(indices, [
+        ["madre", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["n_crias", "Crías"],
+        ["peso_ajustado_prom", "Peso ajustado prom.", "text", function (v) { return esc(v) + " kg"; }],
+        ["indice_pct", "Índice", "text", function (v) { return v != null ? ("<span class='chip " + (v >= 100 ? "verde" : (v >= 90 ? "ambar" : "rojo")) + "'><b>" + esc(v) + "%</b></span>") : "—"; }]
+      ], "Sin crías con peso ajustable (falta peso al nacer o al destete).")
+      + "</div>";
+
+    // 4) Proyección de destetes
+    var proy = d.proyeccion_destetes || [];
+    var proyMes = d.proyeccion_destetes_mes || [];
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("calendar", 16) + "Proyección de destetes (FEP + 205d)</div>";
+    if (proyMes.length) {
+      h += "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;'>"
+        + proyMes.map(function (m) { return "<span class='chip azul'>" + esc(m.mes) + ": <b>" + esc(m.n) + "</b></span>"; }).join("")
+        + "</div>";
+    }
+    h += tabla(proy, [
+        ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["base", "Base"],
+        ["fep", "FEP", "text", function (v) { return esc(fechaCorta(v)); }],
+        ["destete_estimado", "Destete estimado", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }]
+      ], "Sin vacas preñadas con destete proyectado.")
+      + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:6px;'>Estimación: FEP + 205 días. La fecha real puede variar por adelanto o atraso del parto.</div>"
+      + "</div>";
+
+    // 5) Prueba de comportamiento
+    var pc = d.prueba_comportamiento || {};
+    var animalesPC = pc.animales || [];
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid #8b5cf6;'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
+      + "<div style='font-size:14px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("weight", 16) + "Prueba de comportamiento (ranking GMD)</div>"
+      + "<form id='form-carne-rango' style='display:flex; gap:6px; align-items:flex-end; flex-wrap:wrap;'>"
+      + "<label style='font-size:11.5px; font-weight:600;'>Desde<br><input id='carne-desde' type='date' value='" + esc(pc.desde || "") + "' style='padding:6px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<label style='font-size:11.5px; font-weight:600;'>Hasta<br><input id='carne-hasta' type='date' value='" + esc(pc.hasta || "") + "' style='padding:6px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+      + "<button type='submit' class='tema-btn' style='padding:6px 12px; font-weight:700; border-radius:6px;'>Aplicar</button>"
+      + "</form></div>"
+      + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:8px;'>Machos activos con 2+ pesajes en el rango. GMD del lote: <b>"
+      + (pc.gmd_promedio != null ? (esc(pc.gmd_promedio) + " g/d") : "—") + "</b>"
+      + (pc.negativos ? (" · <span class='chip rojo'>" + esc(pc.negativos) + " con GMD negativa</span>") : "") + ".</div>"
+      + tabla(animalesPC, [
+        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
+        ["nombre", "Nombre"],
+        ["raza", "Raza"],
+        ["peso_inicial", "Peso inicial", "text", function (v) { return v != null ? (esc(v) + " kg") : "—"; }],
+        ["peso_final", "Peso final", "text", function (v) { return v != null ? (esc(v) + " kg") : "—"; }],
+        ["dias_prueba", "Días", "text", function (v) { return esc(v) + " d"; }],
+        ["gmd_g_dia", "GMD", "text", function (v) { return "<span class='chip " + (v >= 0 ? "verde" : "rojo") + "'><b>" + esc(v) + " g/d</b></span>"; }]
+      ], "Ningún macho activo con 2+ pesajes en el rango seleccionado.")
+      + "</div>";
+    return h;
+  }
+
+  function bindCarne() {
+    var form = document.getElementById("form-carne-rango");
+    if (form && !form.__bound) {
+      form.__bound = true;
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        _carneRango.desde = (document.getElementById("carne-desde") || {}).value || null;
+        _carneRango.hasta = (document.getElementById("carne-hasta") || {}).value || null;
+        cargar(true);
+      });
+    }
+  }
+
   function renderSanidad(d) {
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("shieldPlus") + "Sanidad</h3>"
@@ -1954,6 +2174,17 @@
         if (lid) mostrarModalDetalleLoteIATF(Number(lid), function () { cargar(true); });
       });
     });
+
+    var formServ = document.getElementById("form-repro-rango-serv");
+    if (formServ && !formServ.__bound) {
+      formServ.__bound = true;
+      formServ.addEventListener("submit", function (e) {
+        e.preventDefault();
+        _reproRango.desde = (document.getElementById("repro-serv-desde") || {}).value || null;
+        _reproRango.hasta = (document.getElementById("repro-serv-hasta") || {}).value || null;
+        cargar(true);
+      });
+    }
   }
 
   function fechaDiaSemana(fStr) {
@@ -12693,12 +12924,19 @@
 
     var pot = (q("#f-potrero") && q("#f-potrero").value || "").trim();
     var url = "/api/" + actual + (pot && actual === "tablero" ? "?potrero=" + encodeURIComponent(pot) : "");
+    if (actual === "carne" && (_carneRango.desde || _carneRango.hasta)) {
+      url += "?desde=" + encodeURIComponent(_carneRango.desde || "") + "&hasta=" + encodeURIComponent(_carneRango.hasta || "");
+    }
+    if (actual === "repro" && (_reproRango.desde || _reproRango.hasta)) {
+      url += "?desde=" + encodeURIComponent(_reproRango.desde || "") + "&hasta=" + encodeURIComponent(_reproRango.hasta || "");
+    }
     if (animar) skeleton(vista, actual);
     fetchJSON(url, function (d) {
       if (!vista) return;
       var html;
       if (actual === "tablero") html = renderTablero(d);
       else if (actual === "repro") html = renderRepro(d);
+      else if (actual === "carne") html = renderCarne(d);
       else if (actual === "sanidad") html = renderSanidad(d);
       else if (actual === "pasturas") html = renderPasturas(d);
       else if (actual === "leche") html = renderLeche(d);
@@ -12710,6 +12948,7 @@
       montarVista(vista, html, animar);
       if (actual === "tablero") bindTablero();
       if (actual === "repro") bindRepro();
+      if (actual === "carne") bindCarne();
       if (actual === "pasturas") bindPasturas();
       if (actual === "leche") bindLeche();
       if (actual === "finanzas") bindFinanzas();
