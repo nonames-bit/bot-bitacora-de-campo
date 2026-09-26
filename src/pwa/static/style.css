@@ -501,10 +501,10 @@ main {
 .vista-entra > .kpis > .kpi:nth-child(6) { animation-delay: .17s; }
 .vista-entra > .kpis > .kpi:nth-child(7) { animation-delay: .20s; }
 
-/* Botón primario: elevación suave al hover y anillo de foco accesible */
-button {
-  transition: background .15s ease, transform .12s ease, box-shadow .15s ease;
-}
+/* Botón primario: elevación suave al hover y anillo de foco accesible.
+   (P2.15) Aquí había un `button { transition }` que la regla base de `button`
+   (más abajo) sobreescribía, dejando la elevación del hover SIN animar. La
+   transición consolidada vive ahora en la regla base. */
 button:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px var(--sombra-activa);
@@ -539,10 +539,9 @@ select:focus-visible {
   .vista-entra > h3, .vista-entra > h4, .vista-entra > .aviso { animation: none; }
 }
 
-/* Header "vidrio": translúcido + blur sobre el contenido al hacer scroll */
-header {
-  background: var(--header-bg);
-}
+/* Header "vidrio": translúcido + blur sobre el contenido al hacer scroll.
+   (P2.15) Se quitó un `header { background }` redundante: el bloque base de
+   `header` ya lo define y el @supports siguiente lo sobreescribe. */
 @supports (backdrop-filter: blur(6px)) {
   header {
     background: color-mix(in srgb, var(--header-bg) 86%, transparent);
@@ -926,7 +925,7 @@ button {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: background .15s ease, transform .1s ease;
+  transition: background .15s ease, transform .1s ease, box-shadow .15s ease; /* (P2.15) incluye box-shadow: consolidado desde una regla duplicada que quedaba anulada */
 }
 button:hover {
   background: var(--verde-marca-hover);
