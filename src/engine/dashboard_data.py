@@ -2011,6 +2011,12 @@ def animales_por_grupo_inventario(
             if valor_norm in p_norm or p_norm in valor_norm:
                 filtrados.append(anim)
         titulo = f"Potrero: {valor}"
+    elif tipo_norm == "sin":
+        # "Animales sin…": activos a los que les falta el dato `valor`.
+        clave = str(valor or "").strip().lower()
+        ids = ids_animales_sin(db, clave, hoy=hoy_date)
+        filtrados = [anim for anim in todos if anim["id_animal"] in ids]
+        titulo = f"Animales sin: {ETIQUETAS_ANIMALES_SIN.get(clave, valor)}"
     else:
         filtrados = todos
         titulo = "Animales Activos"
@@ -3396,9 +3402,138 @@ def datos_inventario(db: Database) -> dict:
         "estructura_hato": _estructura_hato(db),
         "tasa_descarte": _tasa_descarte_anual(db),
     }
+    try:
+        out["animales_sin"] = datos_animales_sin(db)
+    except Exception as e:
+        logger.error("seccion animales_sin fallo", exc_info=True)
+        errores["animales_sin"] = str(e)
     if errores:
         out["errores"] = errores
     return out
+
+
+# "Animales sin…" (calidad de datos del hato, estilo Software Ganadero).
+# clave -> (etiqueta, ayuda). El orden es el de la tabla en Inventario.
+ANIMALES_SIN: list[tuple[str, str, str]] = [
+    ("potrero", "Potrero", "Sin potrero vigente (ni asignado ni por traslado)"),
+    ("sexo", "Sexo", "Sexo sin registrar"),
+    ("nacimiento", "Fecha de nacimiento", "Sin fecha de nacimiento"),
+    ("raza", "Raza", "Sin raza ni composición racial"),
+    ("composicion", "Composición racial (% sangre)", "Sin desglose de razas por porcentaje"),
+    ("hierro", "Hierro", "Sin hierro registrado"),
+    ("color", "Color", "Sin color registrado"),
+    ("chip", "Chip / IDE electrónico", "Sin identificación electrónica"),
+    ("foto", "Foto", "Sin ninguna foto"),
+    ("madre", "Crías sin madre", "Menores de 12 meses sin madre asignada"),
+    ("padre", "Crías sin padre", "Menores de 12 meses sin padre asignado"),
+    ("vacas_sin_cria", "Vacas sin cría", "Parto en los últimos 300 días sin cría asociada"),
+    ("peso_nacer", "Crías sin peso al nacer", "Menores de 12 meses sin peso al nacimiento"),
+    ("pesaje", "Sin pesaje en 90 días", "Ningún pesaje en los últimos 90 días"),
+    ("cc", "Vacas sin condición corporal (90 días)", "Hembras de 2+ años sin condición corporal en 90 días"),
+]
+ETIQUETAS_ANIMALES_SIN = {c: e for c, e, _ in ANIMALES_SIN}
+
+
+def _edades_activos(db: Database, hoy: date) -> dict[int, Optional[int]]:
+    """Edad en días de cada animal ACTIVO: fecha de nacimiento o, si falta,
+    la fecha del parto donde figura como cría."""
+    from ..utils import to_date
+    filas = db.query(
+        "SELECT a.id_animal, a.fecha_nacimiento, "
+        "(SELECT MAX(p.fecha) FROM partos p WHERE p.id_cria = a.id_animal) AS f_parto "
+        "FROM animales a WHERE a.estado = 'ACTIVO'"
+    )
+    edades: dict[int, Optional[int]] = {}
+    for r in filas:
+        f = to_date(r["fecha_nacimiento"]) or to_date(r["f_parto"])
+        edades[r["id_animal"]] = (hoy - f).days if f else None
+    return edades
+
+
+def _ids_sin_potrero(db: Database) -> set[int]:
+    """Misma regla que query.helpers.contar_animales_sin_potrero (potrero
+    vigente real), devolviendo los ids."""
+    from ..db.database import SQL_POTRERO_REAL, POTRERO_VIGENTE_SUBQUERY
+    validos = {r["id"] for r in db.query(f"SELECT id FROM potreros WHERE {SQL_POTRERO_REAL}")}
+    return {
+        r["id_animal"] for r in db.query(
+            f"SELECT a.id_animal, {POTRERO_VIGENTE_SUBQUERY} AS pid FROM animales a WHERE a.estado = 'ACTIVO'"
+        ) if r["pid"] is None or r["pid"] not in validos
+    }
+
+
+def ids_animales_sin(db: Database, clave: str, hoy: Optional[date] = None) -> set[int]:
+    """Ids de animales ACTIVOS a los que les falta el dato ``clave``
+    (ver ANIMALES_SIN). Clave desconocida -> conjunto vacío."""
+    hoy = hoy or date.today()
+    vacio = "(a.{c} IS NULL OR TRIM(a.{c}) = '')"
+
+    def _q(where: str, params: tuple = ()) -> set[int]:
+        return {r["id_animal"] for r in db.query(
+            f"SELECT a.id_animal FROM animales a WHERE a.estado = 'ACTIVO' AND {where}", params)}
+
+    def _crias() -> set[int]:
+        return {aid for aid, e in _edades_activos(db, hoy).items() if e is not None and e < 365}
+
+    hace90 = (hoy - timedelta(days=90)).isoformat()
+    if clave == "potrero":
+        return _ids_sin_potrero(db)
+    if clave == "sexo":
+        return _q("(a.sexo IS NULL OR TRIM(a.sexo) = '' OR LOWER(TRIM(a.sexo)) IN "
+                  "('i', 'indefinido', 'indeterminado', 'desconocido', '?'))")
+    if clave == "nacimiento":
+        return _q(vacio.format(c="fecha_nacimiento"))
+    if clave == "raza":
+        return _q(vacio.format(c="raza") + " AND NOT EXISTS (SELECT 1 FROM composicion_racial cr "
+                  "WHERE cr.animal_id = a.id_animal)")
+    if clave == "composicion":
+        return _q("NOT EXISTS (SELECT 1 FROM composicion_racial cr WHERE cr.animal_id = a.id_animal)")
+    if clave in ("hierro", "color", "chip"):
+        return _q(vacio.format(c=clave))
+    if clave == "foto":
+        return _q("NOT EXISTS (SELECT 1 FROM fotos f WHERE f.animal_id = a.id_animal "
+                  "OR (f.tag IS NOT NULL AND UPPER(f.tag) = UPPER(a.tag)))")
+    if clave == "madre":
+        return _crias() & _q("a.madre_id IS NULL")
+    if clave == "padre":
+        return _crias() & _q("a.padre_id IS NULL")
+    if clave == "vacas_sin_cria":
+        return {r["vaca_id"] for r in db.query(
+            "SELECT DISTINCT p.vaca_id FROM partos p JOIN animales a ON a.id_animal = p.vaca_id "
+            "WHERE a.estado = 'ACTIVO' AND p.fecha >= ? AND p.id_cria IS NULL "
+            "AND UPPER(COALESCE(p.tipo_evento, 'PARTO')) IN ('PARTO', 'GEMELAR')",
+            ((hoy - timedelta(days=300)).isoformat(),))}
+    if clave == "peso_nacer":
+        con_peso = {r["id_cria"] for r in db.query(
+            "SELECT DISTINCT id_cria FROM partos WHERE id_cria IS NOT NULL AND peso_nacimiento > 0")}
+        return _crias() - con_peso
+    if clave == "pesaje":
+        return _q("NOT EXISTS (SELECT 1 FROM pesajes pe WHERE pe.animal_id = a.id_animal AND pe.fecha >= ?)",
+                  (hace90,))
+    if clave == "cc":
+        adultas = {aid for aid, e in _edades_activos(db, hoy).items() if e is not None and e >= 730}
+        return adultas & _q("LOWER(SUBSTR(COALESCE(a.sexo, ''), 1, 1)) = 'h' AND NOT EXISTS "
+                            "(SELECT 1 FROM condicion_corporal c WHERE c.animal_id = a.id_animal AND c.fecha >= ?)",
+                            (hace90,))
+    return set()
+
+
+def datos_animales_sin(db: Database, hoy: Optional[date] = None) -> dict:
+    """Tabla "Animales sin…": cuántos animales ACTIVOS no tienen cada dato."""
+    r = db.query_one("SELECT COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO'")
+    total = int(r["n"]) if r else 0
+    filas = []
+    for clave, etiqueta, ayuda in ANIMALES_SIN:
+        try:
+            n = len(ids_animales_sin(db, clave, hoy=hoy))
+        except Exception:
+            logger.error("animales_sin %s fallo", clave, exc_info=True)
+            continue
+        filas.append({
+            "clave": clave, "etiqueta": etiqueta, "ayuda": ayuda, "total": n,
+            "pct": round(n / total * 100, 1) if total else 0.0,
+        })
+    return {"total_activos": total, "filas": filas}
 
 
 def _estructura_hato(db: Database) -> dict:
