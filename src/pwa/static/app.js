@@ -1230,53 +1230,68 @@
     var k = d.kpis || {};
     h += "<div class='kpis' style='margin-bottom:14px;'>"
       + kpi(esc(k.sin_pesar_nunca || 0), "Nunca pesados", (k.sin_pesar_nunca > 0 ? "alerta" : "ok"))
-      + kpi(esc(k.sin_pesar_vencidos || 0), "Sin pesar &gt; 60d", (k.sin_pesar_vencidos > 0 ? "alerta" : "ok"))
-      + kpi(esc(k.a_pesar_edad || 0), "A pesar por edad")
+      + kpi(esc(k.sin_pesar_vencidos || 0), "Sin pesar > 60 d", (k.sin_pesar_vencidos > 0 ? "alerta" : "ok"))
+      + kpi(esc(k.a_pesar_edad || 0), "Pendientes de pesar", (k.a_pesar_edad > 0 ? "alerta" : "ok"))
       + kpi(esc(k.destetes_12m || 0), "Destetes (12m)")
       + kpi(esc(k.proyeccion_destetes || 0), "Destetes proyectados")
       + kpi(esc(k.prueba_n || 0), "En prueba")
       + "</div>";
 
-    // 1) Animales sin pesar
-    var spNunca = (d.sin_pesar && d.sin_pesar.nunca) || [];
-    var spVenc = (d.sin_pesar && d.sin_pesar.vencidos) || [];
-    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
-      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("scale", 16) + "Animales sin pesar</div>"
-      + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin:6px 0 4px; text-transform:uppercase;'>Nunca pesados (" + spNunca.length + ")</div>"
-      + tabla(spNunca, [
-        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
-        ["nombre", "Nombre"],
-        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
-        ["potrero", "Potrero"],
-        ["ultimo_pesaje", "Último pesaje", "text", function () { return "Nunca"; }]
-      ], "Todos los animales activos tienen al menos un pesaje.")
-      + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin:12px 0 4px; text-transform:uppercase;'>Último pesaje &gt; 60 días (" + spVenc.length + ")</div>"
-      + tabla(spVenc, [
-        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
-        ["nombre", "Nombre"],
-        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
-        ["potrero", "Potrero"],
-        ["ultimo_pesaje", "Último pesaje", "text", function (v) { return esc(fechaCorta(v)); }],
-        ["dias_sin_pesar", "Días sin pesar", "text", function (v) { return "<span class='chip ambar'><b>" + esc(v) + " d</b></span>"; }]
-      ], "Ningún animal activo supera los 60 días sin pesarse. 🎉")
-      + "</div>";
-
-    // 2) Animales a pesar por edad
+    // 1) Agenda de pesaje: una sola lista (nunca pesados + vencidos por edad),
+    // agrupada por potrero porque así se sale a pesar.
     var aPesar = d.a_pesar_edad || [];
-    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--ambar-marca, #D97706);'>"
-      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("weight", 16) + "Animales a pesar por edad</div>"
-      + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:8px;'>Frecuencia: crías &lt;8m cada 30d · levantes 8-18m cada 60d · adultos &gt;18m cada 90d. "
-      + "Excluidos sin fecha de nacimiento: <b>" + esc(d.sin_fecha_nacimiento_n || 0) + "</b>.</div>"
-      + tabla(aPesar, [
-        ["tag", "Animal", "text", function (v) { return enlaceFicha(v); }],
-        ["nombre", "Nombre"],
-        ["edad_dias", "Edad (días)", "text", function (v) { return v != null ? esc(v) : "—"; }],
-        ["frecuencia_dias", "Frecuencia", "text", function (v) { return esc(v) + " d"; }],
-        ["ultimo_pesaje", "Último pesaje", "text", function (v) { return v ? esc(fechaCorta(v)) : "Nunca"; }],
-        ["proximo_pesaje", "Próximo", "text", function (v) { return v ? esc(fechaCorta(v)) : "Hoy"; }],
-        ["potrero", "Potrero"]
-      ], "Ningún animal activo tiene su pesaje vencido por edad. 🎉")
-      + "</div>";
+    var nActivos = k.activos || 0;
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("scale", 16) + "Agenda de pesaje</div>"
+      + "<p class='aviso' style='margin:0 0 8px;'>Frecuencia: crías &lt;8 m cada 30 d · levantes 8-18 m cada 60 d · adultos &gt;18 m cada 90 d.</p>";
+    if (!aPesar.length) {
+      h += vacio("Ningún animal activo tiene su pesaje vencido. 🎉");
+    } else {
+      if (nActivos && aPesar.length >= nActivos * 0.9) {
+        h += "<p class='aviso' style='margin:0 0 10px;'>⚠️ Casi todo el hato (" + esc(aPesar.length) + " de " + esc(nActivos)
+          + ") está sin pesaje reciente. Conviene empezar por las crías y los levantes, que son los que más cambian de peso.</p>";
+      }
+      var cont = { cat: {}, est: { NUNCA: 0, VENCIDO: 0 } };
+      aPesar.forEach(function (a) {
+        cont.cat[a.categoria] = (cont.cat[a.categoria] || 0) + 1;
+        cont.est[a.estado_pesaje] = (cont.est[a.estado_pesaje] || 0) + 1;
+      });
+      var CAT_NOMBRE = { CRIA: "Crías", LEVANTE: "Levantes", ADULTO: "Adultos", SIN_EDAD: "Sin fecha nac." };
+      h += "<div class='gen-filtros' data-grupo-filtro='cat'><button type='button' class='chip btn-filtro-pes act' data-filtro='cat' data-valor='TODOS'>Todos " + aPesar.length + "</button>";
+      ["CRIA", "LEVANTE", "ADULTO", "SIN_EDAD"].forEach(function (c) {
+        if (cont.cat[c]) h += "<button type='button' class='chip btn-filtro-pes' data-filtro='cat' data-valor='" + c + "'>" + CAT_NOMBRE[c] + " " + cont.cat[c] + "</button>";
+      });
+      h += "</div><div class='gen-filtros'><button type='button' class='chip btn-filtro-pes act' data-filtro='est' data-valor='TODOS'>Cualquier estado</button>"
+        + (cont.est.NUNCA ? "<button type='button' class='chip btn-filtro-pes' data-filtro='est' data-valor='NUNCA'>Nunca pesados " + cont.est.NUNCA + "</button>" : "")
+        + (cont.est.VENCIDO ? "<button type='button' class='chip btn-filtro-pes' data-filtro='est' data-valor='VENCIDO'>Pesaje vencido " + cont.est.VENCIDO + "</button>" : "")
+        + "</div>";
+
+      var porPot = {}, pots = [];
+      aPesar.forEach(function (a) {
+        var p = a.potrero || "Sin potrero";
+        if (!porPot[p]) { porPot[p] = []; pots.push(p); }
+        porPot[p].push(a);
+      });
+      pots.sort(function (x, y) { return porPot[y].length - porPot[x].length || x.localeCompare(y); });
+      var abrir = aPesar.length <= 30;
+      pots.forEach(function (p) {
+        var filas = porPot[p];
+        h += "<details class='gen-grupo pes-grupo'" + (abrir ? " open" : "") + "><summary><span>" + esc(p) + "</span>"
+          + "<b class='pes-grupo-n'>" + filas.length + "</b><small>animales</small></summary>";
+        filas.forEach(function (a) {
+          var detalle = a.estado_pesaje === "NUNCA"
+            ? "<span class='chip gris'>Nunca pesado</span>"
+            : "<span class='chip ambar'>Vencido hace " + esc(edadCorta(a.dias_vencido)) + "</span> <small>último " + esc(fechaCorta(a.ultimo_pesaje)) + "</small>";
+          h += "<div class='fila-pes' data-cat='" + esc(a.categoria) + "' data-est='" + esc(a.estado_pesaje) + "'>"
+            + "<div class='fila-pes-cab'><span>" + enlaceFicha(a.tag) + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span>"
+            + "<small>" + (a.edad_dias != null ? esc(edadCorta(a.edad_dias)) : "edad ?") + " · " + esc(CAT_NOMBRE[a.categoria] || "") + "</small></div>"
+            + "<div>" + detalle + "</div></div>";
+        });
+        h += "</details>";
+      });
+      h += "<p class='aviso' id='pes-sin-resultados' hidden>Ningún animal coincide con el filtro.</p>";
+    }
+    h += "</div>";
 
     // 3) Destete / Índice productivo
     var destetes = d.destetes || [];
@@ -1349,7 +1364,45 @@
     return h;
   }
 
+  // Edad o lapso en días → "12 d", "8 m", "7 a".
+  function edadCorta(dias) {
+    var n = Number(dias) || 0;
+    if (n < 60) return n + " d";
+    if (n < 730) return Math.floor(n / 30.4) + " m";
+    return Math.floor(n / 365.25) + " a";
+  }
+
   function bindCarne() {
+    var filtro = { cat: "TODOS", est: "TODOS" };
+    var botones = qa(".btn-filtro-pes");
+    function aplicar() {
+      var total = 0;
+      qa(".pes-grupo").forEach(function (gr) {
+        var n = 0;
+        gr.querySelectorAll(".fila-pes").forEach(function (f) {
+          var ok = (filtro.cat === "TODOS" || f.getAttribute("data-cat") === filtro.cat)
+            && (filtro.est === "TODOS" || f.getAttribute("data-est") === filtro.est);
+          f.hidden = !ok;
+          if (ok) n++;
+        });
+        gr.hidden = !n;
+        var cnt = gr.querySelector(".pes-grupo-n");
+        if (cnt) cnt.textContent = n;
+        total += n;
+      });
+      var sr = q("#pes-sin-resultados");
+      if (sr) sr.hidden = total > 0;
+    }
+    botones.forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tipo = b.getAttribute("data-filtro");
+        filtro[tipo] = b.getAttribute("data-valor");
+        botones.forEach(function (o) {
+          if (o.getAttribute("data-filtro") === tipo) o.classList.toggle("act", o === b);
+        });
+        aplicar();
+      });
+    });
     var form = document.getElementById("form-carne-rango");
     if (form && !form.__bound) {
       form.__bound = true;

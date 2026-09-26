@@ -55,6 +55,12 @@ def test_a_pesar_por_edad_frecuencia_por_categoria(db):
     assert por_tag["ADULTO_VENCIDO"]["frecuencia_dias"] == 90
     assert "ADULTO_OK" not in por_tag
     assert out["sin_fecha_nacimiento_n"] == 1
+    # Agenda unificada: categoría y estado por animal; sin fecha no se pierde.
+    assert por_tag["CRIA"]["categoria"] == "CRIA" and por_tag["CRIA"]["estado_pesaje"] == "NUNCA"
+    assert por_tag["ADULTO_VENCIDO"]["estado_pesaje"] == "VENCIDO"
+    assert por_tag["ADULTO_VENCIDO"]["dias_vencido"] == 10
+    assert por_tag["SIN_FECHA"]["categoria"] == "SIN_EDAD"
+    assert out["kpis"]["activos"] == 5
 
 
 # --------------------------------------------------------------------------- #
