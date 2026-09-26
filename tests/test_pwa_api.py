@@ -59,7 +59,7 @@ def test_endpoints_sin_sesion_devuelven_401(db_file):
     app = crear_app(db_file, password="clave-de-prueba")
     c = app.test_client()
     for ep in ("/api/tablero", "/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche",
-               "/api/ficha/47", "/api/finanzas", "/api/mensajes-equipo"):
+               "/api/ficha/47", "/api/finanzas", "/api/mensajes-equipo", "/api/carne"):
         r = c.get(ep)
         assert r.status_code == 401, ep
 
@@ -188,6 +188,26 @@ def test_endpoints_lectura_repro_sanidad_pasturas_leche(client):
     for ep in ("/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche"):
         r = client.get(ep)
         assert r.status_code == 200, ep
+
+
+def test_api_carne_y_gaps_repro_devuelven_estructura(client):
+    r = client.get("/api/carne")
+    assert r.status_code == 200
+    d = r.get_json()
+    for clave in ("sin_pesar", "a_pesar_edad", "destetes", "indice_productivo",
+                  "proyeccion_destetes", "proyeccion_destetes_mes",
+                  "prueba_comportamiento", "kpis"):
+        assert clave in d, clave
+    assert "nunca" in d["sin_pesar"] and "vencidos" in d["sin_pesar"]
+    assert "animales" in d["prueba_comportamiento"]
+
+    r2 = client.get("/api/repro")
+    assert r2.status_code == 200
+    d2 = r2.get_json()
+    for clave in ("debieron_parir", "sin_programar", "proyeccion_celos",
+                  "servicios_realizados", "servicios_rango",
+                  "novillas_entoradas", "reproductores_estado"):
+        assert clave in d2, clave
         assert isinstance(r.get_json(), dict)
 
 
