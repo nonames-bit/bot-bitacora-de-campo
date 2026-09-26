@@ -86,6 +86,65 @@ FRACCIONES_ESTANDAR: list[tuple[float, str, bool]] = [
 ]
 
 
+# Catálogo de razas de Software Ganadero (raza.dbf) usado cuando el backup
+# no trae su propio raza.dbf.
+CATALOGO_RAZAS_SG_DEFECTO = {
+    "01": "Cebú Comercial",
+    "02": "Pardo Suizo",
+    "03": "Holstein",
+    "04": "Gyr",
+    "05": "Guzerá",
+    "06": "Brahman Gris",
+    "07": "Hartón del Valle",
+    "08": "Holstein Rojo",
+    "09": "Santa Gertrudis",
+    "10": "Costeño con Cuernos (CCC)",
+    "11": "Jersey",
+    "12": "Ayrshire",
+    "13": "Angus Rojo",
+    "14": "Angus Negro",
+    "15": "Simmental",
+    "16": "Criolla",
+    "17": "Blanco Orejinegro (BON)",
+    "18": "Normando",
+    "19": "Pardo Colombiano",
+    "20": "Sahiwal",
+    "21": "Rubio Alemán",
+    "22": "Shorthorn",
+    "23": "Lucerna",
+    "24": "Sanmartinero",
+    "25": "Limonero",
+    "26": "Velásquez",
+    "27": "M.A.Z",
+    "28": "Casanare",
+    "29": "Nelore",
+    "30": "Indubrasil",
+    "31": "Brahman Rojo",
+    "32": "Chino Santandereano",
+    "33": "Romosinuano",
+    "34": "Charolais",
+    "35": "Cebú Comercial",
+    "36": "Limousin",
+    "37": "Chianina",
+    "38": "Beefmaster",
+    "39": "Guernsey",
+    "40": "Carora",
+    "41": "Piamontés",
+    "42": "Hereford",
+    "43": "Gelbvieh",
+    "44": "Belga Azul",
+    "45": "Mono Pinteño",
+    "46": "Búfalo",
+    "47": "Simmental Americano",
+    "48": "Pardo Americano",
+    "49": "Pardo Colombiano",
+    "50": "Simmental Alemán",
+    "51": "Montbéliarde",
+    "52": "Girolando",
+    "53": "7 Colores",
+}
+
+
 # Tipos de raza de SG que no identifican una raza concreta.
 _NO_RAZAS = {"Mestizo", "Taurino", "Cebuino", "Indeterminado", "Desconocida", "Sin Raza"}
 _TIPOS_SG_SIN_RAZA = {"I", "C", "T", "INDETERMINADO", "CEBUINO", "CEBU", "TAURINO"}
@@ -361,6 +420,23 @@ def clasificar_animal_zootecnico(
             "es_tipificado": False,
         }
 
+    # Genealogía incompleta: con >= 1/4 de sangre sin dato ("Desconocida",
+    # tipos genéricos de SG) el grado del cruce no es confiable; un
+    # "3/4 Desconocida + 1/4 Gyr" no es un animal 3/4.
+    sin_dato = sum(c["porcentaje"] for c in c_norm if c["raza"] in _NO_RAZAS)
+    if sin_dato >= 25.0:
+        conocidas = [c["raza"] for c in c_norm if c["raza"] not in _NO_RAZAS]
+        nombres = " + ".join(conocidas[:3]) + (" + otras" if len(conocidas) > 3 else "")
+        frac_sd = porcentaje_a_fraccion(sin_dato)
+        return {
+            "grado_codigo": "PARCIAL",
+            "grado_nombre": "Genealogía incompleta",
+            "fraccion": "Parcial",
+            "chip_color": "gris",
+            "patron_formula": f"{nombres or 'Sin raza conocida'} ({frac_sd} sin dato)",
+            "es_tipificado": True,
+        }
+
     # 1. Puros o Puro por Cruce (>= 96.0%)
     if len(c_norm) == 1 or max_p >= 96.0:
         return {
@@ -442,13 +518,12 @@ def clasificar_animal_zootecnico(
 
     # 6. Media Sangre multirracial (~50% de la raza dominante)
     if abs(max_p - 50.0) <= 6.0:
-        r2 = c_norm[1]["raza"] if len(c_norm) > 1 else "Otro"
         return {
             "grado_codigo": "1_2",
             "grado_nombre": "Media Sangre (1/2)",
             "fraccion": "1/2",
             "chip_color": "lima",
-            "patron_formula": f"1/2 {r1} + 1/2 Cruce ({r2})",
+            "patron_formula": f"1/2 {r1} + 1/2 varias razas",
             "es_tipificado": True,
         }
 
@@ -482,6 +557,7 @@ def calcular_resumen_genetico_hato(
     puntos_raciales: dict[str, float] = {}
     animales_por_raza: dict[str, set[str]] = {}
 
+    puntos_sin_dato = 0.0
     conteo_grados: dict[str, int] = {}
     patrones_map: dict[tuple[str, str, str, str, str], list[str]] = {}
 
@@ -497,6 +573,7 @@ def calcular_resumen_genetico_hato(
         "9_16": {"nombre": "Nueve Dieciseisavos (9/16)", "chip": "9/16", "color": "lima", "orden": 5.4},
         "1_2": {"nombre": "Medias Sangres Multirracial", "chip": "1/2", "color": "lima", "orden": 6},
         "MULTI": {"nombre": "Compuestos / Trihíbridos", "chip": "Compuesto", "color": "naranja", "orden": 7},
+        "PARCIAL": {"nombre": "Genealogía incompleta", "chip": "Parcial", "color": "gris", "orden": 7.5},
         "CEBU": {"nombre": "Cebuino Base", "chip": "Cebuino", "color": "ambar", "orden": 8},
         "TAURINO": {"nombre": "Taurino Base", "chip": "Taurino", "color": "azul", "orden": 9},
         "INDET": {"nombre": "Indeterminados (Base SG)", "chip": "Indeterminado", "color": "gris", "orden": 10},
@@ -531,6 +608,10 @@ def calcular_resumen_genetico_hato(
             for c in comp:
                 nom_r = normalizar_nombre_raza(c.get("raza") or "Sin Raza")
                 pct_r = float(c.get("porcentaje") or 0.0) * f_norm
+                if nom_r in _NO_RAZAS:
+                    # "Desconocida" no es una raza: va aparte del pool.
+                    puntos_sin_dato += pct_r
+                    continue
                 puntos_raciales[nom_r] = puntos_raciales.get(nom_r, 0.0) + pct_r
                 if nom_r not in animales_por_raza:
                     animales_por_raza[nom_r] = set()
@@ -556,6 +637,7 @@ def calcular_resumen_genetico_hato(
     pool_racial = []
     colores_razas = {
         "Gyr": "#2e7d32",
+        "Holstein": "#1565c0",
         "Holstein Negro": "#1565c0",
         "Ayrshire": "#c62828",
         "Cebú Comercial": "#ef6c00",
@@ -563,7 +645,7 @@ def calcular_resumen_genetico_hato(
         "Guzerá": "#00838f",
         "Shorthorn": "#ad1457",
         "Jersey": "#e65100",
-        "Girolando": "#2e7d32",
+        "Girolando": "#7cb342",
         "Cebú Rojo": "#d84315",
         "Holstein Rojo": "#0277bd",
         "Hereford": "#b71c1c",
@@ -583,7 +665,11 @@ def calcular_resumen_genetico_hato(
 
     # 3. Patrones de cruce consolidados
     patrones_cruces = []
-    for (gid, gnom, frac, col, pat), tag_list in sorted(patrones_map.items(), key=lambda x: len(x[1]), reverse=True):
+    def _orden_patron(item):
+        (gid, *_), tags = item
+        return (info_grados.get(gid, {}).get("orden", 99), -len(tags))
+
+    for (gid, gnom, frac, col, pat), tag_list in sorted(patrones_map.items(), key=_orden_patron):
         cabs = len(tag_list)
         patrones_cruces.append({
             "grado_codigo": gid,
@@ -618,6 +704,8 @@ def calcular_resumen_genetico_hato(
         "indeterminados": conteo_grados.get("INDET", 0),
         "grados_resumen": grados_resumen,
         "pool_racial": pool_racial,
+        "pool_sin_dato_pct": round(puntos_sin_dato / (total_puntos + puntos_sin_dato) * 100.0, 1)
+        if (total_puntos + puntos_sin_dato) else 0.0,
         "patrones_cruces": patrones_cruces,
         "filas": filas_compatibles,
     }
@@ -829,3 +917,12 @@ def parsear_texto_raza(texto: Optional[str]) -> list[dict]:
         "fraccion": "Puro",
         "etiqueta": f"{norm} Puro",
     }]
+
+
+def nombre_raza_sg(raza: Optional[str]) -> Optional[str]:
+    """Traduce los códigos sin catálogo que dejó la importación ("Raza 17")."""
+    m = re.fullmatch(r"\s*Raza\s+(\d+)\s*", str(raza or ""))
+    if not m:
+        return raza
+    cod = m.group(1).zfill(2)
+    return CATALOGO_RAZAS_SG_DEFECTO.get(cod, raza)

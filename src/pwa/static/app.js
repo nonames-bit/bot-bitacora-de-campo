@@ -4557,205 +4557,208 @@
       ], "Sin pesajes con GMD calculada recientemente.");
     return h;
   }
+  // Colores de los grados de sangre (legibles en tema claro y oscuro).
+  var GEN_COLOR_GRADO = {
+    morado: "#8e5cc4", verde: "#3f9142", azul: "#2f7fc1", ambar: "#d49a1a",
+    cyan: "#1f9aa6", lima: "#8fa82a", naranja: "#e0782a", gris: "#9aa19b"
+  };
+  var GEN_ICONO_GRADO = {
+    PURO: "🌟", F1_1_2: "🧬", "3_4": "📐", "5_8": "⚖️", "7_8": "🎯", "15_16": "🏅",
+    "13_16": "📐", "11_16": "📐", "9_16": "📐", "1_2": "🌿", MULTI: "🔄",
+    PARCIAL: "🧩", CEBU: "🐂", TAURINO: "🐄", INDET: "❓", SIN_CLASIFICAR: "❔"
+  };
+  // Grados sin raza confiable: al final, en gris y cerrados por defecto.
+  var GEN_SIN_DESGLOSE = { PARCIAL: 1, CEBU: 1, TAURINO: 1, INDET: 1, SIN_CLASIFICAR: 1 };
+
+  function genChipsTags(tags, idx) {
+    var chip = function (tg) {
+      return "<button type='button' class='chip tag-chip-genetica' data-tag='" + esc(tg) + "' title='Ver ficha de " + esc(tg) + "'>" + esc(tg) + "</button>";
+    };
+    var max = 12;
+    var h = tags.slice(0, max).map(chip).join("");
+    var ocultos = tags.slice(max);
+    if (ocultos.length) {
+      var id = "tags-ocultos-gen-" + idx;
+      h += "<span id='" + id + "' hidden>" + ocultos.map(chip).join("") + "</span>"
+        + "<button type='button' class='chip btn-expandir-tags' data-target='" + id + "'>+" + ocultos.length + " más</button>";
+    }
+    return h;
+  }
+
   function renderGenetica(d) {
     var h = "<h3>" + icon("dna") + "Composición Genética & Razas del Hato</h3>" + erroresHtml(d);
 
     var totalAct = d.total_activos || d.total || 0;
     var tip = d.tipificados || 0;
     var pctTip = d.pct_tipificados || (totalAct ? ((tip / totalAct) * 100).toFixed(1) : 0);
-    var indet = d.indeterminados || 0;
+    var grados = d.grados_resumen || [];
 
-    // 1. Tarjetas KPIs principales
-    h += "<div class='kpis' style='margin-bottom:14px;'>"
-      + kpi(tip, "Con Desglose Racial (" + pctTip + "%)", "Tipificados con razas y cruces zootécnicos")
-      + kpi(totalAct, "Total Hato Activo", "Cabezas activas evaluadas")
-      + kpi(indet, "Base SG / Sin Desglose", "Importados sin desglose específico")
+    // 1. KPIs
+    h += "<div class='kpis'>"
+      + kpi(totalAct, "Hato activo")
+      + kpi(tip, "Con desglose racial (" + pctTip + "%)", "ok")
+      + kpi(d.indeterminados || 0, "Sin desglose (base SG)")
       + "</div>";
 
-    // 2. Grados de Sangre (F1, 1/2, 3/4, 5/8, etc.) en chips táctiles
-    var grados = d.grados_resumen || [];
+    // 2. Grados de sangre: barra apilada + leyenda (clic = filtra familias)
     if (grados.length) {
-      h += "<div class='card' style='padding:12px 16px; margin-bottom:16px; border-left:4px solid var(--verde-marca);'>"
-        + "<b style='font-size:13.5px; display:flex; align-items:center; gap:6px; margin-bottom:8px;'>"
-        + icon("dna", 15) + "Distribución por Grados de Sangre Ganaderos</b>"
-        + "<div style='display:flex; flex-wrap:wrap; gap:8px;'>";
+      h += "<h4>" + icon("dna") + "Grados de sangre</h4><div class='gen-barra' role='img' aria-label='Distribución por grados de sangre'>";
       grados.forEach(function (g) {
-        var col = g.color || "gris";
-        h += "<div style='background:var(--superficie-hover); border:1px solid var(--borde); border-radius:8px; padding:6px 10px; display:flex; align-items:center; gap:8px;'>"
-          + "<span class='chip " + esc(col) + "' style='font-weight:700; font-size:11.5px;'>" + esc(g.chip) + "</span>"
-          + "<span style='font-size:12.5px; font-weight:600; color:var(--texto);'>" + esc(g.nombre) + ":</span>"
-          + "<b style='font-size:13.5px; color:var(--texto);'>" + esc(g.cabezas) + "</b>"
-          + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(g.pct_hato) + "%)</small>"
-          + "</div>";
+        var ancho = Math.max(0.6, Number(g.pct_hato) || 0);
+        h += "<span style='width:" + ancho + "%; background:" + (GEN_COLOR_GRADO[g.color] || GEN_COLOR_GRADO.gris) + ";' title='" + esc(g.nombre) + ": " + esc(g.cabezas) + " (" + esc(g.pct_hato) + "%)'></span>";
       });
-      h += "</div></div>";
+      h += "</div><div class='gen-leyenda'>";
+      grados.forEach(function (g) {
+        h += "<button type='button' class='gen-ley-item btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>"
+          + "<i style='background:" + (GEN_COLOR_GRADO[g.color] || GEN_COLOR_GRADO.gris) + ";'></i>"
+          + "<span>" + esc(g.nombre) + "</span><b>" + esc(g.cabezas) + "</b><small>" + esc(g.pct_hato) + "%</small></button>";
+      });
+      h += "</div>";
     }
 
-    // 3. Pool Genético Global (% de sangre en el hato)
+    // 3. Pool genético: % de sangre de cada raza entre los animales con desglose
     var pool = d.pool_racial || [];
     if (pool.length) {
-      h += "<h4>" + icon("chartBar") + "Pool Genético Global del Hato (% de Sangre Real)</h4>";
-      h += "<div style='display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; margin-bottom:16px;'>"
-        + "<div style='flex:1; min-width:280px; max-width:480px;'>"
-        + grafico("composicion_racial", "Pool Genético (Razas)")
-        + "</div>"
-        + "<div style='flex:1; min-width:280px; display:flex; flex-direction:column; gap:8px;'>";
-
+      var maxPct = pool.reduce(function (m, p) { return Math.max(m, Number(p.pct) || 0); }, 1);
+      h += "<h4>" + icon("chartBar") + "Pool genético (% de sangre)</h4>"
+        + "<p class='aviso'>Proporción de sangre de cada raza en los " + esc(tip) + " animales con desglose. Cabezas = animales que portan esa raza.</p>"
+        + "<div class='gen-pool'>";
       pool.forEach(function (p) {
-        var pCol = p.color || "var(--verde-marca)";
-        h += "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:8px; padding:8px 12px;'>"
-          + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;'>"
-          + "<span style='font-weight:700; font-size:13px; display:flex; align-items:center; gap:6px;'>"
-          + "<span style='display:inline-block; width:10px; height:10px; border-radius:50%; background:" + esc(pCol) + ";'></span>"
-          + esc(p.raza)
-          + "</span>"
-          + "<b>" + esc(p.pct) + "% <small style='color:var(--texto-suave); font-weight:normal;'>(" + esc(p.cabezas_portadoras) + " animales)</small></b>"
-          + "</div>"
-          + "<div style='width:100%; height:6px; background:var(--borde); border-radius:3px; overflow:hidden;'>"
-          + "<div style='width:" + Math.min(100, p.pct) + "%; height:100%; background:" + esc(pCol) + "; border-radius:3px;'></div>"
-          + "</div>"
+        var col = p.color || "var(--verde-marca)";
+        h += "<div class='gen-pool-fila'>"
+          + "<span class='gen-pool-raza'>" + esc(p.raza) + "</span>"
+          + "<span class='gen-pool-pista'><span style='width:" + ((Number(p.pct) || 0) / maxPct * 100).toFixed(1) + "%; background:" + esc(col) + ";'></span></span>"
+          + "<b>" + esc(p.pct) + "%</b><small>" + esc(p.cabezas_portadoras) + " cab.</small>"
           + "</div>";
       });
-
-      h += "</div></div>";
+      h += "</div>";
+      if (Number(d.pool_sin_dato_pct) > 0) {
+        h += "<p class='aviso'>🧩 Además, el " + esc(d.pool_sin_dato_pct) + "% de la sangre de estos animales no tiene dato (padre o madre sin raza registrada); no se cuenta como raza.</p>";
+      }
     }
 
-    // 4. Familias de Cruces Zootécnicos (F1, 1/2, 3/4, 5/8, etc.)
+    // 4. Familias de cruce, agrupadas por grado
     var patrones = d.patrones_cruces || [];
     if (patrones.length) {
-      h += "<h4>" + icon("dna") + "Familias de Cruce Zootécnico (F1, 1/2, 3/4, 5/8, 7/8, Puros)</h4>";
-
-      // Filtros táctiles rápidos
-      h += "<div style='display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 10px;'>"
-        + "<button type='button' class='chip btn-filtro-gen act' data-grado='TODOS' style='cursor:pointer; font-weight:700;'>Todos (" + patrones.length + " grupos)</button>"
-        + "<button type='button' class='chip morado btn-filtro-gen' data-grado='PURO' style='cursor:pointer;'>🌟 Puros</button>"
-        + "<button type='button' class='chip verde btn-filtro-gen' data-grado='F1_1_2' style='cursor:pointer;'>🧬 F1 (1/2)</button>"
-        + "<button type='button' class='chip azul btn-filtro-gen' data-grado='3_4' style='cursor:pointer;'>📐 3/4</button>"
-        + "<button type='button' class='chip ambar btn-filtro-gen' data-grado='5_8' style='cursor:pointer;'>⚖️ 5/8</button>"
-        + "<button type='button' class='chip cyan btn-filtro-gen' data-grado='7_8' style='cursor:pointer;'>🎯 7/8</button>"
-        + "<button type='button' class='chip lima btn-filtro-gen' data-grado='1_2' style='cursor:pointer;'>🌿 1/2 Multirracial</button>"
-        + "<button type='button' class='chip naranja btn-filtro-gen' data-grado='MULTI' style='cursor:pointer;'>🔄 Compuestos</button>"
-        + "<button type='button' class='chip gris btn-filtro-gen' data-grado='INDET' style='cursor:pointer;'>❓ Base SG</button>"
-        + "</div>";
-
-      // Buscador interactivo
-      h += "<div style='margin-bottom:12px;'>"
-        + "<input id='buscar-genetica-input' placeholder='🔍 Filtrar por nombre de cruce, raza o arete (ej: Girolando, 3/4, Gyr, JA45)...' style='width:100%; padding:9px 12px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; box-sizing:border-box;'>"
-        + "</div>";
-
-      // Tabla de patrones
-      h += "<div style='overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--borde); border-radius:8px; margin-bottom:16px;'>"
-        + "<table id='tabla-patrones-genetica' style='width:100%; border-collapse:collapse; font-size:13px; text-align:left;'>"
-        + "<thead style='background:var(--superficie-hover); border-bottom:1px solid var(--borde);'>"
-        + "<tr>"
-        + "<th style='padding:9px 12px; width:75px;'>Grado</th>"
-        + "<th style='padding:9px 12px;'>Línea / Cruce Zootécnico</th>"
-        + "<th style='padding:9px 12px; text-align:right; width:85px;'>Cabezas</th>"
-        + "<th style='padding:9px 12px; min-width:180px;'>Animales (Tag)</th>"
-        + "</tr>"
-        + "</thead>"
-        + "<tbody>";
-
-      patrones.forEach(function (p, idx) {
-        var col = p.chip_color || "gris";
-        var tags = p.animales || [];
-        var maxVisibles = 10;
-        var tagsVisibles = tags.slice(0, maxVisibles);
-        var ocultos = tags.slice(maxVisibles);
-
-        var chipsTagsHtml = tagsVisibles.map(function (tg) {
-          return "<button type='button' class='chip tag-chip-genetica' data-tag='" + esc(tg) + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600; margin:1px;' title='Ver ficha de " + esc(tg) + "'>" + esc(tg) + "</button>";
-        }).join(" ");
-
-        if (ocultos.length > 0) {
-          var idOcultos = "tags-ocultos-gen-" + idx;
-          var chipsOcultosHtml = ocultos.map(function (tg) {
-            return "<button type='button' class='chip tag-chip-genetica' data-tag='" + esc(tg) + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600; margin:1px;' title='Ver ficha de " + esc(tg) + "'>" + esc(tg) + "</button>";
-          }).join(" ");
-
-          chipsTagsHtml += " <span id='" + idOcultos + "' style='display:none;'>" + chipsOcultosHtml + "</span>"
-            + " <button type='button' class='btn-expandir-tags chip' data-target='" + idOcultos + "' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:700; background:var(--borde); color:var(--texto);'>+" + ocultos.length + " más...</button>";
-        }
-
-        h += "<tr class='fila-patron-gen' data-grado='" + esc(p.grado_codigo) + "' data-search='" + esc((p.nombre + " " + p.fraccion + " " + tags.join(" ")).toLowerCase()) + "' style='border-bottom:1px solid var(--borde);'>"
-          + "<td style='padding:8px 12px;'><span class='chip " + esc(col) + "' style='font-size:11px; font-weight:700;'>" + esc(p.fraccion) + "</span></td>"
-          + "<td style='padding:8px 12px; font-weight:600; color:var(--texto);'>" + esc(p.nombre) + "</td>"
-          + "<td style='padding:8px 12px; text-align:right;'><b style='font-size:13.5px;'>" + esc(p.cabezas) + "</b> <small style='color:var(--texto-suave); display:block; font-size:10.5px;'>" + esc(p.pct_hato) + "%</small></td>"
-          + "<td style='padding:8px 12px;'>" + chipsTagsHtml + "</td>"
-          + "</tr>";
+      h += "<h4>" + icon("dna") + "Familias de cruce</h4>"
+        + "<div class='gen-filtros'><button type='button' class='chip btn-filtro-gen act' data-grado='TODOS'>Todos</button>";
+      grados.forEach(function (g) {
+        h += "<button type='button' class='chip btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>" + (GEN_ICONO_GRADO[g.codigo] || "") + " " + esc(g.chip) + "</button>";
       });
+      h += "</div>"
+        + "<input id='buscar-genetica-input' class='gen-buscar' type='search' placeholder='🔍 Buscar cruce, raza o arete (ej: Gyr, 3/4, JA45)'>";
 
-      h += "</tbody></table></div>";
+      var grupos = [], porGrado = {};
+      patrones.forEach(function (p) {
+        var g = p.grado_codigo || "SIN_CLASIFICAR";
+        if (!porGrado[g]) { porGrado[g] = { codigo: g, nombre: p.grado_nombre, color: p.chip_color, cabezas: 0, items: [] }; grupos.push(porGrado[g]); }
+        porGrado[g].cabezas += Number(p.cabezas) || 0;
+        porGrado[g].items.push(p);
+      });
+      var resumenPorGrado = {};
+      grados.forEach(function (g) { resumenPorGrado[g.codigo] = g; });
+
+      var idx = 0;
+      grupos.forEach(function (gr) {
+        var res = resumenPorGrado[gr.codigo] || {};
+        var abierto = !GEN_SIN_DESGLOSE[gr.codigo];
+        h += "<details class='gen-grupo' data-grado='" + esc(gr.codigo) + "'" + (abierto ? " open" : "") + ">"
+          + "<summary><i style='background:" + (GEN_COLOR_GRADO[gr.color] || GEN_COLOR_GRADO.gris) + ";'></i>"
+          + "<span>" + (GEN_ICONO_GRADO[gr.codigo] || "") + " " + esc(res.nombre || gr.nombre) + "</span>"
+          + "<b>" + esc(gr.cabezas) + "</b><small>" + esc(res.pct_hato != null ? res.pct_hato + "%" : "") + "</small></summary>";
+        gr.items.forEach(function (p) {
+          var tags = p.animales || [];
+          h += "<div class='fila-patron-gen' data-grado='" + esc(gr.codigo) + "' data-search='" + esc((p.nombre + " " + p.fraccion + " " + tags.join(" ")).toLowerCase()) + "'>"
+            + "<div class='gen-patron-cab'><span>" + esc(p.nombre) + "</span><b>" + esc(p.cabezas) + "</b></div>"
+            + "<div class='gen-tags'>" + genChipsTags(tags, idx++) + "</div>"
+            + "</div>";
+        });
+        h += "</details>";
+      });
+      h += "<p class='aviso' id='gen-sin-resultados' hidden>Ningún cruce coincide con el filtro.</p>";
     } else {
       h += vacio("Sin información genética registrada en el hato activo.");
     }
 
-    // 5. Inventario de Pajuelas y Termo
-    h += "<h4>" + icon("pajuelas") + "Inventario de Pajuelas (Semen para I.A.)</h4>"
-      + tabla(d.pajuelas_inventario, [
-        ["codigo_toro", "Código Toro"], ["raza", "Raza"],
-        ["procedencia", "Procedencia"], ["canastilla", "Canastilla"],
-        ["cantidad", "Pajuelas", "num", function (v) {
-          var n = Number(v);
-          var c = n >= 10 ? "verde" : n >= 3 ? "ambar" : "rojo";
-          return "<span class='chip " + c + "'>" + esc(n) + "</span>";
-        }]
-      ], "Sin inventario de pajuelas registrado.");
+    // 5. Pajuelas y termo
+    var pj = d.pajuelas_inventario || [];
+    var tot = d.pajuelas_totales || {};
+    h += "<h4>" + icon("pajuelas") + "Inventario de pajuelas (semen para I.A.)</h4>";
+    if (tot.toros) {
+      h += "<p class='aviso'><b>" + esc(tot.toros) + "</b> toros con existencias · <b>" + esc(tot.unidades) + "</b> pajuelas en total"
+        + (tot.toros > pj.length ? " · se muestran los " + pj.length + " con más pajuelas" : "") + ".</p>";
+    }
+    var canastillas = {};
+    pj.forEach(function (r) { canastillas[r.canastilla || ""] = 1; });
+    var colsPj = [["codigo_toro", "Código"], ["raza", "Raza"], ["procedencia", "Toro / procedencia"]];
+    if (Object.keys(canastillas).length > 1) colsPj.push(["canastilla", "Canastilla"]);
+    colsPj.push(["cantidad", "Pajuelas", "num", function (v) {
+      var n = Number(v);
+      var c = n >= 10 ? "verde" : n >= 3 ? "ambar" : "rojo";
+      return "<span class='chip " + c + "'>" + esc(n) + "</span>";
+    }]);
+    h += tabla(pj, colsPj, "Sin inventario de pajuelas registrado.");
 
-    h += "<h4>" + icon("snowflake") + "Recargas del Termo de Nitrógeno</h4>"
-      + tabla(d.termo_nitrogeno, [
-        ["fecha_recarga", "Última Recarga"],
-        ["proxima_recarga", "Próxima Recarga", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
-        ["dias_intervalo", "Intervalo (días)", "num"]
-      ], "Sin historial de recargas de nitrógeno.");
+    h += "<h4>" + icon("snowflake") + "Recargas del termo de nitrógeno</h4>";
+    var te = d.termo_estado;
+    if (te && te.vencido) {
+      var dv = Number(te.dias_vencido) || 0;
+      var hace = dv >= 730 ? Math.floor(dv / 365) + " años" : dv >= 60 ? Math.floor(dv / 30) + " meses" : dv + " días";
+      h += "<p><span class='chip rojo'>⚠️ Recarga vencida hace " + esc(hace) + "</span> <small class='aviso'>Registra la última recarga para retomar el control.</small></p>";
+    }
+    h += tabla(d.termo_nitrogeno, [
+      ["fecha_recarga", "Última recarga", "text", function (v) { return esc(fechaCorta(v)); }],
+      ["proxima_recarga", "Próxima recarga", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
+      ["dias_intervalo", "Intervalo (días)", "num"]
+    ], "Sin historial de recargas de nitrógeno.");
 
     return h;
   }
 
   function bindGenetica(d) {
     var botonesFiltro = qa(".btn-filtro-gen");
-    var filas = qa(".fila-patron-gen");
+    var grupos = qa(".gen-grupo");
     var inputBuscar = q("#buscar-genetica-input");
+    var gradoSel = "TODOS";
 
     function aplicarFiltros() {
-      var btnAct = q(".btn-filtro-gen.act");
-      var gradoSel = (btnAct && btnAct.getAttribute("data-grado")) || "TODOS";
-      var txtBusq = ((inputBuscar && inputBuscar.value) || "").trim().toLowerCase();
-
-      filas.forEach(function (f) {
-        var g = f.getAttribute("data-grado") || "";
-        var searchData = f.getAttribute("data-search") || "";
-        var coincideGrado = (gradoSel === "TODOS" || g === gradoSel);
-        var coincideTexto = (!txtBusq || searchData.indexOf(txtBusq) !== -1);
-
-        if (coincideGrado && coincideTexto) {
-          f.style.display = "";
-        } else {
-          f.style.display = "none";
-        }
+      var txt = ((inputBuscar && inputBuscar.value) || "").trim().toLowerCase();
+      var visibles = 0;
+      grupos.forEach(function (gr) {
+        var filasVis = 0;
+        var okGrado = gradoSel === "TODOS" || gr.getAttribute("data-grado") === gradoSel;
+        gr.querySelectorAll(".fila-patron-gen").forEach(function (f) {
+          var ok = okGrado && (!txt || (f.getAttribute("data-search") || "").indexOf(txt) !== -1);
+          f.hidden = !ok;
+          if (ok) filasVis++;
+        });
+        gr.hidden = !filasVis;
+        // Al filtrar se abren los grupos con coincidencias, incluso los grises.
+        if (filasVis && (txt || gradoSel !== "TODOS")) gr.open = true;
+        visibles += filasVis;
       });
+      var sinRes = q("#gen-sin-resultados");
+      if (sinRes) sinRes.hidden = visibles > 0;
     }
 
     botonesFiltro.forEach(function (btn) {
       btn.addEventListener("click", function () {
-        botonesFiltro.forEach(function (b) { b.classList.remove("act"); });
-        btn.classList.add("act");
+        var g = btn.getAttribute("data-grado") || "TODOS";
+        gradoSel = (g === gradoSel && g !== "TODOS") ? "TODOS" : g;
+        botonesFiltro.forEach(function (b) { b.classList.toggle("act", b.getAttribute("data-grado") === gradoSel); });
         aplicarFiltros();
+        if (btn.classList.contains("gen-ley-item")) {
+          var destino = q(".gen-filtros");
+          if (destino && destino.scrollIntoView) destino.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       });
     });
-
-    if (inputBuscar) {
-      inputBuscar.addEventListener("input", aplicarFiltros);
-    }
+    if (inputBuscar) inputBuscar.addEventListener("input", aplicarFiltros);
 
     qa(".btn-expandir-tags").forEach(function (btn) {
       btn.addEventListener("click", function () {
-        var targetId = btn.getAttribute("data-target");
-        var targetEl = document.getElementById(targetId);
-        if (targetEl) {
-          targetEl.style.display = "inline";
-          btn.style.display = "none";
-        }
+        var el = document.getElementById(btn.getAttribute("data-target"));
+        if (el) { el.hidden = false; btn.hidden = true; }
       });
     });
 
