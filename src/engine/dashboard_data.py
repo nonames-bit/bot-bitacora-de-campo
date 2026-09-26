@@ -34,6 +34,7 @@ try:
         tramo_iep,
         tramo_del,
     )
+    from .growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete
     from .genetic_engine import calcular_resumen_genetico_hato
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
@@ -51,11 +52,189 @@ except ImportError:  # ejecución directa
         tramo_iep,
         tramo_del,
     )
+    from src.engine.growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete  # type: ignore
     from src.engine.genetic_engine import calcular_resumen_genetico_hato  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 MEDIA_DIR_DEFAULT = os.getenv("MEDIA_DIR", "media")
+
+# ---------------------------------------------------------------------------
+# Constantes del módulo Carne y gaps de Reproducción (reportes estilo
+# Software Ganadero). Son reglas de negocio acordadas con el usuario;
+# ajustar aquí si cambia el manejo zootécnico de la finca.
+# ---------------------------------------------------------------------------
+DIAS_SIN_PESAR = 60            # último pesaje con más de N días => "vencido"
+EDAD_CRIA_DIAS = 240           # <8 meses: pesaje mensual
+EDAD_LEVANTE_DIAS = 540        # 8-18 meses: pesaje bimensual
+FREQ_PESAJE_CRIA_DIAS = 30     # frecuencia de pesaje para crías (<8 m)
+FREQ_PESAJE_LEVANTE_DIAS = 60  # frecuencia para levantes (8-18 m)
+FREQ_PESAJE_ADULTO_DIAS = 90   # frecuencia para adultos (>18 m)
+PRUEBA_COMPORTAMIENTO_DIAS = 90    # rango default de la prueba (ranking GMD)
+VENTANA_DESTETES_MESES = 12        # destetes del reporte "Destete/Índice"
+DIAS_PROYECCION_CELO = 21          # ciclo estral bovino
+VENTANA_CELO_DIAS = 3              # ±3 días alrededor del celo proyectado
+DIAS_TORO_EN_SERVICIO = 60         # toro con monta natural en últimos N días
+TOLERANCIA_PARTO_FEP_DIAS = 15     # parto en [FEP-15, hoy] cubre la FEP
+DIAS_ABIERTOS_MIN_SIN_PROGRAMAR = 60  # días abiertos mínimos para "sin programar"
+DIAS_ENTORADA = 365                # primer parto en los últimos 12 meses
+DIAS_SERVICIOS_REALIZADOS = 30     # ventana default del listado de servicios
+
+# Resumen reproductivo por vientre ACTIVO: una sola consulta correlacionada
+# alimenta "debían haber parido", "sin programar", "proyección de celos" y
+# "novillas entoradas" (evita 4 barridos casi idénticos sobre las mismas tablas).
+SQL_VIENTRES_ACTIVOS = """
+    SELECT a.id_animal, a.tag, a.nombre, a.fecha_nacimiento,
+           (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal
+              AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS ult_parto,
+           (SELECT MIN(p2.fecha) FROM partos p2 WHERE p2.vaca_id = a.id_animal
+              AND (p2.tipo_evento IS NULL OR p2.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS primer_parto,
+           (SELECT COUNT(*) FROM partos p3 WHERE p3.vaca_id = a.id_animal
+              AND (p3.tipo_evento IS NULL OR p3.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS n_partos,
+           (SELECT dg.resultado FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+              ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_res,
+           (SELECT dg.fecha FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+              ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_fecha,
+           (SELECT dg.dias_gestacion FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+              ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_dias,
+           (SELECT s.fecha FROM servicios s WHERE s.vaca_id = a.id_animal
+              ORDER BY s.fecha DESC, s.id DESC LIMIT 1) AS ult_serv_fecha,
+           (SELECT s.fep_calculada FROM servicios s WHERE s.vaca_id = a.id_animal
+              ORDER BY s.fecha DESC, s.id DESC LIMIT 1) AS ult_serv_fep,
+           (SELECT s.toro_pajilla FROM servicios s WHERE s.vaca_id = a.id_animal
+              ORDER BY s.fecha DESC, s.id DESC LIMIT 1) AS ult_serv_toro,
+           (SELECT MAX(c.fecha) FROM celos c WHERE c.vaca_id = a.id_animal) AS ult_celo_fecha,
+           EXISTS(SELECT 1 FROM alertas al WHERE al.animal_id = a.id_animal
+                  AND al.tipo_alerta = 'INSEMINACION_PROGRAMADA' AND al.estado = 'PENDIENTE') AS tiene_prog_ia
+    FROM animales a
+    WHERE a.estado = 'ACTIVO' AND (a.sexo IS NULL OR LOWER(SUBSTR(a.sexo, 1, 1)) = 'h')
+"""
+
+
+def _estado_reproductivo_vigente(r) -> str:
+    """Clasifica una hembra ACTIVA: ``PRENADA`` / ``EN_ESPERA`` / ``ABIERTA``.
+
+    ``EN_ESPERA`` = servida sin diagnóstico posterior (no se puede afirmar
+    preñada ni vacía). ``PRENADA`` = el último evento reproductivo es un
+    diagnóstico positivo. ``ABIERTA`` = la última palabra es un diagnóstico
+    no positivo, o no hay servicio reciente."""
+    diag_res = str(r["ult_diag_res"] or "").upper()
+    diag_f = to_date_safe(r["ult_diag_fecha"])
+    serv_f = to_date_safe(r["ult_serv_fecha"])
+    if diag_f and (serv_f is None or diag_f >= serv_f):
+        if "PREÑADA" in diag_res or "POSITIV" in diag_res:
+            return "PRENADA"
+        return "ABIERTA"
+    if serv_f is not None:
+        return "EN_ESPERA"
+    return "ABIERTA"
+
+
+def _calcular_debieron_parir(vientres, hoy: date) -> list[dict]:
+    """Vacas con FEP vencida sin parto ni diagnóstico negativo posterior."""
+    out = []
+    for r in vientres:
+        serv_f = to_date_safe(r["ult_serv_fecha"])
+        fep = to_date_safe(r["ult_serv_fep"])
+        if not serv_f or not fep or fep >= hoy:
+            continue
+        diag_f = to_date_safe(r["ult_diag_fecha"])
+        if diag_f and diag_f >= serv_f:
+            res = str(r["ult_diag_res"] or "").upper()
+            if "VAC" in res or "NEGATIV" in res:
+                continue  # el diagnóstico posterior explica la FEP vencida
+        ult_parto = to_date_safe(r["ult_parto"])
+        if ult_parto and ult_parto >= fep - timedelta(days=TOLERANCIA_PARTO_FEP_DIAS):
+            continue  # ya parió dentro de la tolerancia
+        out.append({
+            "tag": r["tag"], "nombre": r["nombre"],
+            "fecha_servicio": r["ult_serv_fecha"], "toro_pajilla": r["ult_serv_toro"],
+            "fep_calculada": r["ult_serv_fep"],
+            "dias_atraso": (hoy - fep).days,
+        })
+    out.sort(key=lambda x: x["dias_atraso"], reverse=True)
+    return out
+
+
+def _calcular_sin_programar(vientres, hoy: date) -> list[dict]:
+    """Vacas paridas, abiertas >60d, sin IA programada ni servicio reciente."""
+    out = []
+    for r in vientres:
+        ult_parto = to_date_safe(r["ult_parto"])
+        if not ult_parto:
+            continue  # sin parto no entra al rodeo de vientres a programar
+        dias_abiertos = (hoy - ult_parto).days
+        if dias_abiertos <= DIAS_ABIERTOS_MIN_SIN_PROGRAMAR:
+            continue
+        if _estado_reproductivo_vigente(r) != "ABIERTA":
+            continue  # preñada o en espera de diagnóstico
+        if r["tiene_prog_ia"]:
+            continue
+        serv_f = to_date_safe(r["ult_serv_fecha"])
+        if serv_f and (hoy - serv_f).days <= DIAS_PROYECCION_CELO:
+            continue  # servicio muy reciente
+        out.append({
+            "tag": r["tag"], "nombre": r["nombre"],
+            "ultimo_parto": r["ult_parto"], "dias_abiertos": dias_abiertos,
+        })
+    out.sort(key=lambda x: x["dias_abiertos"], reverse=True)
+    return out
+
+
+def _calcular_proyeccion_celos(vientres, hoy: date) -> list[dict]:
+    """Próximo celo esperado (+21d) de vacas no preñadas, próximos 30 días."""
+    out = []
+    for r in vientres:
+        if _estado_reproductivo_vigente(r) == "PRENADA":
+            continue
+        ult_celo = to_date_safe(r["ult_celo_fecha"])
+        serv_f = to_date_safe(r["ult_serv_fecha"])
+        diag_f = to_date_safe(r["ult_diag_fecha"])
+        ref = None
+        fuente = None
+        if ult_celo:
+            ref, fuente = ult_celo, "Celo"
+        # Un servicio sin diagnóstico posterior sirve de referencia para el
+        # retorno al celo (si vuelve, está vacía).
+        if serv_f and (diag_f is None or diag_f < serv_f) and (ref is None or serv_f > ref):
+            ref, fuente = serv_f, "Servicio"
+        if not ref:
+            continue
+        prox = ref + timedelta(days=DIAS_PROYECCION_CELO)
+        ini = prox - timedelta(days=VENTANA_CELO_DIAS)
+        fin = prox + timedelta(days=VENTANA_CELO_DIAS)
+        if fin < hoy or ini > hoy + timedelta(days=30):
+            continue
+        out.append({
+            "tag": r["tag"], "nombre": r["nombre"], "fuente": fuente,
+            "fecha_base": ref.isoformat(), "proximo_celo": prox.isoformat(),
+            "ventana_inicio": ini.isoformat(), "ventana_fin": fin.isoformat(),
+            "en_dias": (prox - hoy).days,
+        })
+    out.sort(key=lambda x: x["proximo_celo"])
+    return out
+
+
+def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
+    """Primerizas con primer parto en los últimos 12 meses."""
+    lim = hoy - timedelta(days=DIAS_ENTORADA)
+    etiquetas = {"PRENADA": "Preñada", "EN_ESPERA": "En espera", "ABIERTA": "Abierta"}
+    out = []
+    for r in vientres:
+        primer = to_date_safe(r["primer_parto"])
+        if not primer or primer < lim:
+            continue
+        fnac = to_date_safe(r["fecha_nacimiento"])
+        edad_pp = round((primer - fnac).days / 30.44, 1) if fnac else None
+        estado = _estado_reproductivo_vigente(r)
+        out.append({
+            "tag": r["tag"], "nombre": r["nombre"],
+            "primer_parto": primer.isoformat(),
+            "edad_primer_parto_meses": edad_pp,
+            "estado_reproductivo": etiquetas.get(estado, estado),
+        })
+    out.sort(key=lambda x: x["primer_parto"], reverse=True)
+    return out
 
 
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
@@ -473,8 +652,12 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
     return out
 
 
-def datos_reproduccion(db: Database) -> dict:
-    """Reproducción: FEP≤30d, eco d35 / palpación d60, celos AM-PM pendientes."""
+def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optional[str] = None) -> dict:
+    """Reproducción: FEP≤30d, eco d35 / palpación d60, celos AM-PM pendientes.
+
+    ``desde``/``hasta`` acotan el listado "Servicios realizados" (default:
+    últimos ``DIAS_SERVICIOS_REALIZADOS`` días); el resto de secciones no
+    depende del rango."""
     hoy = date.today()
     hoy_iso_repro = hoy.isoformat()
     lim = (hoy + timedelta(days=30)).isoformat()
@@ -704,6 +887,85 @@ def datos_reproduccion(db: Database) -> dict:
         logger.error("seccion iatf fallo", exc_info=True)
         errores["iatf"] = str(e)
 
+    # --- Gaps estilo Software Ganadero (menú Reproducción) ---
+    vientres: list[dict] = []
+    try:
+        vientres = _filas_dict(db.query(SQL_VIENTRES_ACTIVOS))
+    except Exception as e:
+        logger.error("seccion vientres_activos fallo", exc_info=True)
+        errores["vientres_activos"] = str(e)
+
+    try:
+        debieron_parir = _calcular_debieron_parir(vientres, hoy)
+    except Exception as e:
+        logger.error("seccion debieron_parir fallo", exc_info=True)
+        errores["debieron_parir"] = str(e)
+        debieron_parir = []
+    try:
+        sin_programar = _calcular_sin_programar(vientres, hoy)
+    except Exception as e:
+        logger.error("seccion sin_programar fallo", exc_info=True)
+        errores["sin_programar"] = str(e)
+        sin_programar = []
+    try:
+        proyeccion_celos = _calcular_proyeccion_celos(vientres, hoy)
+    except Exception as e:
+        logger.error("seccion proyeccion_celos fallo", exc_info=True)
+        errores["proyeccion_celos"] = str(e)
+        proyeccion_celos = []
+    try:
+        novillas_entoradas = _calcular_novillas_entoradas(vientres, hoy)
+    except Exception as e:
+        logger.error("seccion novillas_entoradas fallo", exc_info=True)
+        errores["novillas_entoradas"] = str(e)
+        novillas_entoradas = []
+
+    # Servicios realizados en la ventana pedida (default últimos 30 días).
+    hasta_d = to_date_safe(hasta) or hoy
+    desde_d = to_date_safe(desde) or (hasta_d - timedelta(days=DIAS_SERVICIOS_REALIZADOS))
+    servicios_realizados = []
+    try:
+        servicios_realizados = _filas_dict(db.query(
+            """SELECT s.fecha, a.tag, a.nombre, s.tipo_servicio, s.toro_pajilla, s.inseminador,
+                      (SELECT dg.resultado FROM diagnosticos_gestacion dg
+                        WHERE dg.vaca_id = s.vaca_id AND dg.fecha >= s.fecha
+                        ORDER BY dg.fecha ASC, dg.id ASC LIMIT 1) AS resultado_diag
+               FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id
+               WHERE a.estado = 'ACTIVO' AND s.fecha IS NOT NULL
+                 AND s.fecha >= ? AND s.fecha <= ?
+               ORDER BY s.fecha DESC, s.id DESC LIMIT 200""",
+            (desde_d.isoformat(), hasta_d.isoformat())))
+    except Exception as e:
+        logger.error("seccion servicios_realizados fallo", exc_info=True)
+        errores["servicios_realizados"] = str(e)
+
+    # Reproductores en servicio (monta natural reciente) / descanso.
+    reproductores_estado = []
+    try:
+        filas_toros = _filas_dict(db.query(
+            """SELECT a.tag, a.nombre, a.raza,
+                      (SELECT MAX(s.fecha) FROM servicios s
+                        WHERE UPPER(s.toro_pajilla) = UPPER(a.tag)
+                          AND UPPER(COALESCE(s.tipo_servicio, '')) IN ('MONTA', 'MN', 'MONTA_NATURAL')) AS ult_monta
+               FROM animales a
+               WHERE a.estado = 'ACTIVO' AND (
+                   a.tag GLOB 'T[0-9]*'
+                   OR UPPER(COALESCE(a.notas, '')) LIKE '%[REPRODUCTOR]%'
+                   OR UPPER(COALESCE(a.notas, '')) LIKE '%TORO%')
+               ORDER BY a.tag"""))
+        for t in filas_toros:
+            um = to_date_safe(t["ult_monta"])
+            en_servicio = bool(um and (hoy - um).days <= DIAS_TORO_EN_SERVICIO)
+            reproductores_estado.append({
+                "tag": t["tag"], "nombre": t["nombre"], "raza": t["raza"],
+                "ultima_monta": t["ult_monta"],
+                "estado": "EN_SERVICIO" if en_servicio else "EN_DESCANSO",
+                "dias_desde_monta": (hoy - um).days if um else None,
+            })
+    except Exception as e:
+        logger.error("seccion reproductores_estado fallo", exc_info=True)
+        errores["reproductores_estado"] = str(e)
+
     out: dict[str, Any] = {
         "fep_30d": fep,
         "celos_recientes": celos,
@@ -720,6 +982,276 @@ def datos_reproduccion(db: Database) -> dict:
         "alertas_pajuelas": alertas_paj,
         "evaluacion_inseminadores": evaluacion_inseminadores,
         "iatf": iatf_data,
+        "debieron_parir": debieron_parir,
+        "sin_programar": sin_programar,
+        "proyeccion_celos": proyeccion_celos,
+        "servicios_realizados": servicios_realizados,
+        "servicios_rango": {"desde": desde_d.isoformat(), "hasta": hasta_d.isoformat()},
+        "novillas_entoradas": novillas_entoradas,
+        "reproductores_estado": reproductores_estado,
+    }
+    if errores:
+        out["errores"] = errores
+    return out
+
+
+def datos_carne(db: Database, desde: Optional[str] = None, hasta: Optional[str] = None) -> dict:
+    """Reportes de carne estilo Software Ganadero (solo lectura, PWA).
+
+    - ``sin_pesar``: nunca pesados vs. último pesaje con más de ``DIAS_SIN_PESAR``.
+    - ``a_pesar_edad``: vencidos según su frecuencia por categoría etaria.
+    - ``destetes`` / ``indice_productivo``: destetes de los últimos 12 meses
+      con peso ajustado a 205d (``growth_engine``) e índice por vaca.
+    - ``proyeccion_destetes``: FEP + 205d de vacas preñadas, resumen por mes.
+    - ``prueba_comportamiento``: ranking GMD de machos en un rango de fechas.
+
+    Regla Fundamental de Inventario: todo listado filtra ``estado='ACTIVO'``
+    (el reporte histórico de destetes sí muestra la cría aunque ya no esté
+    activa, porque es producción pasada, no inventario presente).
+    """
+    hoy = date.today()
+    errores: dict[str, str] = {}
+
+    # --- Base: ACTIVOS con último pesaje y potrero actual (alimenta 1 y 2) ---
+    sin_pesar_nunca: list[dict] = []
+    sin_pesar_vencidos: list[dict] = []
+    a_pesar_edad: list[dict] = []
+    sin_fecha_nacimiento_n = 0
+    try:
+        filas_pes = _filas_dict(db.query(f"""
+            WITH {ULT_TRASLADO_CTE}
+            SELECT a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.potrero_id,
+                   ut.potrero_destino,
+                   (SELECT MAX(p.fecha) FROM pesajes p WHERE p.animal_id = a.id_animal) AS ult_pesaje,
+                   pt.nombre AS potrero
+            FROM animales a
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            LEFT JOIN potreros pt ON pt.id = {POTRERO_ACTUAL_EXPR}
+            WHERE a.estado = 'ACTIVO'
+        """))
+        for r in filas_pes:
+            ult = to_date_safe(r["ult_pesaje"])
+            dias_sin = (hoy - ult).days if ult else None
+            fnac = to_date_safe(r["fecha_nacimiento"])
+            edad_dias = (hoy - fnac).days if fnac else None
+            base = {
+                "tag": r["tag"], "nombre": r["nombre"],
+                "sexo": r["sexo"], "potrero": r["potrero"] or SIN_POTRERO_LABEL,
+                "ultimo_pesaje": r["ult_pesaje"], "dias_sin_pesar": dias_sin,
+                "edad_dias": edad_dias,
+            }
+            if ult is None:
+                sin_pesar_nunca.append(base)
+            elif dias_sin is not None and dias_sin > DIAS_SIN_PESAR:
+                sin_pesar_vencidos.append(base)
+            if edad_dias is None:
+                sin_fecha_nacimiento_n += 1
+            else:
+                if edad_dias < EDAD_CRIA_DIAS:
+                    freq = FREQ_PESAJE_CRIA_DIAS
+                elif edad_dias < EDAD_LEVANTE_DIAS:
+                    freq = FREQ_PESAJE_LEVANTE_DIAS
+                else:
+                    freq = FREQ_PESAJE_ADULTO_DIAS
+                if ult is None or (dias_sin is not None and dias_sin > freq):
+                    a_pesar_edad.append({
+                        **base, "frecuencia_dias": freq,
+                        "proximo_pesaje": (ult + timedelta(days=freq)).isoformat() if ult else None,
+                    })
+        sin_pesar_vencidos.sort(key=lambda x: x["dias_sin_pesar"] or 0, reverse=True)
+        a_pesar_edad.sort(key=lambda x: (x["frecuencia_dias"], -(x["edad_dias"] or 0)))
+    except Exception as e:
+        logger.error("datos_carne seccion sin_pesar/a_pesar fallo", exc_info=True)
+        errores["pesajes"] = str(e)
+
+    # --- Destete / Índice productivo (últimos 12 meses) ---
+    destetes: list[dict] = []
+    indice_productivo: list[dict] = []
+    try:
+        lim_destete = (hoy - timedelta(days=int(VENTANA_DESTETES_MESES * 30.44))).isoformat()
+        filas_d = _filas_dict(db.query(
+            """SELECT d.animal_id, d.fecha, d.peso_kg,
+                      c.tag AS cria_tag, c.fecha_nacimiento AS cria_fnac,
+                      m.tag AS madre_tag, m.nombre AS madre_nombre,
+                      (SELECT p.peso_nacimiento FROM partos p
+                        WHERE p.id_cria = d.animal_id
+                        ORDER BY p.fecha DESC, p.id DESC LIMIT 1) AS peso_nacimiento
+               FROM destetes d
+               JOIN animales c ON c.id_animal = d.animal_id
+               LEFT JOIN animales m ON m.id_animal = d.madre_id
+               WHERE d.fecha IS NOT NULL AND d.fecha >= ?
+               ORDER BY d.fecha DESC""", (lim_destete,)))
+        acum: dict[str, list[float]] = {}
+        nombres_madre: dict[str, str] = {}
+        for r in filas_d:
+            f_destete = to_date_safe(r["fecha"])
+            fnac = to_date_safe(r["cria_fnac"])
+            edad_dias = (f_destete - fnac).days if (f_destete and fnac and f_destete >= fnac) else None
+            peso = r["peso_kg"]
+            pn = r["peso_nacimiento"]
+            ajustado = None
+            gmd_pre = None
+            try:
+                if peso is not None and pn is not None and edad_dias:
+                    ajustado = round(peso_ajustado_destete(peso, pn, edad_dias), 1)
+                    gmd_pre = round(((float(peso) - float(pn)) / edad_dias) * 1000, 1)
+            except Exception:
+                ajustado = None
+            if ajustado is not None and r["madre_tag"]:
+                acum.setdefault(r["madre_tag"], []).append(ajustado)
+                nombres_madre[r["madre_tag"]] = r["madre_nombre"]
+            destetes.append({
+                "tag": r["cria_tag"], "madre": r["madre_tag"],
+                "fecha": r["fecha"], "edad_destete_dias": edad_dias,
+                "peso_kg": peso, "peso_nacimiento": pn,
+                "peso_ajustado_205": ajustado, "gmd_predestete_g_dia": gmd_pre,
+            })
+        promedios = [p for v in acum.values() for p in v]
+        hato_prom = round(sum(promedios) / len(promedios), 1) if promedios else None
+        for madre, pesos in acum.items():
+            prom = sum(pesos) / len(pesos)
+            indice_productivo.append({
+                "madre": madre, "nombre": nombres_madre.get(madre),
+                "n_crias": len(pesos),
+                "peso_ajustado_prom": round(prom, 1),
+                "indice_pct": round(prom / hato_prom * 100, 1) if hato_prom else None,
+            })
+        indice_productivo.sort(key=lambda x: x["indice_pct"] or 0, reverse=True)
+    except Exception as e:
+        logger.error("datos_carne seccion destetes fallo", exc_info=True)
+        errores["destetes"] = str(e)
+
+    # --- Proyección de destetes (vacas preñadas: FEP + 205d) ---
+    proyeccion_destetes: list[dict] = []
+    proyeccion_destetes_mes: list[dict] = []
+    try:
+        filas_v = _filas_dict(db.query(
+            """SELECT a.tag, a.nombre, a.fecha_nacimiento,
+                      (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal
+                         AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS ult_parto,
+                      (SELECT dg.resultado FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+                         ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_res,
+                      (SELECT dg.fecha FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+                         ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_fecha,
+                      (SELECT dg.dias_gestacion FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal
+                         ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_dias,
+                      (SELECT s.fecha FROM servicios s WHERE s.vaca_id = a.id_animal
+                         ORDER BY s.fecha DESC, s.id DESC LIMIT 1) AS ult_serv_fecha,
+                      (SELECT s.fep_calculada FROM servicios s WHERE s.vaca_id = a.id_animal
+                         ORDER BY s.fecha DESC, s.id DESC LIMIT 1) AS ult_serv_fep
+               FROM animales a
+               WHERE a.estado = 'ACTIVO' AND (a.sexo IS NULL OR LOWER(SUBSTR(a.sexo, 1, 1)) = 'h')"""))
+        for r in filas_v:
+            diag_res = str(r["ult_diag_res"] or "").upper()
+            diag_f = to_date_safe(r["ult_diag_fecha"])
+            serv_f = to_date_safe(r["ult_serv_fecha"])
+            serv_fep = to_date_safe(r["ult_serv_fep"])
+            ult_parto = to_date_safe(r["ult_parto"])
+            prenada = False
+            fep = None
+            base = None
+            if diag_f and (serv_f is None or diag_f >= serv_f):
+                if "PREÑADA" in diag_res or "POSITIV" in diag_res:
+                    prenada = True
+                    base = "Diagnóstico"
+                    dias_g = r["ult_diag_dias"]
+                    if dias_g:
+                        try:
+                            fep = diag_f + timedelta(days=max(0, GESTACION_DIAS - int(dias_g)))
+                        except Exception:
+                            fep = None
+                    fep = fep or serv_fep or (serv_f + timedelta(days=GESTACION_DIAS) if serv_f else None)
+            elif serv_f and (ult_parto is None or serv_f > ult_parto):
+                prenada = True
+                base = "Servicio"
+                fep = serv_fep or (serv_f + timedelta(days=GESTACION_DIAS))
+            if not prenada or not fep:
+                continue
+            if ult_parto and ult_parto >= fep - timedelta(days=TOLERANCIA_PARTO_FEP_DIAS):
+                continue
+            if fep < hoy:
+                continue  # FEP vencida: la cubre el reporte "debieron haber parido"
+            destete_est = fep + timedelta(days=DIA_AJUSTE_DESTETE)
+            proyeccion_destetes.append({
+                "tag": r["tag"], "nombre": r["nombre"], "base": base,
+                "fep": fep.isoformat(), "destete_estimado": destete_est.isoformat(),
+            })
+        proyeccion_destetes.sort(key=lambda x: x["destete_estimado"])
+        agrup: dict[str, int] = {}
+        for p in proyeccion_destetes:
+            agrup[p["destete_estimado"][:7]] = agrup.get(p["destete_estimado"][:7], 0) + 1
+        proyeccion_destetes_mes = [
+            {"mes": m, "n": n} for m, n in sorted(agrup.items())
+        ]
+    except Exception as e:
+        logger.error("datos_carne seccion proyeccion_destetes fallo", exc_info=True)
+        errores["proyeccion_destetes"] = str(e)
+
+    # --- Prueba de comportamiento (ranking GMD de machos) ---
+    hasta_d = to_date_safe(hasta) or hoy
+    desde_d = to_date_safe(desde) or (hasta_d - timedelta(days=PRUEBA_COMPORTAMIENTO_DIAS))
+    prueba_animales: list[dict] = []
+    prueba_promedio = None
+    try:
+        filas_p = _filas_dict(db.query(
+            """SELECT a.tag, a.nombre, a.raza, a.fecha_nacimiento, p.fecha, p.peso_kg
+               FROM pesajes p JOIN animales a ON a.id_animal = p.animal_id
+               WHERE a.estado = 'ACTIVO' AND LOWER(SUBSTR(COALESCE(a.sexo, ''), 1, 1)) = 'm'
+                 AND p.fecha IS NOT NULL AND p.peso_kg IS NOT NULL
+                 AND p.fecha >= ? AND p.fecha <= ?
+               ORDER BY a.id_animal ASC, p.fecha ASC, p.id ASC""",
+            (desde_d.isoformat(), hasta_d.isoformat())))
+        por_animal: dict[str, list] = {}
+        for r in filas_p:
+            por_animal.setdefault(r["tag"], []).append(r)
+        for tag, pes in por_animal.items():
+            if len(pes) < 2:
+                continue
+            primeros, ultimos = pes[0], pes[-1]
+            f_ini = to_date_safe(primeros["fecha"])
+            f_fin = to_date_safe(ultimos["fecha"])
+            dias = (f_fin - f_ini).days if (f_ini and f_fin) else 0
+            if dias <= 0:
+                continue
+            try:
+                delta = float(ultimos["peso_kg"]) - float(primeros["peso_kg"])
+            except (TypeError, ValueError):
+                continue
+            prueba_animales.append({
+                "tag": tag, "nombre": primeros["nombre"], "raza": primeros["raza"],
+                "peso_inicial": primeros["peso_kg"], "peso_final": ultimos["peso_kg"],
+                "n_pesajes": len(pes), "dias_prueba": dias,
+                "gmd_g_dia": round(delta / dias * 1000, 1),
+            })
+        if prueba_animales:
+            prueba_animales.sort(key=lambda x: x["gmd_g_dia"], reverse=True)
+            prueba_promedio = round(sum(a["gmd_g_dia"] for a in prueba_animales) / len(prueba_animales), 1)
+    except Exception as e:
+        logger.error("datos_carne seccion prueba_comportamiento fallo", exc_info=True)
+        errores["prueba_comportamiento"] = str(e)
+
+    out: dict[str, Any] = {
+        "sin_pesar": {"nunca": sin_pesar_nunca, "vencidos": sin_pesar_vencidos},
+        "sin_fecha_nacimiento_n": sin_fecha_nacimiento_n,
+        "a_pesar_edad": a_pesar_edad,
+        "destetes": destetes,
+        "indice_productivo": indice_productivo,
+        "proyeccion_destetes": proyeccion_destetes,
+        "proyeccion_destetes_mes": proyeccion_destetes_mes,
+        "prueba_comportamiento": {
+            "desde": desde_d.isoformat(), "hasta": hasta_d.isoformat(),
+            "animales": prueba_animales, "gmd_promedio": prueba_promedio,
+            "n": len(prueba_animales),
+            "negativos": sum(1 for a in prueba_animales if a["gmd_g_dia"] < 0),
+        },
+        "kpis": {
+            "sin_pesar_nunca": len(sin_pesar_nunca),
+            "sin_pesar_vencidos": len(sin_pesar_vencidos),
+            "a_pesar_edad": len(a_pesar_edad),
+            "destetes_12m": len(destetes),
+            "proyeccion_destetes": len(proyeccion_destetes),
+            "prueba_n": len(prueba_animales),
+        },
     }
     if errores:
         out["errores"] = errores

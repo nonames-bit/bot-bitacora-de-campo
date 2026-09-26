@@ -144,19 +144,19 @@ def test_api_eliminar_evento_control_acceso_rbac():
     r2 = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid})
     assert r2.status_code == 403
 
-    # 3. Con rol ADMIN -> 200 OK (ADMIN también tiene permiso)
+    # 3. Con rol ADMIN -> 403 Forbidden (exclusivo para rol OWNER)
     with client.session_transaction() as sess:
         sess["autenticado"] = True
         sess["user_id"] = 3
         sess["username"] = "admin"
         sess["rol"] = "ADMIN"
-    # Registrar otro pesaje para borrar con admin
+    # Registrar otro pesaje para intentar borrar con admin
     d_admin = Database(db_path)
     pid_admin = d_admin.registrar_pesaje("TAG_X", "2026-09-14", 390.0)
     d_admin.close()
     r3 = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid_admin})
-    assert r3.status_code == 200
-    assert r3.get_json()["ok"] is True
+    assert r3.status_code == 403
+    assert r3.get_json()["ok"] is False
 
     # 4. Con rol OWNER -> 200 OK y eliminado
     with client.session_transaction() as sess:
@@ -169,7 +169,11 @@ def test_api_eliminar_evento_control_acceso_rbac():
     data = r4.get_json()
     assert data["ok"] is True
 
-    # Verificar que el pesaje ya no existe
+    # Eliminar también el segundo con rol OWNER
+    r4_admin = client.post("/api/eventos/eliminar", json={"tipo": "pesaje", "id": pid_admin})
+    assert r4_admin.status_code == 200
+
+    # Verificar que ambos pesajes fueron eliminados por OWNER
     d_check = Database(db_path)
     assert d_check.query_one("SELECT id FROM pesajes WHERE id = ?", (pid,)) is None
     assert d_check.query_one("SELECT id FROM pesajes WHERE id = ?", (pid_admin,)) is None

@@ -89,6 +89,7 @@ try:
     from ..engine.genetic_engine import (
         generar_resumen_zootecnico as _generar_resumen_zootecnico,
         CATALOGO_RAZAS_PREDEFINIDAS as _CATALOGO_RAZAS_PREDEFINIDAS,
+        normalizar_nombre_raza as _normalizar_nombre_raza,
     )
 except ImportError:  # ejecución directa: python src/pwa/app.py
     import sys as _sys
@@ -118,6 +119,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
     from src.engine.genetic_engine import (  # type: ignore
         generar_resumen_zootecnico as _generar_resumen_zootecnico,
         CATALOGO_RAZAS_PREDEFINIDAS as _CATALOGO_RAZAS_PREDEFINIDAS,
+        normalizar_nombre_raza as _normalizar_nombre_raza,
     )
 
 logger = logging.getLogger(__name__)
@@ -2213,21 +2215,27 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/genetica/catalogo-razas")
     def api_genetica_catalogo_razas():
-        """Devuelve el catálogo de razas predefinidas unificado con las registradas en el hato."""
+        """Devuelve el catálogo de razas predefinidas unificado y normalizado sin duplicados."""
         db_a = _db(db_path)
         try:
             filas = db_a.query("SELECT DISTINCT raza FROM composicion_racial WHERE raza IS NOT NULL AND raza != ''")
-            razas_db = [r["raza"] for r in filas]
-            # También razas de animales
+            razas_db = []
+            for r in filas:
+                norm = _normalizar_nombre_raza(r["raza"])
+                if norm:
+                    razas_db.append(norm)
             filas_an = db_a.query("SELECT DISTINCT raza FROM animales WHERE raza IS NOT NULL AND raza != ''")
             for r in filas_an:
                 val = (r["raza"] or "").strip()
                 if val and "+" not in val and "%" not in val and "/" not in val:
-                    razas_db.append(val)
+                    norm = _normalizar_nombre_raza(val)
+                    if norm:
+                        razas_db.append(norm)
             todas = list(dict.fromkeys(_CATALOGO_RAZAS_PREDEFINIDAS + razas_db))
+            todas.sort()
             return jsonify({"ok": True, "razas": todas})
         except Exception:
-            return jsonify({"ok": True, "razas": _CATALOGO_RAZAS_PREDEFINIDAS})
+            return jsonify({"ok": True, "razas": sorted(list(dict.fromkeys(_CATALOGO_RAZAS_PREDEFINIDAS)))})
         finally:
             try:
                 db_a.close()
@@ -2376,10 +2384,10 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         Restringido a roles OWNER y ADMIN.
         """
         rol = _rol_actual()
-        if rol not in ("OWNER", "ADMIN"):
+        if rol != "OWNER":
             return jsonify({
                 "ok": False,
-                "error": "Acceso restringido: solo el propietario (OWNER) o administrador pueden eliminar eventos del sistema.",
+                "error": "Acceso restringido: solo el propietario (OWNER) puede eliminar eventos del sistema.",
             }), 403
 
         datos = request.get_json(silent=True) or request.form or {}
@@ -2444,7 +2452,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             return jsonify({
                 "ok": True,
                 "eventos": eventos,
-                "puede_deshacer": rol in ("OWNER", "ADMIN"),
+                "puede_deshacer": rol == "OWNER",
                 "rol": rol,
             })
         except Exception as e:
@@ -2495,16 +2503,24 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 )
                 ORDER BY CASE WHEN tag GLOB 'T[0-9]*' THEN 0 ELSE 1 END, tag ASC
             """)
-            toros = [
-                {
+            toros = []
+            for r in filas:
+                nom = " ".join((r["nombre"] or "").split())
+                raza_raw = (r["raza"] or "").strip()
+                raza_corta = raza_raw
+                if "+" in raza_raw:
+                    raza_corta = raza_raw.split("+")[0].strip()
+                import re as _re
+                raza_corta = _re.sub(r'^\s*(\d+/\d+|\d+(\.\d+)?%)\s*', '', raza_corta).strip()
+                raza_corta = _re.sub(r'\s+Puro$', '', raza_corta).strip()
+                toros.append({
                     "tag": r["tag"],
-                    "nombre": r["nombre"] or "",
-                    "raza": r["raza"] or "",
+                    "nombre": nom,
+                    "raza": raza_corta or raza_raw,
+                    "raza_completa": raza_raw,
                     "fecha_nacimiento": r["fecha_nacimiento"] or "",
                     "es_reproductor": True,
-                }
-                for r in filas
-            ]
+                })
             return jsonify({"ok": True, "toros": toros})
         except Exception as e:
             logger.exception("Error al listar toros: %s", e)

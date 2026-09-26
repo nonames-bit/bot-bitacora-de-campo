@@ -36,7 +36,7 @@ DBF_REQUERIDOS = [
 CATALOGO_RAZAS_SG_DEFECTO = {
     "01": "Cebú Comercial",
     "02": "Pardo Suizo",
-    "03": "Holstein Negro",
+    "03": "Holstein",
     "04": "Gyr",
     "05": "Guzerá",
     "06": "Brahman Gris",
@@ -68,7 +68,7 @@ CATALOGO_RAZAS_SG_DEFECTO = {
     "32": "Chino Santandereano",
     "33": "Romosinuano",
     "34": "Charolais",
-    "35": "Cebú Rojo",
+    "35": "Cebú Comercial",
     "36": "Limousin",
     "37": "Chianina",
     "38": "Beefmaster",

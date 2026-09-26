@@ -10044,6 +10044,7 @@
     var sheetUsuarios = document.getElementById("sheet-item-usuarios");
     var sheetGps = document.getElementById("sheet-item-gps");
     var sheetMapa = document.getElementById("sheet-item-mapa");
+    var sheetDeshacer = document.getElementById("sheet-item-deshacer");
 
     if (rol === "OWNER") {
       if (btnSistema) btnSistema.style.display = "";
@@ -10054,6 +10055,7 @@
       if (sheetUsuarios) sheetUsuarios.style.display = "";
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "";
+      if (sheetDeshacer) sheetDeshacer.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         // El botón Campo de la barra es exclusivo del mayordomo
@@ -10075,6 +10077,7 @@
       if (sheetGps) sheetGps.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "";
       if (sheetUsuarios) sheetUsuarios.style.display = "";
+      if (sheetDeshacer) sheetDeshacer.style.display = "none";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (v === "sistema" || v === "gps" || v === "campo") b.style.display = "none";
@@ -10082,7 +10085,7 @@
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v === "sistema" || v === "gps") m.style.display = "none";
+        if (v === "sistema" || v === "gps" || m.id === "sheet-item-deshacer") m.style.display = "none";
         else if (v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "TRABAJADOR") {
@@ -10093,6 +10096,8 @@
       if (sheetSistema) sheetSistema.style.display = "none";
       if (sheetUsuarios) sheetUsuarios.style.display = "none";
       if (sheetGps) sheetGps.style.display = "none";
+      if (sheetMapa) sheetMapa.style.display = "none";
+      if (sheetDeshacer) sheetDeshacer.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "none";
       // Modo Campo: el mayordomo entra a 4 botones grandes (Captura,
       // Agenda-hoy, Ficha, GPS) en vez del tablero de oficina. La Agenda
@@ -10932,21 +10937,28 @@
     if (compRacial.length > 0) {
       // Barra apilada multicolor
       h += "<div style='display:flex; width:100%; height:18px; border-radius:9px; overflow:hidden; background:var(--borde); margin-bottom:10px; box-shadow:inset 0 1px 2px rgba(0,0,0,0.1);'>";
-      compRacial.forEach(function (cr) {
-        var col = colorDeRaza(cr.raza);
+      compRacial.forEach(function (cr, idx) {
+        var col = colorDeRaza(cr.raza, idx);
         var ancho = Math.max(cr.porcentaje, 1);
-        h += "<div style='width:" + ancho + "%; background:" + col + "; height:100%;' title='" + esc(cr.raza) + ": " + cr.porcentaje + "% (" + esc(cr.fraccion) + ")'></div>";
+        var fTitle = (cr.fraccion && cr.fraccion.indexOf("%") === -1) ? (" · " + cr.fraccion) : "";
+        h += "<div style='width:" + ancho + "%; background:" + col + "; height:100%;' title='" + esc(cr.raza) + ": " + cr.porcentaje + "%" + esc(fTitle) + "'></div>";
       });
       h += "</div>";
 
-      // Chips con fracciones y porcentajes
+      // Chips con fracciones y porcentajes (evitando redundancias como 30% (30%))
       h += "<div style='display:flex; flex-wrap:wrap; gap:6px;'>";
-      compRacial.forEach(function (cr) {
-        var col = colorDeRaza(cr.raza);
+      compRacial.forEach(function (cr, idx) {
+        var col = colorDeRaza(cr.raza, idx);
         var fLabel = cr.fraccion || porcentajeAFraccionGanadera(cr.porcentaje);
+        var detallePct = "";
+        if (fLabel && fLabel.indexOf("%") === -1 && fLabel !== "S/D") {
+          detallePct = "<span style='color:var(--verde-marca); font-weight:700;'>" + esc(fLabel) + "</span> (" + esc(cr.porcentaje) + "%)";
+        } else {
+          detallePct = "<span style='color:var(--verde-marca); font-weight:700;'>" + esc(cr.porcentaje) + "%</span>";
+        }
         h += "<span class='chip' style='background:rgba(0,0,0,0.04); border:1px solid " + col + "; color:var(--texto); font-size:12px; padding:3px 8px; font-weight:600; display:inline-flex; align-items:center; gap:5px;'>"
           + "<span style='display:inline-block; width:8px; height:8px; border-radius:50%; background:" + col + ";'></span>"
-          + "<b>" + esc(cr.raza) + "</b> <span style='color:var(--verde-marca); font-weight:700;'>" + esc(fLabel) + "</span> (" + esc(cr.porcentaje) + "%)"
+          + "<b>" + esc(cr.raza) + "</b> " + detallePct
           + "</span>";
       });
       h += "</div>";
@@ -11246,18 +11258,18 @@
     var btn = nav.querySelector("button[data-tab='" + tabId + "']");
     if (btn) btn.click();
   };
-  // Helper para renderizar botón de eliminación de eventos (roles OWNER y ADMIN)
+  // Helper para renderizar botón de eliminación de eventos (exclusivo OWNER)
   function renderBtnEliminar(tipo, id, desc) {
-    var puede = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER" || window.__usuarioActual.rol === "ADMIN");
+    var puede = window.__usuarioActual && window.__usuarioActual.rol === "OWNER";
     if (!puede || !id) return "";
     return "<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='" + esc(tipo) + "' data-id='" + esc(id) + "' data-desc='" + esc(desc || "") + "' title='Deshacer / Eliminar registro' aria-label='Eliminar'>" + icon("trash", 13) + "</button>";
   }
   window.renderBtnEliminar = renderBtnEliminar;
 
   function ejecutarEliminacionEvento(tipo, id, desc) {
-    var puede = window.__usuarioActual && (window.__usuarioActual.rol === "OWNER" || window.__usuarioActual.rol === "ADMIN");
+    var puede = window.__usuarioActual && window.__usuarioActual.rol === "OWNER";
     if (!puede) {
-      alert("Acceso restringido: solo el propietario (OWNER) o administrador pueden eliminar eventos registrados.");
+      alert("Acceso restringido: solo el propietario (OWNER) puede eliminar eventos registrados.");
       return;
     }
     if (!tipo || !id) {
@@ -11836,35 +11848,67 @@
   }
 
   var COLORES_RAZA = {
-    "Brahman": "#10b981",
-    "Gyr": "#3b82f6",
-    "Romosinuano": "#f59e0b",
-    "Holstein": "#6366f1",
-    "Jersey": "#ec4899",
-    "Guzerá": "#8b5cf6",
-    "Nelore": "#06b6d4",
-    "Pardo Suizo": "#84cc16",
-    "Simmental": "#ef4444",
-    "Simbrah": "#f97316",
-    "Senepol": "#dc2626",
-    "Blanco Orejinegro (BON)": "#14b8a6",
-    "Costeño con Cuernos (CCC)": "#d97706",
-    "Sanmartinero": "#b45309",
-    "Hartón del Valle": "#a16207",
-    "Brangus": "#334155",
-    "Angus": "#1e293b",
-    "Charolais": "#94a3b8",
-    "Girolando": "#0284c7",
-    "Cebú Comercial": "#059669",
+    "Ayrshire": "#dc2626", // Rojo teja / carmín lechero característico de Ayrshire
+    "Holstein Rojo": "#b91c1c", // Carmesí oscuro
+    "Holstein": "#2563eb", // Azul royal / eléctrico
+    "Gyr": "#16a34a", // Verde esmeralda vivo
+    "Girolando": "#0891b2", // Turquesa / Cyan
+    "Gyrolando": "#0891b2",
+    "Brahman": "#475569", // Pizarra cebú
+    "Cebú Comercial": "#d97706", // Ámbar cálido / ocre
+    "Cebú": "#d97706",
+    "Guzerá": "#7c3aed", // Púrpura / violeta
+    "Nelore": "#4f46e5", // Índigo
+    "Pardo Suizo": "#92400e", // Café / bronce
+    "Jersey": "#ea580c", // Naranja brillante
+    "Simmental": "#e11d48", // Rosa carmín
+    "Simbrah": "#f59e0b", // Ámbar dorado
+    "Senepol": "#c026d3", // Fucsia
+    "Romosinuano": "#ca8a04", // Mostaza
+    "Blanco Orejinegro (BON)": "#0d9488", // Teal
+    "Costeño con Cuernos (CCC)": "#b45309", // Canela
+    "Sanmartinero": "#78350f", // Café oscuro
+    "Hartón del Valle": "#854d0e", // Ocre
+    "Brangus": "#1e293b", // Negro azulado
+    "Angus": "#0f172a", // Negro azabache
+    "Charolais": "#94a3b8", // Crema plateado
+    "Normando": "#65a30d", // Verde oliva
+    "Hereford": "#be123c", // Rojo rubí
+    "Shorthorn": "#9333ea", // Morado
+    "Velásquez": "#854d0e",
+    "Montbéliarde": "#b91c1c",
     "Mestizo": "#64748b",
     "Criollo": "#78716c"
   };
-  function colorDeRaza(raza) {
-    if (!raza) return "#64748b";
+  var PALETA_RESPALDO = [
+    "#dc2626", "#2563eb", "#16a34a", "#d97706", "#7c3aed",
+    "#0891b2", "#ea580c", "#4f46e5", "#92400e", "#e11d48",
+    "#0d9488", "#ca8a04", "#475569", "#b45309", "#c026d3"
+  ];
+  function colorDeRaza(raza, idx) {
+    if (!raza) return PALETA_RESPALDO[(idx || 0) % PALETA_RESPALDO.length];
+    var rLower = raza.toLowerCase().trim();
+    if (rLower.indexOf("ayrshire") !== -1) return "#dc2626";
+    if (rLower.indexOf("holstein rojo") !== -1 || rLower.indexOf("holstein r") !== -1) return "#b91c1c";
+    if (rLower.indexOf("holstein") !== -1) return "#2563eb";
+    if (rLower.indexOf("gyr") !== -1) return "#16a34a";
+    if (rLower.indexOf("girolando") !== -1 || rLower.indexOf("gyrolando") !== -1) return "#0891b2";
+    if (rLower.indexOf("guzer") !== -1) return "#7c3aed";
+    if (rLower.indexOf("nelore") !== -1) return "#4f46e5";
+    if (rLower.indexOf("ceb") !== -1) return "#d97706";
+    if (rLower.indexOf("jersey") !== -1) return "#ea580c";
+    if (rLower.indexOf("pardo") !== -1) return "#92400e";
+    if (rLower.indexOf("brahman") !== -1) return "#475569";
+    if (rLower.indexOf("bon") !== -1 || rLower.indexOf("orejinegro") !== -1) return "#0d9488";
+    if (rLower.indexOf("normand") !== -1) return "#65a30d";
+    if (rLower.indexOf("simmental") !== -1) return "#e11d48";
+    if (rLower.indexOf("simbrah") !== -1) return "#f59e0b";
+    if (rLower.indexOf("hereford") !== -1) return "#be123c";
+    if (rLower.indexOf("shorthorn") !== -1 || rLower.indexOf("shorton") !== -1) return "#9333ea";
     for (var k in COLORES_RAZA) {
-      if (raza.toLowerCase().indexOf(k.toLowerCase()) !== -1) return COLORES_RAZA[k];
+      if (rLower.indexOf(k.toLowerCase()) !== -1) return COLORES_RAZA[k];
     }
-    return "#64748b";
+    return PALETA_RESPALDO[(idx || 0) % PALETA_RESPALDO.length];
   }
 
   function mostrarModalComposicionRacial(tagActual, compPrevia) {
@@ -11960,11 +12004,19 @@
         var badgeF = inputsPct[i].closest(".comp-fila").querySelector(".comp-frac-badge");
         var fr = porcentajeAFraccionGanadera(v);
         if (badgeF) {
-          badgeF.textContent = v > 0 ? (v + "% → " + fr) : "0%";
-          badgeF.className = "comp-frac-badge chip " + (v > 0 ? "verde" : "gris");
+          if (v <= 0) {
+            badgeF.textContent = "0%";
+            badgeF.className = "comp-frac-badge chip gris";
+          } else if (fr && fr.indexOf("%") === -1 && fr !== "S/D") {
+            badgeF.textContent = v + "% (" + fr + ")";
+            badgeF.className = "comp-frac-badge chip verde";
+          } else {
+            badgeF.textContent = v + "%";
+            badgeF.className = "comp-frac-badge chip verde";
+          }
         }
         if (v > 0) {
-          var fCorta = fr;
+          var fCorta = (fr && fr.indexOf("%") === -1 && fr !== "S/D") ? fr : (v + "%");
           if (fCorta.indexOf("1/2") !== -1) fCorta = "1/2";
           else if (fCorta.indexOf("PC") !== -1 || fCorta.indexOf("Puro por Cruce") !== -1) fCorta = "PC";
           partesResumen.push(fCorta + " " + rVal);
@@ -12370,12 +12422,25 @@
   }
   var cargarListaPotreros = cargarListasAutocompletar; // Alias de retrocompatibilidad
 
+  function simplificarRazaToro(raza) {
+    if (!raza) return "";
+    var r = raza.trim();
+    if (r.indexOf("+") !== -1) {
+      r = r.split("+")[0].trim();
+    }
+    r = r.replace(/^\s*(\d+\/\d+|\d+(\.\d+)?%)\s*/i, "").trim();
+    r = r.replace(/\s+Puro$/i, "").trim();
+    return r;
+  }
+
   var _cacheToros = null;
   function cargarListaToros(selEl) {
     function poblar(toros) {
       if (!toros) toros = [];
       var itemsDl = toros.map(function (t) {
-        var desc = (t.tag || "") + (t.nombre ? " · " + t.nombre : "") + (t.raza ? " (" + t.raza + ")" : "");
+        var rCorta = simplificarRazaToro(t.raza);
+        var nomLimpio = (t.nombre || "").replace(/\s+/g, " ").trim();
+        var desc = (t.tag || "") + (nomLimpio ? " · " + nomLimpio : "") + (rCorta ? " (" + rCorta + ")" : "");
         return { value: t.tag, label: desc };
       });
       rellenarDatalist("dl-toros", itemsDl);
@@ -12385,7 +12450,9 @@
         var valActual = sel.value || "";
         var optHtml = "<option value=''>-- Sin especificar (opcional) --</option>";
         toros.forEach(function (t) {
-          var label = (t.tag || "") + (t.nombre ? " · " + t.nombre : "") + (t.raza ? " [" + t.raza + "]" : "");
+          var rCorta = simplificarRazaToro(t.raza);
+          var nomLimpio = (t.nombre || "").replace(/\s+/g, " ").trim();
+          var label = (t.tag || "") + (nomLimpio ? " · " + nomLimpio : "") + (rCorta ? " (" + rCorta + ")" : "");
           optHtml += "<option value='" + esc(t.tag) + "'>" + esc(label) + "</option>";
         });
         optHtml += "<option value='OTRO'>-- Otro toro / Pajuela / Externo --</option>";
