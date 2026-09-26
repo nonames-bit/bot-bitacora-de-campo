@@ -192,6 +192,10 @@ def test_api_rest_genetica(tmp_path):
     client.post("/login", data={"password": "clave-de-prueba"})
 
     with client.session_transaction() as sess:
+        # El guard de /api/* exige session["autenticado"]; se fija explícitamente
+        # para no depender del resultado del POST /login (backoff por IP) y que la
+        # prueba sea determinista en CI.
+        sess["autenticado"] = True
         sess["user_id"] = 1
         sess["rol"] = "OWNER"
 
