@@ -74,6 +74,7 @@ try:
         datos_agenda as _datos_agenda,
         datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
+        datos_carne as _datos_carne,
         datos_ficha_animal as _datos_ficha_animal,
         datos_finanzas as _datos_finanzas,
         datos_genetica as _datos_genetica,
@@ -104,6 +105,7 @@ except ImportError:  # ejecución directa: python src/pwa/app.py
         datos_agenda as _datos_agenda,
         datos_badges as _datos_badges,
         datos_buscar as _datos_buscar,
+        datos_carne as _datos_carne,
         datos_ficha_animal as _datos_ficha_animal,
         datos_finanzas as _datos_finanzas,
         datos_genetica as _datos_genetica,
@@ -434,17 +436,40 @@ def datos_tablero(db_path: str = DB_PATH_DEFAULT, potrero: Optional[str] = None)
             pass
 
 
-def datos_repro(db_path: str = DB_PATH_DEFAULT) -> dict:
+def datos_repro(db_path: str = DB_PATH_DEFAULT, desde: Optional[str] = None,
+                hasta: Optional[str] = None) -> dict:
     """Reproducción: FEP≤30d, eco d35 / palpación d60, celos AM-PM pendientes."""
     # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_reproduccion.
     db = _db(db_path)
     try:
         try:
-            return _datos_reproduccion(db)
+            return _datos_reproduccion(db, desde=desde, hasta=hasta)
         except Exception:
             logger.exception("datos_repro fallo completo")
             return {"fep_30d": [], "celos_recientes": [], "diagnosticos": [],
                     "eco_palp_pendientes": [], "errores": {"repro": "error interno"}}
+    finally:
+        try:
+            db.close()
+        except Exception:
+            pass
+
+
+def datos_carne(db_path: str = DB_PATH_DEFAULT, desde: Optional[str] = None,
+                hasta: Optional[str] = None) -> dict:
+    """Carne: sin pesar, a pesar por edad, destete/índice, proyección y prueba."""
+    # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.datos_carne.
+    db = _db(db_path)
+    try:
+        try:
+            return _datos_carne(db, desde=desde, hasta=hasta)
+        except Exception:
+            logger.exception("datos_carne fallo completo")
+            return {"sin_pesar": {"nunca": [], "vencidos": []}, "a_pesar_edad": [],
+                    "destetes": [], "indice_productivo": [],
+                    "proyeccion_destetes": [], "proyeccion_destetes_mes": [],
+                    "prueba_comportamiento": {"animales": []},
+                    "errores": {"carne": "error interno"}}
     finally:
         try:
             db.close()
@@ -1162,7 +1187,18 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/repro")
     def api_repro():
-        out = datos_repro(db_path)
+        desde = (request.args.get("desde") or "").strip() or None
+        hasta = (request.args.get("hasta") or "").strip() or None
+        out = datos_repro(db_path, desde=desde, hasta=hasta)
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
+    @app.get("/api/carne")
+    def api_carne():
+        """Reportes de carne estilo Software Ganadero (solo lectura, PWA)."""
+        desde = (request.args.get("desde") or "").strip() or None
+        hasta = (request.args.get("hasta") or "").strip() or None
+        out = datos_carne(db_path, desde=desde, hasta=hasta)
         out["rol"] = _rol_actual()
         return jsonify(out)
 

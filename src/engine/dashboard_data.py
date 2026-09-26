@@ -29,6 +29,7 @@ try:
         potreros_reales_where,
     )
     from .reproductive_engine import (
+        GESTACION_DIAS,
         calcular_indice_fertilidad,
         tramo_dias_abiertos,
         tramo_iep,
@@ -47,6 +48,7 @@ except ImportError:  # ejecución directa
         potreros_reales_where,
     )
     from src.engine.reproductive_engine import (  # type: ignore
+        GESTACION_DIAS,
         calcular_indice_fertilidad,
         tramo_dias_abiertos,
         tramo_iep,
