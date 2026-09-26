@@ -88,3 +88,69 @@ def test_exportar_hoja_dbf_conserva_composicion(db):
     fila = next(r for r in DBFReader(export_hoja_dbf(db)).records() if str(r["CODANI"]).strip() == "47")
     assert (str(fila["CODGR1"]).strip(), float(fila["PORGR1"])) == ("04", 75.0)
     assert (str(fila["CODGR2"]).strip(), float(fila["PORGR2"])) == ("03", 25.0)
+
+
+# --- Vista Genética ordenada -------------------------------------------------
+
+def test_desconocida_es_genealogia_incompleta_y_no_entra_al_pool():
+    from src.engine.genetic_engine import calcular_resumen_genetico_hato
+
+    comp = [{"raza": "Desconocida", "porcentaje": 50}, {"raza": "Gyr", "porcentaje": 50}]
+    c = clasificar_animal_zootecnico(comp)
+    assert c["grado_codigo"] == "PARCIAL"
+    assert "Desconocida" not in c["patron_formula"] and "Gyr" in c["patron_formula"]
+    assert clasificar_animal_zootecnico([{"raza": "Desconocida", "porcentaje": 75},
+                                         {"raza": "Gyr", "porcentaje": 25}])["grado_codigo"] == "PARCIAL"
+
+    animales = [{"id_animal": 1, "tag": "A1", "raza": ""}, {"id_animal": 2, "tag": "A2", "raza": ""},
+                {"id_animal": 3, "tag": "A3", "raza": ""}, {"id_animal": 4, "tag": "A4", "raza": "I"}]
+    comp_por = {
+        1: comp,
+        2: [{"raza": "Gyr", "porcentaje": 75}, {"raza": "Holstein", "porcentaje": 25}],
+        3: [{"raza": "Holstein", "porcentaje": 100}],
+    }
+    res = calcular_resumen_genetico_hato(animales, comp_por)
+    razas = {p["raza"] for p in res["pool_racial"]}
+    assert "Desconocida" not in razas and {"Gyr", "Holstein"} <= razas
+    assert abs(sum(p["pct"] for p in res["pool_racial"]) - 100) < 0.5
+    assert res["pool_sin_dato_pct"] == pytest.approx(16.7, abs=0.1)
+    # Ordenado por grado: Puro, 3/4, Parcial, Indeterminado.
+    assert [p["grado_codigo"] for p in res["patrones_cruces"]] == ["PURO", "3_4", "PARCIAL", "INDET"]
+
+
+def test_media_sangre_multirracial_no_nombra_una_sola_raza():
+    c = clasificar_animal_zootecnico([{"raza": "Gyr", "porcentaje": 50}, {"raza": "Holstein", "porcentaje": 25},
+                                      {"raza": "Ayrshire", "porcentaje": 25}])
+    assert c["grado_codigo"] == "1_2"
+    assert c["patron_formula"] == "1/2 Gyr + 1/2 varias razas"
+
+
+def test_donut_pool_usa_razas_y_no_texto_crudo(db):
+    from datetime import date
+
+    from src.engine.dashboard_data import datos_grafico
+
+    for i in range(12):
+        tag = f"G{i}"
+        db.registrar_animal(tag, sexo="Hembra", estado="ACTIVO", raza=f"{i}% Gyr + resto raro")
+        db.guardar_composicion_racial(tag, [{"raza": "Gyr", "porcentaje": 50},
+                                            {"raza": "Desconocida", "porcentaje": 50}])
+    d = datos_grafico(db, "composicion_racial", hoy=date(2026, 9, 26))
+    nombres = [it["nombre"] for it in d["items"]]
+    assert len(d["items"]) <= 9
+    assert nombres[0] == "Gyr" and any(n.startswith("Sin dato") for n in nombres)
+    assert abs(sum(it["pct"] for it in d["items"]) - 100) < 0.5
+
+
+def test_pajuelas_traducen_codigo_de_raza(db):
+    from src.engine.dashboard_data import datos_genetica
+    from src.importers.dbf_importer import import_semen
+
+    import_semen(db, [{"REF": "7MS343", "NOMSEM": "KOURT", "COD1": "22", "EXT": 4}])
+    db.registrar_pajuela_inventario(codigo_toro="138", raza="Raza 17", procedencia="MERLIN",
+                                    canastilla="SG-CANASTA", cantidad=8)
+    d = datos_genetica(db)
+    razas = {p["codigo_toro"]: p["raza"] for p in d["pajuelas_inventario"]}
+    assert razas["7MS343"] == "Shorthorn"
+    assert razas["138"] == "Blanco Orejinegro (BON)"
+    assert d["pajuelas_totales"] == {"toros": 2, "unidades": 12}

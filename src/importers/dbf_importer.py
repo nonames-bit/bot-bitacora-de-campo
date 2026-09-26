@@ -20,7 +20,7 @@ from typing import Iterator, Optional
 from ..db.database import Database
 from ..db.models import TIPOS_EVENTO_PARTO
 from ..engine.growth_engine import gmd
-from ..engine.genetic_engine import generar_resumen_zootecnico
+from ..engine.genetic_engine import CATALOGO_RAZAS_SG_DEFECTO, generar_resumen_zootecnico
 from ..engine.reproductive_engine import fecha_estimada_parto
 from ..utils import hoy, iso, to_date
 
@@ -33,61 +33,6 @@ DBF_REQUERIDOS = [
     "semen.dbf", "termos.dbf", "raza.dbf",
 ]
 
-CATALOGO_RAZAS_SG_DEFECTO = {
-    "01": "Cebú Comercial",
-    "02": "Pardo Suizo",
-    "03": "Holstein",
-    "04": "Gyr",
-    "05": "Guzerá",
-    "06": "Brahman Gris",
-    "07": "Hartón del Valle",
-    "08": "Holstein Rojo",
-    "09": "Santa Gertrudis",
-    "10": "Costeño con Cuernos (CCC)",
-    "11": "Jersey",
-    "12": "Ayrshire",
-    "13": "Angus Rojo",
-    "14": "Angus Negro",
-    "15": "Simmental",
-    "16": "Criolla",
-    "17": "Blanco Orejinegro (BON)",
-    "18": "Normando",
-    "19": "Pardo Colombiano",
-    "20": "Sahiwal",
-    "21": "Rubio Alemán",
-    "22": "Shorthorn",
-    "23": "Lucerna",
-    "24": "Sanmartinero",
-    "25": "Limonero",
-    "26": "Velásquez",
-    "27": "M.A.Z",
-    "28": "Casanare",
-    "29": "Nelore",
-    "30": "Indubrasil",
-    "31": "Brahman Rojo",
-    "32": "Chino Santandereano",
-    "33": "Romosinuano",
-    "34": "Charolais",
-    "35": "Cebú Comercial",
-    "36": "Limousin",
-    "37": "Chianina",
-    "38": "Beefmaster",
-    "39": "Guernsey",
-    "40": "Carora",
-    "41": "Piamontés",
-    "42": "Hereford",
-    "43": "Gelbvieh",
-    "44": "Belga Azul",
-    "45": "Mono Pinteño",
-    "46": "Búfalo",
-    "47": "Simmental Americano",
-    "48": "Pardo Americano",
-    "49": "Pardo Colombiano",
-    "50": "Simmental Alemán",
-    "51": "Montbéliarde",
-    "52": "Girolando",
-    "53": "7 Colores",
-}
 
 # Marcas de campo de Visual FoxPro.
 TIPO_FECHA = "D"
@@ -990,8 +935,9 @@ def import_condcorp(db: Database, records) -> dict:
     return {"nuevos": nuevos, "duplicados": duplicados}
 
 
-def import_semen(db: Database, records) -> dict:
+def import_semen(db: Database, records, catalogo_razas: Optional[dict] = None) -> dict:
     """Siembra inventario de pajuelas/toros desde semen.dbf."""
+    cat = catalogo_razas or CATALOGO_RAZAS_SG_DEFECTO
     nuevos = 0
     actualizados = 0
     for r in records:
@@ -1017,7 +963,7 @@ def import_semen(db: Database, records) -> dict:
         existente = db.query_one("SELECT 1 FROM pajuelas_inventario WHERE codigo_toro = ? LIMIT 1", (codigo_final,))
         db.registrar_pajuela_inventario(
             codigo_toro=codigo_final,
-            raza=f"Raza {cod_raza}" if cod_raza else None,
+            raza=(cat.get(cod_raza) or f"Raza {cod_raza}") if cod_raza else None,
             procedencia=procedencia,
             canastilla="SG-CANASTA",
             cantidad=cantidad,
@@ -1302,7 +1248,8 @@ def import_dbfs(
     if "condcorp.dbf" in lectores:
         conteos["condicion_corporal"] = import_condcorp(db, lectores["condcorp.dbf"].records())
     if "semen.dbf" in lectores:
-        conteos["pajuelas_inventario"] = import_semen(db, lectores["semen.dbf"].records())
+        conteos["pajuelas_inventario"] = import_semen(db, lectores["semen.dbf"].records(),
+                                                      catalogo_razas=cat_razas)
 
     # Fotos si vienen en fotos_data o en dbf_data ("Fotos.Zip" o "fotos.zip")
     fotos_source = fotos_data

@@ -776,6 +776,7 @@ def formatear_genetica_panel(db: Database) -> str:
             "9_16": "📐",
             "1_2": "🌿",
             "MULTI": "🔄",
+            "PARCIAL": "🧩",
             "INDET": "❓",
         }
         for g in grados:
@@ -786,7 +787,10 @@ def formatear_genetica_panel(db: Database) -> str:
 
     # 3. Top líneas de cruces
     patrones = d.get("patrones_cruces", [])
-    patrones_con_cruce = [p for p in patrones if p["grado_codigo"] not in ("INDET", "SIN_CLASIFICAR")][:6]
+    patrones_con_cruce = sorted(
+        (p for p in patrones if p["grado_codigo"] not in ("INDET", "SIN_CLASIFICAR", "PARCIAL")),
+        key=lambda p: -p["cabezas"],
+    )[:6]
     if patrones_con_cruce:
         lineas.append("🏆 <b>Principales Familias de Cruces:</b>")
         for p in patrones_con_cruce:

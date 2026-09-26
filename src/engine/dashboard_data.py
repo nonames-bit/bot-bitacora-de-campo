@@ -36,7 +36,7 @@ try:
         tramo_del,
     )
     from .growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete
-    from .genetic_engine import calcular_resumen_genetico_hato
+    from .genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -55,7 +55,7 @@ except ImportError:  # ejecución directa
         tramo_del,
     )
     from src.engine.growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete  # type: ignore
-    from src.engine.genetic_engine import calcular_resumen_genetico_hato  # type: ignore
+    from src.engine.genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -3603,11 +3603,29 @@ def datos_poblacion(db: Database) -> dict:
     return out
 
 
-def datos_genetica(db: Database) -> dict:
+def _resumen_genetico(db: Database) -> dict:
+    """Resumen genético del hato ACTIVO (compartido por la vista y su donut)."""
+    from collections import defaultdict
+    animales_activos = _filas_dict(db.query(
+        "SELECT id_animal, tag, COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') as raza, nombre, sexo "
+        "FROM animales WHERE estado = 'ACTIVO' ORDER BY tag"
+    ))
+    rows_comp = db.query(
+        "SELECT animal_id, raza, porcentaje FROM composicion_racial ORDER BY animal_id, porcentaje DESC"
+    )
+    comp_por_animal: dict[int, list[dict]] = defaultdict(list)
+    for r in rows_comp:
+        comp_por_animal[int(r["animal_id"])].append({
+            "raza": r["raza"],
+            "porcentaje": float(r["porcentaje"] or 0.0),
+        })
+    return calcular_resumen_genetico_hato(animales_activos, comp_por_animal)
+
+
+def datos_genetica(db: Database, hoy: Optional[date] = None) -> dict:
     """Distribución racial y zootécnica del hato ACTIVO: resumen por grados de sangre,
     pool genético global y agrupación por familias de cruces (F1, 1/2, 3/4, 5/8, etc.).
     """
-    from collections import defaultdict
     errores: dict[str, str] = {}
     resumen_gen: dict[str, Any] = {
         "total": 0,
@@ -3621,20 +3639,7 @@ def datos_genetica(db: Database) -> dict:
         "filas": [],
     }
     try:
-        animales_activos = _filas_dict(db.query(
-            "SELECT id_animal, tag, COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') as raza, nombre, sexo "
-            "FROM animales WHERE estado = 'ACTIVO' ORDER BY tag"
-        ))
-        rows_comp = db.query(
-            "SELECT animal_id, raza, porcentaje FROM composicion_racial ORDER BY animal_id, porcentaje DESC"
-        )
-        comp_por_animal: dict[int, list[dict]] = defaultdict(list)
-        for r in rows_comp:
-            comp_por_animal[int(r["animal_id"])].append({
-                "raza": r["raza"],
-                "porcentaje": float(r["porcentaje"] or 0.0),
-            })
-        resumen_gen = calcular_resumen_genetico_hato(animales_activos, comp_por_animal)
+        resumen_gen = _resumen_genetico(db)
     except Exception as e:
         logger.error("seccion genetica fallo", exc_info=True)
         errores["genetica"] = str(e)
@@ -3644,10 +3649,18 @@ def datos_genetica(db: Database) -> dict:
             """SELECT codigo_toro, raza, procedencia, canastilla, cantidad FROM pajuelas_inventario
                ORDER BY cantidad DESC LIMIT 20"""
         ))
+        for pj in pajuelas:
+            pj["raza"] = nombre_raza_sg(pj.get("raza"))
+        tot_pj = db.query_one(
+            "SELECT COUNT(*) toros, COALESCE(SUM(cantidad), 0) unidades FROM pajuelas_inventario "
+            "WHERE cantidad > 0"
+        )
+        pajuelas_totales = {"toros": int(tot_pj["toros"] or 0), "unidades": int(tot_pj["unidades"] or 0)}
     except Exception as e:
         logger.error("seccion pajuelas_inventario fallo", exc_info=True)
         errores["pajuelas_inventario"] = str(e)
         pajuelas = []
+        pajuelas_totales = {"toros": 0, "unidades": 0}
 
     try:
         termos = _filas_dict(db.query(
@@ -3659,10 +3672,20 @@ def datos_genetica(db: Database) -> dict:
         errores["termo_nitrogeno"] = str(e)
         termos = []
 
+    termo_estado = None
+    if termos:
+        prox = to_date_safe(termos[0].get("proxima_recarga"))
+        if prox:
+            dias = ((hoy or date.today()) - prox).days
+            termo_estado = {"proxima_recarga": prox.isoformat(), "dias_vencido": max(0, dias),
+                            "vencido": dias > 0}
+
     out: dict[str, Any] = {
         **resumen_gen,
         "pajuelas_inventario": pajuelas,
+        "pajuelas_totales": pajuelas_totales,
         "termo_nitrogeno": termos,
+        "termo_estado": termo_estado,
     }
     if errores:
         out["errores"] = errores
@@ -4218,42 +4241,29 @@ def datos_grafico(db: Database, tipo: str, hoy: Optional[date] = None, **kwargs)
         }
 
     if tipo in ("composicion_racial", "razas"):
-        NOMBRES_RAZAS = {
-            "I": "Holstein / Cruce Lechero",
-            "T": "Tricross / Cebú Comercial",
-            "C": "Cebú / Brahman / Gyr",
-            "M": "Mestizo / Doble Propósito",
-            "SIN RAZA": "Sin Clasificar",
-        }
-        COLORES_RAZAS = {
-            "I": "var(--verde-marca)",
-            "T": "#66bb6a",
-            "C": "#8d6e63",
-            "M": "#78909c",
-            "SIN RAZA": "#d4a373",
-        }
-        rows = db.query(
-            "SELECT COALESCE(NULLIF(TRIM(raza), ''), 'SIN RAZA') raza, COUNT(*) n "
-            "FROM animales WHERE estado = 'ACTIVO' GROUP BY raza ORDER BY n DESC"
-        )
-        total = sum(int(r["n"]) for r in rows)
-        items = []
-        for r in rows:
-            c = r["raza"]
-            n = int(r["n"])
-            items.append({
-                "codigo": c,
-                "nombre": NOMBRES_RAZAS.get(c, c),
-                "n": n,
-                "pct": round(n / total * 100, 1) if total else 0.0,
-                "color": COLORES_RAZAS.get(c, "#52796f"),
-            })
+        # Mismo pool de sangre que la lista de la vista Genética: una raza por
+        # porción (top 7 + "Otras") y la sangre sin dato aparte, en gris.
+        res = _resumen_genetico(db)
+        pool = res.get("pool_racial") or []
+        sin_dato = float(res.get("pool_sin_dato_pct") or 0.0)
+        factor = (100.0 - sin_dato) / 100.0
+        items = [{"codigo": p["raza"], "nombre": p["raza"], "n": p["cabezas_portadoras"],
+                  "pct": round(p["pct"] * factor, 1), "color": p["color"]} for p in pool[:7]]
+        resto = pool[7:]
+        if resto:
+            items.append({"codigo": "OTRAS", "nombre": f"Otras ({len(resto)} razas)",
+                          "n": sum(p["cabezas_portadoras"] for p in resto),
+                          "pct": round(sum(p["pct"] for p in resto) * factor, 1), "color": "#90a4ae"})
+        if sin_dato > 0:
+            items.append({"codigo": "SIN_DATO", "nombre": "Sin dato (desconocida)", "n": None,
+                          "pct": round(sin_dato, 1), "color": "#cfd8dc"})
         return {
             "ok": True,
             "tipo": "composicion_racial",
-            "titulo": "Composición Genética (Razas)",
-            "subtitulo": f"{total} animales activos al {hoy.isoformat()}",
-            "total": total,
+            "titulo": "Pool Genético (% de sangre)",
+            "subtitulo": f"{res.get('tipificados', 0)} animales con desglose racial al {hoy.isoformat()}",
+            "total": res.get("tipificados", 0),
+            "etiqueta_total": "con desglose",
             "items": items,
         }
 

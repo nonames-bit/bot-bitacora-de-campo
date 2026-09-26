@@ -485,7 +485,7 @@
       var offset = (1 - acumuladoPct) * c;
       pathsSvg += "<circle cx='90' cy='90' r='" + r + "' fill='none' stroke='" + (rz.color || "var(--verde-marca)") + "' stroke-width='28' "
         + "stroke-dasharray='" + dash + " " + (c - dash) + "' stroke-dashoffset='" + offset + "'>"
-        + "<title>" + esc(rz.nombre) + ": " + rz.n + " (" + rz.pct + "%)</title></circle>";
+        + "<title>" + esc(rz.nombre) + ": " + rz.pct + "%" + (rz.n != null ? " (" + rz.n + " cab.)" : "") + "</title></circle>";
       acumuladoPct += pct;
     });
 
@@ -495,7 +495,7 @@
       + "</svg>"
       + "<div style='position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none;'>"
       + "<b style='font-size:22px; color:var(--verde-marca); line-height:1;'>" + total + "</b>"
-      + "<span style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>animales</span>"
+      + "<span style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc((d && d.etiqueta_total) || "animales") + "</span>"
       + "</div>"
       + "</div>";
 
@@ -507,7 +507,7 @@
         + "<span style='width:12px; height:12px; border-radius:3px; background:" + (rz.color || "var(--verde-marca)") + "; display:inline-block;'></span>"
         + "<span style='font-size:12.5px; font-weight:600; color:var(--texto);'>" + esc(rz.nombre) + "</span>"
         + "</div>"
-        + "<span style='font-size:12px; font-weight:700; color:var(--texto);'>" + rz.n + " <small style='color:var(--texto-suave);'>(" + rz.pct + "%)</small></span>"
+        + "<span style='font-size:12px; font-weight:700; color:var(--texto);'>" + rz.pct + "%" + (rz.n != null ? " <small style='color:var(--texto-suave);'>(" + rz.n + " cab.)</small>" : "") + "</span>"
         + "</div>";
     });
     h += "</div></div>";

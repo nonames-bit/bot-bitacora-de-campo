@@ -664,32 +664,45 @@ def generar_grafico_composicion_racial(db, output_dir: str = "data/reportes",
         total_centro = total
         subtitulo_centro = "animales"
     else:
-        # Agrupar Top 5 razas y colapsar las restantes en 'Otras razas'
-        from .genetic_engine import normalizar_nombre_raza
-        total_puntos = sum(float(r["pts"]) for r in rows_comp)
-        top_rows = rows_comp[:5]
-        resto_rows = rows_comp[5:]
+        # Agrupar por raza normalizada, Top 5 + 'Otras razas'; la sangre sin
+        # dato ("Desconocida") va aparte en gris, no como una raza más.
+        from .genetic_engine import _NO_RAZAS, normalizar_nombre_raza
+        agregados: dict[str, list] = {}
+        pts_sin_dato = 0.0
+        for r in rows_comp:
+            nom = normalizar_nombre_raza(r["raza"])
+            if nom in _NO_RAZAS:
+                pts_sin_dato += float(r["pts"])
+                continue
+            acc = agregados.setdefault(nom, [0.0, 0])
+            acc[0] += float(r["pts"])
+            acc[1] += int(r["n"])
+        ordenadas = sorted(agregados.items(), key=lambda x: x[1][0], reverse=True)
+        total_puntos = sum(v[0] for _, v in ordenadas) + pts_sin_dato
 
         etiquetas = []
         valores = []
-        for r in top_rows:
-            nom = normalizar_nombre_raza(r["raza"])
-            pts = float(r["pts"])
+        for nom, (pts, n_ani) in ordenadas[:5]:
             pct = (pts / total_puntos * 100.0) if total_puntos else 0.0
-            n_ani = int(r["n"])
             etiquetas.append(f"{nom}: {pct:.1f}% ({n_ani} cab)")
             valores.append(pts)
 
-        if resto_rows:
-            pts_resto = sum(float(r["pts"]) for r in resto_rows)
+        resto = ordenadas[5:]
+        if resto:
+            pts_resto = sum(v[0] for _, v in resto)
             pct_resto = (pts_resto / total_puntos * 100.0) if total_puntos else 0.0
             etiquetas.append(f"Otras razas: {pct_resto:.1f}%")
             valores.append(pts_resto)
+        if pts_sin_dato > 0:
+            etiquetas.append(f"Sin dato: {pts_sin_dato / total_puntos * 100.0:.1f}%")
+            valores.append(pts_sin_dato)
 
         total_centro = n_tipificados
         subtitulo_centro = "tipificados"
 
     colores = [_PALETA[i % len(_PALETA)] for i in range(len(valores))]
+    if etiquetas and etiquetas[-1].startswith("Sin dato"):
+        colores[-1] = "#cfd8dc"
 
     fig, ax = plt.subplots(figsize=(7, 6), dpi=dpi)
     ax.pie(
