@@ -45,9 +45,14 @@ jobs:
             echo "Servidor no configurado (secrets VPS_HOST / VPS_SSH_KEY): se omite el despliegue."
             exit 0
           fi
+          # Limpiar posibles espacios, prefijos ssh/http o usuario incluido en el host
+          HOST=$(echo "$VPS_HOST" | tr -d '[:space:]' | sed -e 's|^.*@||' -e 's|^https\?://||' -e 's|/.*$||')
+          USUARIO=$(echo "${VPS_USUARIO:-root}" | tr -d '[:space:]' | sed -e 's|@.*||')
+          USUARIO=${USUARIO:-root}
+          DIR=$(echo "${VPS_DIR:-/opt/bitacora}" | tr -d '[:space:]')
           install -m 700 -d ~/.ssh
           echo "$VPS_SSH_KEY" > ~/.ssh/id_despliegue
           chmod 600 ~/.ssh/id_despliegue
-          ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
-          ssh -i ~/.ssh/id_despliegue "${VPS_USUARIO:-root}@$VPS_HOST" \
-            "cd '$VPS_DIR' && git pull --ff-only && docker compose up -d --build --remove-orphans && docker image prune -f"
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh -i ~/.ssh/id_despliegue "$USUARIO@$HOST" \
+            "cd '$DIR' && git pull --ff-only && docker compose up -d --build --remove-orphans && docker image prune -f"
