@@ -239,13 +239,66 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
     return out
 
 
+def _evaluacion_palpadores(db: Database, hoy: date) -> list[dict]:
+    """Palpaciones del último año por responsable: cuántas, preñadas/vacías y
+    positivos que un diagnóstico posterior (<= 90 d) contradijo."""
+    desde = (hoy - timedelta(days=365)).isoformat()
+    try:
+        filas = _filas_dict(db.query(
+            """SELECT COALESCE(NULLIF(TRIM(d.responsable), ''), 'Sin responsable') resp,
+                      d.vaca_id, d.fecha, UPPER(d.resultado) res
+               FROM diagnosticos_gestacion d JOIN animales a ON a.id_animal = d.vaca_id
+               WHERE d.fecha >= ? ORDER BY d.vaca_id, d.fecha""", (desde,)))
+    except Exception:
+        logger.error("evaluacion_palpadores fallo", exc_info=True)
+        return []
+    por: dict[str, dict] = {}
+    for i, r in enumerate(filas):
+        e = por.setdefault(r["resp"], {"responsable": r["resp"], "palpaciones": 0, "prenadas": 0,
+                                       "vacias": 0, "contradichas": 0})
+        e["palpaciones"] += 1
+        positivo = "PREÑ" in (r["res"] or "") or "POSITIV" in (r["res"] or "")
+        if positivo:
+            e["prenadas"] += 1
+            sig = filas[i + 1] if i + 1 < len(filas) else None
+            f0, f1 = to_date_safe(r["fecha"]), to_date_safe(sig["fecha"]) if sig else None
+            if (sig and sig["vaca_id"] == r["vaca_id"] and f0 and f1 and (f1 - f0).days <= 90
+                    and ("VAC" in (sig["res"] or "") or "NEGATIV" in (sig["res"] or ""))):
+                e["contradichas"] += 1
+        else:
+            e["vacias"] += 1
+    out = sorted(por.values(), key=lambda x: -x["palpaciones"])
+    for e in out:
+        e["pct_prenez"] = round(e["prenadas"] / e["palpaciones"] * 100, 1) if e["palpaciones"] else 0.0
+    return out
+
+
+def _responsables_sugeridos(db: Database) -> list[str]:
+    """Nombres para el campo "¿Quién palpa?": inseminadores activos y
+    responsables usados antes."""
+    nombres: list[str] = []
+    try:
+        for q in ("SELECT nombre n FROM inseminadores WHERE COALESCE(activo, 1) = 1 ORDER BY nombre",
+                  "SELECT DISTINCT TRIM(responsable) n FROM diagnosticos_gestacion "
+                  "WHERE responsable IS NOT NULL AND TRIM(responsable) != '' ORDER BY n LIMIT 30"):
+            for r in db.query(q):
+                if r["n"] and r["n"] not in nombres:
+                    nombres.append(r["n"])
+    except Exception:
+        logger.error("responsables_sugeridos fallo", exc_info=True)
+    return nombres
+
+
 def datos_lista_trabajo(db: Database, hoy: Optional[date] = None, usar_cache: bool = False) -> dict:
     """Listas de trabajo del día (ver ``engine/tareas.py``)."""
     try:
         from .tareas import datos_tareas
     except ImportError:  # ejecución directa
         from src.engine.tareas import datos_tareas  # type: ignore
-    return datos_tareas(db, hoy, usar_cache=usar_cache)
+    out = datos_tareas(db, hoy, usar_cache=usar_cache)
+    if not usar_cache:
+        out["responsables_sugeridos"] = _responsables_sugeridos(db)
+    return out
 
 
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
@@ -955,29 +1008,14 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         logger.error("seccion servicios_realizados fallo", exc_info=True)
         errores["servicios_realizados"] = str(e)
 
-    # Reproductores en servicio (monta natural reciente) / descanso.
+    # Reproductores en servicio / descanso (manual, monta o potrero con hembras).
     reproductores_estado = []
     try:
-        filas_toros = _filas_dict(db.query(
-            """SELECT a.tag, a.nombre, a.raza,
-                      (SELECT MAX(s.fecha) FROM servicios s
-                        WHERE UPPER(s.toro_pajilla) = UPPER(a.tag)
-                          AND UPPER(COALESCE(s.tipo_servicio, '')) IN ('MONTA', 'MN', 'MONTA_NATURAL')) AS ult_monta
-               FROM animales a
-               WHERE a.estado = 'ACTIVO' AND (
-                   a.tag GLOB 'T[0-9]*'
-                   OR UPPER(COALESCE(a.notas, '')) LIKE '%[REPRODUCTOR]%'
-                   OR UPPER(COALESCE(a.notas, '')) LIKE '%TORO%')
-               ORDER BY a.tag"""))
-        for t in filas_toros:
-            um = to_date_safe(t["ult_monta"])
-            en_servicio = bool(um and (hoy - um).days <= DIAS_TORO_EN_SERVICIO)
-            reproductores_estado.append({
-                "tag": t["tag"], "nombre": t["nombre"], "raza": t["raza"],
-                "ultima_monta": t["ult_monta"],
-                "estado": "EN_SERVICIO" if en_servicio else "EN_DESCANSO",
-                "dias_desde_monta": (hoy - um).days if um else None,
-            })
+        try:
+            from .tareas import estado_toros
+        except ImportError:  # ejecución directa
+            from src.engine.tareas import estado_toros  # type: ignore
+        reproductores_estado = estado_toros(db, hoy)
     except Exception as e:
         logger.error("seccion reproductores_estado fallo", exc_info=True)
         errores["reproductores_estado"] = str(e)
@@ -1010,6 +1048,8 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "novillas_entoradas": novillas_entoradas,
         "reproductores_estado": reproductores_estado,
         "lista_trabajo": datos_lista_trabajo(db, hoy),
+        "evaluacion_palpadores": _evaluacion_palpadores(db, hoy),
+        "responsables_sugeridos": _responsables_sugeridos(db),
     }
     if errores:
         out["errores"] = errores
@@ -2384,7 +2424,7 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
             badge_fisio = "Toro Reproductor"
             color_fisio = "azul"
             icono_fisio = "bull"
-            detalle_fisio = "Macho reproductor activo de la finca"
+            detalle_fisio = "Reproductor de la finca"
         elif edad_dias is not None and edad_dias < 365:
             cod_fisio = "CRIA_MACHO"
             titulo_fisio = "Cría (Ternero)"
@@ -2601,7 +2641,7 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
             titulo_repro = "Toro reproductor activo"
             badge_repro = "Toro Reproductor"
             color_repro = "azul"
-            detalle_repro = "Macho padre reproductor disponible en el hato."
+            detalle_repro = "Reproductor"
         else:
             cod_repro = "MACHO_ACTIVO"
             titulo_repro = "Macho en desarrollo / ceba"
@@ -3040,6 +3080,28 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     estados_z = calcular_estados_zootecnicos(base)
     base["estado_fisiologico"] = estados_z["fisiologico"]
     base["estado_reproductivo"] = estados_z["reproductivo"]
+    if base["estado_fisiologico"].get("codigo") == "TORO":
+        # Un solo estado para toros: en servicio / descanso (ver tareas.estado_toros).
+        try:
+            try:
+                from .tareas import estado_toros
+            except ImportError:  # ejecución directa
+                from src.engine.tareas import estado_toros  # type: ignore
+            ts = next((t for t in estado_toros(db) if str(t["tag"]).upper() == str(base.get("tag") or "").upper()), None)
+        except Exception:
+            logger.error("ficha: estado del toro fallo", exc_info=True)
+            ts = None
+        if ts:
+            ts["n_crias"] = len(base.get("crias") or [])
+            base["toro_servicio"] = ts
+            en_serv = ts["estado"] == "EN_SERVICIO"
+            base["estado_reproductivo"] = {
+                **base["estado_reproductivo"],
+                "titulo": "En servicio" if en_serv else "En descanso",
+                "badge": "En servicio" if en_serv else "En descanso",
+                "color": "verde" if en_serv else "gris",
+                "detalle": ts["motivo"],
+            }
     base["estado_repro"] = estados_z["reproductivo"]["titulo"]
     base["dias_abiertos"] = estados_z["reproductivo"]["dias_abiertos"]
     base["alerta_repro"] = estados_z["reproductivo"]["alerta"]

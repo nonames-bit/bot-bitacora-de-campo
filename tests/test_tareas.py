@@ -109,7 +109,7 @@ def test_tratamientos_leche_y_carne(db):
     db.registrar_parto("DEL", fecha=_d(-400), sexo_cria="Macho")
     _a(db, "PAUSA")
     db.registrar_parto("PAUSA", fecha=_d(-60), sexo_cria="Macho")
-    db.registrar_pausa_ordeno("PAUSA", fecha_inicio=_d(-20))
+    db.registrar_pausa_ordeno("PAUSA", fecha_inicio=_d(-3))
     _a(db, "FLACO", sexo="Macho", edad=500)
     db.registrar_pesaje("FLACO", fecha=_d(-60), peso_kg=300)
     db.registrar_pesaje("FLACO", fecha=_d(-5), peso_kg=305)
@@ -120,7 +120,8 @@ def test_tratamientos_leche_y_carne(db):
     t = datos_tareas(db, HOY)
     trat = {f["tag"]: f for f in t["tratamientos"]}
     assert "Retiro de leche" in trat["TR"]["detalle"] and "Oxitetraciclina" in trat["TR"]["detalle"]
-    assert "DEL" in _tags(t, "del_alto")
+    secar = {f["tag"]: f for f in t["secar"]}
+    assert "Lactancia larga" in secar["DEL"]["motivo"]
     assert "PAUSA" in _tags(t, "pausas")
     assert "FLACO" in _tags(t, "bajo_peso")
     assert "GORDO" in _tags(t, "venta") and "FLACO" not in _tags(t, "venta")
@@ -159,3 +160,48 @@ def test_manejo_tipo_invalido(db):
     _a(db, "X")
     with pytest.raises(ValueError):
         db.registrar_manejo("X", "OTRA_COSA")
+
+
+def test_secar_preñez_7_meses_y_una_fila_si_cumple_ambas(db):
+    _a(db, "P212")
+    db.registrar_diagnostico("P212", fecha=_d(-62), resultado="PREÑADA", dias_gestacion=150)
+    _a(db, "AMBAS")
+    db.registrar_parto("AMBAS", fecha=_d(-400), sexo_cria="Macho")
+    db.registrar_diagnostico("AMBAS", fecha=_d(-70), resultado="PREÑADA", dias_gestacion=150)
+    t = datos_tareas(db, HOY)
+    secar = {f["tag"]: f for f in t["secar"]}
+    assert "Preñez" in secar["P212"]["motivo"]
+    assert [f["tag"] for f in t["secar"]].count("AMBAS") == 1
+    assert "Preñez" in secar["AMBAS"]["motivo"] and "Lactancia larga" in secar["AMBAS"]["motivo"]
+
+
+def test_estado_toros_manual_potrero_y_solo(db):
+    from src.engine.tareas import estado_toros
+    db.registrar_potrero(nombre="OLEGARIO", codigo="O1")
+    db.registrar_potrero(nombre="SOLO", codigo="S1")
+    db.registrar_animal("T01", sexo="Macho", estado="ACTIVO", fecha_nacimiento=_d(-1500), potrero="OLEGARIO")
+    db.registrar_animal("T02", sexo="Macho", estado="ACTIVO", fecha_nacimiento=_d(-1500), potrero="OLEGARIO")
+    db.registrar_animal("T03", sexo="Macho", estado="ACTIVO", fecha_nacimiento=_d(-1500), potrero="SOLO")
+    for i in range(3):
+        db.registrar_animal(f"V{i}", sexo="Hembra", estado="ACTIVO", fecha_nacimiento=_d(-1500), potrero="OLEGARIO")
+    db.registrar_manejo("T02", "TORO_DESCANSO")
+    est = {t["tag"]: t for t in estado_toros(db, HOY)}
+    assert est["T01"]["estado"] == "EN_SERVICIO" and "3 hembras" in est["T01"]["motivo"]
+    assert est["T02"]["estado"] == "EN_DESCANSO" and est["T02"]["fuente"] == "MANUAL"
+    assert est["T03"]["estado"] == "EN_DESCANSO"
+    db.registrar_manejo("T02", "TORO_SERVICIO")
+    assert {t["tag"]: t for t in estado_toros(db, HOY)}["T02"]["estado"] == "EN_SERVICIO"
+
+
+def test_manejo_guarda_responsable_y_evaluacion_palpadores(db):
+    from src.engine.dashboard_data import _evaluacion_palpadores, _responsables_sugeridos
+    _a(db, "R1", sexo="Macho", edad=60)
+    db.registrar_manejo("R1", "TOPIZADO", responsable="Pedro")
+    assert db.query_one("SELECT responsable FROM manejos")["responsable"] == "Pedro"
+    _a(db, "V1")
+    db.registrar_diagnostico("V1", fecha=_d(-60), resultado="PREÑADA", dias_gestacion=60, responsable="Dr. Ruiz")
+    db.registrar_diagnostico("V1", fecha=_d(-20), resultado="VACIA", responsable="Juan")
+    ev = {e["responsable"]: e for e in _evaluacion_palpadores(db, HOY)}
+    assert ev["Dr. Ruiz"]["prenadas"] == 1 and ev["Dr. Ruiz"]["contradichas"] == 1
+    assert ev["Juan"]["vacias"] == 1
+    assert {"Dr. Ruiz", "Juan"} <= set(_responsables_sugeridos(db))

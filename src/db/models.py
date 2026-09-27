@@ -167,6 +167,7 @@ CREATE TABLE IF NOT EXISTS manejos (
     producto TEXT,
     lote_producto TEXT,
     notas TEXT,
+    responsable TEXT,
     creado_en TEXT,
     registrado_por INTEGER
 );

@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 GESTACION = 283
 DIAS_DATO_VIGENTE = 365
 DIAS_PALPAR_MIN = 35
-DIAS_SECAR = 220
+DIAS_SECAR = 210  # 7 meses de preñez
 DIAS_GESTACION_MAX = 300
 DIAS_SERVIR_POSPARTO = 45
 DIAS_SERVICIO_RECIENTE = 21
@@ -67,7 +67,6 @@ EDAD_BRUCELOSIS = (90, 240)
 DIAS_TRATAMIENTO_SEGUIMIENTO = 7
 DIAS_RETIRO_PROXIMO = 7
 DEL_ALTO = (305, 600)
-DIAS_PAUSA_LARGA = 15
 DIAS_PESAJE_RECIENTE = 180
 GMD_MIN_KG = 0.30
 PESO_VENTA_KG = 400
@@ -80,7 +79,7 @@ CACHE_SEGUNDOS = 60
 CLAVES = (
     "chequeo", "palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras",
     "destetar", "topizar", "castrar", "marcar", "vac_brucelosis", "vac_aftosa",
-    "tratamientos", "del_alto", "pausas", "bajo_peso", "venta", "descarte", "categoria",
+    "tratamientos", "pausas", "bajo_peso", "venta", "descarte", "categoria",
 )
 
 _RE_REPRODUCTOR = re.compile(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b")
@@ -268,9 +267,11 @@ def _reproduccion(out: dict, datos: dict, info: dict, hoy: date) -> None:
                 ult_sec = to_date_safe(datos["secados"].get(aid))
                 ref = max([d for d in (ult_parto, to_date_safe(r["ult_diag_fecha"])) if d], default=None)
                 if not (ult_sec and (ref is None or ult_sec >= ref)):
+                    faltan_p = max(0, GESTACION - gest)
                     out["secar"].append({**base, "dias_gestacion": gest,
                                          "fep": (hoy + timedelta(days=GESTACION - gest)).isoformat(),
-                                         "dias_para_parto": max(0, GESTACION - gest)})
+                                         "dias_para_parto": faltan_p,
+                                         "motivo": f"Preñez ~{gest // 30} m · parto en {faltan_p} d"})
 
         if estado in ("ABIERTA", "PARIDA"):
             libre = not r["tiene_prog_ia"] and not (serv_f and (hoy - serv_f).days <= DIAS_SERVICIO_RECIENTE)
@@ -349,12 +350,19 @@ def _sanidad_leche_carne(out: dict, datos: dict, info: dict, hoy: date) -> None:
         del_d = (hoy - a["ult_parto"]).days
         ult_sec = to_date_safe(datos["secados"].get(aid))
         if DEL_ALTO[0] <= del_d <= DEL_ALTO[1] and not (ult_sec and ult_sec >= a["ult_parto"]):
-            out["del_alto"].append({**a["base"], "dias_en_leche": del_d,
-                                    "prenada": a.get("estado_repro") == "PRENADA"})
+            # Lactancia larga: también va a "Secar" (una sola fila por vaca).
+            motivo = f"Lactancia larga: {del_d} días en leche"
+            fila = next((x for x in out["secar"] if x["tag"] == a["tag"]), None)
+            if fila:
+                fila["motivo"] += " · " + motivo
+            else:
+                out["secar"].append({**a["base"], "dias_en_leche": del_d, "dias_para_parto": None,
+                                     "motivo": motivo})
+    # A toda leche / ordeño pausado: todas las pausas abiertas.
     for p in datos["pausas"]:
         a = info.get(p["animal_id"])
         f = to_date_safe(p["fecha_inicio"])
-        if a and f and (hoy - f).days > DIAS_PAUSA_LARGA:
+        if a and f:
             out["pausas"].append({**a["base"], "desde": p["fecha_inicio"], "dias": (hoy - f).days,
                                   "motivo": p["motivo"]})
 
@@ -379,6 +387,66 @@ def _sanidad_leche_carne(out: dict, datos: dict, info: dict, hoy: date) -> None:
                 motivos.append(f"sin parto hace {a['posparto'] // 30} meses")
             if motivos:
                 out["descarte"].append({**a["base"], "motivo": " · ".join(motivos)})
+
+
+DIAS_TORO_MONTA = 60
+
+
+def estado_toros(db: Database, hoy: Optional[date] = None) -> list[dict]:
+    """Toros activos en servicio o en descanso. Decide, en orden: el último
+    manejo manual (TORO_SERVICIO / TORO_DESCANSO), una monta registrada en
+    los últimos 60 días, o estar en un potrero con hembras adultas."""
+    hoy = hoy or date.today()
+    filas = _filas_dict(db.query(f"""
+        WITH {ULT_TRASLADO_CTE}
+        SELECT a.id_animal, a.tag, a.nombre, a.raza, a.sexo, a.notas, a.fecha_nacimiento,
+               {POTRERO_ACTUAL_EXPR} AS pid, pt.nombre AS potrero
+        FROM animales a
+        LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+        LEFT JOIN potreros pt ON pt.id = {POTRERO_ACTUAL_EXPR}
+        WHERE a.estado = 'ACTIVO'"""))
+
+    def _es_toro(a) -> bool:
+        return bool(re.match(r"^T\d+", str(a["tag"] or ""), re.IGNORECASE)) or bool(
+            re.search(r"\b(?:TORO|REPRODUCTOR)\b", str(a["notas"] or "").upper()))
+
+    toros = [a for a in filas if _es_toro(a)]
+    if not toros:
+        return []
+    lim_adulta = (hoy - timedelta(days=EDAD_ADULTA_DIAS)).isoformat()
+    hembras_por_pot: dict[Any, int] = {}
+    for a in filas:
+        if a["pid"] is not None and _es_hembra(a["sexo"]) and not _es_toro(a) \
+                and (a["fecha_nacimiento"] or "") and a["fecha_nacimiento"] <= lim_adulta:
+            hembras_por_pot[a["pid"]] = hembras_por_pot.get(a["pid"], 0) + 1
+    manuales = {r["animal_id"]: (r["tipo"], r["fecha"]) for r in db.query(
+        "SELECT m.animal_id, m.tipo, m.fecha FROM manejos m WHERE m.tipo IN ('TORO_SERVICIO','TORO_DESCANSO') "
+        "AND m.id = (SELECT m2.id FROM manejos m2 WHERE m2.animal_id = m.animal_id "
+        "AND m2.tipo IN ('TORO_SERVICIO','TORO_DESCANSO') ORDER BY m2.fecha DESC, m2.id DESC LIMIT 1)")}
+    montas = {str(r["t"] or "").upper(): r["f"] for r in db.query(
+        "SELECT UPPER(toro_pajilla) t, MAX(fecha) f FROM servicios "
+        "WHERE UPPER(COALESCE(tipo_servicio, '')) IN ('MONTA', 'MN', 'MONTA_NATURAL') GROUP BY UPPER(toro_pajilla)")}
+    out = []
+    for t in sorted(toros, key=lambda x: str(x["tag"])):
+        um = to_date_safe(montas.get(str(t["tag"]).upper()))
+        n_h = hembras_por_pot.get(t["pid"], 0)
+        man = manuales.get(t["id_animal"])
+        if man:
+            estado = "EN_SERVICIO" if man[0] == "TORO_SERVICIO" else "EN_DESCANSO"
+            motivo, fuente = f"Marcado a mano el {man[1]}", "MANUAL"
+        elif um and (hoy - um).days <= DIAS_TORO_MONTA:
+            estado, motivo, fuente = "EN_SERVICIO", f"Monta hace {(hoy - um).days} d", "MONTA"
+        elif n_h:
+            estado, fuente = "EN_SERVICIO", "POTRERO"
+            motivo = f"Con {n_h} hembras en {t['potrero'] or 'su potrero'}"
+        else:
+            estado, motivo, fuente = "EN_DESCANSO", "Sin hembras en su potrero", "POTRERO"
+        out.append({"tag": t["tag"], "nombre": t["nombre"], "raza": t["raza"],
+                    "potrero": t["potrero"] or SIN_POTRERO_LABEL, "estado": estado,
+                    "motivo": motivo, "fuente": fuente, "hembras_potrero": n_h,
+                    "ultima_monta": um.isoformat() if um else None,
+                    "dias_desde_monta": (hoy - um).days if um else None})
+    return out
 
 
 def datos_tareas(db: Database, hoy: Optional[date] = None, usar_cache: bool = False) -> dict:
@@ -418,7 +486,7 @@ def datos_tareas(db: Database, hoy: Optional[date] = None, usar_cache: bool = Fa
             out.setdefault("errores", {})[nombre] = str(e)
 
     out["palpar"].sort(key=lambda x: -x["dias"])
-    out["secar"].sort(key=lambda x: x["dias_para_parto"])
+    out["secar"].sort(key=lambda x: (x["dias_para_parto"] is None, x["dias_para_parto"] or 0))
     out["servir"].sort(key=lambda x: -(x["dias_abiertos"] or 0))
     out["partos"].sort(key=lambda x: x["en_dias"])
     out["celos"].sort(key=lambda x: x["en_dias"])

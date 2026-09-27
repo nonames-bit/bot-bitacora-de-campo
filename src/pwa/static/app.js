@@ -138,8 +138,8 @@
 
     var col = obtenerHoraColombia();
     var esNocheHora = (col.hora > 18 || (col.hora === 18 && col.min >= 30) || col.hora < 5 || (col.hora === 5 && col.min < 30));
-    var tema = document.documentElement.getAttribute("data-theme");
-    var esNoche = esNocheHora || (tema === "dark");
+    // Día/noche por la hora de la finca, no por el tema oscuro de la app.
+    var esNoche = esNocheHora;
 
     var nuevoEstado = "dia";
     if (_vacaContexto.esFicha && _vacaContexto.esTernero) {
@@ -205,8 +205,8 @@
 
     var col = obtenerHoraColombia();
     var esNocheHora = (col.hora > 18 || (col.hora === 18 && col.min >= 30) || col.hora < 5 || (col.hora === 5 && col.min < 30));
-    var tema = document.documentElement.getAttribute("data-theme");
-    var esNoche = esNocheHora || (tema === "dark");
+    // Día/noche por la hora de la finca, no por el tema oscuro de la app.
+    var esNoche = esNocheHora;
 
     // Detección de lluvia en tiempo real:
     // IMPORTANTE: NO basarse en lluvia_mm diaria acumulada ni en prob_lluvia máxima de 24h,
@@ -495,8 +495,13 @@
       + "</div>";
   }
   function bindTablero() {
-    qa(".btn-ir-tareas").forEach(function (b) {
-      b.addEventListener("click", function () { irAVista(b.getAttribute("data-vista")); });
+    qa(".btn-ir-tareas, .kpi-link").forEach(function (b) {
+      b.addEventListener("click", function () {
+        window.__ltAbrir = b.getAttribute("data-lt") || null;
+        irAVista(b.getAttribute("data-vista"));
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
+      });
     });
     var btnVerTodos = document.getElementById("btn-ver-todos-eventos-tablero");
     if (btnVerTodos) {
@@ -693,11 +698,16 @@
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px; font-size:18px;'>" + icon("grid") + "Tablero finca" + pot + "</h3>"
       + "<div style='display:flex; gap:6px; align-items:center;'>" + pdfBtn + "</div>"
       + "</div>";
+    // KPIs tocables: llevan a la vista (y a la lista de trabajo) de cada dato.
+    function kpiLink(html, vista, lt) {
+      return "<div class='kpi-link' role='button' tabindex='0' data-vista='" + vista + "'" + (lt ? " data-lt='" + lt + "'" : "") + ">" + html + "</div>";
+    }
     h += "<div class='kpis'>"
-      + kpi(d.activos, "Activos") + kpi(d.hembras, "Hembras") + kpi(d.machos, "Machos")
-      + kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : "")
-      + kpi(d.celos_7d, "Celos 7d") + kpi(d.servicios_7d, "Serv. 7d")
-      + kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : "") + "</div>";
+      + kpiLink(kpi(d.activos, "Activos"), "inventario") + kpiLink(kpi(d.hembras, "Hembras"), "inventario")
+      + kpiLink(kpi(d.machos, "Machos"), "inventario")
+      + kpiLink(kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : ""), "repro", "partos")
+      + kpiLink(kpi(d.celos_7d, "Celos 7d"), "repro", "celos") + kpiLink(kpi(d.servicios_7d, "Serv. 7d"), "repro", "palpar")
+      + kpiLink(kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : ""), "sanidad", "tratamientos") + "</div>";
     h += erroresHtml(d);
     h += renderTareasHoy(d.tareas_conteos);
     h += renderResumenDiaTablero(d);
@@ -822,7 +832,7 @@
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
     palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca preñada pendiente de secar." },
+    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
     servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca parida pendiente de servir." },
     novillas: { nombre: "Novillas a entorar", icono: "🐄", vacio: "Ninguna novilla lista para entorar." },
     partos: { nombre: "Partos", icono: "🐣", vacio: "Ningún parto próximo ni atrasado." },
@@ -835,8 +845,7 @@
     vac_brucelosis: { nombre: "Brucelosis", icono: "💉", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
     vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
     tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
-    del_alto: { nombre: "> 305 d en leche", icono: "📉", vacio: "Ninguna vaca con más de 305 días en leche." },
-    pausas: { nombre: "Pausas largas", icono: "⏸️", vacio: "Ninguna pausa de ordeño de más de 15 días." },
+    pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
     bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
     venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
     descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
@@ -847,7 +856,7 @@
     var edad = a.edad_dias != null ? esc(edadCorta(a.edad_dias)) : "";
     switch (clave) {
       case "palpar": return "Servida " + esc(fechaCorta(a.fecha_servicio)) + " · hace " + esc(a.dias) + " d" + (a.toro ? " · " + esc(a.toro) : "");
-      case "secar": return "Gestación ~" + esc(a.dias_gestacion) + " d · parto en " + esc(a.dias_para_parto) + " d (" + esc(fechaCorta(a.fep)) + ")";
+      case "secar": return esc(a.motivo);
       case "servir": return "Parió " + esc(fechaCorta(a.ultimo_parto)) + " · " + esc(a.dias_abiertos) + " d abiertos";
       case "novillas": return edad + " · " + (a.peso_kg != null ? esc(a.peso_kg) + " kg" : "sin peso");
       case "partos": return a.estado === "ATRASADO"
@@ -858,8 +867,7 @@
       case "destetar": return edad + (a.madre ? " · madre " + esc(a.madre) : "");
       case "vac_aftosa": return a.ultima ? "Última aftosa " + esc(fechaCorta(a.ultima)) : "Sin aftosa registrada";
       case "tratamientos": return esc(a.detalle);
-      case "del_alto": return esc(a.dias_en_leche) + " d en leche" + (a.prenada ? " · preñada" : " · vacía");
-      case "pausas": return "En pausa desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
+      case "pausas": return "Sin ordeñar desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
       case "bajo_peso": return esc(a.gmd_g) + " g/día · " + esc(a.peso_kg) + " kg (" + esc(fechaCorta(a.fecha)) + ")";
       case "venta": return esc(a.peso_kg) + " kg" + (edad ? " · " + edad : "");
       case "categoria": return esc(a.cambio) + " · " + edad;
@@ -901,14 +909,16 @@
   // t = datos_tareas (dict con listas + conteos); claves = listas de la vista.
   function renderListaTrabajo(t, claves, titulo) {
     if (!t) return "";
+    if (t.responsables_sugeridos) window.__responsablesSugeridos = t.responsables_sugeridos;
     var c = t.conteos || {};
-    var h = "<div class='card lt-card'><div class='lt-titulo'>" + icon("calendar", 16) + esc(titulo || "Lista de trabajo") + "</div>";
+    var h = "<div class='card lt-card'>" + datalistResponsables() + "<div class='lt-titulo'>" + icon("calendar", 16) + esc(titulo || "Lista de trabajo") + "</div>";
     if (claves.indexOf("palpar") !== -1 && c.chequeo) {
       h += "<div class='lt-chequeo-aviso'><span>⚠️ <b>" + esc(c.chequeo) + "</b> hembras sin dato reproductivo en el último año. "
         + "Pálpalas y marca su estado para retomar el control.</span>"
         + "<button type='button' class='tema-btn btn-iniciar-chequeo'>Iniciar chequeo del hato</button></div>";
     }
     var primera = claves.filter(function (k) { return c[k]; })[0] || claves[0];
+    if (window.__ltAbrir && claves.indexOf(window.__ltAbrir) !== -1) { primera = window.__ltAbrir; window.__ltAbrir = null; }
     h += "<div class='gen-filtros'>";
     claves.forEach(function (k) {
       h += "<button type='button' class='chip btn-lt" + (k === primera ? " act" : "") + "' data-lt='" + k + "'>"
@@ -920,8 +930,10 @@
       var info = LT_INFO[k];
       h += "<div class='lt-panel' data-lt='" + k + "'" + (k === primera ? "" : " hidden") + ">";
       if (k === "vac_aftosa" && t.ciclo_aftosa) h += "<p class='aviso'>Ciclo " + esc(t.ciclo_aftosa) + " (ICA). Anota producto y lote antes de marcar.</p>";
-      if (info.manejo && filas.length && k.indexOf("vac_") === 0) {
-        h += "<div class='lt-producto'><input class='lt-prod-input' placeholder='Producto (opcional)'><input class='lt-lote-input' placeholder='Lote (opcional)'></div>";
+      if (info.manejo && filas.length) {
+        h += "<div class='lt-producto'><input class='lt-resp-input' list='dl-responsables' placeholder='¿Quién lo hace?'>"
+          + (k.indexOf("vac_") === 0 ? "<input class='lt-prod-input' placeholder='Producto'><input class='lt-lote-input' placeholder='Lote'>" : "")
+          + "</div>";
       }
       h += filas.length ? ltGruposPorPotrero(filas, function (a) { return ltFilaHtml(k, a); }, filas.length <= 15, !!info.manejo && k !== "castrar")
         : vacio(info.vacio);
@@ -930,12 +942,26 @@
     return h + "</div>";
   }
 
+  // "¿Quién palpa / quién lo hace?": se recuerda en este celular y se
+  // sugiere con los inseminadores y responsables ya usados.
+  function responsableGuardado() {
+    try { return localStorage.getItem("ja_responsable_campo") || ""; } catch (e) { return ""; }
+  }
+  function guardarResponsable(v) {
+    try { localStorage.setItem("ja_responsable_campo", v); } catch (e) { /* sin almacenamiento */ }
+  }
+  function datalistResponsables() {
+    var nombres = window.__responsablesSugeridos || [];
+    return "<datalist id='dl-responsables'>" + nombres.map(function (n) { return "<option value='" + esc(n) + "'>"; }).join("") + "</datalist>";
+  }
+
   function renderChequeoHato(lt) {
     var filas = (lt && lt.chequeo) || [];
     var h = "<div class='lt-chequeo'><div class='lt-chequeo-cab'><b>Chequeo del hato</b>"
       + "<span class='lt-progreso'>Hechas <b id='lt-hechas'>0</b> de " + filas.length + "</span>"
       + "<button type='button' class='tema-btn btn-cerrar-chequeo'>Cerrar</button></div>"
-      + "<p class='aviso'>Marca cada vaca después de palparla. Si está preñada, elige los meses. Marca «Seca» si ya no se ordeña.</p>";
+      + "<p class='aviso'>Marca cada vaca después de palparla. Si está preñada, elige los meses. Marca «Seca» si ya no se ordeña.</p>"
+      + "<label class='lt-resp'>¿Quién palpa? <input id='chk-responsable' list='dl-responsables' placeholder='Palpador / veterinario' value='" + esc(responsableGuardado()) + "'></label>";
     h += ltGruposPorPotrero(filas, function (a) {
       var meses = "";
       for (var m = 1; m <= 9; m++) meses += "<button type='button' class='chip btn-chk-mes' data-mes='" + m + "'>" + m + "</button>";
@@ -971,6 +997,7 @@
   }
 
   function bindListaTrabajo() {
+    qa(".lt-resp-input").forEach(function (i) { if (!i.value) i.value = responsableGuardado(); });
     qa(".lt-card").forEach(function (card) {
       card.querySelectorAll(".btn-lt").forEach(function (b) {
         b.addEventListener("click", function () {
@@ -983,7 +1010,10 @@
     function extras(panel) {
       var prod = panel && panel.querySelector(".lt-prod-input");
       var lote = panel && panel.querySelector(".lt-lote-input");
-      return { producto: (prod && prod.value.trim()) || null, lote_producto: (lote && lote.value.trim()) || null };
+      var resp = panel && panel.querySelector(".lt-resp-input");
+      if (resp && resp.value.trim()) guardarResponsable(resp.value.trim());
+      return { producto: (prod && prod.value.trim()) || null, lote_producto: (lote && lote.value.trim()) || null,
+               responsable: (resp && resp.value.trim()) || null };
     }
     qa(".btn-lt-hecho").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -991,7 +1021,7 @@
         var tipo = b.getAttribute("data-tipo");
         var ex = extras(b.closest(".lt-panel"));
         fila.querySelectorAll("button").forEach(function (x) { x.disabled = true; });
-        enviarEventoLt("manejo", { animal_tag: fila.getAttribute("data-tag"), tipo_manejo: tipo, producto: ex.producto, lote_producto: ex.lote_producto })
+        enviarEventoLt("manejo", { animal_tag: fila.getAttribute("data-tag"), tipo_manejo: tipo, producto: ex.producto, lote_producto: ex.lote_producto, responsable: ex.responsable })
           .then(function () { ltMarcarHecha(fila, b.textContent.replace("✓", "").trim()); });
       });
     });
@@ -1004,7 +1034,7 @@
         if (!confirm("¿Marcar como hechos los " + tags.length + " animales de " + b.getAttribute("data-potrero") + "?")) return;
         var ex = extras(panel);
         b.disabled = true;
-        enviarEventoLt("manejo", { animal_tags: tags, tipo_manejo: hecho.getAttribute("data-tipo"), producto: ex.producto, lote_producto: ex.lote_producto })
+        enviarEventoLt("manejo", { animal_tags: tags, tipo_manejo: hecho.getAttribute("data-tipo"), producto: ex.producto, lote_producto: ex.lote_producto, responsable: ex.responsable })
           .then(function () {
             b.closest("details").querySelectorAll(".fila-lt").forEach(function (f) { ltMarcarHecha(f, "Hecho"); });
             b.textContent = "✓ " + tags.length + " marcados";
@@ -1029,13 +1059,21 @@
   function bindChequeoHato() {
     var hechas = 0;
     function guardar(fila, resultado, meses) {
+      var inpResp = q("#chk-responsable");
+      var responsable = ((inpResp && inpResp.value) || "").trim();
+      if (!responsable) {
+        alert("Escribe quién palpa antes de marcar las vacas: así se puede evaluar al palpador.");
+        if (inpResp) inpResp.focus();
+        return;
+      }
+      guardarResponsable(responsable);
       var tag = fila.getAttribute("data-tag");
       var seca = fila.querySelector(".chk-seca-input").checked;
-      var payload = { animal_tag: tag, resultado: resultado, metodo: "TACTO", detalle: "Chequeo del hato" };
+      var payload = { animal_tag: tag, resultado: resultado, metodo: "TACTO", detalle: "Chequeo del hato", responsable: responsable };
       if (meses) payload.dias_gestacion = meses * 30;
       fila.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
       enviarEventoLt("diagnostico", payload).then(function () {
-        if (seca) return enviarEventoLt("secado", { animal_tag: tag, motivo: "Chequeo del hato" });
+        if (seca) return enviarEventoLt("secado", { animal_tag: tag, motivo: "Chequeo del hato", notas: "Palpó: " + responsable });
       }).then(function () {
         fila.querySelector(".chk-meses").hidden = true;
         ltMarcarHecha(fila, (resultado === "VACIA" ? "Vacía" : "Preñada " + meses + " m") + (seca ? " · Seca" : ""));
@@ -1059,10 +1097,37 @@
     if (cerrar) cerrar.addEventListener("click", function () { cargar(true); });
   }
 
+  // Toro: un solo estado (en servicio / descanso) con botón para cambiarlo.
+  function botonToroEstado(t) {
+    var enServ = t.estado === "EN_SERVICIO";
+    return "<button type='button' class='chip btn-toro-estado' data-tag='" + esc(t.tag) + "' data-tipo='"
+      + (enServ ? "TORO_DESCANSO" : "TORO_SERVICIO") + "'>" + (enServ ? "Poner en descanso" : "Poner en servicio") + "</button>";
+  }
+  function renderToroServicio(t) {
+    var enServ = t.estado === "EN_SERVICIO";
+    return "<div class='card toro-card " + (enServ ? "en-servicio" : "") + "'>"
+      + "<div class='toro-card-cab'><b>" + icon("crown", 16) + " Reproductor</b>"
+      + "<span class='chip " + (enServ ? "verde" : "gris") + "'><b>" + (enServ ? "En servicio" : "En descanso") + "</b></span></div>"
+      + "<p class='toro-card-det'>" + esc(t.motivo)
+      + (t.ultima_monta ? " · última monta " + esc(fechaCorta(t.ultima_monta)) : "")
+      + " · " + esc(t.n_crias || 0) + " crías registradas</p>"
+      + botonToroEstado(t) + "</div>";
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest(".btn-toro-estado") : null;
+    if (!b) return;
+    b.disabled = true;
+    enviarEventoLt("manejo", { animal_tag: b.getAttribute("data-tag"), tipo_manejo: b.getAttribute("data-tipo") })
+      .then(function () {
+        if (/^\/ficha\//.test(location.pathname)) location.reload();
+        else cargar(true);
+      });
+  });
+
   // Tarjeta "Tareas de hoy" del Tablero: conteos por vista.
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
-    { vista: "leche", nombre: "Leche", claves: ["secar", "del_alto", "pausas"] },
+    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas"] },
     { vista: "carne", nombre: "Carne", claves: ["destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
     { vista: "sanidad", nombre: "Sanidad", claves: ["vac_brucelosis", "vac_aftosa", "tratamientos"] }
   ];
@@ -1087,6 +1152,7 @@
       + barraDescargaSeccion("reproduccion", "Reproducción")
       + "</div>" + erroresHtml(d);
     window.__listaTrabajo = d.lista_trabajo || null;
+    window.__responsablesSugeridos = d.responsables_sugeridos || window.__responsablesSugeridos || [];
     h += renderListaTrabajo(d.lista_trabajo, ltClaves("repro")) + grafico("reproductivo_hato", "Estado reproductivo del hato");
 
     // Banco de Semen & Termo Criogénico (Software Ganadero)
@@ -1259,6 +1325,18 @@
       h += vacio("No hay lotes IATF en curso. Use «➕ Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
     }
     h += "</div>";
+
+    // Evaluación de palpadores: palpaciones del último año por responsable.
+    h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid #0ea5e9;'>"
+      + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>" + icon("stethoscope", 16) + " Evaluación de palpadores (último año)</div>"
+      + "<p class='aviso' style='margin:0 0 8px;'>«Contradichas»: preñadas que otro diagnóstico dio vacías en menos de 90 días (error o pérdida).</p>"
+      + tabla(d.evaluacion_palpadores, [
+        ["responsable", "Responsable"], ["palpaciones", "Palpaciones", "num"],
+        ["prenadas", "Preñadas", "num"], ["vacias", "Vacías", "num"],
+        ["pct_prenez", "% preñez", "text", function (v) { return esc(v) + "%"; }],
+        ["contradichas", "Contradichas", "text", function (v) { return v ? "<span class='chip ambar'>" + esc(v) + "</span>" : "0"; }]
+      ], "Sin palpaciones registradas en el último año.")
+      + "</div>";
 
     // 🏆 Evaluación y Efectividad de Inseminadores
     var insems = d.evaluacion_inseminadores || [];
@@ -1503,8 +1581,9 @@
         ["tag", "Toro", "text", function (v) { return enlaceFicha(v); }],
         ["nombre", "Nombre"],
         ["raza", "Raza"],
-        ["ultima_monta", "Última monta", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
-        ["estado", "Estado", "text", function (v) { return v === "EN_SERVICIO" ? "<span class='chip verde'><b>En servicio</b></span>" : "<span class='chip gris'>En descanso</span>"; }]
+        ["estado", "Estado", "text", function (v) { return v === "EN_SERVICIO" ? "<span class='chip verde'><b>En servicio</b></span>" : "<span class='chip gris'>En descanso</span>"; }],
+        ["motivo", "Motivo"],
+        ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
     return h;
   }
@@ -2673,6 +2752,9 @@
       + "</div>"
       + "</div>" + erroresHtml(d);
     h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
+    if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
+      h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
+    }
 
     // 1. KPIs Ejecutivos de Producción
     h += "<div class='kpis'>"
@@ -11496,6 +11578,9 @@
         + "</div>";
     }
 
+    if (ef.codigo === "TORO" && f.toro_servicio) {
+      h += renderToroServicio(f.toro_servicio);
+    } else {
     // 3. Tarjeta Destacada: Estado Fisiológico & Reproductivo (Prioridad #1 en Ficha)
     var fisioIcon = ef.icono === "milk" ? icon("milk", 16)
                   : ef.icono === "calf" ? icon("calf", 16)
@@ -11580,6 +11665,7 @@
     }
 
     h += "</div>"; // fin tarjeta estado zootecnico
+    }
 
     // 3. Tarjeta de Identificación & Genealogía (el pedigree completo vive en
     // la pestaña "Genealogía (3G)" -- sin botones duplicados hacia lo mismo)

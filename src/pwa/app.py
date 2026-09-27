@@ -3626,6 +3626,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                                     animal_tag=str(tag_m), tipo=payload.get("tipo_manejo"), fecha=fecha,
                                     producto=payload.get("producto"), lote_producto=payload.get("lote_producto"),
                                     notas=payload.get("notas"), registrado_por=uid,
+                                    responsable=payload.get("responsable"),
                                 )
                         procesados += 1
                         if id_local:
