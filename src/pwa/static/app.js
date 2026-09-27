@@ -814,11 +814,167 @@
     var chip = (opts && opts.chip) ? (" chip " + opts.chip) : "";
     return "<a href='#' class='ficha-link" + chip + "' data-ir-ficha='" + t + "' style='font-weight:700; text-decoration:none;'>" + t + "</a>";
   }
+  // ---------- Lista de trabajo reproductiva + chequeo del hato ----------
+  var LT_INFO = {
+    palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
+    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca preñada pendiente de secar." },
+    servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca vacía pendiente de servir." },
+    destetar: { nombre: "Destetar", icono: "🐮", vacio: "Ninguna cría pendiente de destete." }
+  };
+
+  function ltDetalle(clave, a) {
+    if (clave === "palpar") return "Servida " + esc(fechaCorta(a.fecha_servicio)) + " · hace " + esc(a.dias) + " d" + (a.toro ? " · " + esc(a.toro) : "");
+    if (clave === "secar") return "Gestación ~" + esc(a.dias_gestacion) + " d · parto en " + esc(a.dias_para_parto) + " d (" + esc(fechaCorta(a.fep)) + ")";
+    if (clave === "servir") return a.ultimo_parto ? ("Parió " + esc(fechaCorta(a.ultimo_parto)) + " · " + esc(a.dias_abiertos) + " d abiertos") : "Sin partos (novilla)";
+    if (clave === "destetar") return esc(a.edad_dias) + " d de edad" + (a.madre ? " · madre " + esc(a.madre) : "");
+    return "";
+  }
+
+  function ltGruposPorPotrero(filas, filaHtml, abrir) {
+    var por = {}, pots = [];
+    filas.forEach(function (a) {
+      var p = a.potrero || "Sin potrero";
+      if (!por[p]) { por[p] = []; pots.push(p); }
+      por[p].push(a);
+    });
+    pots.sort(function (x, y) { return por[y].length - por[x].length || x.localeCompare(y); });
+    return pots.map(function (p) {
+      return "<details class='gen-grupo pes-grupo'" + (abrir ? " open" : "") + "><summary><span>" + esc(p) + "</span><b>" + por[p].length
+        + "</b><small>animales</small></summary>" + por[p].map(filaHtml).join("") + "</details>";
+    }).join("");
+  }
+
+  function renderListaTrabajo(lt) {
+    if (!lt) return "";
+    var c = lt.conteos || {};
+    var h = "<div class='card lt-card'>"
+      + "<div class='lt-titulo'>" + icon("calendar", 16) + "Lista de trabajo</div>";
+    var nChk = c.chequeo || 0;
+    if (nChk) {
+      h += "<div class='lt-chequeo-aviso'><span>⚠️ <b>" + esc(nChk) + "</b> hembras sin dato reproductivo en el último año. "
+        + "Pálpalas y marca su estado para retomar el control.</span>"
+        + "<button type='button' class='tema-btn btn-iniciar-chequeo'>Iniciar chequeo del hato</button></div>";
+    }
+    var claves = ["palpar", "secar", "servir", "destetar"];
+    var primera = claves.filter(function (k) { return c[k]; })[0] || "palpar";
+    h += "<div class='gen-filtros'>";
+    claves.forEach(function (k) {
+      h += "<button type='button' class='chip btn-lt" + (k === primera ? " act" : "") + "' data-lt='" + k + "'>"
+        + LT_INFO[k].icono + " " + LT_INFO[k].nombre + " " + esc(c[k] || 0) + "</button>";
+    });
+    h += "</div>";
+    claves.forEach(function (k) {
+      var filas = lt[k] || [];
+      h += "<div class='lt-panel' data-lt='" + k + "'" + (k === primera ? "" : " hidden") + ">";
+      h += filas.length ? ltGruposPorPotrero(filas, function (a) {
+        return "<div class='fila-pes'><div class='fila-pes-cab'><span>" + enlaceFicha(a.tag)
+          + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span></div><small>" + ltDetalle(k, a) + "</small></div>";
+      }, filas.length <= 15) : vacio(LT_INFO[k].vacio);
+      h += "</div>";
+    });
+    return h + "</div>";
+  }
+
+  function renderChequeoHato(lt) {
+    var filas = (lt && lt.chequeo) || [];
+    var h = "<div class='lt-chequeo'><div class='lt-chequeo-cab'><b>Chequeo del hato</b>"
+      + "<span class='lt-progreso'>Hechas <b id='lt-hechas'>0</b> de " + filas.length + "</span>"
+      + "<button type='button' class='tema-btn btn-cerrar-chequeo'>Cerrar</button></div>"
+      + "<p class='aviso'>Marca cada vaca después de palparla. Si está preñada, elige los meses. Marca «Seca» si ya no se ordeña.</p>";
+    h += ltGruposPorPotrero(filas, function (a) {
+      var meses = "";
+      for (var m = 1; m <= 9; m++) meses += "<button type='button' class='chip btn-chk-mes' data-mes='" + m + "'>" + m + "</button>";
+      return "<div class='fila-pes fila-chk' data-tag='" + esc(a.tag) + "'>"
+        + "<div class='fila-pes-cab'><span>" + enlaceFicha(a.tag) + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span>"
+        + "<small>" + (a.fecha_ultimo_dato ? esc(a.ultimo_dato) + " " + esc(fechaCorta(a.fecha_ultimo_dato)) : "sin datos") + "</small></div>"
+        + "<div class='chk-acciones'><button type='button' class='chip btn-chk' data-res='PREÑADA'>Preñada</button>"
+        + "<button type='button' class='chip btn-chk' data-res='VACIA'>Vacía</button>"
+        + "<label class='chk-seca'><input type='checkbox' class='chk-seca-input'> Seca</label></div>"
+        + "<div class='chk-meses' hidden><small>Meses de preñez:</small> " + meses + "</div>"
+        + "<div class='chk-ok' hidden>✓ Guardado</div></div>";
+    }, false);
+    return h + "</div>";
+  }
+
+  function bindListaTrabajo() {
+    var lt = window.__listaTrabajo;
+    qa(".btn-lt").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var k = b.getAttribute("data-lt");
+        qa(".btn-lt").forEach(function (o) { o.classList.toggle("act", o === b); });
+        qa(".lt-panel").forEach(function (p) { p.hidden = p.getAttribute("data-lt") !== k; });
+      });
+    });
+    var btnIni = q(".btn-iniciar-chequeo");
+    if (!btnIni || !lt) return;
+    btnIni.addEventListener("click", function () {
+      var card = q(".lt-card");
+      if (!card) return;
+      var cont = document.createElement("div");
+      cont.innerHTML = renderChequeoHato(lt);
+      card.parentNode.insertBefore(cont.firstChild, card.nextSibling);
+      card.hidden = true;
+      bindChequeoHato();
+      var chk = q(".lt-chequeo");
+      if (chk && chk.scrollIntoView) chk.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function enviarEventoLt(tipo, payload) {
+    var fecha = new Date().toISOString().slice(0, 10);
+    if (navigator.onLine === false) return encolarOffline(tipo, payload, fecha);
+    return fetch("/api/sync", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventos: [{ tipo: tipo, payload: payload, fecha: fecha }] })
+    }).then(function (r) { return r.json(); }).then(function (res) {
+      if (!(res.ok && res.procesados > 0)) return encolarOffline(tipo, payload, fecha);
+    }).catch(function () { return encolarOffline(tipo, payload, fecha); });
+  }
+
+  function bindChequeoHato() {
+    var hechas = 0;
+    function guardar(fila, resultado, meses) {
+      var tag = fila.getAttribute("data-tag");
+      var seca = fila.querySelector(".chk-seca-input").checked;
+      var payload = { animal_tag: tag, resultado: resultado, metodo: "TACTO", detalle: "Chequeo del hato" };
+      if (meses) payload.dias_gestacion = meses * 30;
+      fila.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+      enviarEventoLt("diagnostico", payload).then(function () {
+        if (seca) return enviarEventoLt("secado", { animal_tag: tag, motivo: "Chequeo del hato" });
+      }).then(function () {
+        fila.classList.add("hecha");
+        fila.querySelector(".chk-acciones").hidden = true;
+        fila.querySelector(".chk-meses").hidden = true;
+        var ok = fila.querySelector(".chk-ok");
+        ok.textContent = "✓ " + (resultado === "VACIA" ? "Vacía" : "Preñada " + meses + " m") + (seca ? " · Seca" : "");
+        ok.hidden = false;
+        hechas++;
+        var el = q("#lt-hechas");
+        if (el) el.textContent = hechas;
+      });
+    }
+    qa(".fila-chk").forEach(function (fila) {
+      fila.querySelectorAll(".btn-chk").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (b.getAttribute("data-res") === "VACIA") guardar(fila, "VACIA", null);
+          else fila.querySelector(".chk-meses").hidden = false;
+        });
+      });
+      fila.querySelectorAll(".btn-chk-mes").forEach(function (b) {
+        b.addEventListener("click", function () { guardar(fila, "PREÑADA", Number(b.getAttribute("data-mes"))); });
+      });
+    });
+    var cerrar = q(".btn-cerrar-chequeo");
+    if (cerrar) cerrar.addEventListener("click", function () { cargar(true); });
+  }
+
   function renderRepro(d) {
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
       + barraDescargaSeccion("reproduccion", "Reproducción")
-      + "</div>" + erroresHtml(d) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+      + "</div>" + erroresHtml(d);
+    window.__listaTrabajo = d.lista_trabajo || null;
+    h += renderListaTrabajo(d.lista_trabajo) + grafico("reproductivo_hato", "Estado reproductivo del hato");
 
     // Banco de Semen & Termo Criogénico (Software Ganadero)
     var termo = d.termo;
@@ -2173,6 +2329,7 @@
   }
 
   function bindRepro() {
+    bindListaTrabajo();
     qa(".btn-ir-cap-directo").forEach(function (btn) {
       btn.addEventListener("click", function () {
         var tipo = this.getAttribute("data-tipo");
@@ -2480,6 +2637,13 @@
         + "</details>";
     }
 
+    var aSecar = d.a_secar || [];
+    h += "<div class='card lt-card-leche'><div class='lt-titulo'>🍼 Vacas a secar (" + aSecar.length + ")</div>"
+      + (aSecar.length ? ltGruposPorPotrero(aSecar, function (a) {
+        return "<div class='fila-pes'><div class='fila-pes-cab'><span>" + enlaceFicha(a.tag)
+          + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span></div><small>" + ltDetalle("secar", a) + "</small></div>";
+      }, aSecar.length <= 15) : vacio("Ninguna vaca preñada pendiente de secar (preñez ≥ 220 d)."))
+      + "</div>";
     return h;
   }
 

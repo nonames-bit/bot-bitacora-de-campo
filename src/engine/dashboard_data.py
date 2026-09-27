@@ -239,6 +239,146 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
     return out
 
 
+# Lista de trabajo reproductiva: solo cuentan hembras con algún dato
+# reproductivo reciente; las demás van al chequeo general del hato, para
+# que los datos viejos importados no generen tareas falsas.
+DIAS_DATO_VIGENTE = 365
+DIAS_PALPAR_MIN = 35
+DIAS_SECAR = 220
+DIAS_GESTACION_MAX = 300
+DIAS_SERVIR_POSPARTO = 45
+DIAS_SERVICIO_RECIENTE = 21
+EDAD_ADULTA_DIAS = 450
+EDAD_DESTETE_DIAS = 240
+EDAD_DESTETE_MAX_DIAS = 365
+
+
+def _ultimo_dato_reproductivo(r) -> tuple[Optional[date], Optional[str]]:
+    """Fecha y tipo del evento reproductivo más reciente de un vientre."""
+    candidatos = [
+        (to_date_safe(r["ult_parto"]), "Parto"),
+        (to_date_safe(r["ult_serv_fecha"]), "Servicio"),
+        (to_date_safe(r["ult_diag_fecha"]), "Diagnóstico"),
+        (to_date_safe(r["ult_celo_fecha"]), "Celo"),
+    ]
+    candidatos = [c for c in candidatos if c[0]]
+    if not candidatos:
+        return None, None
+    return max(candidatos, key=lambda c: c[0])
+
+
+def _dias_gestacion_estimados(r, hoy: date) -> Optional[int]:
+    """Gestación estimada hoy: diagnóstico positivo con días + lo transcurrido,
+    o, si no trae días, los días desde el último servicio."""
+    diag_f = to_date_safe(r["ult_diag_fecha"])
+    dias_diag = r["ult_diag_dias"]
+    if diag_f and dias_diag:
+        try:
+            return int(dias_diag) + (hoy - diag_f).days
+        except (TypeError, ValueError):
+            pass
+    serv_f = to_date_safe(r["ult_serv_fecha"])
+    if serv_f and (diag_f is None or serv_f <= diag_f):
+        return (hoy - serv_f).days
+    return None
+
+
+def datos_lista_trabajo(db: Database, hoy: Optional[date] = None) -> dict:
+    """Tareas reproductivas del día sobre el hato ACTIVO.
+
+    - ``chequeo``: hembras adultas sin dato reproductivo en el último año.
+    - ``palpar``: servidas hace >= 35 d sin diagnóstico posterior.
+    - ``secar``: preñadas con gestación estimada >= 220 d, sin secado.
+    - ``servir``: vacías con dato vigente, > 45 d posparto, sin IA programada.
+    - ``destetar``: crías de 8-12 meses con madre y sin destete registrado.
+    """
+    hoy = hoy or date.today()
+    out: dict[str, Any] = {k: [] for k in ("chequeo", "palpar", "secar", "servir", "destetar")}
+    try:
+        vientres = _filas_dict(db.query(SQL_VIENTRES_ACTIVOS))
+        potreros = {r["id_animal"]: r["potrero"] for r in db.query(f"""
+            WITH {ULT_TRASLADO_CTE}
+            SELECT a.id_animal, pt.nombre AS potrero FROM animales a
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            LEFT JOIN potreros pt ON pt.id = {POTRERO_ACTUAL_EXPR}
+            WHERE a.estado = 'ACTIVO'""")}
+        secados = {r["animal_id"]: r["f"] for r in db.query(
+            "SELECT animal_id, MAX(fecha) f FROM secados GROUP BY animal_id")}
+    except Exception as e:
+        logger.error("datos_lista_trabajo fallo", exc_info=True)
+        out["errores"] = {"lista_trabajo": str(e)}
+        return out
+
+    for r in vientres:
+        aid = r["id_animal"]
+        base = {"tag": r["tag"], "nombre": r["nombre"],
+                "potrero": potreros.get(aid) or SIN_POTRERO_LABEL}
+        fnac = to_date_safe(r["fecha_nacimiento"])
+        edad = (hoy - fnac).days if fnac else None
+        n_partos = int(r["n_partos"] or 0)
+        adulta = n_partos > 0 or edad is None or edad >= EDAD_ADULTA_DIAS
+        if not adulta:
+            continue
+        f_dato, tipo_dato = _ultimo_dato_reproductivo(r)
+        if f_dato is None or (hoy - f_dato).days > DIAS_DATO_VIGENTE:
+            out["chequeo"].append({**base, "ultimo_dato": tipo_dato,
+                                   "fecha_ultimo_dato": f_dato.isoformat() if f_dato else None})
+            continue
+
+        estado = _estado_reproductivo_vigente(r)
+        serv_f = to_date_safe(r["ult_serv_fecha"])
+        ult_parto = to_date_safe(r["ult_parto"])
+        if estado == "EN_ESPERA" and serv_f and (hoy - serv_f).days >= DIAS_PALPAR_MIN:
+            out["palpar"].append({**base, "fecha_servicio": r["ult_serv_fecha"],
+                                  "toro": r["ult_serv_toro"], "dias": (hoy - serv_f).days})
+        elif estado == "PRENADA":
+            gest = _dias_gestacion_estimados(r, hoy)
+            ult_sec = to_date_safe(secados.get(aid))
+            ref = max([d for d in (ult_parto, to_date_safe(r["ult_diag_fecha"])) if d], default=None)
+            ya_seca = bool(ult_sec and (ref is None or ult_sec >= ref))
+            if gest is not None and DIAS_SECAR <= gest < DIAS_GESTACION_MAX and not ya_seca:
+                fep = hoy + timedelta(days=283 - gest)
+                out["secar"].append({**base, "dias_gestacion": gest, "fep": fep.isoformat(),
+                                     "dias_para_parto": max(0, 283 - gest)})
+        elif estado == "ABIERTA":
+            if ult_parto and (hoy - ult_parto).days <= DIAS_SERVIR_POSPARTO:
+                continue
+            if r["tiene_prog_ia"]:
+                continue
+            if serv_f and (hoy - serv_f).days <= DIAS_SERVICIO_RECIENTE:
+                continue
+            out["servir"].append({**base, "ultimo_parto": r["ult_parto"],
+                                  "dias_abiertos": (hoy - ult_parto).days if ult_parto else None})
+
+    try:
+        lim_min = (hoy - timedelta(days=EDAD_DESTETE_MAX_DIAS)).isoformat()
+        lim_max = (hoy - timedelta(days=EDAD_DESTETE_DIAS)).isoformat()
+        for r in db.query(f"""
+            WITH {ULT_TRASLADO_CTE}
+            SELECT a.tag, a.nombre, a.fecha_nacimiento, m.tag AS madre, pt.nombre AS potrero
+            FROM animales a
+            JOIN animales m ON m.id_animal = a.madre_id
+            LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+            LEFT JOIN potreros pt ON pt.id = {POTRERO_ACTUAL_EXPR}
+            WHERE a.estado = 'ACTIVO' AND a.fecha_nacimiento >= ? AND a.fecha_nacimiento <= ?
+              AND NOT EXISTS (SELECT 1 FROM destetes d WHERE d.animal_id = a.id_animal)
+            ORDER BY a.fecha_nacimiento""", (lim_min, lim_max)):
+            fnac = to_date_safe(r["fecha_nacimiento"])
+            out["destetar"].append({"tag": r["tag"], "nombre": r["nombre"], "madre": r["madre"],
+                                    "potrero": r["potrero"] or SIN_POTRERO_LABEL,
+                                    "edad_dias": (hoy - fnac).days if fnac else None})
+    except Exception as e:
+        logger.error("lista_trabajo destetar fallo", exc_info=True)
+        out.setdefault("errores", {})["destetar"] = str(e)
+
+    out["palpar"].sort(key=lambda x: -x["dias"])
+    out["secar"].sort(key=lambda x: x["dias_para_parto"])
+    out["servir"].sort(key=lambda x: -(x["dias_abiertos"] or 0))
+    out["chequeo"].sort(key=lambda x: (x["potrero"], x["tag"]))
+    out["conteos"] = {k: len(out[k]) for k in ("chequeo", "palpar", "secar", "servir", "destetar")}
+    return out
+
+
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
     """Inventario presente: solo potreros reales (geom WGS84), solo ACTIVOS,
     por potrero vigente (potrero_id y, si falta, último traslado: POTRERO_ACTUAL_EXPR). Añade "Sin potrero" solo si hay
@@ -993,6 +1133,7 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "servicios_rango": {"desde": desde_d.isoformat(), "hasta": hasta_d.isoformat()},
         "novillas_entoradas": novillas_entoradas,
         "reproductores_estado": reproductores_estado,
+        "lista_trabajo": datos_lista_trabajo(db, hoy),
     }
     if errores:
         out["errores"] = errores
@@ -2234,6 +2375,7 @@ def datos_leche(db: Database) -> dict:
         "serie_tanque": serie,
         "resumen": resumen,
         "resumen_ordeno": resumen_ordeno,
+        "a_secar": datos_lista_trabajo(db).get("secar", []),
         "controles": controles_modernos,
         "ranking_vacas": ranking,
         "fotos_recibos": fotos_recibos,
@@ -3950,6 +4092,8 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
         )
         repro = int(r1["n"]) if r1 else 0
         repro += int(r2["n"]) if r2 else 0
+        c = datos_lista_trabajo(db, hoy).get("conteos") or {}
+        repro += sum(c.get(k, 0) for k in ("palpar", "secar", "servir", "destetar"))
     except Exception as e:
         logger.error("seccion badges_repro fallo", exc_info=True)
         errores["repro"] = str(e)
