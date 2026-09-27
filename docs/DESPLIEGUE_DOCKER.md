@@ -65,6 +65,17 @@ Agregue al final de `/opt/bitacora/.env`:
 DOMINIO=ganaderiaja.duckdns.org
 ```
 
+Las rutas de la instalación vieja que trae ese `.env` (`USERS_FILE`,
+`BITACORA_DB`, `PWA_HOST`...) no molestan: `docker-compose.yml` fija las
+correctas dentro del contenedor. Lo único que hay que ajustar a mano:
+
+- **Earth Engine** (NDVI y lluvia satelital): si `GEE_SERVICE_ACCOUNT_KEY_PATH`
+  apunta a un archivo en `/root`, cópielo a `data/` y cambie la ruta:
+  ```bash
+  mkdir -p data && cp /ruta/vieja/llave.json data/gee-llave.json
+  sed -i 's|^GEE_SERVICE_ACCOUNT_KEY_PATH=.*|GEE_SERVICE_ACCOUNT_KEY_PATH=/app/data/gee-llave.json|' .env
+  ```
+
 ### 3. Detener los servicios viejos
 
 ```bash
