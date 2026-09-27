@@ -1,8 +1,10 @@
 name: docker
 
-# Construye la imagen de producción cuando los tests pasan en main, la
-# publica en GitHub Container Registry y, si el servidor está configurado
-# (secrets VPS_HOST, VPS_USUARIO, VPS_SSH_KEY), la despliega por SSH.
+# Cuando los tests pasan en main: comprueba que la imagen Docker se construye
+# (sin publicarla en ningún registro) y, si el servidor está configurado
+# (secrets VPS_HOST, VPS_USUARIO, VPS_SSH_KEY), le pide que se actualice: el
+# propio servidor descarga el código nuevo y arma la imagen. Así no se usa
+# almacenamiento de paquetes de GitHub.
 on:
   workflow_run:
     workflows: ["tests"]
@@ -12,47 +14,32 @@ on:
 
 permissions:
   contents: read
-  packages: write
 
 jobs:
-  imagen:
+  construir:
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push') }}
     runs-on: ubuntu-latest
-    outputs:
-      imagen: ${{ steps.nombre.outputs.imagen }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - id: nombre
-        run: echo "imagen=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ${{ steps.nombre.outputs.imagen }}:latest
-            ${{ steps.nombre.outputs.imagen }}:${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Construir la imagen (verificación, no se publica)
+        run: docker build -t bitacora:verificacion .
 
   desplegar:
-    needs: imagen
+    needs: construir
     runs-on: ubuntu-latest
+    concurrency:
+      group: despliegue-produccion
+      cancel-in-progress: false
     env:
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_USUARIO: ${{ secrets.VPS_USUARIO }}
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
       VPS_DIR: ${{ vars.VPS_DIR || '/opt/bitacora' }}
-      IMAGEN: ${{ needs.imagen.outputs.imagen }}
     steps:
-      - name: Desplegar en el servidor
+      - name: Actualizar el servidor
         run: |
           if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ]; then
             echo "Servidor no configurado (secrets VPS_HOST / VPS_SSH_KEY): se omite el despliegue."
@@ -63,4 +50,4 @@ jobs:
           chmod 600 ~/.ssh/id_despliegue
           ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
           ssh -i ~/.ssh/id_despliegue "${VPS_USUARIO:-root}@$VPS_HOST" \
-            "cd '$VPS_DIR' && git pull --ff-only && BITACORA_IMAGEN='$IMAGEN:latest' docker compose pull app bot tareas && BITACORA_IMAGEN='$IMAGEN:latest' docker compose up -d --remove-orphans && docker image prune -f"
+            "cd '$VPS_DIR' && git pull --ff-only && docker compose up -d --build --remove-orphans && docker image prune -f"
