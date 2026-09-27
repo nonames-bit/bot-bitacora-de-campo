@@ -205,3 +205,27 @@ def test_manejo_guarda_responsable_y_evaluacion_palpadores(db):
     assert ev["Dr. Ruiz"]["prenadas"] == 1 and ev["Dr. Ruiz"]["contradichas"] == 1
     assert ev["Juan"]["vacias"] == 1
     assert {"Dr. Ruiz", "Juan"} <= set(_responsables_sugeridos(db))
+
+
+def test_toro_por_arete_no_va_a_venta_ni_castrar(db):
+    # T02 es toro por su arete (como en "Toros"); no debe salir para vender.
+    _a(db, "T02", sexo="Macho", edad=1900, nombre="PERLA OHIO 2B")
+    db.registrar_pesaje("T02", fecha=_d(-5), peso_kg=669)
+    _a(db, "T09", sexo="Macho", edad=300)
+    t = datos_tareas(db, HOY)
+    assert "T02" not in _tags(t, "venta")
+    assert "T09" not in _tags(t, "castrar")
+
+
+def test_responsables_usuarios_app_sin_codigos_sg(db, tmp_path, monkeypatch):
+    import json
+    from src.engine.dashboard_data import _responsables_sugeridos
+    users = tmp_path / "users.json"
+    users.write_text(json.dumps([{"user_id": 1, "nombre": "Jaime", "rol": "OWNER", "pin": "1"}]))
+    monkeypatch.setenv("USERS_FILE", str(users))
+    for n in ("01", "02", "Histórico SG", "Dr. Ruiz"):
+        db.execute("INSERT INTO inseminadores (nombre) VALUES (?)", (n,))
+    nombres = _responsables_sugeridos(db)
+    assert nombres[0] == "Jaime"
+    assert "Dr. Ruiz" in nombres
+    assert not {"01", "02", "Histórico SG"} & set(nombres)

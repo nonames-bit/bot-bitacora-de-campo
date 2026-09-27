@@ -5215,7 +5215,13 @@ if __name__ == "__main__":  # pragma: no cover
             from waitress import serve  # type: ignore
 
             print("▶️  Servidor WSGI: waitress (producción, multi-hilo)", flush=True)
-            serve(_app, host=_host, port=_puerto, threads=8)
+            # clear_untrusted_proxy_headers=False: waitress por defecto borra
+            # X-Forwarded-Proto/For del proxy (Caddy/nginx) y la app veía
+            # "http" y la IP del proxy -> WebAuthn fallaba por origen y el
+            # rate-limit de /login trataba a todos como una sola IP. ProxyFix
+            # (1 salto, ver crear_app) ya decide en qué confiar.
+            serve(_app, host=_host, port=_puerto, threads=8,
+                  clear_untrusted_proxy_headers=False)
             return
         except ImportError:
             print(
