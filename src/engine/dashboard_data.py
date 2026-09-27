@@ -239,13 +239,66 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
     return out
 
 
+def _evaluacion_palpadores(db: Database, hoy: date) -> list[dict]:
+    """Palpaciones del último año por responsable: cuántas, preñadas/vacías y
+    positivos que un diagnóstico posterior (<= 90 d) contradijo."""
+    desde = (hoy - timedelta(days=365)).isoformat()
+    try:
+        filas = _filas_dict(db.query(
+            """SELECT COALESCE(NULLIF(TRIM(d.responsable), ''), 'Sin responsable') resp,
+                      d.vaca_id, d.fecha, UPPER(d.resultado) res
+               FROM diagnosticos_gestacion d JOIN animales a ON a.id_animal = d.vaca_id
+               WHERE d.fecha >= ? ORDER BY d.vaca_id, d.fecha""", (desde,)))
+    except Exception:
+        logger.error("evaluacion_palpadores fallo", exc_info=True)
+        return []
+    por: dict[str, dict] = {}
+    for i, r in enumerate(filas):
+        e = por.setdefault(r["resp"], {"responsable": r["resp"], "palpaciones": 0, "prenadas": 0,
+                                       "vacias": 0, "contradichas": 0})
+        e["palpaciones"] += 1
+        positivo = "PREÑ" in (r["res"] or "") or "POSITIV" in (r["res"] or "")
+        if positivo:
+            e["prenadas"] += 1
+            sig = filas[i + 1] if i + 1 < len(filas) else None
+            f0, f1 = to_date_safe(r["fecha"]), to_date_safe(sig["fecha"]) if sig else None
+            if (sig and sig["vaca_id"] == r["vaca_id"] and f0 and f1 and (f1 - f0).days <= 90
+                    and ("VAC" in (sig["res"] or "") or "NEGATIV" in (sig["res"] or ""))):
+                e["contradichas"] += 1
+        else:
+            e["vacias"] += 1
+    out = sorted(por.values(), key=lambda x: -x["palpaciones"])
+    for e in out:
+        e["pct_prenez"] = round(e["prenadas"] / e["palpaciones"] * 100, 1) if e["palpaciones"] else 0.0
+    return out
+
+
+def _responsables_sugeridos(db: Database) -> list[str]:
+    """Nombres para el campo "¿Quién palpa?": inseminadores activos y
+    responsables usados antes."""
+    nombres: list[str] = []
+    try:
+        for q in ("SELECT nombre n FROM inseminadores WHERE COALESCE(activo, 1) = 1 ORDER BY nombre",
+                  "SELECT DISTINCT TRIM(responsable) n FROM diagnosticos_gestacion "
+                  "WHERE responsable IS NOT NULL AND TRIM(responsable) != '' ORDER BY n LIMIT 30"):
+            for r in db.query(q):
+                if r["n"] and r["n"] not in nombres:
+                    nombres.append(r["n"])
+    except Exception:
+        logger.error("responsables_sugeridos fallo", exc_info=True)
+    return nombres
+
+
 def datos_lista_trabajo(db: Database, hoy: Optional[date] = None, usar_cache: bool = False) -> dict:
     """Listas de trabajo del día (ver ``engine/tareas.py``)."""
     try:
         from .tareas import datos_tareas
     except ImportError:  # ejecución directa
         from src.engine.tareas import datos_tareas  # type: ignore
-    return datos_tareas(db, hoy, usar_cache=usar_cache)
+    out = datos_tareas(db, hoy, usar_cache=usar_cache)
+    if not usar_cache:
+        out["responsables_sugeridos"] = _responsables_sugeridos(db)
+    return out
 
 
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
@@ -995,6 +1048,8 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "novillas_entoradas": novillas_entoradas,
         "reproductores_estado": reproductores_estado,
         "lista_trabajo": datos_lista_trabajo(db, hoy),
+        "evaluacion_palpadores": _evaluacion_palpadores(db, hoy),
+        "responsables_sugeridos": _responsables_sugeridos(db),
     }
     if errores:
         out["errores"] = errores

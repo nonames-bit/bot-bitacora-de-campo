@@ -191,3 +191,17 @@ def test_estado_toros_manual_potrero_y_solo(db):
     assert est["T03"]["estado"] == "EN_DESCANSO"
     db.registrar_manejo("T02", "TORO_SERVICIO")
     assert {t["tag"]: t for t in estado_toros(db, HOY)}["T02"]["estado"] == "EN_SERVICIO"
+
+
+def test_manejo_guarda_responsable_y_evaluacion_palpadores(db):
+    from src.engine.dashboard_data import _evaluacion_palpadores, _responsables_sugeridos
+    _a(db, "R1", sexo="Macho", edad=60)
+    db.registrar_manejo("R1", "TOPIZADO", responsable="Pedro")
+    assert db.query_one("SELECT responsable FROM manejos")["responsable"] == "Pedro"
+    _a(db, "V1")
+    db.registrar_diagnostico("V1", fecha=_d(-60), resultado="PREÑADA", dias_gestacion=60, responsable="Dr. Ruiz")
+    db.registrar_diagnostico("V1", fecha=_d(-20), resultado="VACIA", responsable="Juan")
+    ev = {e["responsable"]: e for e in _evaluacion_palpadores(db, HOY)}
+    assert ev["Dr. Ruiz"]["prenadas"] == 1 and ev["Dr. Ruiz"]["contradichas"] == 1
+    assert ev["Juan"]["vacias"] == 1
+    assert {"Dr. Ruiz", "Juan"} <= set(_responsables_sugeridos(db))
