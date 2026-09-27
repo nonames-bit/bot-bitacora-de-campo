@@ -463,7 +463,7 @@ def crear_teclado_reproduccion(rol: Optional[str] = None) -> InlineKeyboardMarku
     """Menú de gestión reproductiva, termo criogénico y diagnósticos."""
     keyboard = [
         [
-            InlineKeyboardButton("🧪 Stock Pajuelas", callback_data="cmd:pajuelas"),
+            InlineKeyboardButton("🧪 Stock Pajillas", callback_data="cmd:pajuelas"),
             InlineKeyboardButton("❄️ N₂ / Termo", callback_data="cmd:termo"),
         ],
         [
@@ -493,12 +493,12 @@ def crear_teclado_reproduccion_detalle() -> InlineKeyboardMarkup:
 
 
 def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> InlineKeyboardMarkup:
-    """Teclado interactivo para confirmar o descartar la carga de stock de pajuelas detectadas por OCR."""
+    """Teclado interactivo para confirmar o descartar la carga de stock de pajillas detectadas por OCR."""
     toro_param = str(toro).replace(":", "_").strip()
     keyboard = [
         [
             InlineKeyboardButton(
-                f"✅ Cargar {cantidad} pajuelas {toro}",
+                f"✅ Cargar {cantidad} pajillas {toro}",
                 callback_data=f"cmd:confirmar_factura:{toro_param}:{cantidad}",
             ),
             InlineKeyboardButton(
@@ -508,6 +508,9 @@ def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> Inline
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
+
+
+crear_teclado_confirmar_factura_pajillas = crear_teclado_confirmar_factura_pajuelas
 
 
 def crear_teclado_clima() -> InlineKeyboardMarkup:

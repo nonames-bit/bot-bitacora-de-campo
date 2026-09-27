@@ -313,10 +313,10 @@ def extraer_datos_historicos_sg(
                     db.conn.execute(
                         """
                         INSERT INTO pajuelas_inventario
-                        (codigo_toro, raza, procedencia, canastilla, cantidad, costo, fecha_ingreso, creado_en)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        (codigo_toro, raza, procedencia, canastilla, cantidad, costo, fecha_ingreso, estado, creado_en)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                        (codigo_final, raza, procedencia, "SG-CANASTA", cantidad, costo, fecha_ingreso, db._ahora()),
+                        (codigo_final, raza, procedencia, "SG-CANASTA", cantidad, costo, fecha_ingreso, "INACTIVO", db._ahora()),
                     )
                     nuevos_pajuelas += 1
 

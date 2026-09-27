@@ -907,6 +907,9 @@ class PajuelaInventario:
     id: Optional[int] = None
 
 
+PajillaInventario = PajuelaInventario
+
+
 @dataclass
 class TermoNitrogeno:
     fecha_recarga: str = ""

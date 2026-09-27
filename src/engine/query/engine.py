@@ -233,7 +233,7 @@ class QueryEngine(
             return self._ultimo_parto(tag)
 
         # 3. Servicios, Inseminación, Termo y Diagnósticos
-        if re.search(r"\b(?:stock\s+de\s+pajuelas?|inventario\s+de\s+pajuelas?|pajuelas?\s+disponibles?|cuantas\s+pajuelas?|canastilla)\b", t):
+        if re.search(r"\b(?:stock\s+de\s+(?:pajuelas?|pajillas?)|inventario\s+de\s+(?:pajuelas?|pajillas?)|(?:pajuelas?|pajillas?)\s+disponibles?|cuantas\s+(?:pajuelas?|pajillas?)|canastilla)\b", t):
             return self._stock_pajuelas(codigo_toro=tag or None)
         if re.search(r"\b(?:termo|nitrogeno|tanque\s+criog[eé]nico|recarga\s+de\s+nitr[oó]geno|recargas?\s+de\s+n2)\b", t):
             return self._estado_termo_nitrogeno()
@@ -243,9 +243,9 @@ class QueryEngine(
             return self._ultimos_diagnosticos_gestacion()
 
         if re.search(r"\b(?:que\s+vacas?|cuales\s+vacas?|que\s+animales?|a\s+que\s+vacas?|hay\s+para\s+inseminar)\b", t) or not tag:
-            if re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b|\btoca.*servicio\b", t):
+            if re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bpajilla\b|\bmonta\b|\btoca.*servicio\b", t):
                 return self._inseminacion_programada()
-        if tag and (re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bmonta\b|\bsirvio\b|\bque\s+toro\b", t)):
+        if tag and (re.search(r"\binsemin|\bservicio\b|\bpajuela\b|\bpajilla\b|\bmonta\b|\bsirvio\b|\bque\s+toro\b", t)):
             return self._ultimo_servicio(tag)
         if re.search(r"\bpalpacion", t) and re.search(r"\bpendiente", t):
             return self._palpacion_pendiente()

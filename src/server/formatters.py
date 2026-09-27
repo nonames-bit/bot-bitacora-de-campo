@@ -206,7 +206,7 @@ def formatear_reprod_animal_tab(db: Database, tag: str, hoy: Optional[date] = No
     if servicios:
         ult_s = servicios[0]
         tipo_s = ult_s["tipo_servicio"] or "IA"
-        toro_s = f" (Toro/Pajuela: {_esc(ult_s['toro_pajilla'])})" if ult_s["toro_pajilla"] else ""
+        toro_s = f" (Toro/Pajilla: {_esc(ult_s['toro_pajilla'])})" if ult_s["toro_pajilla"] else ""
         lineas.append(f"• <b>Último Servicio:</b> [{ult_s['fecha']}] {tipo_s}{toro_s}")
         if ult_s["fep_calculada"]:
             lineas.append(f"• <b>FEP (Parto Estimado):</b> <b>{ult_s['fep_calculada']}</b>")
@@ -1542,7 +1542,7 @@ def texto_ejemplo_evento(tipo: str) -> str:
         ),
         "servicio": (
             "🐂 <b>Ejemplo de Inseminación / Servicio:</b>\n"
-            "<code>insemine la 47 con pajuela toro brahman 502</code>\n"
+            "<code>insemine la 47 con pajilla toro brahman 502</code>\n"
             "<code>servicio directo la novilla 15 con toro reproductor</code>\n\n"
             "💡 <i>Automático:</i> El bot programa ecografía (d35), palpación (d60) y secado (FEP-60d)."
         ),
@@ -1748,7 +1748,7 @@ def texto_guia_voz_fotos() -> str:
         "1. Mantén presionado el botón del <b>micrófono</b> en Telegram.\n"
         "2. Habla con naturalidad en el potrero o corral:\n"
         "   • <i>«Parió la 47 ternero macho vivo de 38 kilos en santa martha»</i>\n"
-        "   • <i>«Inseminé la novilla 15 con pajuela toro brahman 502»</i>\n"
+        "   • <i>«Inseminé la novilla 15 con pajilla toro brahman 502»</i>\n"
         "   • <i>«Le puse 20ml de oxitetraciclina a la 12 por mastitis»</i>\n"
         "   • <i>«Pasé el lote 2 del potrero bajo al potrero olegario»</i>\n"
         "3. Suelta el botón y el bot procesará y registrará todo automáticamente.\n\n"
@@ -1782,7 +1782,7 @@ def texto_guia_audios() -> str:
         "1. Mantenga presionado el botón del <b>micrófono</b> en Telegram.\n"
         "2. Hable con calma y claridad diciendo la novedad y el animal. Por ejemplo:\n"
         "   • <i>«Don Julio, le aviso que parió la 47 un ternero macho vivo de 38 kilos»</i>\n"
-        "   • <i>«Inseminé la novilla 15 con pajuela toro brahman 502»</i>\n"
+        "   • <i>«Inseminé la novilla 15 con pajilla toro brahman 502»</i>\n"
         "   • <i>«Pasé el lote 2 del potrero bajo al potrero olegario 1»</i>\n"
         "3. Suelte el botón para enviar.\n"
         "4. El bot transcribe sus palabras, reconoce el evento de campo y lo registra automáticamente en la base de datos."
@@ -2420,9 +2420,9 @@ def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> st
     else:
         lineas.append("❄️ <b>Termo N₂:</b> <i>Sin recargas registradas</i> (use <code>/recarga_n2</code>)")
 
-    # Stock de pajuelas
+    # Stock de pajillas
     aviso_crit = f" ⚠️ ({len(criticas)} en stock bajo)" if criticas else ""
-    lineas.append(f"🧪 <b>Banco de Pajuelas:</b> <b>{total_pajuelas}</b> unidades ({n_toros} reproductores){aviso_crit}")
+    lineas.append(f"🧪 <b>Banco de Pajillas:</b> <b>{total_pajuelas}</b> unidades ({n_toros} reproductores){aviso_crit}")
 
     # KPIs de concepción
     if kpis and kpis["total_evaluados"] > 0:
@@ -2433,8 +2433,8 @@ def formatear_panel_reproduccion(db: Database, hoy: Optional[date] = None) -> st
 
     lineas.append("────────────────────────────────────────")
     lineas.append("💡 <i>Seleccione una opción o use los comandos rápidos:</i>")
-    lineas.append("• <code>/pajuela_stock</code> — Ver inventario detallado de pajuelas")
-    lineas.append("• <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt;</code> — Añadir pajuelas")
+    lineas.append("• <code>/pajilla_stock</code> — Ver inventario detallado de pajillas")
+    lineas.append("• <code>/pajilla_add &lt;toro&gt; &lt;cantidad&gt;</code> — Añadir pajillas")
     lineas.append("• <code>/termo</code> — Ver nivel y recargas de nitrógeno")
     lineas.append("• <code>/recarga_n2</code> — Registrar recarga de nitrógeno")
     lineas.append("• <code>palpé la 47 confirmada preñada 60 días</code> — Registrar diagnóstico")
@@ -2499,24 +2499,24 @@ def formatear_despacho_tarde(db: Database, hoy=None) -> str:
 
 
 def formatear_stock_pajuelas(db: Database) -> str:
-    """Formatea la lista completa de inventario de pajuelas en el termo criogénico."""
+    """Formatea la lista completa de inventario de pajillas en el termo criogénico."""
     pajuelas = db.listar_pajuelas()
     if not pajuelas:
         return (
-            "🧪 <b>INVENTARIO DE PAJUELAS (TERMO CRIOGÉNICO)</b>\n"
+            "🧪 <b>INVENTARIO DE PAJUELAS / PAJILLAS (TERMO CRIOGÉNICO)</b>\n"
             "────────────────────────────────────────\n"
-            "⚠️ <i>No hay pajuelas registradas en el inventario.</i>\n\n"
-            "💡 <b>Para registrar ingreso de pajuelas:</b>\n"
-            "• Use el comando: <code>/pajuela_add 502 10 Brahman C1 35000</code>\n"
-            "  (Formato: <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>)"
+            "⚠️ <i>No hay pajillas activas registradas en el inventario.</i>\n\n"
+            "💡 <b>Para registrar ingreso de pajillas:</b>\n"
+            "• Use el comando: <code>/pajilla_add 502 10 Brahman C1 35000</code>\n"
+            "  (Formato: <code>/pajilla_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>)"
         )
 
     total_unidades = sum(p["cantidad"] for p in pajuelas)
     criticos = sum(1 for p in pajuelas if p["cantidad"] <= 2)
 
     lineas = [
-        "🧪 <b>INVENTARIO DE PAJUELAS — TERMO CRIOGÉNICO</b>",
-        f"📊 <b>Total:</b> <b>{total_unidades} pajuelas</b> ({len(pajuelas)} toros/lotes)",
+        "🧪 <b>INVENTARIO DE PAJUELAS / PAJILLAS — TERMO CRIOGÉNICO</b>",
+        f"📊 <b>Total:</b> <b>{total_unidades} pajillas</b> ({len(pajuelas)} toros/lotes)",
         "────────────────────────────────────────",
     ]
 
@@ -2532,10 +2532,13 @@ def formatear_stock_pajuelas(db: Database) -> str:
 
     if criticos > 0:
         lineas.append("────────────────────────────────────────")
-        lineas.append(f"⚠️ <i>Atención: {criticos} reproductor(es) tienen 2 o menos pajuelas disponibles.</i>")
+        lineas.append(f"⚠️ <i>Atención: {criticos} reproductor(es) tienen 2 o menos pajillas disponibles.</i>")
 
-    lineas.append("\n💡 <i>Para agregar stock use: <code>/pajuela_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code></i>")
+    lineas.append("\n💡 <i>Para agregar stock use: <code>/pajilla_add &lt;toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code></i>")
     return "\n".join(lineas)
+
+
+formatear_stock_pajillas = formatear_stock_pajuelas
 
 
 def formatear_estado_termo(db: Database, hoy: Optional[date] = None) -> str:
@@ -2647,7 +2650,7 @@ def formatear_kpis_reproduccion(db: Database) -> str:
     ]
 
     if kpis.get("por_toro") and len(kpis["por_toro"]) > 0:
-        lineas.append("🏆 <b>Ranking de Fertilidad por Reproductor / Pajuela:</b>")
+        lineas.append("🏆 <b>Ranking de Fertilidad por Reproductor / Pajilla:</b>")
         for t in kpis["por_toro"][:10]:
             sc_t = f"{t['sc']:.2f}" if t['sc'] else "N/D"
             lineas.append(

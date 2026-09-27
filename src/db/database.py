@@ -200,9 +200,9 @@ class Database:
                 cols_pj = {r[1] for r in self.conn.execute("PRAGMA table_info(pajuelas_inventario)").fetchall()}
                 if "estado" not in cols_pj:
                     self.conn.execute("ALTER TABLE pajuelas_inventario ADD COLUMN estado TEXT DEFAULT 'ACTIVO'")
-                    self.conn.execute(
-                        "UPDATE pajuelas_inventario SET estado = 'INACTIVO' WHERE fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01'"
-                    )
+                self.conn.execute(
+                    "UPDATE pajuelas_inventario SET estado = 'INACTIVO' WHERE (fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01' OR canastilla = 'SG-CANASTA') AND COALESCE(estado, 'ACTIVO') = 'ACTIVO'"
+                )
 
             # Asegurar existencia de nuevas tablas zootécnicas si la BD ya existía
             self.conn.execute("""

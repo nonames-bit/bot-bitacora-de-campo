@@ -4284,6 +4284,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 "pajillas": pajuelas,
                 "pajuelas_inactivas": pajuelas_inactivas,
                 "pajillas_inactivas": pajuelas_inactivas,
+                "inactivas": pajuelas_inactivas,
                 "alertas_stock": alertas,
                 "termo": termo,
                 "total_pajuelas": sum(p.get("cantidad", 0) for p in pajuelas),

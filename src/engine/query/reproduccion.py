@@ -49,7 +49,7 @@ class ReproduccionQueryMixin:
         if serv is None:
             return f"No hay servicio ni inseminación registrada para {tag_str}{nombre}."
         fec = serv["fecha"]
-        toro_str = f" con toro/pajuela {serv['toro_pajilla']}" if ("toro_pajilla" in serv.keys() and serv["toro_pajilla"]) else ""
+        toro_str = f" con toro/pajilla {serv['toro_pajilla']}" if ("toro_pajilla" in serv.keys() and serv["toro_pajilla"]) else ""
         tipo_str = f" ({serv['tipo_servicio']})" if serv["tipo_servicio"] else ""
         fep = serv["fep_calculada"] or iso(add_days(serv["fecha"], 283))
         dias_gest = (self.hoy - to_date(fec)).days if to_date(fec) else 0
@@ -419,17 +419,17 @@ class ReproduccionQueryMixin:
     # Consultas Fase 5.1: Termo de Inseminación, Pajuelas y Diagnósticos
     # ------------------------------------------------------------------ #
     def _stock_pajuelas(self, codigo_toro: Optional[str] = None) -> str:
-        """Consulta el inventario de pajuelas en el termo criogénico."""
+        """Consulta el inventario de pajillas en el termo criogénico."""
         if codigo_toro:
             paj = self.db.obtener_pajuela(codigo_toro)
             if not paj:
-                return f"🧪 No hay registro de pajuelas para el toro <b>{codigo_toro}</b>."
+                return f"🧪 No hay registro de pajillas para el toro <b>{codigo_toro}</b>."
             can = f" (Canastilla {paj['canastilla']})" if paj["canastilla"] else ""
             raza = f" · {paj['raza']}" if paj["raza"] else ""
             alerta = " ⚠️ [STOCK CRÍTICO]" if paj["cantidad"] <= 2 else ""
             costo_str = f"\n• Costo unitario: ${paj['costo']:,.0f}" if paj["costo"] else ""
             return (
-                f"🧪 <b>Pajuelas Toro {paj['codigo_toro']}{raza}</b>\n"
+                f"🧪 <b>Pajillas Toro {paj['codigo_toro']}{raza}</b>\n"
                 f"• Stock disponible: <b>{paj['cantidad']} unidades</b>{alerta}\n"
                 f"• Ubicación: {can or 'Sin canastilla asignada'}"
                 f"{costo_str}"
@@ -437,16 +437,18 @@ class ReproduccionQueryMixin:
 
         pajuelas = self.db.listar_pajuelas()
         if not pajuelas:
-            return "🧪 El termo criogénico no tiene pajuelas registradas actualmente."
+            return "🧪 El termo criogénico no tiene pajillas registradas actualmente."
 
         total_unidades = sum(p["cantidad"] for p in pajuelas)
-        lineas = [f"🧪 <b>Inventario de Pajuelas ({len(pajuelas)} toros, {total_unidades} pajuelas):</b>"]
+        lineas = [f"🧪 <b>Inventario de Pajillas ({len(pajuelas)} toros, {total_unidades} pajillas):</b>"]
         for p in pajuelas:
             can = f" [Canastilla {p['canastilla']}]" if p["canastilla"] else ""
             raza = f" ({p['raza']})" if p["raza"] else ""
             aviso = " ⚠️ <i>(Bajo)</i>" if p["cantidad"] <= 2 else ""
             lineas.append(f"• <b>{p['codigo_toro']}</b>{raza}: {p['cantidad']} unid.{can}{aviso}")
         return "\n".join(lineas)
+
+    _stock_pajillas = _stock_pajuelas
 
     def _estado_termo_nitrogeno(self) -> str:
         """Estado del tanque criogénico y días restantes para la próxima recarga de N2."""
@@ -494,7 +496,7 @@ class ReproduccionQueryMixin:
         ]
 
         if kpis.get("por_toro") and len(kpis["por_toro"]) > 1:
-            lineas.append("\n<b>Desglose por Reproductor / Pajuela:</b>")
+            lineas.append("\n<b>Desglose por Reproductor / Pajilla:</b>")
             for t in kpis["por_toro"][:8]:
                 sc_t = f"{t['sc']:.2f}" if t['sc'] else "N/D"
                 lineas.append(f"• <b>{t['toro']}</b>: {t['tasa_concepcion']:.1f}% concepción ({t['prenadas']}/{t['evaluados']}) | S/C: {sc_t}")

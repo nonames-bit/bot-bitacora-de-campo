@@ -873,10 +873,12 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         errores["perdidas_reproductivas"] = str(e)
 
     pajuelas_data = []
+    pajuelas_inactivas_data = []
     termo_data = None
     alertas_paj = []
     try:
-        pajuelas_data = _filas_dict(db.listar_pajuelas())
+        pajuelas_data = _filas_dict(db.listar_pajuelas(solo_activas=True))
+        pajuelas_inactivas_data = _filas_dict(db.listar_pajuelas_inactivas())
         termo_data = db.ultimo_estado_termo(hoy)
         alertas_paj = _filas_dict(db.alertas_stock_pajuelas(3))
     except Exception as e:
@@ -992,8 +994,12 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "distribucion_iep": dist_iep,
         "perdidas": perdidas,
         "pajuelas": pajuelas_data,
+        "pajuelas_inactivas": pajuelas_inactivas_data,
+        "pajillas": pajuelas_data,
+        "pajillas_inactivas": pajuelas_inactivas_data,
         "termo": termo_data,
         "alertas_pajuelas": alertas_paj,
+        "alertas_pajillas": alertas_paj,
         "evaluacion_inseminadores": evaluacion_inseminadores,
         "iatf": iatf_data,
         "debieron_parir": debieron_parir,
@@ -3664,22 +3670,32 @@ def datos_genetica(db: Database, hoy: Optional[date] = None) -> dict:
         logger.error("seccion genetica fallo", exc_info=True)
         errores["genetica"] = str(e)
 
+    pajuelas_inactivas = []
     try:
         pajuelas = _filas_dict(db.query(
             """SELECT codigo_toro, raza, procedencia, canastilla, cantidad FROM pajuelas_inventario
+               WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO'
                ORDER BY cantidad DESC LIMIT 20"""
+        ))
+        pajuelas_inactivas = _filas_dict(db.query(
+            """SELECT codigo_toro, raza, procedencia, canastilla, cantidad FROM pajuelas_inventario
+               WHERE COALESCE(estado, 'ACTIVO') != 'ACTIVO'
+               ORDER BY codigo_toro ASC"""
         ))
         for pj in pajuelas:
             pj["raza"] = nombre_raza_sg(pj.get("raza"))
+        for pj in pajuelas_inactivas:
+            pj["raza"] = nombre_raza_sg(pj.get("raza"))
         tot_pj = db.query_one(
             "SELECT COUNT(*) toros, COALESCE(SUM(cantidad), 0) unidades FROM pajuelas_inventario "
-            "WHERE cantidad > 0"
+            "WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO' AND cantidad > 0"
         )
         pajuelas_totales = {"toros": int(tot_pj["toros"] or 0), "unidades": int(tot_pj["unidades"] or 0)}
     except Exception as e:
         logger.error("seccion pajuelas_inventario fallo", exc_info=True)
         errores["pajuelas_inventario"] = str(e)
         pajuelas = []
+        pajuelas_inactivas = []
         pajuelas_totales = {"toros": 0, "unidades": 0}
 
     try:
@@ -3703,7 +3719,11 @@ def datos_genetica(db: Database, hoy: Optional[date] = None) -> dict:
     out: dict[str, Any] = {
         **resumen_gen,
         "pajuelas_inventario": pajuelas,
+        "pajillas_inventario": pajuelas,
+        "pajuelas_inactivas": pajuelas_inactivas,
+        "pajillas_inactivas": pajuelas_inactivas,
         "pajuelas_totales": pajuelas_totales,
+        "pajillas_totales": pajuelas_totales,
         "termo_nitrogeno": termos,
         "termo_estado": termo_estado,
     }

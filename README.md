@@ -845,6 +845,13 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - Inseminación Masiva a 1-Toque: genera los servicios en bloque, descuenta existencias de pajuelas en `pajuelas_inventario` y actualiza el lote a `IATF_REALIZADA`.
         - Endpoints REST `/api/inseminadores`, `/api/iatf/protocolos`, `/api/iatf/lotes` y soporte offline en `/api/sync`.
         - Pruebas unitarias completas en `tests/test_inseminadores_iatf.py` y validación visual en viewport móvil (390×844 DPR=2) y escritorio (1280×800).
+    - **Inactivación de Catálogo Histórico de Pajillas & Estandarización de Terminología (2026-09-26)**:
+        - **Inactivación de Toros Históricos Antiguos**: Los 101 toros antiguos importados de Software Ganadero (2013-2018, canastilla `SG-CANASTA`, con 65 en stock 0) se marcan con `estado = 'INACTIVO'` en `pajuelas_inventario`, eliminando las 65 falsas alertas de stock bajo y despejando el termo para nuevas compras de semen.
+        - **Consultas & Alertas Filtradas por Estado Activo**: `listar_pajuelas(solo_activas=True)` y `alertas_stock_pajuelas()` filtran estrictamente `COALESCE(estado, 'ACTIVO') = 'ACTIVO'` siguiendo la Regla Fundamental de Inventario (Hato Activo vs Histórico).
+        - **Catálogo Histórico Desplegable en PWA**: Sección colapsable en Reproducción (`v=reprod`) y Genética (`v=genetica`) con lista de toros antiguos, botón para "Reactivar" al stock activo o "Marcar Inactiva" en los actuales.
+        - **Estandarización Terminológica a Pajillas**: Reemplazo de "pajuelas" por "pajillas" en toda la interfaz de usuario de la PWA, Bot de Telegram (`formatters.py`, `keyboards.py`, `telegram_bot.py`), Captura Rápida de Campo y enrutador de lenguaje natural de `QueryEngine`, manteniendo retrocompatibilidad total con comandos anteriores (`/pajilla_stock`, `/pajillas`, `/pajilla_add`).
+        - **Endpoints API**: Nuevas rutas `/api/pajillas` y `/api/pajillas/estado` con compatibilidad de esquemas.
+        - **Pruebas y Verificación**: Suite de pruebas `tests/test_pajillas_estado.py` en verde (44/44 tests pasando), `node --check` y `ruff` limpios.
 
 
 ---

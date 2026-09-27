@@ -11239,7 +11239,7 @@
           if (t === "IATF") return "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + icon("sperm", 12) + " IATF</span>";
           return "<span class='chip verde' style='font-size:11px; font-weight:700;'>" + icon("sperm", 12) + " IA</span>";
         }],
-        ["toro_pajilla", "Toro / Pajuela"],
+        ["toro_pajilla", "Toro / Pajilla"],
         ["fep_calculada", "FEP", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
         ["estado", "Estado", "text", function (v) { return chipResultado(v); }]
       ];
@@ -11255,7 +11255,7 @@
         ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
         ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>📟 Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>🖐️ Tacto</span>"; }],
         ["dias_gestacion", "Días", "text", function (v) { return v ? (esc(v) + " d") : "—"; }],
-        ["toro_pajuela", "Toro / Pajuela", "text", function (v) { return v ? esc(v) : "—"; }],
+        ["toro_pajuela", "Toro / Pajilla", "text", function (v) { return v ? esc(v) : "—"; }],
         ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
           var p = [];
           if (v) p.push("<b>" + esc(v) + "</b>");
@@ -13176,7 +13176,7 @@
           var label = (t.tag || "") + (nomLimpio ? " · " + nomLimpio : "") + (rCorta ? " (" + rCorta + ")" : "");
           optHtml += "<option value='" + esc(t.tag) + "'>" + esc(label) + "</option>";
         });
-        optHtml += "<option value='OTRO'>-- Otro toro / Pajuela / Externo --</option>";
+        optHtml += "<option value='OTRO'>-- Otro toro / Pajilla / Externo --</option>";
         sel.innerHTML = optHtml;
         if (valActual) sel.value = valActual;
       }

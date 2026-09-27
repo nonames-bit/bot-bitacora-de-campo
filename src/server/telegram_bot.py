@@ -941,10 +941,10 @@ def construir_application(
             args = context.args or []
             if not args or len(args) < 2:
                 await update.message.reply_text(
-                    "💡 <b>Uso del comando /pajuela_add:</b>\n"
-                    "<code>/pajuela_add &lt;código_toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>\n\n"
+                    "💡 <b>Uso del comando /pajilla_add:</b>\n"
+                    "<code>/pajilla_add &lt;código_toro&gt; &lt;cantidad&gt; [raza] [canastilla] [costo]</code>\n\n"
                     "<b>Ejemplo:</b>\n"
-                    "<code>/pajuela_add 502 10 Brahman C1 35000</code>",
+                    "<code>/pajilla_add 502 10 Brahman C1 35000</code>",
                     parse_mode="HTML",
                 )
                 return
@@ -976,7 +976,7 @@ def construir_application(
             )
 
             msg = (
-                f"✅ <b>Pajuelas Registradas con Éxito</b>\n"
+                f"✅ <b>Pajillas Registradas con Éxito</b>\n"
                 f"• Toro: <b>{html.escape(codigo_toro)}</b>\n"
                 f"• Cantidad ingresada: <b>+{cantidad} unidades</b>\n"
             )
@@ -3389,7 +3389,7 @@ def construir_application(
                 if "descartar" in data:
                     if query.message:
                         await query.message.edit_text(
-                            "❌ <i>Carga de pajuelas descartada. No se modificó el inventario.</i>",
+                            "❌ <i>Carga de pajillas descartada. No se modificó el inventario.</i>",
                             parse_mode="HTML",
                         )
                 else:
@@ -3416,7 +3416,7 @@ def construir_application(
                     if toro_code and cant_paj <= 0:
                         toro_code = None
                         if query.message:
-                            await query.message.edit_text("❌ Cantidad de pajuelas inválida. No se modificó el inventario.")
+                            await query.message.edit_text("❌ Cantidad de pajillas inválida. No se modificó el inventario.")
                     if toro_code:
                         db.registrar_pajuela(
                             codigo_toro=toro_code,
@@ -3426,10 +3426,10 @@ def construir_application(
                         stock_actual = paj_info["cantidad"] if paj_info else cant_paj
 
                         msg_confirmado = (
-                            f"✅ <b>Stock de Pajuelas Actualizado</b>\n\n"
-                            f"Se cargaron <b>+{cant_paj} pajuelas</b> del toro <b>{html.escape(str(toro_code))}</b> al termo criogénico.\n"
+                            f"✅ <b>Stock de Pajillas Actualizado</b>\n\n"
+                            f"Se cargaron <b>+{cant_paj} pajillas</b> del toro <b>{html.escape(str(toro_code))}</b> al termo criogénico.\n"
                             f"• Stock actual de {html.escape(str(toro_code))}: <b>{stock_actual} unidades</b>.\n\n"
-                            f"💡 <i>Use <code>/pajuela_stock</code> para ver el banco completo.</i>"
+                            f"💡 <i>Use <code>/pajilla_stock</code> para ver el banco completo.</i>"
                         )
                         if query.message:
                             await query.message.edit_text(
@@ -3471,8 +3471,8 @@ def construir_application(
     app.add_handler(CommandHandler(["genetica", "razas", "cruces"], cmd_genetica))
     app.add_handler(CommandHandler(["arbol", "genealogia", "pedigree", "trazabilidad"], cmd_arbol_genealogico))
     app.add_handler(CommandHandler(["reproduccion", "reprod", "reproduccion_menu"], cmd_reprod_menu))
-    app.add_handler(CommandHandler(["pajuela_stock", "pajuelas", "stock_pajuelas"], cmd_pajuela_stock))
-    app.add_handler(CommandHandler(["pajuela_add", "pajuela_agregar"], cmd_pajuela_add))
+    app.add_handler(CommandHandler(["pajilla_stock", "pajillas", "stock_pajillas", "pajuela_stock", "pajuelas", "stock_pajuelas"], cmd_pajuela_stock))
+    app.add_handler(CommandHandler(["pajilla_add", "pajilla_agregar", "pajuela_add", "pajuela_agregar"], cmd_pajuela_add))
     app.add_handler(CommandHandler(["termo", "termo_nitrogeno", "nitrogeno"], cmd_termo))
     app.add_handler(CommandHandler(["recarga_n2", "recarga_nitrogeno"], cmd_recarga_n2))
     app.add_handler(CommandHandler(["diagnosticos", "palpaciones"], cmd_diagnosticos))
