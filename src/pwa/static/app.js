@@ -700,7 +700,7 @@
       + kpiLink(kpi(d.celos_7d, "Celos 7d"), "repro", "celos") + kpiLink(kpi(d.servicios_7d, "Serv. 7d"), "repro", "palpar")
       + kpiLink(kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : ""), "sanidad", "tratamientos") + "</div>";
     h += erroresHtml(d);
-    h += renderTareasHoy(d.tareas_conteos);
+    h += renderTareasHoy(d.tareas_conteos, d.datos_revisar_n);
     h += renderResumenDiaTablero(d);
     h += grafico("evolucion", "Evolución del rebaño");
 
@@ -1223,7 +1223,7 @@
     for (var i = 0; i < LT_VISTAS.length; i++) if (LT_VISTAS[i].vista === vista) return LT_VISTAS[i].claves;
     return [];
   }
-  function renderTareasHoy(c) {
+  function renderTareasHoy(c, nRevisar) {
     if (!c) return "";
     var h = "<div class='card lt-card-tablero'><div class='lt-titulo'>" + icon("calendar", 16) + "Tareas de hoy</div><div class='gen-filtros'>";
     LT_VISTAS.forEach(function (v) {
@@ -1231,6 +1231,7 @@
       h += "<button type='button' class='chip btn-ir-tareas' data-vista='" + v.vista + "'>" + esc(v.nombre) + " <b>" + n + "</b></button>";
     });
     if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>⚠️ Chequeo <b>" + esc(c.chequeo) + "</b></button>";
+    if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>🧹 Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
     return h + "</div></div>";
   }
 
@@ -5058,6 +5059,58 @@
     return h;
   }
 
+  // Registros imposibles o sospechosos (engine/calidad_datos.py). Se
+  // corrigen desde la ficha de cada animal.
+  var GRAVEDAD_ICONO = { alta: "🔴", media: "🟠", baja: "⚪" };
+  var DR_MAX_FILAS = 30;
+  function renderDatosRevisar(lista) {
+    if (!lista) return "";
+    var h = "<div class='card lt-card'><h4 style='margin:0 0 6px;'>🧹 Datos a revisar (" + lista.length + ")</h4>";
+    if (!lista.length) return h + vacio("No se encontraron registros imposibles en el hato activo.") + "</div>";
+    h += "<p class='aviso' style='margin:0 0 8px;'>Registros que no pueden ser ciertos (casi siempre errores de digitación "
+      + "o de la importación). Abra la ficha y corríjalos: mientras tanto pueden descuadrar listas y conteos.</p>";
+    var tipos = [], por = {};
+    lista.forEach(function (p) {
+      if (!por[p.tipo]) { por[p.tipo] = []; tipos.push(p.tipo); }
+      por[p.tipo].push(p);
+    });
+    h += "<div class='gen-filtros'>";
+    tipos.forEach(function (t, i) {
+      var p0 = por[t][0];
+      h += "<button type='button' class='chip btn-dr" + (i === 0 ? " act" : "") + "' data-dr='" + esc(t) + "'>"
+        + (GRAVEDAD_ICONO[p0.gravedad] || "") + " " + esc(p0.titulo) + " <b>" + por[t].length + "</b></button>";
+    });
+    h += "</div>";
+    tipos.forEach(function (t, i) {
+      h += "<div class='dr-panel' data-dr='" + esc(t) + "'" + (i === 0 ? "" : " hidden") + ">";
+      por[t].forEach(function (p, j) {
+        h += "<div class='fila-pes'" + (j >= DR_MAX_FILAS ? " data-dr-extra hidden" : "") + "><div class='fila-pes-cab'><span>" + enlaceFicha(p.tag)
+          + (p.nombre ? " <small>" + esc(p.nombre) + "</small>" : "") + "</span>"
+          + (p.potrero ? "<small>" + esc(p.potrero) + "</small>" : "") + "</div><small>" + esc(p.detalle) + "</small></div>";
+      });
+      if (por[t].length > DR_MAX_FILAS) {
+        h += "<button type='button' class='tema-btn btn-dr-todos'>Ver todos (" + por[t].length + ")</button>";
+      }
+      h += "</div>";
+    });
+    return h + "</div>";
+  }
+  function bindDatosRevisar() {
+    qa(".btn-dr").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var t = b.getAttribute("data-dr");
+        qa(".btn-dr").forEach(function (o) { o.classList.toggle("act", o === b); });
+        qa(".dr-panel").forEach(function (p) { p.hidden = p.getAttribute("data-dr") !== t; });
+      });
+    });
+    qa(".btn-dr-todos").forEach(function (b) {
+      b.addEventListener("click", function () {
+        b.closest(".dr-panel").querySelectorAll("[data-dr-extra]").forEach(function (f) { f.hidden = false; });
+        b.remove();
+      });
+    });
+  }
+
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
     var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
@@ -5098,6 +5151,7 @@
       h += "<p class='aviso' style='margin-top:6px;'>UGG (Unidad Gran Ganado) estimado con factores estándar por categoría, no con el peso real de cada animal.</p>";
     }
     h += renderAnimalesSin(d.animales_sin);
+    h += renderDatosRevisar(d.datos_revisar);
     h += "<h4>" + icon("chartLine") + "Distribución por Categorías de Edad</h4>";
     h += "<div class='tabla-scroll tabla-responsive-auto'><table class='tabla-inventario-compacta'><tr><th class='col-cat'>Categoría</th><th class='col-cab' style='text-align:center;'>Cabezas</th><th class='col-pct' style='text-align:right;' title='Distribución porcentual'>% Dist.</th><th class='col-acum' style='text-align:right;' title='Porcentaje acumulado'>% Acum.</th><th class='col-act' style='text-align:center;'>Acción</th></tr>";
     (d.filas || []).forEach(function (f) {
@@ -11704,9 +11758,12 @@
         + "</div>";
     }
 
-    if (f.aviso_datos) {
+    var avisosDatos = (f.aviso_datos ? [f.aviso_datos] : []).concat(f.avisos_datos || []);
+    if (avisosDatos.length) {
       h += "<div class='card' style='border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;'>"
-        + "<b>⚠️ Dato a revisar</b><p style='margin:6px 0 0; font-size:13px;'>" + esc(f.aviso_datos) + "</p></div>";
+        + "<b>⚠️ " + (avisosDatos.length > 1 ? avisosDatos.length + " datos a revisar" : "Dato a revisar") + "</b>"
+        + avisosDatos.map(function (t) { return "<p style='margin:6px 0 0; font-size:13px;'>" + esc(t) + "</p>"; }).join("")
+        + "</div>";
     }
     if (ef.codigo === "TORO" && f.toro_servicio) {
       h += renderToroServicio(f.toro_servicio);
@@ -13671,6 +13728,7 @@
       if (actual === "agenda") bindAgenda();
       if (actual === "sanidad") bindSanidad();
       if (actual === "genetica") bindGenetica(d);
+      if (actual === "inventario" || actual === "poblacion") bindDatosRevisar();
       if (window.__kpiDestino) {
         var kd = window.__kpiDestino;
         window.__kpiDestino = null;

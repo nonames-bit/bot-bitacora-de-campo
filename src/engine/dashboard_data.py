@@ -319,6 +319,18 @@ def _responsables_sugeridos(db: Database) -> list[str]:
     return nombres
 
 
+def _contar_datos_revisar(db: Database) -> int:
+    try:
+        try:
+            from .calidad_datos import revisar_datos
+        except ImportError:  # ejecución directa
+            from src.engine.calidad_datos import revisar_datos  # type: ignore
+        return len(revisar_datos(db))
+    except Exception:
+        logger.error("contar datos_revisar fallo", exc_info=True)
+        return 0
+
+
 def datos_lista_trabajo(db: Database, hoy: Optional[date] = None, usar_cache: bool = False) -> dict:
     """Listas de trabajo del día (ver ``engine/tareas.py``)."""
     try:
@@ -736,6 +748,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "servicios_7d": servicios_7d,
         "retiros_activos": retiros,
         "tareas_conteos": (datos_lista_trabajo(db, hoy, usar_cache=True).get("conteos") or {}),
+        "datos_revisar_n": _contar_datos_revisar(db),
         "por_potrero": por_potrero,
         "potrero_filtro": potrero,
         "eventos_recientes": eventos_recientes,
@@ -2783,6 +2796,18 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         errores["ultimo_parto"] = str(e)
         base["ultimo_parto"] = None
     try:
+        try:
+            from .calidad_datos import problemas_de_animal
+        except ImportError:  # ejecución directa
+            from src.engine.calidad_datos import problemas_de_animal  # type: ignore
+        # El parto en ternera ya lo explica aviso_datos (arriba) con más detalle.
+        base["avisos_datos"] = [p["titulo"] + ": " + p["detalle"] for p in problemas_de_animal(db, aid)
+                                if not (p["tipo"] == "parto_en_ternera" and base.get("aviso_datos"))]
+    except Exception as e:
+        logger.error("seccion avisos_datos fallo", exc_info=True)
+        errores["avisos_datos"] = str(e)
+        base["avisos_datos"] = []
+    try:
         base["ultimo_servicio"] = dict(db.ultimo_servicio(aid)) if db.ultimo_servicio(aid) else None
     except Exception as e:
         logger.error("seccion ultimo_servicio fallo", exc_info=True)
@@ -3558,6 +3583,16 @@ def datos_inventario(db: Database) -> dict:
     except Exception as e:
         logger.error("seccion animales_sin fallo", exc_info=True)
         errores["animales_sin"] = str(e)
+    try:
+        try:
+            from .calidad_datos import revisar_datos
+        except ImportError:  # ejecución directa
+            from src.engine.calidad_datos import revisar_datos  # type: ignore
+        out["datos_revisar"] = revisar_datos(db)
+    except Exception as e:
+        logger.error("seccion datos_revisar fallo", exc_info=True)
+        errores["datos_revisar"] = str(e)
+        out["datos_revisar"] = []
     if errores:
         out["errores"] = errores
     return out
