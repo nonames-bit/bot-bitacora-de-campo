@@ -3601,6 +3601,22 @@ def construir_application(
             logger.warning("No se pudo programar aviso vespertino en job_queue: %s", ejq2)
     # Si job_queue no está disponible, el aviso vespertino simplemente no se programa.
 
+    # Latido: la alerta de salud (scripts/programador.py, contenedor "tareas")
+    # revisa que este archivo se actualice. Corre dentro del event loop del
+    # bot, así que también detecta un bot colgado, no solo caído.
+    if app.job_queue:
+        ruta_latido = os.getenv("BOT_LATIDO") or os.path.join(
+            os.path.dirname(os.path.abspath(getattr(db, "path", "data/bitacora.db"))), ".latido_bot")
+
+        async def _latido(_context) -> None:
+            try:
+                with open(ruta_latido, "w", encoding="utf-8") as f:
+                    f.write(time.strftime("%Y-%m-%dT%H:%M:%S"))
+            except OSError as e:
+                logger.warning("No se pudo escribir el latido del bot: %s", e)
+
+        app.job_queue.run_repeating(_latido, interval=60, first=5)
+
     return app
 
 
