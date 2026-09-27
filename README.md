@@ -146,6 +146,8 @@ pip install -r requirements.txt
 python -m src.main --server
 ```
 
+> 🐳 **Recomendado: Docker** — [`docs/DESPLIEGUE_DOCKER.md`](docs/DESPLIEGUE_DOCKER.md) (HTTPS automático, réplica de la base en la nube, despliegue automático desde GitHub y guía para migrar el servidor actual).
+>
 > 📖 Guías detalladas: [`docs/DESPLIEGUE_DIGITALOCEAN.md`](docs/DESPLIEGUE_DIGITALOCEAN.md)
 > (despliegue paso a paso en VPS), [`docs/TELEGRAM_GUIA_USUARIO.md`](docs/TELEGRAM_GUIA_USUARIO.md)
 > (manual para el personal de campo) y

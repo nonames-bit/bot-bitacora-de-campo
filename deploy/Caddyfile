@@ -1,0 +1,24 @@
+# Caddy: HTTPS automático (Let's Encrypt) delante de la PWA.
+# El dominio sale de la variable DOMINIO del .env (ej. ganaderiaja.duckdns.org).
+{$DOMINIO} {
+	encode zstd gzip
+
+	# Fotos del arete y recibos: mismo límite que tenía nginx.
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy app:8080 {
+		header_up X-Real-IP {remote_host}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options SAMEORIGIN
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		Content-Security-Policy "default-src 'self'; img-src 'self' data: https://server.arcgisonline.com; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://server.arcgisonline.com; object-src 'none'; frame-ancestors 'self'"
+		Permissions-Policy "geolocation=(self), camera=(self), microphone=(self), bluetooth=(self), payment=(), usb=(), magnetometer=(), gyroscope=(), publickey-credentials-get=(self), publickey-credentials-create=(self)"
+		-Server
+	}
+}
