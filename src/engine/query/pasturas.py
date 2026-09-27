@@ -7,6 +7,7 @@ from typing import Optional
 
 from ...db.database import POTRERO_VIGENTE_SUBQUERY, SQL_POTRERO_REAL, es_potrero_real
 from ...utils import normalizar, to_date
+from ..lactancia import es_seca, estados_lactancia
 from .helpers import (
     REPOSO_LISTO_DIAS,
     _fmt_es_co,
@@ -383,6 +384,7 @@ class PasturasQueryMixin:
     }
 
     def _animales_en_potrero(self, nombre_potrero: str, categorias_filtro: list[str] | None = None) -> str:
+        estados_lac = None  # VP/VS con la regla del lote de ordeño (engine/lactancia.py)
         p_row = self._buscar_potrero(nombre_potrero)
         # Un potrero legacy resuelto por nombre se trata como inexistente:
         # el inventario presente solo lista potreros reales.
@@ -470,7 +472,9 @@ class PasturasQueryMixin:
                     p_ult = self.db.ultimo_parto(aid)
                     if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
                         dp = (self.hoy - to_date(p_ult["fecha"])).days
-                        categoria = "Vacas paridas" if dp <= 305 else "Vacas secas"
+                        if estados_lac is None:
+                            estados_lac = estados_lactancia(self.db, self.hoy)
+                        categoria = "Vacas secas" if es_seca(estados_lac, aid, dp) else "Vacas paridas"
                     else:
                         categoria = "Novillas vientre (>2a)"
             else:

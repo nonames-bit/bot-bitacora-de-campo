@@ -1436,3 +1436,28 @@ def test_consulta_ayuda_rectificar_chapeta(db):
 
 
 
+
+
+def test_ficha_telegram_seca_segun_lote_de_ordeno(db):
+    # Misma regla que la PWA (engine/lactancia.py): el lote de ordeño manda,
+    # no los días en leche.
+    db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="P1")
+    db.registrar_potrero(nombre="OLEGARIO II", codigo="P2")
+    db.registrar_animal("A015", sexo="Hembra", fecha_nacimiento="2019-01-01", estado="ACTIVO", potrero="OLEGARIO II")
+    db.registrar_parto("A015", fecha="2025-04-02", sexo_cria="Macho")  # 513 DEL, fuera del lote
+    db.registrar_animal("LARGA", sexo="Hembra", fecha_nacimiento="2019-01-01", estado="ACTIVO",
+                        potrero="ORDENO SANTA MARTHA")
+    db.registrar_parto("LARGA", fecha="2025-07-24", sexo_cria="Macho")  # 400 DEL, en el lote
+    db.registrar_animal("FRESCA", sexo="Hembra", fecha_nacimiento="2019-01-01", estado="ACTIVO", potrero="OLEGARIO II")
+    db.registrar_parto("FRESCA", fecha="2026-07-29", sexo_cria="Macho")  # 30 DEL, fuera del lote
+    db.registrar_animal("A048", sexo="Hembra", fecha_nacimiento="2026-01-30", estado="ACTIVO")
+    db.registrar_parto("A048", fecha="2026-07-29", sexo_cria="Macho")  # parto imposible (6 meses)
+
+    qe = QueryEngine(db, hoy=date(2026, 8, 28))
+    r_a015 = qe.responder("ficha A015")
+    assert "VACA SECA" in r_a015 and "Lactancia:</b> Seca" in r_a015
+    r_larga = qe.responder("ficha LARGA")
+    assert "VACA PARIDA" in r_larga and "Lactancia:</b> En ordeño" in r_larga
+    assert "VACA SECA" in qe.responder("ficha FRESCA")
+    r_a048 = qe.responder("ficha A048")
+    assert "CRÍA HEMBRA" in r_a048 and "Vaca A048" not in r_a048

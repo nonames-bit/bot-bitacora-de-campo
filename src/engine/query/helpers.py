@@ -10,6 +10,7 @@ from datetime import date
 from typing import Optional
 
 from ...db.database import Database, SQL_POTRERO_REAL
+from ..lactancia import es_seca, estados_lactancia
 from ...utils import normalizar, to_date
 
 REPOSO_LISTO_DIAS = 21
@@ -340,6 +341,7 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
     potreros = db.query(f"SELECT * FROM potreros WHERE {SQL_POTRERO_REAL}")
     if not potreros:
         return []
+    estados_lac = estados_lactancia(db, hoy)  # VP/VS con la regla del lote de ordeño
 
     potreros_by_id = {p["id"]: p for p in potreros}
     grupos: dict[str, dict] = {}
@@ -412,7 +414,7 @@ def calcular_existencias_potreros_sg(db: Database, hoy: Optional[date] = None) -
                     p_ult = db.ultimo_parto(aid)
                     if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
                         dp = (hoy - to_date(p_ult["fecha"])).days
-                        if dp <= 305:
+                        if not es_seca(estados_lac, aid, dp):
                             g["vp"] += 1
                         else:
                             g["vs"] += 1
@@ -460,6 +462,7 @@ def calcular_estructura_hato_sg(db: Database, hoy: Optional[date] = None) -> dic
     de cada animal (no hay cobertura de pesajes para todo el hato)."""
     hoy = hoy or date.today()
     cont = {k: 0 for k in UGG_FACTOR_SG}
+    estados_lac = estados_lactancia(db, hoy)  # VP/VS con la regla del lote de ordeño
     animales = db.query(
         "SELECT id_animal, tag, sexo, fecha_nacimiento, nombre, notas FROM animales WHERE estado = 'ACTIVO'"
     )
@@ -478,7 +481,7 @@ def calcular_estructura_hato_sg(db: Database, hoy: Optional[date] = None) -> dic
                 p_ult = db.ultimo_parto(aid)
                 if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
                     dp = (hoy - to_date(p_ult["fecha"])).days
-                    cont["vp" if dp <= 305 else "vs"] += 1
+                    cont["vs" if es_seca(estados_lac, aid, dp) else "vp"] += 1
                 else:
                     cont["nv"] += 1
         else:

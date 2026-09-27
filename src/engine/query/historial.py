@@ -4,6 +4,7 @@ from __future__ import annotations
 from ...utils import iso, to_date
 from ..growth_engine import gmd
 from ..reproductive_engine import fecha_estimada_parto, fecha_palpacion, fecha_secado
+from ..lactancia import estados_lactancia, parto_imposible
 from .helpers import formatear_edad_zootecnica
 
 
@@ -69,7 +70,10 @@ class HistorialQueryMixin:
                     return row.get(key, default)  # type: ignore
                 except Exception:
                     return default
-        partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != _row_get(p, "id_cria")]
+        # Partos con la vaca de < 15 meses son errores de registro (ver
+        # engine/lactancia.py): no la vuelven "Vaca".
+        partos = [] if es_macho else [p for p in h.get("partos", []) if p["vaca_id"] != _row_get(p, "id_cria")
+                                      and not parto_imposible(animal["fecha_nacimiento"], p["fecha"])]
         servicios = [] if es_macho else h.get("servicios", [])
         celos = [] if es_macho else h.get("celos", [])
         diagnosticos = [] if es_macho else h.get("diagnosticos", [])
@@ -148,6 +152,7 @@ class HistorialQueryMixin:
                 if diag_post_parto and diag_post_servicio:
                     diag_activo = ult_diagnostico
 
+            lac = estados_lactancia(self.db, self.hoy).get(aid) if partos else None
             if partos:
                 tipo_animal = "Vaca"
                 if diag_activo:
@@ -156,7 +161,10 @@ class HistorialQueryMixin:
                         estado_reprod = "VACIA"
                     else:
                         estado_reprod = "PREÑADA"
-                elif da > 305:
+                elif (lac["estado"] == "SECA") if lac else da > 305:
+                    # Seca según la misma regla de la PWA (secado registrado >
+                    # lote de ordeño > días en leche); sin estado (animal no
+                    # activo) se conserva la regla SG de > 305 días.
                     if len(partos) > 1 and not serv_post_parto:
                         estado_reprod = "VACA ESCOTERA"
                     elif serv_post_parto:
@@ -164,7 +172,7 @@ class HistorialQueryMixin:
                     else:
                         estado_reprod = "VACA SECA"
                 else:
-                    # da <= 305 días (vaca parida en lactancia activa)
+                    # Vaca parida que se está ordeñando
                     if serv_post_parto:
                         estado_reprod = "VACA PARIDA SERVIDA / SIN PALPAR"
                     else:
@@ -228,10 +236,11 @@ class HistorialQueryMixin:
             )
         if animal["notas"] and str(animal["notas"]).strip():
             header.append(f"📝 <b>Observaciones:</b> {animal['notas'].strip()}")
-        header.extend([
-            f"🧬 <b>Reproductivo:</b> {estado_reprod}",
-            "───────────────────",
-        ])
+        header.append(f"🧬 <b>Reproductivo:</b> {estado_reprod}")
+        if es_hembra and partos and lac:
+            txt_lac = {"SECA": "Seca", "PAUSADA": "En ordeño (pausada)"}.get(lac["estado"], "En ordeño")
+            header.append(f"🥛 <b>Lactancia:</b> {txt_lac} · {lac['del_dias']} DEL ({lac['motivo']})")
+        header.append("───────────────────")
         bloques.append("\n".join(header))
 
         # Sección Reproducción

@@ -151,3 +151,15 @@ def test_novillas_entoradas_solo_edad_real_de_primer_parto():
                       "ult_serv_fecha": None, "tiene_prog_ia": 0})
     tags = {x["tag"] for x in _calcular_novillas_entoradas(filas, HOY)}
     assert tags == {"PRIMERIZA"}
+
+
+def test_estructura_hato_vp_vs_segun_lote(db):
+    from src.engine.query.helpers import calcular_estructura_hato_sg
+    db.registrar_potrero(nombre="ORDENO", codigo="P1")
+    db.registrar_potrero(nombre="OLEGARIO II", codigo="P2")
+    _vaca(db, "LARGA", "ORDENO", parto=400)   # antes contaba como seca (> 305 DEL)
+    _vaca(db, "A015", "OLEGARIO II", parto=513)
+    _vaca(db, "FRESCA_FUERA", "OLEGARIO II", parto=40)  # antes contaba como parida
+    est = calcular_estructura_hato_sg(db, HOY)
+    filas = {f["categoria"]: f["n"] for f in est["filas"]}
+    assert filas.get("Vaca parida") == 1 and filas.get("Vaca seca") == 2
