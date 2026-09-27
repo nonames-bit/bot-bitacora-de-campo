@@ -319,6 +319,22 @@ def _responsables_sugeridos(db: Database) -> list[str]:
     return nombres
 
 
+def _estados_lactancia(db: Database, hoy: Optional[date] = None) -> dict:
+    try:
+        from .lactancia import estados_lactancia
+    except ImportError:  # ejecución directa
+        from src.engine.lactancia import estados_lactancia  # type: ignore
+    return estados_lactancia(db, hoy)
+
+
+def _es_seca(estados: dict, animal_id: int, del_dias: int) -> bool:
+    try:
+        from .lactancia import es_seca
+    except ImportError:  # ejecución directa
+        from src.engine.lactancia import es_seca  # type: ignore
+    return es_seca(estados, animal_id, del_dias)
+
+
 def _contar_datos_revisar(db: Database) -> int:
     try:
         try:
@@ -1688,6 +1704,7 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
     Cumple estrictamente la Regla Fundamental de Inventario (estado = 'ACTIVO').
     """
     hoy_date = hoy or date.today()
+    estados_lac = None  # VP/VS con la regla del lote de ordeño (engine/lactancia.py)
     from ..utils import to_date, normalizar
 
     p_row = None
@@ -1804,12 +1821,14 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
                 p_ult = db.ultimo_parto(aid)
                 if p_ult and p_ult["fecha"] and to_date(p_ult["fecha"]):
                     dp = (hoy_date - to_date(p_ult["fecha"])).days
-                    if dp <= 305:
+                    if estados_lac is None:
+                        estados_lac = _estados_lactancia(db, hoy_date)
+                    if not _es_seca(estados_lac, aid, dp):
                         cat = "VP"
-                        cat_desc = "Vaca Parida (<=305 DEL)"
+                        cat_desc = "Vaca Parida (en ordeño)"
                     else:
                         cat = "VS"
-                        cat_desc = "Vaca Seca / Escotera (>305 DEL)"
+                        cat_desc = "Vaca Seca / Escotera"
                 else:
                     cat = "NV"
                     cat_desc = "Novilla de Vientre (>=2 años)"
@@ -1877,6 +1896,7 @@ def animales_por_grupo_inventario(
     Cumple estrictamente la Regla Fundamental de Inventario (estado = 'ACTIVO').
     """
     hoy_date = hoy or date.today()
+    estados_lac = None  # VP/VS con la regla del lote de ordeño (engine/lactancia.py)
     from ..utils import to_date, normalizar
 
     tipo_norm = (tipo or "").strip().lower()
@@ -2009,7 +2029,9 @@ def animales_por_grupo_inventario(
                 ult_p = a.get("ult_parto_fecha")
                 if ult_p and to_date(ult_p):
                     del_dias = (hoy_date - to_date(ult_p)).days
-                    if del_dias <= 305:
+                    if estados_lac is None:
+                        estados_lac = _estados_lactancia(db, hoy_date)
+                    if not _es_seca(estados_lac, a["id_animal"], del_dias):
                         cat_sg = "VP"
                         cat_desc = "Vaca parida"
                         estado_reprod = f"Parida ({del_dias} DEL)"

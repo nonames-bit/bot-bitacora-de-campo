@@ -143,6 +143,13 @@ def estados_lactancia(db, hoy: Optional[date] = None) -> dict[int, dict]:
     return out
 
 
+def es_seca(estados: dict[int, dict], animal_id: int, del_dias: int) -> bool:
+    """¿Vaca seca? Con el estado de ``estados_lactancia`` si lo hay (vaca
+    ACTIVA con parto válido); si no, la regla SG de más de 305 días."""
+    e = estados.get(animal_id)
+    return e["estado"] == "SECA" if e else del_dias > 305
+
+
 def marcar_potrero_ordeno(db, potrero_id: int, valor: Optional[bool]) -> None:
     """True/False fija el potrero como de ordeño o no; None vuelve a automático."""
     db.execute("UPDATE potreros SET ordeno = ? WHERE id = ?",

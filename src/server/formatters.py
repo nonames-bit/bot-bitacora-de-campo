@@ -280,7 +280,13 @@ def formatear_leche_animal_tab(db: Database, tag: str, hoy: Optional[date] = Non
     ult_p = partos[0]
     f_p = to_date(ult_p["fecha"])
     del_dias = (hoy - f_p).days if f_p else 0
-    estado_lact = "En Ordeño (Lactante)" if del_dias < 300 else "Seca / En descanso"
+    # Misma regla que la PWA (engine/lactancia.py): secado > lote de ordeño > DEL.
+    from ..engine.lactancia import estados_lactancia
+    lac = estados_lactancia(db, hoy).get(aid)
+    seca = (lac["estado"] == "SECA") if lac else del_dias >= 300
+    estado_lact = "Seca / En descanso" if seca else "En Ordeño (Lactante)"
+    if lac:
+        estado_lact += f" · {lac['motivo']}"
 
     lineas.append(f"• <b>Estado Lácteo:</b> <b>{estado_lact}</b>")
     lineas.append(f"• <b>Días de Lactancia (DEL):</b> <b>{del_dias} días</b>")
