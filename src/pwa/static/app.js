@@ -1862,7 +1862,6 @@
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("shieldPlus") + "Sanidad</h3>"
       + barraDescargaSeccion("sanidad", "Sanidad")
       + "</div>" + erroresHtml(d);
-    h += renderListaTrabajo(d.tareas, ltClaves("sanidad"), "Lista de trabajo · Sanidad");
     // Alta operativa directa (misma tabla que Telegram/Captura vía POST /api/sanidad/tratamiento).
     var hoySan = new Date().toISOString().slice(0, 10);
     h += "<div class='card' style='padding:12px 14px; margin-bottom:12px; border-left:4px solid var(--verde-marca);'>"
@@ -1886,6 +1885,7 @@
       + "<button type='submit' id='btn-san-guardar' class='btn-guardar-manga' style='margin-top:4px;'>Guardar tratamiento</button>"
       + "<div id='san-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
       + "</form></div>";
+    h += renderListaTrabajo(d.tareas, ltClaves("sanidad"), "Lista de trabajo · Sanidad");
     h += "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
     if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
     else {
