@@ -14,7 +14,7 @@ AWS, GCP, etc.) y para **migrar el servidor actual** (systemd + nginx en
 | `deploy/litestream.yml` | Copia la base en tiempo real a un almacenamiento S3 fuera del servidor. |
 | `scripts/programador.py` | Reemplaza el cron: respaldo 03:00, mercado 06:00, NDVI cada 3 días, lluvia los lunes. |
 | `scripts/endurecer_vps.sh` | Firewall, SSH solo con llave, fail2ban, actualizaciones automáticas e instalación de Docker. |
-| `.github/workflows/docker.yml` | Cuando los tests pasan en `main`: construye la imagen, la publica en GitHub y (opcional) la despliega. |
+| `.github/workflows/docker.yml` | Cuando los tests pasan en `main`: verifica que la imagen se construye y (opcional) le pide al servidor que se actualice; el servidor arma la imagen (sin registro de paquetes, costo $0). |
 
 Los datos viven **fuera del contenedor**, en carpetas del servidor:
 
@@ -151,29 +151,28 @@ usando `scripts/respaldo_drive.sh` (rclone) desde el cron del servidor sobre
 
 ## C. Despliegue automático desde GitHub
 
-Cuando se fusiona un PR y los tests pasan, GitHub construye la imagen y
-actualiza el servidor solo.
+Cuando se fusiona un PR y los tests pasan, GitHub comprueba que la imagen se
+construye y le avisa al servidor, que descarga el código nuevo y **arma la
+imagen él mismo**. No se usa almacenamiento de paquetes de GitHub (costo $0).
 
-1. **En el servidor**, dé acceso a la imagen (una vez). Cree un token en
-   GitHub → Settings → Developer settings → *Personal access tokens (classic)*
-   con permiso solo `read:packages`:
+1. **Llave de despliegue**: en el servidor,
    ```bash
-   echo TOKEN | docker login ghcr.io -u SU_USUARIO_GITHUB --password-stdin
+   ssh-keygen -t ed25519 -f /root/.ssh/despliegue -N ""
+   cat /root/.ssh/despliegue.pub >> /root/.ssh/authorized_keys
+   cat /root/.ssh/despliegue      # copiar TODO, de -----BEGIN a END-----
    ```
-   y en `/opt/bitacora/.env`:
-   ```
-   BITACORA_IMAGEN=ghcr.io/nonames-bit/bot-bitacora-de-campo:latest
-   ```
-2. **Llave de despliegue**: en el servidor,
-   `ssh-keygen -t ed25519 -f /root/.ssh/despliegue -N ""` y agregue
-   `/root/.ssh/despliegue.pub` a `/root/.ssh/authorized_keys`.
-3. **En GitHub** → Settings → Secrets and variables → Actions:
+2. **En GitHub** → Settings → Secrets and variables → Actions → *New repository secret*:
    - `VPS_HOST` = IP del servidor
    - `VPS_USUARIO` = `root`
-   - `VPS_SSH_KEY` = contenido de `/root/.ssh/despliegue` (la privada)
+   - `VPS_SSH_KEY` = la llave privada que copió
    - (variable opcional) `VPS_DIR` = `/opt/bitacora`
+3. Si el repositorio es **privado**, el servidor necesita poder hacer
+   `git pull`: agregue `/root/.ssh/despliegue.pub` (u otra llave del servidor)
+   como *Deploy key* de solo lectura en GitHub → Settings → Deploy keys, y
+   clone con `git@github.com:nonames-bit/bot-bitacora-de-campo.git`.
 
-Sin esos secrets, el workflow solo construye y publica la imagen; no toca el servidor.
+Sin los secrets, el workflow solo verifica que la imagen se construye; no toca el servidor.
+El avance se ve en la pestaña **Actions**, flujo **docker**.
 
 **Actualizar a mano** (sin GitHub Actions):
 
@@ -181,9 +180,13 @@ Sin esos secrets, el workflow solo construye y publica la imagen; no toca el ser
 cd /opt/bitacora && git pull && docker compose up -d --build
 ```
 
-**Volver a una versión anterior**: cada imagen queda publicada con el SHA
-del commit (`ghcr.io/...:<sha>`). Ponga ese valor en `BITACORA_IMAGEN` y
-`docker compose up -d`.
+**Volver a una versión anterior**:
+
+```bash
+cd /opt/bitacora && git log --oneline -5      # elegir el commit bueno
+git checkout <commit> && docker compose up -d --build
+# para volver a la última versión: git checkout main && git pull
+```
 
 ---
 
