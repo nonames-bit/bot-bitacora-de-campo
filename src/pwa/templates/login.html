@@ -25,6 +25,11 @@ p.sub{color:#666;font-size:13px;margin:0 0 20px}
 label{display:block;font-size:13px;margin:12px 0 4px;color:#444;text-align:left}
 .btn-ingresar{width:100%;padding:14px;margin-top:16px;border:0;border-radius:10px;background:var(--verde-marca, #2F5233);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
 .btn-ingresar:hover{opacity:0.92}
+.btn-huella{width:100%;padding:14px;border:1px solid var(--verde-marca, #2F5233);border-radius:10px;background:transparent;color:var(--verde-marca, #2F5233);font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px}
+.btn-huella:hover{background:rgba(47,82,51,0.06)}
+.huella-msg{font-size:12px;color:#666;margin:8px 0 0;min-height:14px}
+.divisor-o{display:flex;align-items:center;gap:10px;margin:16px 0 4px;color:#999;font-size:12px}
+.divisor-o::before,.divisor-o::after{content:"";flex:1;height:1px;background:#e2e2e2}
 .ayuda-pin{font-size:12px;color:#777;margin-top:14px;line-height:1.4}
 .error{color:var(--rojo, #c62828);font-size:13px;margin-top:12px;font-weight:500}
 </style>
@@ -34,6 +39,16 @@ label{display:block;font-size:13px;margin:12px 0 4px;color:#444;text-align:left}
   <img src="/static/logo.jpg" alt="Logo Ganadería JA" width="76" height="76" style="display:block; margin:0 auto 14px; border-radius:50%; box-shadow:0 4px 14px rgba(0,0,0,0.18); border: 2px solid rgba(47,82,51,0.25); object-fit:cover;">
   <h1>GANADERÍA JA</h1>
   <p class="sub">Bitácora de Campo & Tablero</p>
+
+  <div id="box-huella-login" style="display:none;">
+    <button id="btn-huella-login" type="button" class="btn-huella">
+      <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true"><path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/><path d="M14 13.12c0 2.38 0 6.38-1 8.88"/><path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/><path d="M2 12a10 10 0 0 1 18-6"/><path d="M2 16h.01"/><path d="M21.8 16c.2-2 .131-5.354 0-6"/><path d="M5 19.5C5.5 18 6 15 6 12a6 6 0 0 1 .34-2"/><path d="M8.65 22c.21-.66.45-1.32.57-2"/><path d="M9 6.8a6 6 0 0 1 9 5.2v2"/></svg>
+      Ingresar con huella / Face ID
+    </button>
+    <p id="huella-msg" class="huella-msg" aria-live="polite"></p>
+    <div class="divisor-o"><span>o use su PIN</span></div>
+  </div>
+
   <form method="post" action="/login">
     <div class="pin-box">
       <input type="password" id="password" name="password" class="pin-input" placeholder="••••" autofocus required inputmode="numeric" autocomplete="current-password">

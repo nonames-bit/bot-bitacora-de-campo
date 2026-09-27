@@ -39,6 +39,11 @@ psutil>=5.9.0
 # VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_CLAIMS_EMAIL en .env.
 pywebpush>=2.0
 
+# Login con huella / Face ID en la PWA (WebAuthn). Sin esta librería, los
+# endpoints /api/webauthn/* responden 503 "Biometría no disponible" y el
+# resto de la PWA sigue operativo (import perezoso en src/pwa/webauthn.py).
+webauthn>=3.0
+
 # OCR de aretes/fotos (Etapa C / fotos del bot) — opcional; sin ello la
 # detección degrada con elegancia a sidecar/manual:
 # pytesseract>=0.3.10

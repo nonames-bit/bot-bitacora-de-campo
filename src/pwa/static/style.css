@@ -4369,3 +4369,18 @@ body.modo-campo #vista { font-size: 15px; }
 .lt-producto { display: flex; gap: 6px; margin-bottom: 8px; }
 .lt-producto input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--borde-fuerte); font-size: 14px; }
 .fila-lt.hecha { opacity: .75; }
+
+/* ---- Login con huella / Face ID (WebAuthn) ---- */
+.huella-vacio { font-size: 12.5px; color: var(--texto-suave); padding: 6px 0; }
+.huella-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 9px 11px; margin: 6px 0; border: 1px solid var(--borde-fuerte);
+  border-radius: 9px; background: var(--superficie);
+}
+.huella-item b { font-size: 13px; }
+.huella-revocar {
+  flex: none; font-size: 11.5px; font-weight: 700; padding: 5px 11px;
+  border-radius: 7px; border: 1px solid var(--color-rojo-txt, #b91c1c);
+  background: transparent; color: var(--color-rojo-txt, #b91c1c); cursor: pointer;
+}
+.huella-revocar:hover { background: rgba(185, 28, 28, 0.08); }

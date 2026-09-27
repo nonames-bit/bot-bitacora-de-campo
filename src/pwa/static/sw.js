@@ -75,6 +75,7 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // extraídos a /static/sw-register.js y /static/login.js (sin <script>
 // inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
 // v86: Animaciones contextuales en el header (vaca_echada en descanso nocturno y vaca_con_cria para fichas de paridas), easter egg interactivo con métricas en vivo y lluvia animada en header.
+// v87: Login con huella / Face ID (WebAuthn) en la PWA -- botón "Ingresar con huella" en /login, activación por dispositivo desde el menú de perfil y revocación por OWNER/ADMIN; /api/webauthn* se sirve siempre de red (nunca desde caché).
 // BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
 // __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
 // P1.4 (auditoría 2026-09-23): (a) no se cachean /api/grafico* ni URLs con
@@ -211,8 +212,12 @@ self.addEventListener("fetch", function (e) {
     // (P1.4a) Los gráficos (/api/grafico/...) llegan con ?t=<timestamp> único
     // por render (ja-core.js): cachearlos llena Cache Storage sin límite y
     // nunca se reutilizan. Igual cualquier URL con parámetro volátil t=.
+    // (v87) WebAuthn tampoco se cachea: los challenge/verificación son de un
+    // solo uso y una respuesta vieja de /api/webauthn* rompería el login.
     // Estas URLs se sirven solo de red (sin escribir ni leer caché).
-    var volatil = url.pathname.indexOf("/api/grafico") === 0 || url.searchParams.has("t");
+    var volatil = url.pathname.indexOf("/api/grafico") === 0
+      || url.pathname.indexOf("/api/webauthn") === 0
+      || url.searchParams.has("t");
     if (volatil) {
       e.respondWith(
         fetch(req).catch(function () {

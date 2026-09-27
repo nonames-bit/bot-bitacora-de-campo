@@ -59,9 +59,19 @@ def test_endpoints_sin_sesion_devuelven_401(db_file):
     app = crear_app(db_file, password="clave-de-prueba")
     c = app.test_client()
     for ep in ("/api/tablero", "/api/repro", "/api/sanidad", "/api/pasturas", "/api/leche",
-               "/api/ficha/47", "/api/finanzas", "/api/mensajes-equipo", "/api/carne"):
+               "/api/ficha/47", "/api/finanzas", "/api/mensajes-equipo", "/api/carne",
+               "/api/webauthn/estado", "/api/webauthn/credenciales/todas"):
         r = c.get(ep)
         assert r.status_code == 401, ep
+
+
+def test_webauthn_rutas_publicas_disponibles_sin_sesion(db_file):
+    """El login con huella ocurre sin sesión: opciones/verificar y disponible
+    deben ser alcanzables (no 401); el resto exige sesión."""
+    app = crear_app(db_file, password="clave-de-prueba")
+    c = app.test_client()
+    assert c.get("/api/webauthn/disponible").status_code == 200
+    assert c.post("/api/webauthn/login/opciones", json={}).status_code in (200, 503)
 
 
 def test_pagina_html_sin_sesion_redirige_a_login(db_file):

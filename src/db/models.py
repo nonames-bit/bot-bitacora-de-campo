@@ -300,6 +300,7 @@ CREATE TABLE IF NOT EXISTS pajuelas_inventario (
     cantidad INTEGER DEFAULT 0,
     costo REAL DEFAULT 0.0,
     fecha_ingreso TEXT,
+    estado TEXT DEFAULT 'ACTIVO',
     creado_en TEXT
 );
 
@@ -656,6 +657,27 @@ CREATE TABLE IF NOT EXISTS composicion_racial (
 
 CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id);
 CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza);
+
+-- Login con huella / Face ID en la PWA (WebAuthn). Se guarda SOLO la clave
+-- pública de cada dispositivo; la huella nunca sale del teléfono. user_id
+-- puede ser NULL cuando la credencial se activó desde una sesión iniciada
+-- con la contraseña maestra (queda como "Propietario (clave maestra)").
+-- La revocación se apoya en users.json: si el user_id ya no existe en
+-- users.json, el login por huella se rechaza y la credencial se borra.
+CREATE TABLE IF NOT EXISTS webauthn_credenciales (
+    credencial_id TEXT PRIMARY KEY,
+    user_id INTEGER,
+    nombre_usuario TEXT,
+    clave_publica TEXT NOT NULL,
+    sign_count INTEGER NOT NULL DEFAULT 0,
+    aaguid TEXT,
+    transportes TEXT,
+    nombre_dispositivo TEXT,
+    creado_en TEXT,
+    ultimo_uso TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_webauthn_credenciales_user ON webauthn_credenciales(user_id);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).
@@ -669,7 +691,7 @@ TABLAS = [
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
     "precios_mercado", "mensajes_equipo", "sync_ids_procesados",
     "inseminadores", "protocolos_iatf", "lotes_iatf", "lote_iatf_animales",
-    "composicion_racial",
+    "composicion_racial", "webauthn_credenciales",
 ]
 
 
@@ -880,6 +902,7 @@ class PajuelaInventario:
     cantidad: int = 0
     costo: float = 0.0
     fecha_ingreso: Optional[str] = None
+    estado: str = "ACTIVO"
     creado_en: Optional[str] = None
     id: Optional[int] = None
 

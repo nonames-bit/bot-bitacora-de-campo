@@ -196,6 +196,13 @@ class Database:
                 ]:
                     if col_name not in cols_dg:
                         self.conn.execute(f"ALTER TABLE diagnosticos_gestacion ADD COLUMN {col_name} {col_type}")
+            if "pajuelas_inventario" in tablas:
+                cols_pj = {r[1] for r in self.conn.execute("PRAGMA table_info(pajuelas_inventario)").fetchall()}
+                if "estado" not in cols_pj:
+                    self.conn.execute("ALTER TABLE pajuelas_inventario ADD COLUMN estado TEXT DEFAULT 'ACTIVO'")
+                    self.conn.execute(
+                        "UPDATE pajuelas_inventario SET estado = 'INACTIVO' WHERE fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01'"
+                    )
 
             # Asegurar existencia de nuevas tablas zootécnicas si la BD ya existía
             self.conn.execute("""
@@ -2334,13 +2341,21 @@ class Database:
     def registrar_pajuela_inventario(self, codigo_toro: str, raza: Optional[str] = None,
                                      procedencia: Optional[str] = None, canastilla: Optional[str] = None,
                                      cantidad: int = 0, costo: float = 0.0,
-                                     fecha_ingreso: Optional[str] = None) -> int:
+                                     fecha_ingreso: Optional[str] = None,
+                                     estado: Optional[str] = None) -> int:
         cod = codigo_toro.strip()
+        f_iso = iso(fecha_ingreso)
+        if estado is not None:
+            estado_calc = "INACTIVO" if str(estado).strip().upper() in ("INACTIVO", "INACTIVA", "AGOTADO", "AGOTADA", "USADA", "USADO") else "ACTIVO"
+        else:
+            estado_calc = "INACTIVO" if (f_iso and f_iso < "2022-01-01") else "ACTIVO"
+
         existente = self.query_one(
-            "SELECT id FROM pajuelas_inventario WHERE codigo_toro = ? LIMIT 1",
+            "SELECT id, estado FROM pajuelas_inventario WHERE codigo_toro = ? LIMIT 1",
             (cod,),
         )
         if existente:
+            est_final = estado_calc if estado is not None else (existente["estado"] or "ACTIVO")
             self.conn.execute(
                 """
                 UPDATE pajuelas_inventario
@@ -2349,22 +2364,27 @@ class Database:
                     canastilla = COALESCE(?, canastilla),
                     cantidad = ?,
                     costo = ?,
-                    fecha_ingreso = COALESCE(?, fecha_ingreso)
+                    fecha_ingreso = COALESCE(?, fecha_ingreso),
+                    estado = ?
                 WHERE id = ?
                 """,
-                (raza, procedencia, canastilla, cantidad, costo, iso(fecha_ingreso), existente["id"]),
+                (raza, procedencia, canastilla, cantidad, costo, f_iso, est_final, existente["id"]),
             )
             return existente["id"]
         return self.insert("pajuelas_inventario", dict(
             codigo_toro=cod, raza=raza, procedencia=procedencia,
             canastilla=canastilla, cantidad=cantidad, costo=costo,
-            fecha_ingreso=iso(fecha_ingreso), creado_en=self._ahora(),
+            fecha_ingreso=f_iso, estado=estado_calc, creado_en=self._ahora(),
         ))
+
+    registrar_pajilla_inventario = registrar_pajuela_inventario
 
     def listar_pajuelas_inventario(self, solo_con_saldo: bool = False) -> list[sqlite3.Row]:
         if solo_con_saldo:
             return self.query("SELECT * FROM pajuelas_inventario WHERE cantidad > 0 ORDER BY codigo_toro")
         return self.query("SELECT * FROM pajuelas_inventario ORDER BY codigo_toro")
+
+    listar_pajillas_inventario = listar_pajuelas_inventario
 
     def registrar_consulta_animal(self, animal_tag_or_id, hoy=None) -> None:
         """Marca ``animal_tag_or_id`` como consultado ahora (para el panel de
@@ -3382,7 +3402,8 @@ class Database:
                     raza = COALESCE(?, raza),
                     procedencia = COALESCE(?, procedencia),
                     canastilla = COALESCE(?, canastilla),
-                    costo = CASE WHEN ? > 0 THEN ? ELSE costo END
+                    costo = CASE WHEN ? > 0 THEN ? ELSE costo END,
+                    estado = 'ACTIVO'
                 WHERE id = ?
                 """,
                 (cant, raza, procedencia, canastilla_clean, float(costo), float(costo), pid),
@@ -3397,8 +3418,11 @@ class Database:
             cantidad=cant,
             costo=float(costo),
             fecha_ingreso=f_ing,
+            estado="ACTIVO",
             creado_en=self._ahora(),
         ))
+
+    registrar_pajilla = registrar_pajuela
 
     def descontar_pajuela(self, codigo_toro: str, cantidad: int = 1) -> bool:
         if not codigo_toro:
@@ -3417,8 +3441,18 @@ class Database:
             return True
         return False
 
-    def listar_pajuelas(self) -> list[sqlite3.Row]:
+    descontar_pajilla = descontar_pajuela
+
+    def listar_pajuelas(self, solo_activas: bool = True) -> list[sqlite3.Row]:
+        if solo_activas:
+            return self.query("SELECT * FROM pajuelas_inventario WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO' ORDER BY COALESCE(canastilla, 'ZZ'), codigo_toro ASC")
         return self.query("SELECT * FROM pajuelas_inventario ORDER BY COALESCE(canastilla, 'ZZ'), codigo_toro ASC")
+
+    def listar_pajuelas_inactivas(self) -> list[sqlite3.Row]:
+        return self.query("SELECT * FROM pajuelas_inventario WHERE COALESCE(estado, 'ACTIVO') != 'ACTIVO' ORDER BY COALESCE(canastilla, 'ZZ'), codigo_toro ASC")
+
+    listar_pajillas = listar_pajuelas
+    listar_pajillas_inactivas = listar_pajuelas_inactivas
 
     def obtener_pajuela(self, codigo_toro: str) -> Optional[sqlite3.Row]:
         t = str(codigo_toro).strip()
@@ -3427,11 +3461,27 @@ class Database:
             (t, f"%{t}%"),
         )
 
+    obtener_pajilla = obtener_pajuela
+
     def alertas_stock_pajuelas(self, umbral_critico: int = 2) -> list[sqlite3.Row]:
         return self.query(
-            "SELECT * FROM pajuelas_inventario WHERE cantidad <= ? ORDER BY cantidad ASC, codigo_toro ASC",
+            "SELECT * FROM pajuelas_inventario WHERE COALESCE(estado, 'ACTIVO') = 'ACTIVO' AND cantidad <= ? ORDER BY cantidad ASC, codigo_toro ASC",
             (umbral_critico,),
         )
+
+    alertas_stock_pajillas = alertas_stock_pajuelas
+
+    def actualizar_estado_pajuela(self, id_o_codigo, nuevo_estado: str) -> bool:
+        est = "INACTIVO" if str(nuevo_estado).strip().upper() in ("INACTIVO", "INACTIVA", "AGOTADO", "AGOTADA", "USADA", "USADO") else "ACTIVO"
+        try:
+            val_id = int(id_o_codigo)
+            self.execute("UPDATE pajuelas_inventario SET estado = ? WHERE id = ?", (est, val_id))
+            return True
+        except (ValueError, TypeError):
+            self.execute("UPDATE pajuelas_inventario SET estado = ? WHERE UPPER(codigo_toro) = UPPER(?)", (est, str(id_o_codigo).strip()))
+            return True
+
+    actualizar_estado_pajilla = actualizar_estado_pajuela
 
     def registrar_recarga_nitrogeno(self, fecha_recarga=None, dias_intervalo: int = 21, proxima_recarga=None) -> int:
         f_rec = iso(fecha_recarga) or date.today().isoformat()
@@ -4460,6 +4510,140 @@ class Database:
             return False
         self.execute("DELETE FROM mensajes_equipo WHERE id = ?", (id_mensaje,))
         return True
+
+    # ------------------------------------------------------------------ #
+    # WebAuthn — login con huella / Face ID en la PWA
+    # ------------------------------------------------------------------ #
+    def _ensure_webauthn_table(self) -> None:
+        try:
+            self.conn.execute("""
+                CREATE TABLE IF NOT EXISTS webauthn_credenciales (
+                    credencial_id TEXT PRIMARY KEY,
+                    user_id INTEGER,
+                    nombre_usuario TEXT,
+                    clave_publica TEXT NOT NULL,
+                    sign_count INTEGER NOT NULL DEFAULT 0,
+                    aaguid TEXT,
+                    transportes TEXT,
+                    nombre_dispositivo TEXT,
+                    creado_en TEXT,
+                    ultimo_uso TEXT
+                )
+            """)
+            self.conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_webauthn_credenciales_user "
+                "ON webauthn_credenciales(user_id)"
+            )
+        except Exception:
+            pass
+
+    def guardar_credencial_webauthn(self, credencial_id: str, clave_publica: str,
+                                    user_id: Optional[int] = None,
+                                    nombre_usuario: Optional[str] = None,
+                                    sign_count: int = 0, aaguid: Optional[str] = None,
+                                    transportes: Optional[str] = None,
+                                    nombre_dispositivo: Optional[str] = None) -> bool:
+        """Guarda o reemplaza una credencial WebAuthn (idempotente por id)."""
+        self._ensure_webauthn_table()
+        ahora = datetime.now(timezone.utc).isoformat()
+        uid = int(user_id) if user_id is not None else None
+        self.execute(
+            """
+            INSERT INTO webauthn_credenciales
+                (credencial_id, user_id, nombre_usuario, clave_publica, sign_count,
+                 aaguid, transportes, nombre_dispositivo, creado_en, ultimo_uso)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(credencial_id) DO UPDATE SET
+                user_id = excluded.user_id,
+                nombre_usuario = excluded.nombre_usuario,
+                clave_publica = excluded.clave_publica,
+                sign_count = excluded.sign_count,
+                aaguid = excluded.aaguid,
+                transportes = excluded.transportes,
+                nombre_dispositivo = excluded.nombre_dispositivo,
+                ultimo_uso = excluded.ultimo_uso
+            """,
+            (str(credencial_id), uid, nombre_usuario, str(clave_publica), int(sign_count),
+             aaguid, transportes, nombre_dispositivo, ahora, ahora),
+        )
+        return True
+
+    def obtener_credencial_webauthn(self, credencial_id: str) -> Optional[dict[str, Any]]:
+        """Devuelve la credencial por su id (base64url) o None."""
+        self._ensure_webauthn_table()
+        fila = self.query_one(
+            "SELECT * FROM webauthn_credenciales WHERE credencial_id = ?",
+            (str(credencial_id),),
+        )
+        return dict(fila) if fila else None
+
+    def listar_credenciales_webauthn(self, user_id: Optional[int] = None) -> list[dict[str, Any]]:
+        """Todas las credenciales (admin) o las de un usuario concreto.
+
+        Ojo: ``user_id=None`` significa "todas" (uso OWNER/ADMIN). Para las
+        credenciales de una sesión con clave maestra (user_id NULL) usar
+        ``listar_credenciales_de_usuario(None)``.
+        """
+        self._ensure_webauthn_table()
+        if user_id is None:
+            filas = self.query("SELECT * FROM webauthn_credenciales ORDER BY creado_en DESC")
+        else:
+            filas = self.query(
+                "SELECT * FROM webauthn_credenciales WHERE user_id = ? ORDER BY creado_en DESC",
+                (int(user_id),),
+            )
+        return [dict(f) for f in filas]
+
+    def listar_credenciales_de_usuario(self, user_id: Optional[int]) -> list[dict[str, Any]]:
+        """Credenciales que pertenecen a la sesión actual (user_id NULL incluido)."""
+        self._ensure_webauthn_table()
+        if user_id is None:
+            filas = self.query(
+                "SELECT * FROM webauthn_credenciales WHERE user_id IS NULL ORDER BY creado_en DESC"
+            )
+        else:
+            filas = self.query(
+                "SELECT * FROM webauthn_credenciales WHERE user_id IS NULL OR user_id = ? "
+                "ORDER BY creado_en DESC",
+                (int(user_id),),
+            )
+        return [dict(f) for f in filas]
+
+    def contar_credenciales_webauthn(self, user_id: Optional[int] = None) -> int:
+        """Cuenta las credenciales de un usuario (o todas si user_id=None)."""
+        self._ensure_webauthn_table()
+        if user_id is None:
+            fila = self.query_one("SELECT COUNT(*) AS n FROM webauthn_credenciales")
+        else:
+            fila = self.query_one(
+                "SELECT COUNT(*) AS n FROM webauthn_credenciales "
+                "WHERE user_id IS NULL OR user_id = ?",
+                (int(user_id),),
+            )
+        return int(fila["n"]) if fila else 0
+
+    def hay_credenciales_webauthn(self) -> bool:
+        """True si existe al menos una credencial registrada."""
+        self._ensure_webauthn_table()
+        return self.query_one("SELECT 1 AS hay FROM webauthn_credenciales LIMIT 1") is not None
+
+    def actualizar_uso_credencial_webauthn(self, credencial_id: str, sign_count: int) -> None:
+        """Actualiza el contador de firmas y la fecha de último uso."""
+        self._ensure_webauthn_table()
+        ahora = datetime.now(timezone.utc).isoformat()
+        self.execute(
+            "UPDATE webauthn_credenciales SET sign_count = ?, ultimo_uso = ? WHERE credencial_id = ?",
+            (int(sign_count), ahora, str(credencial_id)),
+        )
+
+    def borrar_credencial_webauthn(self, credencial_id: str) -> bool:
+        """Elimina (revoca) una credencial. True si existía."""
+        self._ensure_webauthn_table()
+        cursor = self.execute(
+            "DELETE FROM webauthn_credenciales WHERE credencial_id = ?",
+            (str(credencial_id),),
+        )
+        return cursor.rowcount > 0
 
     # ------------------------------------------------------------------ #
     # Web Push Notifications (PWA)

@@ -1091,9 +1091,10 @@
 
     // Banco de Semen & Termo Criogénico (Software Ganadero)
     var termo = d.termo;
-    var pajuelas = d.pajuelas || [];
+    var pajuelas = d.pajuelas || d.pajillas || [];
+    var pajuelasInactivas = d.pajuelas_inactivas || d.pajillas_inactivas || [];
     var totalPaj = pajuelas.reduce(function (s, p) { return s + (Number(p.cantidad) || 0); }, 0);
-    var alertasPaj = d.alertas_pajuelas || [];
+    var alertasPaj = d.alertas_pajuelas || d.alertas_pajillas || [];
 
     var semNitr = !termo ? "gris" : (termo.dias_restantes <= 3 ? "rojo" : (termo.dias_restantes <= 7 ? "ambar" : "verde"));
     var txtNitr = !termo ? "Sin datos de recarga" : (termo.dias_restantes > 0 ? (termo.dias_restantes + " días restantes") : "¡Recarga vencida!");
@@ -1101,27 +1102,27 @@
     h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
       + "<div style='font-size:14px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>"
-      + icon("snowflake", 16) + "Banco de Semen & Termo Criogénico"
+      + icon("snowflake", 16) + "Banco de Semen &amp; Termo Criogénico"
       + "</div>"
       + "<div style='display:flex; gap:6px; flex-wrap:wrap;'>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='palpacion' style='font-size:11.5px; padding:5px 10px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
       + icon("stethoscope", 13) + "Tacto / Palpación</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='pajuela' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("sperm", 13) + "➕ Entrada Pajuelas</button>"
+      + icon("sperm", 13) + "➕ Entrada Pajillas</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='nitrogeno' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
       + icon("snowflake", 13) + "❄️ Recarga Nitrógeno</button>"
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
       + kpi("<span class='chip " + semNitr + "' style='font-size:13px; font-weight:700;'><b>" + esc(txtNitr) + "</b></span>", "Termo Nitrógeno Líquido", termo && termo.dias_restantes <= 3 ? "alerta" : "ok")
-      + kpi(esc(totalPaj) + " pajuelas", "Stock Total de Semen", "ok")
-      + kpi(esc(pajuelas.length) + " toros", "Reproductores Disponibles")
-      + (alertasPaj.length ? kpi("<span class='chip rojo'><b>" + alertasPaj.length + " en riesgo</b></span>", "Alertas Stock ≤ 3 pajuelas", "alerta") : "")
+      + kpi(esc(totalPaj) + " pajillas", "Stock Total de Semen", "ok")
+      + kpi(esc(pajuelas.length) + " toros activos", "Reproductores Disponibles")
+      + (alertasPaj.length ? kpi("<span class='chip rojo'><b>" + alertasPaj.length + " en riesgo</b></span>", "Alertas Stock ≤ 3 pajillas", "alerta") : "")
       + "</div>";
 
     if (pajuelas.length) {
-      h += "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-bottom:6px; text-transform:uppercase;'>Inventario Detallado de Pajuelas:</div>"
-        + "<div class='tabla-scroll'><table><tr><th>Toro</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Cantidad</th><th style='text-align:right;'>Costo Unit.</th><th>Procedencia</th></tr>";
+      h += "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-bottom:6px; text-transform:uppercase;'>Inventario Activo de Pajillas:</div>"
+        + "<div class='tabla-scroll'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Cantidad</th><th style='text-align:right;'>Costo Unit.</th><th>Procedencia</th><th style='text-align:center;'>Estado</th></tr>";
       h += pajuelas.map(function (p) {
         var cant = Number(p.cantidad) || 0;
         var cantChip = cant <= 2 ? "<span class='chip rojo'><b>" + cant + " un.</b></span>" : (cant <= 5 ? "<span class='chip ambar'><b>" + cant + " un.</b></span>" : "<span class='chip verde'><b>" + cant + " un.</b></span>");
@@ -1133,11 +1134,32 @@
           + "<td style='text-align:right;'>" + cantChip + "</td>"
           + "<td style='text-align:right; font-family:var(--font-mono);'>" + esc(costoStr) + "</td>"
           + "<td style='font-size:11.5px; color:var(--texto-suave);'>" + esc(p.procedencia || "—") + "</td>"
+          + "<td style='text-align:center;'><button type='button' class='btn-cambiar-estado-pajilla' data-id='" + esc(p.id) + "' data-estado='INACTIVO' style='font-size:10.5px; padding:3px 7px; border:1px solid var(--borde-fuerte); border-radius:4px; background:var(--superficie-2); cursor:pointer;'>Marcar Inactiva</button></td>"
           + "</tr>";
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay pajuelas registradas en el termo criogénico. Use el botón «➕ Entrada Pajuelas» para cargar el catálogo.");
+      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas de Software Ganadero están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
+    }
+
+    if (pajuelasInactivas.length) {
+      h += "<details style='margin-top:14px; background:var(--superficie-2); border-radius:8px; padding:10px 14px; border:1px solid var(--borde-suave);'>"
+        + "<summary style='cursor:pointer; font-weight:700; font-size:12px; color:var(--texto-suave);'>"
+        + "📁 Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
+        + "</summary>"
+        + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico importado de Software Ganadero (2013–2018) archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
+        + "<div class='tabla-scroll' style='max-height:240px; overflow-y:auto;'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Saldo Ant.</th><th>Procedencia</th><th style='text-align:center;'>Acción</th></tr>"
+        + pajuelasInactivas.map(function (p) {
+          return "<tr>"
+            + "<td><b>" + esc(p.codigo_toro) + "</b></td>"
+            + "<td>" + esc(p.raza || "—") + "</td>"
+            + "<td style='text-align:center;'><span class='chip gris'>" + esc(p.canastilla || "—") + "</span></td>"
+            + "<td style='text-align:right; color:var(--texto-suave);'>" + esc(p.cantidad || 0) + " un.</td>"
+            + "<td style='font-size:11.5px; color:var(--texto-suave);'>" + esc(p.procedencia || "—") + "</td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-cambiar-estado-pajilla' data-id='" + esc(p.id) + "' data-estado='ACTIVO' style='font-size:10.5px; padding:3px 7px; border:1px solid var(--verde-marca); color:var(--verde-marca); border-radius:4px; background:transparent; cursor:pointer;'>Reactivar</button></td>"
+            + "</tr>";
+        }).join("")
+        + "</table></div></details>";
     }
     h += "</div>";
 
@@ -1421,7 +1443,7 @@
       + tabla(debieron, [
         ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
         ["fecha_servicio", "Servicio"],
-        ["toro_pajilla", "Toro / Pajuela"],
+        ["toro_pajilla", "Toro / Pajilla"],
         ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
         ["dias_atraso", "Atraso", "text", function (v) { return "<span class='chip rojo'><b>" + esc(v) + " d</b></span>"; }]
       ], "Ninguna vaca con FEP vencida sin parto registrado. 🎉");
@@ -1459,7 +1481,7 @@
         ["fecha", "Fecha", "text", function (v) { return esc(fechaCorta(v)); }],
         ["tag", "Vaca", "text", function (v) { return enlaceFicha(v); }],
         ["tipo_servicio", "Tipo"],
-        ["toro_pajilla", "Toro / Pajuela"],
+        ["toro_pajilla", "Toro / Pajilla"],
         ["inseminador", "Técnico"],
         ["resultado_diag", "Resultado", "text", function (v) { return v ? chipEstado(v) : "—"; }]
       ], "Sin servicios registrados en el rango.")
@@ -2456,6 +2478,36 @@
           cargar(true);
           try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
         }
+      });
+    });
+
+    qa(".btn-cambiar-estado-pajilla").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var id = this.getAttribute("data-id");
+        var nuevoEstado = this.getAttribute("data-estado");
+        if (!id || !nuevoEstado) return;
+        var accionTxt = nuevoEstado === "INACTIVO" ? "marcar como inactiva / usada" : "reactivar en el termo";
+        if (!confirm("¿Desea " + accionTxt + " esta pajilla?")) return;
+        btn.disabled = true;
+        fetch("/api/pajillas/estado", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: Number(id), estado: nuevoEstado })
+        })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.ok) {
+              mostrarToast(nuevoEstado === "INACTIVO" ? "Pajilla archivada como inactiva" : "Pajilla reactivada en inventario", "verde");
+              cargar(false);
+            } else {
+              mostrarToast(res.error || "No se pudo actualizar el estado", "rojo");
+              btn.disabled = false;
+            }
+          })
+          .catch(function () {
+            mostrarToast("Error de conexión al actualizar pajilla", "rojo");
+            btn.disabled = false;
+          });
       });
     });
 
@@ -3800,7 +3852,7 @@
       + "<input id='lote-hora-iatf' type='time' value='08:00' required style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
       + "</div>"
       + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
-      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Toro / Pajuela Sugerido:<br>"
+      + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Toro / Pajilla Sugerido:<br>"
       + "<input id='lote-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
       + "<label style='flex:1; min-width:130px; font-size:12.5px; font-weight:600;'>Inseminador Asignado:<br>"
       + "<input id='lote-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
@@ -4017,10 +4069,10 @@
       + "<div style='padding:16px;'>"
       + "<div style='background:rgba(22,163,74,0.08); border-left:4px solid var(--verde-marca); padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
       + "Se registrará el servicio por IATF para las <b>" + nHembras + " hembras activas</b> de <b>" + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "</b> "
-      + "y se descontarán automáticamente las pajuelas del termo criogénico."
+      + "y se descontarán automáticamente las pajillas del termo criogénico."
       + "</div>"
       + "<form id='form-inseminar-lote' style='display:flex; flex-direction:column; gap:10px;'>"
-      + "<label style='font-size:12.5px; font-weight:600;'>Código Toro / Pajuela a Descontar:*<br>"
+      + "<label style='font-size:12.5px; font-weight:600;'>Código Toro / Pajilla a Descontar:*<br>"
       + "<input id='ins-lote-toro' required value='" + esc(lote && lote.toro_pajuela ? lote.toro_pajuela : "") + "' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
       + "<label style='font-size:12.5px; font-weight:600;'>Técnico Inseminador Responsable:*<br>"
       + "<input id='ins-lote-inseminador' required value='" + esc(lote && lote.inseminador ? lote.inseminador : "") + "' placeholder='Nombre del inseminador' list='dl-inseminadores' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
@@ -5009,24 +5061,39 @@
       h += vacio("Sin información genética registrada en el hato activo.");
     }
 
-    // 5. Pajuelas y termo
-    var pj = d.pajuelas_inventario || [];
-    var tot = d.pajuelas_totales || {};
-    h += "<h4>" + icon("pajuelas") + "Inventario de pajuelas (semen para I.A.)</h4>";
+    // 5. Pajillas y termo
+    var pj = d.pajillas_inventario || d.pajuelas_inventario || [];
+    var tot = d.pajillas_totales || d.pajuelas_totales || {};
+    h += "<h4>" + icon("pajillas") + "Inventario de pajillas (semen para I.A.)</h4>";
     if (tot.toros) {
-      h += "<p class='aviso'><b>" + esc(tot.toros) + "</b> toros con existencias · <b>" + esc(tot.unidades) + "</b> pajuelas en total"
-        + (tot.toros > pj.length ? " · se muestran los " + pj.length + " con más pajuelas" : "") + ".</p>";
+      h += "<p class='aviso'><b>" + esc(tot.toros) + "</b> toros con existencias · <b>" + esc(tot.unidades) + "</b> pajillas en total"
+        + (tot.toros > pj.length ? " · se muestran los " + pj.length + " con más pajillas" : "") + ".</p>";
     }
     var canastillas = {};
     pj.forEach(function (r) { canastillas[r.canastilla || ""] = 1; });
     var colsPj = [["codigo_toro", "Código"], ["raza", "Raza"], ["procedencia", "Toro / procedencia"]];
     if (Object.keys(canastillas).length > 1) colsPj.push(["canastilla", "Canastilla"]);
-    colsPj.push(["cantidad", "Pajuelas", "num", function (v) {
+    colsPj.push(["cantidad", "Pajillas", "num", function (v) {
       var n = Number(v);
       var c = n >= 10 ? "verde" : n >= 3 ? "ambar" : "rojo";
       return "<span class='chip " + c + "'>" + esc(n) + "</span>";
     }]);
-    h += tabla(pj, colsPj, "Sin inventario de pajuelas registrado.");
+    h += tabla(pj, colsPj, "Sin inventario activo de pajillas registrado.");
+
+    var pjinact = d.pajillas_inactivas || d.pajuelas_inactivas || [];
+    if (pjinact.length) {
+      h += "<details style='margin-top:10px; font-size:12px; background:var(--superficie-2); border:1px solid var(--borde-suave); border-radius:8px; padding:8px 12px;'>"
+        + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>📦 Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
+        + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico importado de Software Ganadero archivados para no generar falsas alertas en el termo actual.</p>"
+        + "<div class='tabla-scroll' style='max-height:200px; overflow-y:auto; margin-top:6px;'>"
+        + tabla(pjinact, [
+          ["codigo_toro", "Código"],
+          ["raza", "Raza"],
+          ["procedencia", "Procedencia"],
+          ["cantidad", "Saldo Ant.", "num", function (v) { return "<span class='chip gris'>" + esc(v) + " un.</span>"; }]
+        ], "Sin registros históricos.")
+        + "</div></details>";
+    }
 
     h += "<h4>" + icon("snowflake") + "Recargas del termo de nitrógeno</h4>";
     var te = d.termo_estado;
@@ -6016,7 +6083,7 @@
       { id: "parto", nom: "Parto", ico: "cowCalf" },
       { id: "pesaje", nom: "Pesaje", ico: "scale" },
       { id: "palpacion", nom: "Tacto / Palpación", ico: "stethoscope" },
-      { id: "pajuela", nom: "Stock Pajuelas", ico: "sperm" },
+      { id: "pajuela", nom: "Stock Pajillas", ico: "sperm" },
       { id: "nitrogeno", nom: "Recarga Nitrógeno", ico: "snowflake" },
       { id: "tratamiento", nom: "Tratamiento", ico: "syringe" },
       { id: "traslado", nom: "Traslado", ico: "truck" },
@@ -6102,7 +6169,7 @@
         + "<div style='margin-top:6px; margin-bottom:8px;'>"
         + "<label>Toro / Padre de la cría (opcional): <select id='cap-toro-padre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>-- Sin especificar (opcional) --</option></select></label>"
         + "<div id='cap-toro-sugerido-hint' style='font-size:12px; margin:4px 0 6px 2px; min-height:18px;'></div>"
-        + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajuela...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
+        + "<div id='cap-toro-otro-wrap' style='display:none; margin-top:4px;'><input id='cap-toro-otro' placeholder='Escribir código de toro o pajilla...' list='dl-toros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></div>"
         + "<div id='cap-cruce-cria-preview' style='display:none; margin:4px 0 8px; padding:6px 10px; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.3); border-radius:6px; font-size:12px; color:var(--texto); line-height:1.4;'></div>"
         + "</div>"
         + "<div id='cap-gemelo2-wrap' style='display:none; padding:10px; border:1px dashed var(--borde-fuerte); border-radius:8px;'>"
@@ -6190,7 +6257,7 @@
     } else if (tipo === "servicio") {
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
-        + "<label>Código Toro / Pajuela: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Código Toro / Pajilla: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;'>➕</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -6233,7 +6300,7 @@
         + "<div style='flex:1;'><label>Días de Preñez / Gestación: <input type='number' min='1' max='300' id='cap-palp-dias' placeholder='ej. 45' value='45' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>FEP Calculada: <input type='date' id='cap-palp-fep' readonly style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo-card); font-weight:700;'></label></div>"
         + "</div>"
-        + "<div style='margin-top:8px;'><label>Reproductor / Toro de la Preñez: <input id='cap-palp-toro' placeholder='ej. GUZ-01 o Nombre de Toro/Pajuela' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='margin-top:8px;'><label>Reproductor / Toro de la Preñez: <input id='cap-palp-toro' placeholder='ej. GUZ-01 o Nombre de Toro/Pajilla' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<label>Hallazgo Zootécnico / Ovario (opcional): <input id='cap-palp-hallazgo' placeholder='ej. CL derecho 22mm, Folículo preovulatorio, Quiste, Útero normal...' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
@@ -6249,8 +6316,8 @@
         + "<div style='flex:1;'><label>Canastilla: <input id='cap-paj-canastilla' placeholder='ej. Canastilla 1, A-2' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
-        + "<div style='flex:1;'><label>Cantidad de pajuelas que ingresan: <input type='number' min='1' id='cap-paj-cant' value='5' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
-        + "<div style='flex:1;'><label>Costo por pajuela ($): <input type='number' step='100' id='cap-paj-costo' placeholder='ej. 45000' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Cantidad de pajillas que ingresan: <input type='number' min='1' id='cap-paj-cant' value='5' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Costo por pajilla ($): <input type='number' step='100' id='cap-paj-costo' placeholder='ej. 45000' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<label>Procedencia / Casa Genética: <input id='cap-paj-procedencia' placeholder='ej. Ciale, Semex, Ganadería El Oasis' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Notas adicionales: <input id='cap-notas' placeholder='ej. Registro Asocebú 89123' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
@@ -6288,8 +6355,8 @@
       titFoto = "Foto Ecografía / Ficha Reproductiva";
       hintFoto = "Foto de la pantalla del ecógrafo, ovario o útero palpado";
     } else if (tipo === "pajuela") {
-      titFoto = "Foto de Pajuela / Catálogo";
-      hintFoto = "Foto de la pajuela, catálogo del toro o certificado genético";
+      titFoto = "Foto de Pajilla / Catálogo";
+      hintFoto = "Foto de la pajilla, catálogo del toro o certificado genético";
     } else if (tipo === "nitrogeno") {
       titFoto = "Foto del Termo / Comprobante Recarga";
       hintFoto = "Foto del termo criogénico o recibo de recarga de nitrógeno";
@@ -6297,8 +6364,8 @@
       titFoto = "Foto de Manifestación de Celo";
       hintFoto = "Foto de manifestación de celo (moco, monta, comportamiento)";
     } else if (tipo === "servicio") {
-      titFoto = "Foto de Pajuela / Procedimiento";
-      hintFoto = "Foto de la pajuela, catálogo del toro o procedimiento IA";
+      titFoto = "Foto de Pajilla / Procedimiento";
+      hintFoto = "Foto de la pajilla, catálogo del toro o procedimiento IA";
     } else if (tipo === "traslado") {
       titFoto = "Foto del Lote / Potrero";
       hintFoto = "Foto del lote o potrero de destino";
@@ -6508,7 +6575,7 @@
 
     function nombreTipoCap(id) {
       var noms = {
-        parto: "Parto", pesaje: "Pesaje", palpacion: "Tacto / Palpación", pajuela: "Stock Pajuelas",
+        parto: "Parto", pesaje: "Pesaje", palpacion: "Tacto / Palpación", pajuela: "Stock Pajillas",
         nitrogeno: "Recarga Nitrógeno", tratamiento: "Tratamiento", traslado: "Traslado",
         destete: "Destete", secado: "Secado", celo: "Celo", servicio: "Servicio / IA",
         leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea"
@@ -6870,7 +6937,7 @@
             + "<div style='font-size:13px;'>🤰 <b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
             + (d["cap-palp-fep"] ? (" · FEP: <b>" + esc(fechaCorta(d["cap-palp-fep"])) + "</b>") : "")
             + "</div>"
-            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>🐂 Toro/Pajuela: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
+            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>🐂 Toro/Pajilla: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
             + "</div>";
         }
         if (d["cap-palp-hallazgo"]) {
@@ -6896,7 +6963,7 @@
           + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
           + "<div style='font-size:14px;'>🐂 <b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
           + (d["cap-paj-raza"] ? (" (" + esc(d["cap-paj-raza"]) + ")") : "") + "</div>"
-          + "<div style='font-size:12.5px; margin-top:3px;'>Canastilla: <b>" + esc(d["cap-paj-canastilla"] || "—") + "</b> · Entrada: <b>" + esc(d["cap-paj-cant"] || "1") + " pajuelas</b>"
+          + "<div style='font-size:12.5px; margin-top:3px;'>Canastilla: <b>" + esc(d["cap-paj-canastilla"] || "—") + "</b> · Entrada: <b>" + esc(d["cap-paj-cant"] || "1") + " pajillas</b>"
           + (d["cap-paj-costo"] ? (" · Costo unit: <b>" + fmtMoneda(Number(d["cap-paj-costo"])) + "</b>") : "") + "</div>"
           + (d["cap-paj-procedencia"] ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Procedencia: " + esc(d["cap-paj-procedencia"]) + "</div>") : "")
           + "</div>";
@@ -8090,7 +8157,7 @@
       + "<li><b>" + icon("cowCalf", 14) + "Partos:</b> Registra arete de la madre, nuevo arete de la cría, sexo, peso al nacer y foto del ternero.</li>"
       + "<li><b>" + icon("syringe", 14) + "Tratamientos:</b> Producto, dosis, vía y control automático de días de retiro para leche y carne.</li>"
       + "<li><b>" + icon("cowSkull", 14) + "Muerte / Descarte:</b> Causa presunta, notas de necropsia y foto de respaldo.</li>"
-      + "<li><b>" + icon("flame", 14) + "Celo / " + icon("sperm", 14) + "Servicio IA:</b> Horario AM-PM, código de pajuela/toro e inseminador.</li>"
+      + "<li><b>" + icon("flame", 14) + "Celo / " + icon("sperm", 14) + "Servicio IA:</b> Horario AM-PM, código de pajilla/toro e inseminador.</li>"
       + "<li><b>Fotos ligeras:</b> Las fotos tomadas se optimizan automáticamente a menos de 150 KB para no consumir memoria ni datos en campo.</li>"
       + "</ul>"
       + "</div></div>";
@@ -9567,6 +9634,16 @@
     }
     h += "</div>";
 
+    // Tarjeta: Credenciales de huella / Face ID (OWNER/ADMIN)
+    if (miRol === "OWNER" || miRol === "ADMIN") {
+      h += "<div class='card' style='padding:18px; margin-bottom:16px;'>"
+        + "<h4>" + icon("shieldPlus", 16) + "Acceso con huella / Face ID</h4>"
+        + "<p class='aviso' style='margin-top:6px;'>Solo se guarda la clave pública de cada dispositivo; la huella nunca sale del teléfono. "
+        + "Cada usuario activa su huella desde el menú de perfil; aquí se pueden revocar todas las credenciales.</p>"
+        + "<div id='usr-huella-lista'><small style='color:var(--texto-suave);'>Cargando…</small></div>"
+        + "</div>";
+    }
+
     return h;
   }
 
@@ -9594,6 +9671,38 @@
           });
       });
     }
+
+    function cargarCredencialesHuellaAdmin() {
+      var cont = document.getElementById("usr-huella-lista");
+      if (!cont) return;
+      fetchJSON("/api/webauthn/credenciales/todas", function (d) {
+        var creds = (d && d.credenciales) || [];
+        if (!creds.length) {
+          cont.innerHTML = "<small style='color:var(--texto-suave);'>Sin credenciales de huella registradas.</small>";
+          return;
+        }
+        cont.innerHTML = creds.map(function (c) {
+          var quien = c.nombre_usuario || ((c.user_id === null || c.user_id === undefined) ? "Propietario (clave maestra)" : ("Usuario #" + c.user_id));
+          var uso = c.ultimo_uso ? ("Último uso: " + fechaCorta(c.ultimo_uso)) : "Sin usar todavía";
+          return "<div class='huella-item'><div><b>" + esc(quien) + "</b> · " + esc(c.nombre_dispositivo || "Dispositivo")
+            + "<div style='font-size:11.5px;color:var(--texto-suave);'>" + esc(uso) + "</div></div>"
+            + "<button type='button' class='huella-revocar' data-cred-id='" + esc(c.credencial_id) + "'>Revocar</button></div>";
+        }).join("");
+        qa("#usr-huella-lista .huella-revocar").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (!confirm("¿Revocar este acceso con huella?")) return;
+            fetch("/api/webauthn/credenciales/" + encodeURIComponent(b.getAttribute("data-cred-id")), { method: "DELETE" })
+              .then(function (r) { return r.json().catch(function () { return {}; }).then(function (dd) { return { ok: r.ok, d: dd }; }); })
+              .then(function (res) {
+                if (res.ok && res.d && res.d.ok) cargarCredencialesHuellaAdmin();
+                else alert((res.d && res.d.error) || "No se pudo revocar.");
+              })
+              .catch(function () { alert("No se pudo revocar. Revise su conexión."); });
+          });
+        });
+      });
+    }
+    cargarCredencialesHuellaAdmin();
 
     function seleccionarAvatar(avKey) {
       if (!avKey) avKey = "vaquero";
@@ -14028,6 +14137,131 @@
     var btnCerrar = document.getElementById("btn-cerrar-menu-usuario");
     if (!modal || !btnMarca) return;
 
+    /* ---------- Acceso con huella / Face ID (WebAuthn) ---------- */
+    function huellaSoportada() {
+      return !!window.PublicKeyCredential && window.isSecureContext && !!navigator.credentials;
+    }
+
+    function huellaB64ToBuf(s) {
+      s = String(s || "").replace(/-/g, "+").replace(/_/g, "/");
+      var pad = s.length % 4 ? new Array(5 - (s.length % 4)).join("=") : "";
+      var raw = atob(s + pad);
+      var buf = new Uint8Array(raw.length);
+      for (var i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i);
+      return buf.buffer;
+    }
+
+    function huellaBufToB64(buf) {
+      var bytes = new Uint8Array(buf);
+      var bin = "";
+      for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    }
+
+    function huellaCredCreateJSON(cred) {
+      var out;
+      if (cred && typeof cred.toJSON === "function") {
+        out = cred.toJSON();
+      } else {
+        var r = cred.response || {};
+        out = {
+          id: cred.id, rawId: huellaBufToB64(cred.rawId), type: cred.type,
+          response: { clientDataJSON: huellaBufToB64(r.clientDataJSON), attestationObject: huellaBufToB64(r.attestationObject) },
+          clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {}
+        };
+      }
+      try {
+        if (cred.response && typeof cred.response.getTransports === "function") {
+          out.transports = cred.response.getTransports();
+        }
+      } catch (e) {}
+      return out;
+    }
+
+    function actualizarHuellaMenu() {
+      var btnHuella = document.getElementById("menu-btn-huella");
+      var bloque = document.getElementById("menu-huella-bloque");
+      var lista = document.getElementById("menu-huella-lista");
+      var sub = document.getElementById("menu-huella-sub");
+      if (!btnHuella || !bloque || !lista) return;
+      if (!huellaSoportada()) {
+        btnHuella.style.display = "none";
+        bloque.style.display = "none";
+        return;
+      }
+      btnHuella.style.display = "flex";
+      fetchJSON("/api/webauthn/estado", function (d) {
+        var creds = (d && d.credenciales) || [];
+        if (sub) sub.textContent = creds.length ? (creds.length + " dispositivo(s)") : "Activar en este equipo";
+        bloque.style.display = "block";
+        if (!creds.length) {
+          lista.innerHTML = "<div class='huella-vacio'>Aún no ha activado la huella en ningún dispositivo.</div>";
+          return;
+        }
+        lista.innerHTML = creds.map(function (c) {
+          var nombre = c.nombre_dispositivo || "Dispositivo";
+          var uso = c.ultimo_uso ? ("Último uso: " + fechaCorta(c.ultimo_uso)) : "Sin usar todavía";
+          return "<div class='huella-item'><div><b>" + esc(nombre) + "</b>"
+            + "<div style='font-size:11.5px;color:var(--texto-suave);'>" + esc(uso) + "</div></div>"
+            + "<button type='button' class='huella-revocar' data-cred-id='" + esc(c.credencial_id) + "'>Revocar</button></div>";
+        }).join("");
+        qa("#menu-huella-lista .huella-revocar").forEach(function (b) {
+          b.addEventListener("click", function () {
+            if (!confirm("¿Revocar este acceso con huella?")) return;
+            fetch("/api/webauthn/credenciales/" + encodeURIComponent(b.getAttribute("data-cred-id")), { method: "DELETE" })
+              .then(function (r) { return r.json().catch(function () { return {}; }).then(function (dd) { return { ok: r.ok, d: dd }; }); })
+              .then(function (res) {
+                if (res.ok && res.d && res.d.ok) actualizarHuellaMenu();
+                else alert((res.d && res.d.error) || "No se pudo revocar.");
+              })
+              .catch(function () { alert("No se pudo revocar. Revise su conexión."); });
+          });
+        });
+      });
+    }
+
+    function registrarHuellaDispositivo() {
+      var btn = document.getElementById("menu-btn-huella");
+      if (!huellaSoportada()) {
+        alert("Este navegador no permite el acceso con huella. Use su PIN.");
+        return;
+      }
+      if (btn) btn.disabled = true;
+      fetch("/api/webauthn/registro/opciones", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (dd) { return { ok: r.ok, d: dd }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.d || !res.d.opciones) throw new Error((res.d && res.d.error) || "opciones");
+          var pk = res.d.opciones;
+          pk.challenge = huellaB64ToBuf(pk.challenge);
+          if (pk.user && pk.user.id) pk.user.id = huellaB64ToBuf(pk.user.id);
+          (pk.excludeCredentials || []).forEach(function (c) { c.id = huellaB64ToBuf(c.id); });
+          return navigator.credentials.create({ publicKey: pk });
+        })
+        .then(function (cred) {
+          if (!cred) throw new Error("sin_credencial");
+          var nombre = (navigator.userAgent || "Dispositivo").slice(0, 60);
+          return fetch("/api/webauthn/registro/verificar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ credencial: huellaCredCreateJSON(cred), nombre_dispositivo: nombre })
+          }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (dd) { return { ok: r.ok, d: dd }; }); });
+        })
+        .then(function (res) {
+          if (btn) btn.disabled = false;
+          if (res.ok && res.d && res.d.ok) {
+            try { localStorage.setItem("ja_huella_preferida", "1"); } catch (e) {}
+            actualizarHuellaMenu();
+            alert("✅ Huella activada. La próxima vez puede entrar tocando 'Ingresar con huella'.");
+          } else {
+            alert((res.d && res.d.error) || "No se pudo activar la huella.");
+          }
+        })
+        .catch(function () {
+          if (btn) btn.disabled = false;
+          alert("No se pudo activar la huella en este dispositivo.");
+        });
+    }
+
     function abrirMenu() {
       modal.style.display = "flex";
       var actualTema = temaInicial();
@@ -14045,6 +14279,7 @@
       }
       actualizarMenuEstadoSync();
       actualizarMenuAvisos();
+      actualizarHuellaMenu();
     }
 
     function cerrarMenu() {
@@ -14135,6 +14370,14 @@
         cerrarMenu();
         var topBtnInstalar = document.getElementById("btn-instalar-app");
         if (topBtnInstalar) topBtnInstalar.click();
+      });
+    }
+
+    // Acción activar huella / Face ID desde menú
+    var menuBtnHuella = document.getElementById("menu-btn-huella");
+    if (menuBtnHuella) {
+      menuBtnHuella.addEventListener("click", function () {
+        registrarHuellaDispositivo();
       });
     }
 
