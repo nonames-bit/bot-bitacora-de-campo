@@ -218,6 +218,9 @@ def _calcular_proyeccion_celos(vientres, hoy: date) -> list[dict]:
     return out
 
 
+EDAD_PRIMER_PARTO_MESES = (15, 42)
+
+
 def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
     """Primerizas con primer parto en los últimos 12 meses."""
     lim = hoy - timedelta(days=DIAS_ENTORADA)
@@ -229,6 +232,11 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
             continue
         fnac = to_date_safe(r["fecha_nacimiento"])
         edad_pp = round((primer - fnac).days / 30.44, 1) if fnac else None
+        # Primer parto REGISTRADO no siempre es el primero real: una vaca de
+        # 6 años con historia incompleta no es primeriza (y < 15 meses es un
+        # error de registro). Solo edades realistas de primer parto.
+        if edad_pp is not None and not (EDAD_PRIMER_PARTO_MESES[0] <= edad_pp <= EDAD_PRIMER_PARTO_MESES[1]):
+            continue
         estado = _estado_reproductivo_vigente(r)
         out.append({
             "tag": r["tag"], "nombre": r["nombre"],
@@ -2125,6 +2133,31 @@ def animales_por_grupo_inventario(
     }
 
 
+def _lotes_ordeno(db: Database) -> list[dict]:
+    """Potreros con vacas paridas y si cuentan como lote de ordeño (para
+    revisarlo y corregirlo en la vista Leche). Ver engine/lactancia.py."""
+    try:
+        try:
+            from .lactancia import estados_lactancia, potreros_ordeno
+        except ImportError:  # ejecución directa
+            from src.engine.lactancia import estados_lactancia, potreros_ordeno  # type: ignore
+        pots = potreros_ordeno(db)
+        estados = estados_lactancia(db)
+        vacas_por_pot: dict[Any, int] = {}
+        for r in db.query(f"WITH {ULT_TRASLADO_CTE} SELECT a.id_animal, {POTRERO_ACTUAL_EXPR} pid FROM animales a "
+                          "LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1 "
+                          "WHERE a.estado = 'ACTIVO'"):
+            if r["id_animal"] in estados and r["pid"] is not None:
+                vacas_por_pot[r["pid"]] = vacas_por_pot.get(r["pid"], 0) + 1
+        out = [{"id": pid, **p, "vacas_paridas": vacas_por_pot.get(pid, 0)}
+               for pid, p in pots.items() if vacas_por_pot.get(pid) or p["modo"] == "manual"]
+        out.sort(key=lambda x: (not x["ordeno"], x["nombre"]))
+        return out
+    except Exception:
+        logger.error("lotes_ordeno fallo", exc_info=True)
+        return []
+
+
 def datos_leche(db: Database) -> dict:
     """Leche: producción total diaria de la finca (tanque / recibos de quincena) +
     controles zootécnicos.
@@ -2315,6 +2348,7 @@ def datos_leche(db: Database) -> dict:
         "serie_tanque": serie,
         "resumen": resumen,
         "resumen_ordeno": resumen_ordeno,
+        "lotes_ordeno": _lotes_ordeno(db),
         "tareas": datos_lista_trabajo(db),
         "controles": controles_modernos,
         "ranking_vacas": ranking,
@@ -2472,7 +2506,9 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
     elif es_hembra:
         lactancia = f.get("lactancia") or {}
         ult_parto = f.get("ultimo_parto") or {}
-        tiene_partos = bool(ult_parto and ult_parto.get("fecha")) or bool(f.get("partos"))
+        # Con aviso_datos el único parto es imposible (anotado en una ternera):
+        # no la convierte en vaca.
+        tiene_partos = bool(ult_parto and ult_parto.get("fecha")) or (bool(f.get("partos")) and not f.get("aviso_datos"))
         del_dias = lactancia.get("del_dias")
 
         if edad_dias is not None and edad_dias < 365 and not tiene_partos:
@@ -2516,7 +2552,7 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
                 detalle_fisio = f"Secada el {f_sec} (preparación para parto)" if f_sec else "Período seco (sin ordeño)"
             else:
                 pot_nom = str(f.get("potrero") or "").upper()
-                if "ORDEÑO" in pot_nom or "PARIDA" in pot_nom:
+                if re.search(r"ORDE[NÑ]O|PARIDA", pot_nom):
                     cod_fisio = "VACA_ORDENO"
                     titulo_fisio = "Vaca en Ordeño"
                     badge_fisio = "En Ordeño"
@@ -2725,6 +2761,23 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         base["composicion_racial"] = []
     try:
         base["ultimo_parto"] = dict(db.ultimo_parto(aid)) if db.ultimo_parto(aid) else None
+        # Parto con la vaca de < 15 meses: error de registro. No la convierte
+        # en vaca parida; se avisa en la ficha para corregirlo.
+        try:
+            from .lactancia import EDAD_MIN_PARTO_DIAS, parto_imposible
+        except ImportError:  # ejecución directa
+            from src.engine.lactancia import EDAD_MIN_PARTO_DIAS, parto_imposible  # type: ignore
+        up = base["ultimo_parto"]
+        if up and parto_imposible(an["fecha_nacimiento"], up.get("fecha")):
+            edad_m = round((to_date_safe(up["fecha"]) - to_date_safe(an["fecha_nacimiento"])).days / 30.44, 1)
+            madre = db.query_one("SELECT m.tag FROM animales a JOIN animales m ON m.id_animal = a.madre_id "
+                                 "WHERE a.id_animal = ?", (aid,))
+            base["aviso_datos"] = (
+                f"Hay un parto registrado el {up['fecha']} cuando este animal tenía {edad_m} meses "
+                f"(mínimo {EDAD_MIN_PARTO_DIAS // 30} meses). Seguramente es el parto de "
+                + (f"la madre ({madre['tag']})" if madre else "otra vaca")
+                + ". Revíselo en la pestaña Reproducción y elimínelo o páselo a la vaca correcta.")
+            base["ultimo_parto"] = None
     except Exception as e:
         logger.error("seccion ultimo_parto fallo", exc_info=True)
         errores["ultimo_parto"] = str(e)
@@ -2793,41 +2846,29 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         base["diagnosticos"] = []
     lactancia: Optional[dict[str, Any]] = None
     try:
-        if es_hembra and base.get("ultimo_parto") and base["ultimo_parto"].get("fecha"):
-            fecha_parto_iso = base["ultimo_parto"]["fecha"]
-            f_parto = to_date_safe(fecha_parto_iso)
-            if f_parto:
-                del_dias = max(0, (date.today() - f_parto).days)
-                # Secado real (tabla `secados`) posterior al último parto:
-                # reemplaza el estimado por días con la fecha confirmada --
-                # un destete de la cría NO seca a la vaca, solo un secado
-                # explícito lo hace (ver Database.registrar_secado).
-                secado_row = db.query_one(
-                    "SELECT fecha FROM secados WHERE animal_id = ? AND fecha >= ? "
-                    "ORDER BY fecha DESC, id DESC LIMIT 1",
-                    (aid, fecha_parto_iso),
-                )
-                if secado_row and secado_row["fecha"]:
-                    lactancia = {
-                        "del_dias": del_dias,
-                        "estado": "Seca",
-                        "estado_confirmado": True,
-                        "fecha_secado": secado_row["fecha"],
-                        "fecha_parto": fecha_parto_iso,
-                    }
-                else:
-                    lactancia = {
-                        "del_dias": del_dias,
-                        "estado": "En ordeño" if del_dias < 300 else "Seca",
-                        "estado_confirmado": False,
-                        "fecha_parto": fecha_parto_iso,
-                    }
-                    if lactancia["estado"] == "En ordeño":
-                        pausa = db.pausa_ordeno_abierta(aid)
-                        lactancia["en_pausa"] = bool(pausa)
-                        if pausa:
-                            lactancia["pausa_fecha_inicio"] = pausa["fecha_inicio"]
-                            lactancia["pausa_motivo"] = pausa["motivo"]
+        # Misma regla que la lista "Secar" y el recibo de leche (engine/lactancia.py):
+        # secado registrado > lote de ordeño > (sin lote conocido) días en leche.
+        try:
+            from .lactancia import estados_lactancia
+        except ImportError:  # ejecución directa
+            from src.engine.lactancia import estados_lactancia  # type: ignore
+        lac = estados_lactancia(db).get(aid) if es_hembra else None
+        if lac:
+            lactancia = {
+                "del_dias": lac["del_dias"],
+                "estado": "Seca" if lac["estado"] == "SECA" else "En ordeño",
+                "estado_confirmado": lac["confirmado"],
+                "fecha_parto": lac["fecha_parto"],
+                "motivo": lac["motivo"],
+            }
+            if lac["fecha_secado"]:
+                lactancia["fecha_secado"] = lac["fecha_secado"]
+            if lactancia["estado"] == "En ordeño":
+                pausa = db.pausa_ordeno_abierta(aid) if lac["estado"] == "PAUSADA" else None
+                lactancia["en_pausa"] = bool(pausa)
+                if pausa:
+                    lactancia["pausa_fecha_inicio"] = pausa["fecha_inicio"]
+                    lactancia["pausa_motivo"] = pausa["motivo"]
     except Exception as e:
         logger.error("seccion lactancia fallo", exc_info=True)
         errores["lactancia"] = str(e)

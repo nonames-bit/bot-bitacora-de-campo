@@ -27,7 +27,9 @@ try:
         _filas_dict,
         to_date_safe,
     )
+    from .lactancia import estados_lactancia, parto_imposible
 except ImportError:  # ejecución directa
+    from src.engine.lactancia import estados_lactancia, parto_imposible  # type: ignore
     from src.engine.dashboard_data import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
         SIN_POTRERO_LABEL,
@@ -66,7 +68,7 @@ EDAD_MARCAR = (180, 730)
 EDAD_BRUCELOSIS = (90, 240)
 DIAS_TRATAMIENTO_SEGUIMIENTO = 7
 DIAS_RETIRO_PROXIMO = 7
-DEL_ALTO = (305, 600)
+DEL_LACTANCIA_LARGA = 305  # días en leche para avisar "lactancia larga"
 DIAS_PESAJE_RECIENTE = 180
 GMD_MIN_KG = 0.30
 PESO_VENTA_KG = 400
@@ -160,6 +162,19 @@ def _vacio() -> dict[str, Any]:
     return {k: [] for k in CLAVES}
 
 
+def _vientres_sin_partos_imposibles(filas: list[dict]) -> list[dict]:
+    """Ignora partos anotados con la vaca de < 15 meses (error de registro,
+    normalmente el parto de la madre puesto en la cría): la ternera sigue
+    siendo ternera en las listas. La ficha avisa para corregirlo."""
+    for v in filas:
+        if parto_imposible(v.get("fecha_nacimiento"), v.get("ult_parto")):
+            v["ult_parto"] = None
+        if parto_imposible(v.get("fecha_nacimiento"), v.get("primer_parto")):
+            v["primer_parto"] = v["ult_parto"]
+            v["n_partos"] = max(0, (v.get("n_partos") or 1) - 1)
+    return filas
+
+
 def _cargar(db: Database) -> dict[str, Any]:
     """Todas las lecturas en pocas consultas (sin N+1 por animal)."""
     animales = _filas_dict(db.query(f"""
@@ -197,9 +212,7 @@ def _cargar(db: Database) -> dict[str, Any]:
             servicios.setdefault(r["vaca_id"], []).append(f)
     return {
         "animales": animales,
-        "vientres": _filas_dict(db.query(SQL_VIENTRES_ACTIVOS)),
-        "secados": {r["animal_id"]: r["f"] for r in db.query(
-            "SELECT animal_id, MAX(fecha) f FROM secados GROUP BY animal_id")},
+        "vientres": _vientres_sin_partos_imposibles(_filas_dict(db.query(SQL_VIENTRES_ACTIVOS))),
         "destetados": {r["animal_id"] for r in db.query("SELECT DISTINCT animal_id FROM destetes")},
         "manejos": manejos,
         "pesos": pesos,
@@ -210,6 +223,12 @@ def _cargar(db: Database) -> dict[str, Any]:
             "SELECT animal_id, fecha, producto, fecha_fin_retiro_leche, fecha_fin_retiro_carne "
             "FROM tratamientos ORDER BY fecha DESC")),
     }
+
+
+def _se_ordena(datos: dict, aid: int) -> bool:
+    """La vaca se está ordeñando (o está en pausa) según engine/lactancia.py."""
+    lac = datos.get("lactancia", {}).get(aid)
+    return bool(lac and lac["estado"] in ("EN_ORDENO", "PAUSADA"))
 
 
 def _reproduccion(out: dict, datos: dict, info: dict, hoy: date) -> None:
@@ -270,9 +289,9 @@ def _reproduccion(out: dict, datos: dict, info: dict, hoy: date) -> None:
                         out["partos"].append({**base, "fep": (hoy + timedelta(days=faltan)).isoformat(),
                                               "en_dias": faltan, "estado": "ATRASADO"})
             if estado == "PRENADA" and gest is not None and DIAS_SECAR <= gest < DIAS_GESTACION_MAX:
-                ult_sec = to_date_safe(datos["secados"].get(aid))
-                ref = max([d for d in (ult_parto, to_date_safe(r["ult_diag_fecha"])) if d], default=None)
-                if not (ult_sec and (ref is None or ult_sec >= ref)):
+                # Solo si se está ordeñando (engine/lactancia.py): una vaca ya
+                # seca o una novilla preñada no va a "Secar".
+                if _se_ordena(datos, aid):
                     faltan_p = max(0, GESTACION - gest)
                     out["secar"].append({**base, "dias_gestacion": gest,
                                          "fep": (hoy + timedelta(days=GESTACION - gest)).isoformat(),
@@ -354,8 +373,7 @@ def _sanidad_leche_carne(out: dict, datos: dict, info: dict, hoy: date) -> None:
         if not _es_hembra(a["sexo"]) or not a["ult_parto"]:
             continue
         del_d = (hoy - a["ult_parto"]).days
-        ult_sec = to_date_safe(datos["secados"].get(aid))
-        if DEL_ALTO[0] <= del_d <= DEL_ALTO[1] and not (ult_sec and ult_sec >= a["ult_parto"]):
+        if del_d >= DEL_LACTANCIA_LARGA and _se_ordena(datos, aid):
             # Lactancia larga: también va a "Secar" (una sola fila por vaca).
             motivo = f"Lactancia larga: {del_d} días en leche"
             fila = next((x for x in out["secar"] if x["tag"] == a["tag"]), None)
@@ -463,6 +481,7 @@ def datos_tareas(db: Database, hoy: Optional[date] = None, usar_cache: bool = Fa
     out: dict[str, Any] = _vacio()
     try:
         datos = _cargar(db)
+        datos["lactancia"] = estados_lactancia(db, hoy)
     except Exception as e:
         logger.error("datos_tareas: lectura fallo", exc_info=True)
         out["errores"] = {"tareas": str(e)}

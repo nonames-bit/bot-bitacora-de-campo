@@ -105,9 +105,13 @@ def test_tratamientos_leche_y_carne(db):
     _a(db, "TR")
     db.registrar_tratamiento("TR", fecha=_d(-2), producto="Oxitetraciclina",
                              fecha_fin_retiro_leche=_d(3))
-    _a(db, "DEL")
+    db.registrar_potrero(nombre="ORDENO SANTA MARTHA", codigo="P1")
+    db.registrar_potrero(nombre="OLEGARIO II", codigo="P2")
+    _a(db, "DEL", potrero="ORDENO SANTA MARTHA")
     db.registrar_parto("DEL", fecha=_d(-400), sexo_cria="Macho")
-    _a(db, "PAUSA")
+    _a(db, "SECA513", potrero="OLEGARIO II")  # fuera del lote de ordeño: ya está seca
+    db.registrar_parto("SECA513", fecha=_d(-513), sexo_cria="Macho")
+    _a(db, "PAUSA", potrero="ORDENO SANTA MARTHA")
     db.registrar_parto("PAUSA", fecha=_d(-60), sexo_cria="Macho")
     db.registrar_pausa_ordeno("PAUSA", fecha_inicio=_d(-3))
     _a(db, "FLACO", sexo="Macho", edad=500)
@@ -122,6 +126,7 @@ def test_tratamientos_leche_y_carne(db):
     assert "Retiro de leche" in trat["TR"]["detalle"] and "Oxitetraciclina" in trat["TR"]["detalle"]
     secar = {f["tag"]: f for f in t["secar"]}
     assert "Lactancia larga" in secar["DEL"]["motivo"]
+    assert "SECA513" not in secar
     assert "PAUSA" in _tags(t, "pausas")
     assert "FLACO" in _tags(t, "bajo_peso")
     assert "GORDO" in _tags(t, "venta") and "FLACO" not in _tags(t, "venta")
@@ -163,9 +168,11 @@ def test_manejo_tipo_invalido(db):
 
 
 def test_secar_preñez_7_meses_y_una_fila_si_cumple_ambas(db):
-    _a(db, "P212")
+    db.registrar_potrero(nombre="ORDENO", codigo="P1")
+    _a(db, "P212", potrero="ORDENO")
+    db.registrar_parto("P212", fecha=_d(-280), sexo_cria="Macho")
     db.registrar_diagnostico("P212", fecha=_d(-62), resultado="PREÑADA", dias_gestacion=150)
-    _a(db, "AMBAS")
+    _a(db, "AMBAS", potrero="ORDENO")
     db.registrar_parto("AMBAS", fecha=_d(-400), sexo_cria="Macho")
     db.registrar_diagnostico("AMBAS", fecha=_d(-70), resultado="PREÑADA", dias_gestacion=150)
     t = datos_tareas(db, HOY)
