@@ -414,6 +414,16 @@ def _generadores_graficos_pwa():
 # ------------------------------------------------------------------ #
 # Consultas de lectura (envoltorios finos, siempre estado='ACTIVO')
 # ------------------------------------------------------------------ #
+def _invalidar_tareas() -> None:
+    """Las listas de trabajo se cachean 60 s para los badges; un evento nuevo
+    las debe refrescar al instante."""
+    try:
+        from src.engine.tareas import invalidar_cache
+        invalidar_cache()
+    except Exception:
+        logger.debug("no se pudo invalidar el caché de tareas", exc_info=True)
+
+
 def datos_tablero(db_path: str = DB_PATH_DEFAULT, potrero: Optional[str] = None) -> dict:
     """Tablero finca: activos por categoría, eventos 7d, retiros activos."""
     # Envoltorio fino WS-2: el SQL vive en engine.dashboard_data.conteos_tablero.
@@ -3276,6 +3286,20 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                    elif tipo == "manejo":
+                        tags_m = payload.get("animal_tags")
+                        if not isinstance(tags_m, list) or not tags_m:
+                            tags_m = [payload.get("animal_tag") or payload.get("tag")]
+                        for tag_m in tags_m[:500]:
+                            if tag_m:
+                                db_sync.registrar_manejo(
+                                    animal_tag=str(tag_m), tipo=payload.get("tipo_manejo"), fecha=fecha,
+                                    producto=payload.get("producto"), lote_producto=payload.get("lote_producto"),
+                                    notas=payload.get("notas"), registrado_por=uid,
+                                )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
                     elif tipo == "secado":
                         db_sync.registrar_secado(
                             vaca_tag=payload.get("animal_tag") or payload.get("vaca_tag") or payload.get("tag"),
@@ -3601,6 +3625,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                 )
             except Exception:
                 pass
+            if procesados:
+                _invalidar_tareas()
 
             return jsonify({
                 "ok": True,
