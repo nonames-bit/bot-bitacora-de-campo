@@ -955,29 +955,14 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         logger.error("seccion servicios_realizados fallo", exc_info=True)
         errores["servicios_realizados"] = str(e)
 
-    # Reproductores en servicio (monta natural reciente) / descanso.
+    # Reproductores en servicio / descanso (manual, monta o potrero con hembras).
     reproductores_estado = []
     try:
-        filas_toros = _filas_dict(db.query(
-            """SELECT a.tag, a.nombre, a.raza,
-                      (SELECT MAX(s.fecha) FROM servicios s
-                        WHERE UPPER(s.toro_pajilla) = UPPER(a.tag)
-                          AND UPPER(COALESCE(s.tipo_servicio, '')) IN ('MONTA', 'MN', 'MONTA_NATURAL')) AS ult_monta
-               FROM animales a
-               WHERE a.estado = 'ACTIVO' AND (
-                   a.tag GLOB 'T[0-9]*'
-                   OR UPPER(COALESCE(a.notas, '')) LIKE '%[REPRODUCTOR]%'
-                   OR UPPER(COALESCE(a.notas, '')) LIKE '%TORO%')
-               ORDER BY a.tag"""))
-        for t in filas_toros:
-            um = to_date_safe(t["ult_monta"])
-            en_servicio = bool(um and (hoy - um).days <= DIAS_TORO_EN_SERVICIO)
-            reproductores_estado.append({
-                "tag": t["tag"], "nombre": t["nombre"], "raza": t["raza"],
-                "ultima_monta": t["ult_monta"],
-                "estado": "EN_SERVICIO" if en_servicio else "EN_DESCANSO",
-                "dias_desde_monta": (hoy - um).days if um else None,
-            })
+        try:
+            from .tareas import estado_toros
+        except ImportError:  # ejecución directa
+            from src.engine.tareas import estado_toros  # type: ignore
+        reproductores_estado = estado_toros(db, hoy)
     except Exception as e:
         logger.error("seccion reproductores_estado fallo", exc_info=True)
         errores["reproductores_estado"] = str(e)
@@ -2384,7 +2369,7 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
             badge_fisio = "Toro Reproductor"
             color_fisio = "azul"
             icono_fisio = "bull"
-            detalle_fisio = "Macho reproductor activo de la finca"
+            detalle_fisio = "Reproductor de la finca"
         elif edad_dias is not None and edad_dias < 365:
             cod_fisio = "CRIA_MACHO"
             titulo_fisio = "Cría (Ternero)"
@@ -2601,7 +2586,7 @@ def calcular_estados_zootecnicos(f: dict) -> dict:
             titulo_repro = "Toro reproductor activo"
             badge_repro = "Toro Reproductor"
             color_repro = "azul"
-            detalle_repro = "Macho padre reproductor disponible en el hato."
+            detalle_repro = "Reproductor"
         else:
             cod_repro = "MACHO_ACTIVO"
             titulo_repro = "Macho en desarrollo / ceba"
@@ -3040,6 +3025,28 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     estados_z = calcular_estados_zootecnicos(base)
     base["estado_fisiologico"] = estados_z["fisiologico"]
     base["estado_reproductivo"] = estados_z["reproductivo"]
+    if base["estado_fisiologico"].get("codigo") == "TORO":
+        # Un solo estado para toros: en servicio / descanso (ver tareas.estado_toros).
+        try:
+            try:
+                from .tareas import estado_toros
+            except ImportError:  # ejecución directa
+                from src.engine.tareas import estado_toros  # type: ignore
+            ts = next((t for t in estado_toros(db) if str(t["tag"]).upper() == str(base.get("tag") or "").upper()), None)
+        except Exception:
+            logger.error("ficha: estado del toro fallo", exc_info=True)
+            ts = None
+        if ts:
+            ts["n_crias"] = len(base.get("crias") or [])
+            base["toro_servicio"] = ts
+            en_serv = ts["estado"] == "EN_SERVICIO"
+            base["estado_reproductivo"] = {
+                **base["estado_reproductivo"],
+                "titulo": "En servicio" if en_serv else "En descanso",
+                "badge": "En servicio" if en_serv else "En descanso",
+                "color": "verde" if en_serv else "gris",
+                "detalle": ts["motivo"],
+            }
     base["estado_repro"] = estados_z["reproductivo"]["titulo"]
     base["dias_abiertos"] = estados_z["reproductivo"]["dias_abiertos"]
     base["alerta_repro"] = estados_z["reproductivo"]["alerta"]

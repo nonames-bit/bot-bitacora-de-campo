@@ -822,7 +822,7 @@
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
     palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca preñada pendiente de secar." },
+    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
     servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca parida pendiente de servir." },
     novillas: { nombre: "Novillas a entorar", icono: "🐄", vacio: "Ninguna novilla lista para entorar." },
     partos: { nombre: "Partos", icono: "🐣", vacio: "Ningún parto próximo ni atrasado." },
@@ -835,8 +835,7 @@
     vac_brucelosis: { nombre: "Brucelosis", icono: "💉", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
     vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
     tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
-    del_alto: { nombre: "> 305 d en leche", icono: "📉", vacio: "Ninguna vaca con más de 305 días en leche." },
-    pausas: { nombre: "Pausas largas", icono: "⏸️", vacio: "Ninguna pausa de ordeño de más de 15 días." },
+    pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
     bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
     venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
     descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
@@ -847,7 +846,7 @@
     var edad = a.edad_dias != null ? esc(edadCorta(a.edad_dias)) : "";
     switch (clave) {
       case "palpar": return "Servida " + esc(fechaCorta(a.fecha_servicio)) + " · hace " + esc(a.dias) + " d" + (a.toro ? " · " + esc(a.toro) : "");
-      case "secar": return "Gestación ~" + esc(a.dias_gestacion) + " d · parto en " + esc(a.dias_para_parto) + " d (" + esc(fechaCorta(a.fep)) + ")";
+      case "secar": return esc(a.motivo);
       case "servir": return "Parió " + esc(fechaCorta(a.ultimo_parto)) + " · " + esc(a.dias_abiertos) + " d abiertos";
       case "novillas": return edad + " · " + (a.peso_kg != null ? esc(a.peso_kg) + " kg" : "sin peso");
       case "partos": return a.estado === "ATRASADO"
@@ -858,8 +857,7 @@
       case "destetar": return edad + (a.madre ? " · madre " + esc(a.madre) : "");
       case "vac_aftosa": return a.ultima ? "Última aftosa " + esc(fechaCorta(a.ultima)) : "Sin aftosa registrada";
       case "tratamientos": return esc(a.detalle);
-      case "del_alto": return esc(a.dias_en_leche) + " d en leche" + (a.prenada ? " · preñada" : " · vacía");
-      case "pausas": return "En pausa desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
+      case "pausas": return "Sin ordeñar desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
       case "bajo_peso": return esc(a.gmd_g) + " g/día · " + esc(a.peso_kg) + " kg (" + esc(fechaCorta(a.fecha)) + ")";
       case "venta": return esc(a.peso_kg) + " kg" + (edad ? " · " + edad : "");
       case "categoria": return esc(a.cambio) + " · " + edad;
@@ -1059,10 +1057,37 @@
     if (cerrar) cerrar.addEventListener("click", function () { cargar(true); });
   }
 
+  // Toro: un solo estado (en servicio / descanso) con botón para cambiarlo.
+  function botonToroEstado(t) {
+    var enServ = t.estado === "EN_SERVICIO";
+    return "<button type='button' class='chip btn-toro-estado' data-tag='" + esc(t.tag) + "' data-tipo='"
+      + (enServ ? "TORO_DESCANSO" : "TORO_SERVICIO") + "'>" + (enServ ? "Poner en descanso" : "Poner en servicio") + "</button>";
+  }
+  function renderToroServicio(t) {
+    var enServ = t.estado === "EN_SERVICIO";
+    return "<div class='card toro-card " + (enServ ? "en-servicio" : "") + "'>"
+      + "<div class='toro-card-cab'><b>" + icon("crown", 16) + " Reproductor</b>"
+      + "<span class='chip " + (enServ ? "verde" : "gris") + "'><b>" + (enServ ? "En servicio" : "En descanso") + "</b></span></div>"
+      + "<p class='toro-card-det'>" + esc(t.motivo)
+      + (t.ultima_monta ? " · última monta " + esc(fechaCorta(t.ultima_monta)) : "")
+      + " · " + esc(t.n_crias || 0) + " crías registradas</p>"
+      + botonToroEstado(t) + "</div>";
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest(".btn-toro-estado") : null;
+    if (!b) return;
+    b.disabled = true;
+    enviarEventoLt("manejo", { animal_tag: b.getAttribute("data-tag"), tipo_manejo: b.getAttribute("data-tipo") })
+      .then(function () {
+        if (/^\/ficha\//.test(location.pathname)) location.reload();
+        else cargar(true);
+      });
+  });
+
   // Tarjeta "Tareas de hoy" del Tablero: conteos por vista.
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
-    { vista: "leche", nombre: "Leche", claves: ["secar", "del_alto", "pausas"] },
+    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas"] },
     { vista: "carne", nombre: "Carne", claves: ["destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
     { vista: "sanidad", nombre: "Sanidad", claves: ["vac_brucelosis", "vac_aftosa", "tratamientos"] }
   ];
@@ -1503,8 +1528,9 @@
         ["tag", "Toro", "text", function (v) { return enlaceFicha(v); }],
         ["nombre", "Nombre"],
         ["raza", "Raza"],
-        ["ultima_monta", "Última monta", "text", function (v) { return v ? esc(fechaCorta(v)) : "—"; }],
-        ["estado", "Estado", "text", function (v) { return v === "EN_SERVICIO" ? "<span class='chip verde'><b>En servicio</b></span>" : "<span class='chip gris'>En descanso</span>"; }]
+        ["estado", "Estado", "text", function (v) { return v === "EN_SERVICIO" ? "<span class='chip verde'><b>En servicio</b></span>" : "<span class='chip gris'>En descanso</span>"; }],
+        ["motivo", "Motivo"],
+        ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
     return h;
   }
@@ -2673,6 +2699,9 @@
       + "</div>"
       + "</div>" + erroresHtml(d);
     h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
+    if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
+      h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
+    }
 
     // 1. KPIs Ejecutivos de Producción
     h += "<div class='kpis'>"
@@ -11496,6 +11525,9 @@
         + "</div>";
     }
 
+    if (ef.codigo === "TORO" && f.toro_servicio) {
+      h += renderToroServicio(f.toro_servicio);
+    } else {
     // 3. Tarjeta Destacada: Estado Fisiológico & Reproductivo (Prioridad #1 en Ficha)
     var fisioIcon = ef.icono === "milk" ? icon("milk", 16)
                   : ef.icono === "calf" ? icon("calf", 16)
@@ -11580,6 +11612,7 @@
     }
 
     h += "</div>"; // fin tarjeta estado zootecnico
+    }
 
     // 3. Tarjeta de Identificación & Genealogía (el pedigree completo vive en
     // la pestaña "Genealogía (3G)" -- sin botones duplicados hacia lo mismo)

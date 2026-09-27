@@ -4384,3 +4384,8 @@ body.modo-campo #vista { font-size: 15px; }
   background: transparent; color: var(--color-rojo-txt, #b91c1c); cursor: pointer;
 }
 .huella-revocar:hover { background: rgba(185, 28, 28, 0.08); }
+.toro-card { padding: 14px 16px; margin-bottom: 16px; border-left: 5px solid var(--borde-fuerte); }
+.toro-card.en-servicio { border-left-color: var(--color-verde-txt); }
+.toro-card-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 15px; }
+.toro-card-det { margin: 6px 0 10px; font-size: 13px; color: var(--texto-suave); }
+.btn-toro-estado { cursor: pointer; min-height: 34px; padding: 4px 12px; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--texto); font-weight: 600; }

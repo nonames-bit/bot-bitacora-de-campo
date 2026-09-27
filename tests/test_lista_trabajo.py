@@ -57,7 +57,7 @@ def test_secar_por_gestacion_estimada_y_no_si_ya_seca(db):
     db.registrar_diagnostico("P230S", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=150)
     db.registrar_secado("P230S", fecha=_d(-5))
     _vaca(db, "P100")
-    db.registrar_diagnostico("P100", fecha=_d(-10), resultado="PREÑADA", dias_gestacion=90)
+    db.registrar_diagnostico("P100", fecha=_d(-10), resultado="PREÑADA", dias_gestacion=90)  # 100 d
     lt = datos_lista_trabajo(db, HOY)
     secar = {f["tag"]: f for f in lt["secar"]}
     assert "P230" in secar and secar["P230"]["dias_gestacion"] == 230

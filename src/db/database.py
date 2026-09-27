@@ -1545,7 +1545,8 @@ class Database:
         return sid
 
     TIPOS_MANEJO = ("TOPIZADO", "CASTRACION", "ENTERO", "MARCACION",
-                    "VACUNA_AFTOSA", "VACUNA_BRUCELOSIS", "VACUNA_OTRA")
+                    "VACUNA_AFTOSA", "VACUNA_BRUCELOSIS", "VACUNA_OTRA",
+                    "TORO_SERVICIO", "TORO_DESCANSO")
 
     def registrar_manejo(self, animal_tag, tipo, fecha=None, producto=None,
                          lote_producto=None, notas=None, registrado_por=None) -> Optional[int]:
@@ -1560,9 +1561,11 @@ class Database:
         if animal_id is None:
             return None
         f = iso(fecha) or date.today().isoformat()
-        existente = self._id_si_ya_existe("manejos", {"animal_id": animal_id, "tipo": tipo_n, "fecha": f})
-        if existente:
-            return existente
+        # Los cambios servicio/descanso de un toro pueden alternar el mismo día.
+        if not tipo_n.startswith("TORO_"):
+            existente = self._id_si_ya_existe("manejos", {"animal_id": animal_id, "tipo": tipo_n, "fecha": f})
+            if existente:
+                return existente
         mid = self.insert("manejos", dict(
             animal_id=animal_id, fecha=f, tipo=tipo_n, producto=producto,
             lote_producto=lote_producto, notas=notas,
