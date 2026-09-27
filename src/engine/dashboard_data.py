@@ -12,6 +12,7 @@ NO importa pwa.app ni charts (evita ciclos).
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 from datetime import date, timedelta
@@ -273,17 +274,38 @@ def _evaluacion_palpadores(db: Database, hoy: date) -> list[dict]:
     return out
 
 
+def _usuarios_app() -> list[str]:
+    """Nombres de los usuarios de la app (users.json)."""
+    ruta = os.getenv("USERS_FILE") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "server", "users.json")
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+    except (OSError, ValueError):
+        return []
+    return [str(u["nombre"]).strip() for u in datos
+            if isinstance(u, dict) and str(u.get("nombre") or "").strip()]
+
+
+def _responsable_valido(nombre: str) -> bool:
+    """Descarta códigos importados de SG (01, 02...) y "Histórico SG":
+    no dicen quién hizo el trabajo."""
+    n = (nombre or "").strip()
+    return bool(n) and not n.isdigit() and "HISTÓRICO" not in n.upper() and "HISTORICO" not in n.upper()
+
+
 def _responsables_sugeridos(db: Database) -> list[str]:
-    """Nombres para el campo "¿Quién palpa?": inseminadores activos y
-    responsables usados antes."""
-    nombres: list[str] = []
+    """Nombres para el campo "¿Quién palpa?": usuarios de la app primero,
+    luego inseminadores y responsables escritos antes (sin códigos de SG)."""
+    nombres: list[str] = [n for n in _usuarios_app() if _responsable_valido(n)]
     try:
         for q in ("SELECT nombre n FROM inseminadores WHERE COALESCE(activo, 1) = 1 ORDER BY nombre",
                   "SELECT DISTINCT TRIM(responsable) n FROM diagnosticos_gestacion "
                   "WHERE responsable IS NOT NULL AND TRIM(responsable) != '' ORDER BY n LIMIT 30"):
             for r in db.query(q):
-                if r["n"] and r["n"] not in nombres:
-                    nombres.append(r["n"])
+                n = str(r["n"] or "").strip()
+                if _responsable_valido(n) and n.upper() not in {x.upper() for x in nombres}:
+                    nombres.append(n)
     except Exception:
         logger.error("responsables_sugeridos fallo", exc_info=True)
     return nombres

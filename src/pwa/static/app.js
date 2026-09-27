@@ -936,7 +936,15 @@
   // "¿Quién palpa / quién lo hace?": se recuerda en este celular y se
   // sugiere con los inseminadores y responsables ya usados.
   function responsableGuardado() {
-    try { return localStorage.getItem("ja_responsable_campo") || ""; } catch (e) { return ""; }
+    // Último nombre usado; si no hay (o era un código de SG como "01"), el usuario en sesión.
+    var v = "";
+    try { v = localStorage.getItem("ja_responsable_campo") || ""; } catch (e) { /* sin almacenamiento */ }
+    if (!v || /^\d+$/.test(v.trim())) {
+      var yo = document.getElementById("menu-usuario-nombre");
+      v = (yo && yo.textContent || "").trim();
+      if (v === "Ganadería JA") v = "";  // texto por defecto antes de cargar el perfil
+    }
+    return v;
   }
   function guardarResponsable(v) {
     try { localStorage.setItem("ja_responsable_campo", v); } catch (e) { /* sin almacenamiento */ }

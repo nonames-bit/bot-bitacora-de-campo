@@ -83,6 +83,7 @@ CLAVES = (
 )
 
 _RE_REPRODUCTOR = re.compile(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b")
+_RE_TAG_TORO = re.compile(r"^T\d+", re.IGNORECASE)
 _cache: dict[tuple, tuple[float, dict]] = {}
 
 
@@ -101,6 +102,11 @@ def _es_macho(sexo: Any) -> bool:
 
 
 def _es_reproductor(a: dict) -> bool:
+    """Toro/reproductor: arete que empieza por T+número (T02) o TORO,
+    REPRODUCTOR... en nombre o notas. Misma regla para "Toros" y para no
+    mandarlo a venta, castración ni marcación."""
+    if _RE_TAG_TORO.match(str(a.get("tag") or "")):
+        return True
     return bool(_RE_REPRODUCTOR.search(f"{a.get('nombre') or ''} {a.get('notas') or ''}".upper()))
 
 
@@ -407,8 +413,7 @@ def estado_toros(db: Database, hoy: Optional[date] = None) -> list[dict]:
         WHERE a.estado = 'ACTIVO'"""))
 
     def _es_toro(a) -> bool:
-        return bool(re.match(r"^T\d+", str(a["tag"] or ""), re.IGNORECASE)) or bool(
-            re.search(r"\b(?:TORO|REPRODUCTOR)\b", str(a["notas"] or "").upper()))
+        return _es_reproductor(a) and not _es_hembra(a["sexo"])
 
     toros = [a for a in filas if _es_toro(a)]
     if not toros:
