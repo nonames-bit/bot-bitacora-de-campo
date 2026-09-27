@@ -493,6 +493,24 @@ def crear_teclado_reproduccion_detalle() -> InlineKeyboardMarkup:
 
 
 def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> InlineKeyboardMarkup:
+    """Teclado interactivo para confirmar o descartar la carga de stock de pajuelas detectadas por OCR."""
+    toro_param = str(toro).replace(":", "_").strip()
+    keyboard = [
+        [
+            InlineKeyboardButton(
+                f"✅ Cargar {cantidad} pajuelas {toro}",
+                callback_data=f"cmd:confirmar_factura:{toro_param}:{cantidad}",
+            ),
+            InlineKeyboardButton(
+                "❌ Descartar",
+                callback_data="cmd:confirmar_factura:descartar",
+            ),
+        ],
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def crear_teclado_confirmar_factura_pajillas(toro: str, cantidad: int) -> InlineKeyboardMarkup:
     """Teclado interactivo para confirmar o descartar la carga de stock de pajillas detectadas por OCR."""
     toro_param = str(toro).replace(":", "_").strip()
     keyboard = [
@@ -508,9 +526,6 @@ def crear_teclado_confirmar_factura_pajuelas(toro: str, cantidad: int) -> Inline
         ],
     ]
     return InlineKeyboardMarkup(keyboard)
-
-
-crear_teclado_confirmar_factura_pajillas = crear_teclado_confirmar_factura_pajuelas
 
 
 def crear_teclado_clima() -> InlineKeyboardMarkup:

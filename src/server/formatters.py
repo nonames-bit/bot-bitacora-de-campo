@@ -1542,7 +1542,7 @@ def texto_ejemplo_evento(tipo: str) -> str:
         ),
         "servicio": (
             "🐂 <b>Ejemplo de Inseminación / Servicio:</b>\n"
-            "<code>insemine la 47 con pajilla toro brahman 502</code>\n"
+            "<code>insemine la 47 con pajilla toro brahman 502</code> (o pajuela)\n"
             "<code>servicio directo la novilla 15 con toro reproductor</code>\n\n"
             "💡 <i>Automático:</i> El bot programa ecografía (d35), palpación (d60) y secado (FEP-60d)."
         ),

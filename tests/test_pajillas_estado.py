@@ -32,8 +32,8 @@ def test_inactivacion_catalogo_historico(tmp_path):
             ("TORO-NUEVO", "Guzerat", "C-1", 10, 45000, "2024-01-15", "ACTIVO"),
         )
 
-    # Corremos la migración de columnas esenciales
-    db._migrar_columnas_esenciales()
+    # Marcamos el catálogo histórico
+    db.marcar_pajuelas_historicas_inactivas()
 
     # El toro histórico con fecha 2015 debe estar INACTIVO
     inactivas = db.listar_pajuelas_inactivas()

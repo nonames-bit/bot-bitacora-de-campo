@@ -200,9 +200,9 @@ class Database:
                 cols_pj = {r[1] for r in self.conn.execute("PRAGMA table_info(pajuelas_inventario)").fetchall()}
                 if "estado" not in cols_pj:
                     self.conn.execute("ALTER TABLE pajuelas_inventario ADD COLUMN estado TEXT DEFAULT 'ACTIVO'")
-                self.conn.execute(
-                    "UPDATE pajuelas_inventario SET estado = 'INACTIVO' WHERE (fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01' OR canastilla = 'SG-CANASTA') AND COALESCE(estado, 'ACTIVO') = 'ACTIVO'"
-                )
+                    self.conn.execute(
+                        "UPDATE pajuelas_inventario SET estado = 'INACTIVO' WHERE (fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01' OR canastilla = 'SG-CANASTA')"
+                    )
 
             # Asegurar existencia de nuevas tablas zootécnicas si la BD ya existía
             self.conn.execute("""
@@ -284,6 +284,7 @@ class Database:
             """)
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_animal ON composicion_racial(animal_id)")
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza)")
+            self.conn.commit()
         except Exception:
             logger.warning("Migración de tablas esenciales incompleta", exc_info=True)
 
@@ -402,6 +403,10 @@ class Database:
             self.marcar_historicos_sg()
         except Exception as e:
             logger.error("Error en marcar_historicos_sg durante create_tables: %s", e, exc_info=True)
+        try:
+            self.marcar_pajuelas_historicas_inactivas()
+        except Exception as e:
+            logger.error("Error en marcar_pajuelas_historicas_inactivas durante create_tables: %s", e, exc_info=True)
         self.conn.commit()
         return self
 
@@ -4089,6 +4094,21 @@ class Database:
         )
         self.conn.commit()
         return cur.rowcount
+
+    def marcar_pajuelas_historicas_inactivas(self) -> int:
+        """Marca como INACTIVO el catálogo histórico de pajuelas de SG (ingresos < 2022 o SG-CANASTA)."""
+        cur = self.conn.execute(
+            """
+            UPDATE pajuelas_inventario
+            SET estado = 'INACTIVO'
+            WHERE (fecha_ingreso IS NOT NULL AND fecha_ingreso < '2022-01-01' OR canastilla = 'SG-CANASTA')
+              AND COALESCE(estado, 'ACTIVO') = 'ACTIVO'
+            """
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    marcar_pajillas_historicas_inactivas = marcar_pajuelas_historicas_inactivas
 
     # ------------------------------------------------------------------ #
     # Geolocalización GPS y Rondas de Inspección de Potrero
