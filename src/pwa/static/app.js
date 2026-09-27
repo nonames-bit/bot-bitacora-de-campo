@@ -938,13 +938,15 @@
   // "¿Quién palpa / quién lo hace?": se recuerda en este celular y se
   // sugiere con los inseminadores y responsables ya usados.
   function responsableGuardado() {
-    // Último nombre usado; si no hay (o era un código de SG como "01"), el usuario en sesión.
     var v = "";
-    try { v = localStorage.getItem("ja_responsable_campo") || ""; } catch (e) { /* sin almacenamiento */ }
-    if (!v || /^\d+$/.test(v.trim())) {
-      var yo = document.getElementById("menu-usuario-nombre");
-      v = (yo && yo.textContent || "").trim();
-      if (v === "Ganadería JA") v = "";  // texto por defecto antes de cargar el perfil
+    try { v = (localStorage.getItem("ja_responsable_campo") || "").trim(); } catch (e) { /* sin almacenamiento */ }
+    if (!v || /^\d+$/.test(v) || v.toUpperCase().indexOf("HISTORIC") !== -1) {
+      v = (window.__usuarioActual && window.__usuarioActual.nombre) || "";
+      if (!v) {
+        var yo = document.getElementById("menu-usuario-nombre");
+        v = (yo && yo.textContent || "").trim();
+        if (v === "Ganadería JA") v = "";
+      }
     }
     return v;
   }
@@ -953,6 +955,9 @@
   }
   function datalistResponsables() {
     var nombres = window.__responsablesSugeridos || [];
+    if (!nombres.length && typeof _cacheInseminadores !== "undefined" && _cacheInseminadores && _cacheInseminadores.length) {
+      nombres = _cacheInseminadores.map(function (it) { return it.nombre; });
+    }
     return "<datalist id='dl-responsables'>" + nombres.map(function (n) { return "<option value='" + esc(n) + "'>"; }).join("") + "</datalist>";
   }
 
@@ -3900,9 +3905,19 @@
         return { value: it.nombre, label: label };
       });
       rellenarDatalist("dl-inseminadores", items);
+      rellenarDatalist("dl-responsables", items);
+      var miNombre = (window.__usuarioActual && window.__usuarioActual.nombre) || "";
       var inp = document.getElementById("cap-inseminador");
-      if (inp && !inp.value && window.__usuarioActual && window.__usuarioActual.nombre) {
-        inp.value = window.__usuarioActual.nombre;
+      if (inp && !inp.value && miNombre) {
+        inp.value = miNombre;
+      }
+      var inpPalp = document.getElementById("cap-palp-responsable");
+      if (inpPalp && !inpPalp.value && miNombre) {
+        inpPalp.value = miNombre;
+      }
+      var inpChk = document.getElementById("chk-responsable");
+      if (inpChk && !inpChk.value && miNombre) {
+        inpChk.value = miNombre;
       }
     }
   }
@@ -6568,7 +6583,7 @@
         + "<div style='flex:1;'><label>Condición Corporal (1-5): <select id='cap-cc' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0' selected>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
         + "<div style='flex:1;'><label>Peso actual (kg, opcional): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 450' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
-        + "<label>Veterinario / Profesional: <input id='cap-palp-responsable' placeholder='ej. Dr. Carlos Rodríguez' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Veterinario / Profesional: <input id='cap-palp-responsable' list='dl-responsables' placeholder='ej. Jaime, Pipe, Sebas...' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Confirmación ecográfica 45 días' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "pajuela") {
       h += "<label>Código o Nombre del Toro: <input id='cap-paj-toro' placeholder='ej. GUZ-01 / DON FULANO' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -6805,10 +6820,14 @@
       var fFechaDef = document.getElementById("cap-fecha");
       if (fFechaDef && !fFechaDef.value) fFechaDef.value = new Date().toISOString().slice(0, 10);
 
-      // Inseminador por defecto: usuario en sesión si el campo está presente y vacío
+      // Inseminador y Palpador por defecto: usuario en sesión si el campo está presente y vacío
       var fInsemDef = document.getElementById("cap-inseminador");
       if (fInsemDef && !fInsemDef.value && window.__usuarioActual && window.__usuarioActual.nombre) {
         fInsemDef.value = window.__usuarioActual.nombre;
+      }
+      var fPalpDef = document.getElementById("cap-palp-responsable");
+      if (fPalpDef && !fPalpDef.value && window.__usuarioActual && window.__usuarioActual.nombre) {
+        fPalpDef.value = window.__usuarioActual.nombre;
       }
       cargarListaInseminadores();
 

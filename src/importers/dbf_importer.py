@@ -17,7 +17,7 @@ import zipfile
 from datetime import date
 from typing import Iterator, Optional
 
-from ..db.database import Database
+from ..db.database import Database, MAPEO_TECNICOS_SG
 from ..db.models import TIPOS_EVENTO_PARTO
 from ..engine.growth_engine import gmd
 from ..engine.genetic_engine import CATALOGO_RAZAS_SG_DEFECTO, generar_resumen_zootecnico
@@ -738,11 +738,13 @@ def import_servicios(db: Database, records) -> dict:
             continue
 
         fep = fecha_estimada_parto(fecha)
+        insem_cod = (r.get("INSEMINA") or "").strip()
+        inseminador = MAPEO_TECNICOS_SG.get(insem_cod, insem_cod) or None
         db.registrar_servicio(
             vaca_tag=vaca, fecha=fecha, tipo_servicio=tipo_servicio,
             toro_pajilla=(r.get("TORO") or "").strip() or None,
             raza_toro=None,
-            inseminador=(r.get("INSEMINA") or "").strip() or None,
+            inseminador=inseminador,
             fep_calculada=fep,
             estado=(r.get("EST") or "").strip() or None,
         )
@@ -850,9 +852,11 @@ def import_tactos(db: Database, records) -> dict:
             duplicados += 1
             continue
 
+        palpador_cod = (r.get("PALPO") or "").strip()
+        palpador = MAPEO_TECNICOS_SG.get(palpador_cod, palpador_cod) or None
         db.registrar_diagnostico(
             vaca_tag=tag, fecha=r.get("FECHA"), resultado=resultado,
-            dias_gestacion=dias_gestacion,
+            dias_gestacion=dias_gestacion, responsable=palpador,
         )
         nuevos += 1
     return {"nuevos": nuevos, "duplicados": duplicados}

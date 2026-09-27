@@ -303,17 +303,23 @@ def _responsable_valido(nombre: str) -> bool:
 
 
 def _responsables_sugeridos(db: Database) -> list[str]:
-    """Nombres para el campo "¿Quién palpa?": usuarios de la app primero,
-    luego inseminadores y responsables escritos antes (sin códigos de SG)."""
+    """Nombres para el campo '¿Quién palpa?' o '¿Quién lo hace?':
+    usuarios del sistema activos primero (Jaime, Pipe, Sebas...),
+    luego otros técnicos activos y responsables usados antes."""
     nombres: list[str] = [n for n in _usuarios_app() if _responsable_valido(n)]
     try:
-        for q in ("SELECT nombre n FROM inseminadores WHERE COALESCE(activo, 1) = 1 ORDER BY nombre",
-                  "SELECT DISTINCT TRIM(responsable) n FROM diagnosticos_gestacion "
-                  "WHERE responsable IS NOT NULL AND TRIM(responsable) != '' ORDER BY n LIMIT 30"):
+        if hasattr(db, "sincronizar_usuarios_sistema"):
+            db.sincronizar_usuarios_sistema()
+        for q in (
+            "SELECT nombre AS n FROM inseminadores WHERE COALESCE(activo, 1) = 1 AND es_usuario_sistema = 1 ORDER BY id ASC",
+            "SELECT nombre AS n FROM inseminadores WHERE COALESCE(activo, 1) = 1 AND COALESCE(es_usuario_sistema, 0) = 0 ORDER BY nombre ASC",
+            "SELECT DISTINCT TRIM(responsable) AS n FROM diagnosticos_gestacion "
+            "WHERE responsable IS NOT NULL AND TRIM(responsable) != '' ORDER BY n LIMIT 30",
+        ):
             for r in db.query(q):
-                n = str(r["n"] or "").strip()
-                if _responsable_valido(n) and n.upper() not in {x.upper() for x in nombres}:
-                    nombres.append(n)
+                val = str(r["n"] or "").strip()
+                if _responsable_valido(val) and val.upper() not in {x.upper() for x in nombres}:
+                    nombres.append(val)
     except Exception:
         logger.error("responsables_sugeridos fallo", exc_info=True)
     return nombres

@@ -18,7 +18,7 @@ import sys
 import zipfile
 from typing import Optional
 
-from ..db.database import Database
+from ..db.database import Database, MAPEO_TECNICOS_SG
 from ..importers.dbf_importer import DBFReader, _validar_zip_seguro
 from ..utils import iso, to_date
 
@@ -240,7 +240,8 @@ def extraer_datos_historicos_sg(
                     duplicados_tactos += 1
                     continue
 
-                palpador = (rec.get("PALPO") or "").strip() or "Histórico SG"
+                palpador_cod = (rec.get("PALPO") or "").strip()
+                palpador = MAPEO_TECNICOS_SG.get(palpador_cod, palpador_cod) or "Histórico SG"
                 db.conn.execute(
                     """
                     INSERT INTO diagnosticos_gestacion

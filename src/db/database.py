@@ -100,6 +100,19 @@ def es_potrero_real(db: "Database", fila_potrero) -> bool:
     return hay_geo is None
 
 
+# Mapeo oficial de códigos de técnicos e inseminadores de Software Ganadero a usuarios reales
+MAPEO_TECNICOS_SG: dict[str, str] = {
+    "01": "Jaime",
+    "1": "Jaime",
+    "02": "Sebas",
+    "2": "Sebas",
+    "03": "Histórico (03)",
+    "3": "Histórico (03)",
+    "04": "Histórico (04)",
+    "4": "Histórico (04)",
+}
+
+
 class Database:
     """Envoltorio de sqlite3 con helpers de resolución tag → id y CRUD."""
 
@@ -5272,8 +5285,101 @@ class Database:
     # ------------------------------------------------------------------ #
     # Catálogo y Evaluación de Inseminadores
     # ------------------------------------------------------------------ #
+    def sincronizar_usuarios_sistema(self) -> int:
+        """Asegura que todos los usuarios de users.json existan en el catálogo de inseminadores/técnicos."""
+        insertados = 0
+        ahora = datetime.now().isoformat(timespec="seconds")
+        users_file = os.environ.get("USERS_FILE")
+        if not users_file:
+            for cand in ("data/users.json", "/app/data/users.json", "src/server/users.json"):
+                if os.path.exists(cand):
+                    users_file = cand
+                    break
+        if users_file and os.path.exists(users_file):
+            try:
+                with open(users_file, "r", encoding="utf-8") as f:
+                    u_list = json.load(f)
+                if isinstance(u_list, list):
+                    for u in u_list:
+                        raw_nom = (u.get("nombre") or "").strip()
+                        uid = u.get("user_id")
+                        if not raw_nom:
+                            continue
+                        nom = raw_nom.title() if (raw_nom.isupper() and len(raw_nom) > 1) else raw_nom
+                        existente = self.query_one("SELECT id, nombre FROM inseminadores WHERE UPPER(nombre) = UPPER(?)", (nom,))
+                        if existente:
+                            self.conn.execute(
+                                "UPDATE inseminadores SET nombre = ?, es_usuario_sistema = 1, user_id = COALESCE(?, user_id), activo = 1 WHERE id = ?",
+                                (nom, uid, existente["id"])
+                            )
+                        else:
+                            self.conn.execute(
+                                "INSERT INTO inseminadores (nombre, es_usuario_sistema, user_id, activo, creado_en) VALUES (?, 1, ?, 1, ?)",
+                                (nom, uid, ahora)
+                            )
+                            insertados += 1
+                    self.conn.commit()
+            except Exception as e:
+                logger.error("Error sincronizando usuarios con inseminadores: %s", e)
+        return insertados
+
+    def migrar_responsables_historicos_sg(self) -> dict[str, int]:
+        """Actualiza los códigos históricos de SG (01 -> Jaime, 02 -> Sebas, 03/04 -> Histórico)
+        en servicios, diagnosticos_gestacion e inseminadores, y sincroniza los usuarios del sistema."""
+        cambios = {"servicios": 0, "diagnosticos": 0, "inseminadores": 0}
+        try:
+            ahora = datetime.now().isoformat(timespec="seconds")
+            mapeo = MAPEO_TECNICOS_SG
+            # 1. Actualizar servicios
+            for cod, nom in mapeo.items():
+                cur = self.conn.execute(
+                    "UPDATE servicios SET inseminador = ? WHERE TRIM(inseminador) = ?",
+                    (nom, cod)
+                )
+                cambios["servicios"] += cur.rowcount
+
+            # 2. Actualizar diagnósticos de gestación
+            for cod, nom in mapeo.items():
+                cur = self.conn.execute(
+                    "UPDATE diagnosticos_gestacion SET responsable = ? WHERE TRIM(responsable) = ?",
+                    (nom, cod)
+                )
+                cambios["diagnosticos"] += cur.rowcount
+
+            # 3. Actualizar / sembrar catálogo de inseminadores
+            for cod, nom in [("01", "Jaime"), ("02", "Sebas"), ("03", "Histórico (03)"), ("04", "Histórico (04)")]:
+                es_user = 1 if cod in ("01", "02") else 0
+                uid = 1 if cod == "01" else (3 if cod == "02" else None)
+                existente_cod = self.query_one("SELECT id FROM inseminadores WHERE nombre = ?", (cod,))
+                existente_nom = self.query_one("SELECT id FROM inseminadores WHERE UPPER(nombre) = UPPER(?)", (nom,))
+                if existente_cod and not existente_nom:
+                    self.conn.execute(
+                        "UPDATE inseminadores SET nombre = ?, es_usuario_sistema = ?, user_id = ?, activo = 1 WHERE id = ?",
+                        (nom, es_user, uid, existente_cod["id"])
+                    )
+                    cambios["inseminadores"] += 1
+                elif not existente_nom:
+                    self.conn.execute(
+                        "INSERT INTO inseminadores (nombre, es_usuario_sistema, user_id, activo, creado_en) VALUES (?, ?, ?, 1, ?)",
+                        (nom, es_user, uid, ahora)
+                    )
+                    cambios["inseminadores"] += 1
+                elif existente_cod and existente_nom and existente_cod["id"] != existente_nom["id"]:
+                    self.conn.execute("DELETE FROM inseminadores WHERE id = ?", (existente_cod["id"],))
+
+            # Eliminar remanentes numéricos viejos que hayan quedado en el catálogo
+            self.conn.execute("DELETE FROM inseminadores WHERE nombre IN ('01', '02', '03', '04', '1', '2', '3', '4')")
+
+            # 4. Asegurar que todos los usuarios de users.json queden en inseminadores
+            self.sincronizar_usuarios_sistema()
+            self.conn.commit()
+        except Exception as e:
+            logger.error("Error migrando responsables históricos SG: %s", e, exc_info=True)
+        return cambios
+
     def sembrar_inseminadores_iniciales(self) -> int:
         """Puebla inseminadores a partir de servicios históricos y users.json si la tabla está vacía."""
+        self.migrar_responsables_historicos_sg()
         try:
             n = self.query_one("SELECT COUNT(*) AS c FROM inseminadores")["c"]
             if n > 0:
@@ -5299,22 +5405,7 @@ class Database:
                     except Exception:
                         pass
             # 2. Usuarios del sistema
-            try:
-                from ..server.auth import Auth
-                auth = Auth()
-                for uid, udata in getattr(auth, "_usuarios", {}).items():
-                    nom = udata.get("nombre") or udata.get("usuario")
-                    if nom and nom.strip():
-                        try:
-                            self.conn.execute(
-                                "INSERT OR IGNORE INTO inseminadores (nombre, es_usuario_sistema, user_id, creado_en) VALUES (?, 1, ?, ?)",
-                                (nom.strip(), int(uid) if str(uid).isdigit() else None, ahora)
-                            )
-                            insertados += 1
-                        except Exception:
-                            pass
-            except Exception:
-                pass
+            self.sincronizar_usuarios_sistema()
             self.conn.commit()
             return insertados
         except Exception as e:
@@ -5375,6 +5466,7 @@ class Database:
         servicios, diagnosticados, preñadas, vacías, tasa de concepción % y servicios/concepción (S/C).
         """
         self.sembrar_inseminadores_iniciales()
+        cat_map = {ic["nombre"].upper(): ic for ic in self.listar_inseminadores(solo_activos=False)}
         filas = self.query("""
             WITH serv_con_diag AS (
                 SELECT s.id AS servicio_id,
@@ -5430,9 +5522,12 @@ class Database:
                 semaforo = "rojo"
                 estado_label = "Baja concepción (<45%, revisar técnica)"
 
+            ic_info = cat_map.get(nom.upper()) or {}
             resultado.append({
                 "nombre": nom,
                 "inseminador": nom,
+                "es_usuario_sistema": bool(ic_info.get("es_usuario_sistema")),
+                "telefono": ic_info.get("telefono"),
                 "total_servicios": tot,
                 "total_ias": tot,
                 "diagnosticados": diag,
@@ -5457,6 +5552,8 @@ class Database:
                 resultado.append({
                     "nombre": nom_c,
                     "inseminador": nom_c,
+                    "es_usuario_sistema": bool(ic.get("es_usuario_sistema")),
+                    "telefono": ic.get("telefono"),
                     "total_servicios": 0,
                     "total_ias": 0,
                     "diagnosticados": 0,
@@ -5473,6 +5570,7 @@ class Database:
                     "ultimo_servicio": None,
                 })
 
+        resultado.sort(key=lambda x: (not x.get("es_usuario_sistema", False), -x.get("total_servicios", 0), x.get("nombre", "")))
         return resultado
 
     # ------------------------------------------------------------------ #
