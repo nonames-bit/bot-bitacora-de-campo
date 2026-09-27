@@ -1,0 +1,14 @@
+# Litestream: copia la base SQLite en tiempo real a un almacenamiento S3
+# (DigitalOcean Spaces, AWS S3, Backblaze B2, Cloudflare R2 o GCS con
+# interoperabilidad S3). Credenciales y destino en el .env:
+#   LITESTREAM_ACCESS_KEY_ID, LITESTREAM_SECRET_ACCESS_KEY
+#   LITESTREAM_REPLICA_URL  (ej. s3://mi-bucket/bitacora)
+#   LITESTREAM_ENDPOINT     (vacío para AWS; ej. https://nyc3.digitaloceanspaces.com)
+dbs:
+  - path: /app/data/bitacora.db
+    replicas:
+      - url: ${LITESTREAM_REPLICA_URL}
+        endpoint: ${LITESTREAM_ENDPOINT}
+        retention: 720h        # 30 días de historial para volver a cualquier punto
+        snapshot-interval: 24h
+        sync-interval: 10s

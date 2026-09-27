@@ -1,0 +1,78 @@
+# Despliegue en Docker (ver docs/DESPLIEGUE_DOCKER.md).
+#
+#   cp .env.example .env        # completar claves y DOMINIO
+#   docker compose up -d --build
+#
+# Servicios: app (PWA) · bot (Telegram) · tareas (respaldos, mercado,
+# satélite) · caddy (HTTPS automático) · litestream (réplica de la base en
+# un almacenamiento S3 fuera del servidor, perfil "replica").
+x-bitacora: &bitacora
+  image: ${BITACORA_IMAGEN:-bitacora:local}
+  build: .
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    LOG_FILE: /app/data/bot.log
+  volumes:
+    - ./data:/app/data
+    - ./media:/app/media
+    - ./backups:/app/backups
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  app:
+    <<: *bitacora
+    command: ["python", "-m", "src.pwa.app"]
+    expose:
+      - "8080"
+
+  bot:
+    <<: *bitacora
+    command: ["python", "-m", "src.main", "--server"]
+    healthcheck:
+      disable: true
+
+  tareas:
+    <<: *bitacora
+    command: ["python", "scripts/programador.py"]
+    healthcheck:
+      disable: true
+
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMINIO: ${DOMINIO:?Defina DOMINIO en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data
+      - caddy_config:/config
+
+  litestream:
+    image: litestream/litestream:0.3.13
+    profiles: ["replica"]
+    restart: unless-stopped
+    command: ["replicate"]
+    user: "1000:1000"
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+      - ./deploy/litestream.yml:/etc/litestream.yml:ro
+
+volumes:
+  caddy_datos:
+  caddy_config:
