@@ -134,6 +134,11 @@ try:
 except ImportError:  # ejecución directa: python src/pwa/app.py
     from src.pwa import webauthn as _webauthn  # type: ignore
 
+try:
+    from ..engine import lactancia as _lactancia
+except ImportError:  # ejecución directa
+    from src.engine import lactancia as _lactancia  # type: ignore
+
 __all__ = ["_ruta_relativa_media"]  # re-export compat WS-2 (fuente: engine.dashboard_data)
 
 try:
@@ -2469,6 +2474,29 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
             except Exception:
                 pass
 
+    @app.post("/api/potrero/<int:pid>/ordeno")
+    def api_potrero_ordeno(pid):
+        """Marca un potrero como lote de ordeño (true), no ordeño (false) o
+        automático (null). Ver engine/lactancia.py."""
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere rol ADMIN o OWNER."}), 403
+        datos = request.get_json(silent=True) or {}
+        valor = datos.get("valor")
+        if valor not in (True, False, None):
+            return jsonify({"ok": False, "error": "valor debe ser true, false o null."}), 400
+        db_p = _db(db_path)
+        try:
+            if not db_p.query_one("SELECT 1 FROM potreros WHERE id = ?", (pid,)):
+                return jsonify({"ok": False, "error": "Potrero no encontrado."}), 404
+            _lactancia.marcar_potrero_ordeno(db_p, pid, valor)
+            _invalidar_tareas()
+            return jsonify({"ok": True})
+        except Exception:
+            logger.exception("Error al marcar potrero de ordeño %s", pid)
+            return _error_interno(500)
+        finally:
+            db_p.close()
+
     @app.post("/api/animal/<tag>/pausa-ordeno")
     def api_animal_pausa_ordeno(tag):
         """Marca que la vaca <tag> dejó de ordeñarse TEMPORALMENTE (ej. se
@@ -3560,6 +3588,19 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
                     if tipo == "parto":
                         tipo_evento = str(payload.get("tipo_evento") or "PARTO").upper()
                         padre_tag = payload.get("padre_tag") or payload.get("toro_tag") or payload.get("toro") or None
+                        # Parto con la "vaca" de < 15 meses: casi siempre es el
+                        # parto de la madre anotado en la cría. No se guarda;
+                        # se avisa y se saca de la cola para no reintentarlo.
+                        vaca_tag_p = str(payload.get("vaca_tag") or payload.get("tag") or "").strip()
+                        fila_v = db_sync.query_one(
+                            "SELECT fecha_nacimiento FROM animales WHERE UPPER(tag) = UPPER(?)", (vaca_tag_p,))
+                        if fila_v and _lactancia.parto_imposible(fila_v["fecha_nacimiento"], fecha):
+                            errores.append(
+                                f"Parto de {vaca_tag_p} NO guardado: nació el {fila_v['fecha_nacimiento']} y es "
+                                f"muy joven para parir. ¿Era el parto de su madre?")
+                            if id_local:
+                                ids_ok.append(id_local)
+                            continue
                         primer_id = db_sync.registrar_parto(
                             vaca_tag=payload.get("vaca_tag") or payload.get("tag"),
                             fecha=fecha,

@@ -52,8 +52,12 @@ def test_palpar_desde_dia_35(db):
 
 def test_secar_por_gestacion_estimada_y_no_si_ya_seca(db):
     _vaca(db, "P230")
+    db.registrar_parto("P230", fecha=_d(-250), sexo_cria="Macho")  # se ordeña (250 DEL)
     db.registrar_diagnostico("P230", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=150)
+    _vaca(db, "NOV230")  # novilla preñada: no se ordeña, no va a Secar
+    db.registrar_diagnostico("NOV230", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=150)
     _vaca(db, "P230S")
+    db.registrar_parto("P230S", fecha=_d(-250), sexo_cria="Macho")
     db.registrar_diagnostico("P230S", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=150)
     db.registrar_secado("P230S", fecha=_d(-5))
     _vaca(db, "P100")
@@ -61,7 +65,7 @@ def test_secar_por_gestacion_estimada_y_no_si_ya_seca(db):
     lt = datos_lista_trabajo(db, HOY)
     secar = {f["tag"]: f for f in lt["secar"]}
     assert "P230" in secar and secar["P230"]["dias_gestacion"] == 230
-    assert "P230S" not in secar and "P100" not in secar
+    assert "P230S" not in secar and "P100" not in secar and "NOV230" not in secar
 
 
 def test_servir_vacia_posparto_sin_ia_programada(db):

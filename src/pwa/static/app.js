@@ -823,7 +823,7 @@
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
     palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
+    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
     servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca parida pendiente de servir." },
     novillas: { nombre: "Novillas a entorar", icono: "🐄", vacio: "Ninguna novilla lista para entorar." },
     partos: { nombre: "Partos", icono: "🐣", vacio: "Ningún parto próximo ni atrasado." },
@@ -889,6 +889,8 @@
     if (clave === "castrar") {
       acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='CASTRACION'>Castrado</button>"
         + "<button type='button' class='chip btn-lt-hecho' data-tipo='ENTERO'>Queda entero</button>";
+    } else if (clave === "secar") {
+      acciones = "<button type='button' class='chip btn-lt-secado'>🍼 Secada / ya está seca</button>";
     } else if (info.manejo) {
       acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>✓ Hecho</button>";
     }
@@ -1022,6 +1024,14 @@
         fila.querySelectorAll("button").forEach(function (x) { x.disabled = true; });
         enviarEventoLt("manejo", { animal_tag: fila.getAttribute("data-tag"), tipo_manejo: tipo, producto: ex.producto, lote_producto: ex.lote_producto, responsable: ex.responsable })
           .then(function () { ltMarcarHecha(fila, b.textContent.replace("✓", "").trim()); });
+      });
+    });
+    qa(".btn-lt-secado").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var fila = b.closest(".fila-lt");
+        b.disabled = true;
+        enviarEventoLt("secado", { animal_tag: fila.getAttribute("data-tag"), motivo: "Marcada en la lista Secar" })
+          .then(function () { ltMarcarHecha(fila, "Seca"); });
       });
     });
     qa(".btn-lt-todos").forEach(function (b) {
@@ -2808,6 +2818,41 @@
     return svg;
   }
 
+  // Lote de ordeño: define qué vacas se cuentan en ordeño (Secar, ficha,
+  // litros/vaca). Se detecta solo donde están las recién paridas; aquí se
+  // corrige tocando el potrero (Automático → Sí → No).
+  var LOTE_MODO = { manual: "fijado a mano", nombre: "por el nombre", auto: "hay recién paridas", no: "" };
+  function renderLotesOrdeno(lotes) {
+    if (!lotes || !lotes.length) return "";
+    var h = "<div class='card'><h4 style='margin:0 0 6px;'>🥛 Lote de ordeño</h4>"
+      + "<p class='aviso' style='margin:0 0 8px;'>Solo las vacas de los potreros marcados cuentan como <b>en ordeño</b> "
+      + "(lista Secar, ficha y litros/vaca). Las demás paridas se toman como secas. Toque un potrero para corregirlo.</p>"
+      + "<div class='gen-filtros'>";
+    lotes.forEach(function (p) {
+      h += "<button type='button' class='chip btn-lote-ordeno" + (p.ordeno ? " act" : "") + "' data-pid='" + esc(p.id)
+        + "' data-modo='" + esc(p.modo) + "' data-ordeno='" + (p.ordeno ? 1 : 0) + "' title='" + esc(LOTE_MODO[p.modo] || "") + "'>"
+        + (p.ordeno ? "🥛 " : "") + esc(p.nombre) + " · " + esc(p.vacas_paridas) + " paridas"
+        + (p.modo === "manual" ? " 📌" : "") + "</button>";
+    });
+    return h + "</div><small>📌 = fijado a mano. Toque: automático → sí es ordeño → no es ordeño.</small></div>";
+  }
+  function bindLotesOrdeno() {
+    qa(".btn-lote-ordeno").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var modo = b.getAttribute("data-modo"), ordeno = b.getAttribute("data-ordeno") === "1";
+        // Ciclo: automático -> fijo sí -> fijo no -> automático
+        var valor = modo !== "manual" ? true : (ordeno ? false : null);
+        b.disabled = true;
+        fetch("/api/potrero/" + b.getAttribute("data-pid") + "/ordeno", {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ valor: valor })
+        }).then(function (r) { return r.json(); }).then(function (res) {
+          if (!res.ok) { alert(res.error || "No se pudo guardar."); b.disabled = false; return; }
+          cargar(true);
+        }).catch(function () { alert("Sin conexión."); b.disabled = false; });
+      });
+    });
+  }
+
   function renderLeche(d) {
     var serie = d.serie_tanque || [];
     var res = d.resumen || {};
@@ -2830,6 +2875,7 @@
       + "</div>"
       + "</div>" + erroresHtml(d);
     h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
+    h += renderLotesOrdeno(d.lotes_ordeno);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
       h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
@@ -2972,6 +3018,7 @@
 
   function bindLeche() {
     bindListaTrabajo();
+    bindLotesOrdeno();
     var btnIa = document.getElementById("btn-ir-captura-leche");
     if (btnIa) {
       btnIa.addEventListener("click", function () {
@@ -11453,7 +11500,7 @@
       if (lac && lac.fecha_parto) {
         var txtEstado = lac.estado_confirmado && lac.fecha_secado
           ? esc(lac.estado) + " (secada el " + esc(lac.fecha_secado) + ")"
-          : esc(lac.estado) + (lac.estado === "Seca" ? " (estimado por días, sin secado registrado)" : "");
+          : esc(lac.estado) + (lac.motivo ? " (" + esc(lac.motivo) + ")" : "");
         h3 += "<p class='aviso'>" + icon("milk", 14) + txtEstado + " · <b>" + esc(lac.del_dias) + "</b> DEL (parto " + esc(lac.fecha_parto) + ")</p>";
         if (lac.estado === "En ordeño") {
           if (lac.en_pausa) {
@@ -11464,8 +11511,9 @@
               + "<button type='button' class='tema-btn' data-accion='reanudar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>▶ Reanudar ordeño</button>"
               + "</div>";
           } else {
-            h3 += "<div style='margin:8px 0;'>"
+            h3 += "<div style='margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;'>"
               + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>⏸ Pausar ordeño (no se está ordeñando)</button>"
+              + "<button type='button' class='tema-btn' data-accion='registrar-secado' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>🍼 Ya está seca</button>"
               + "</div>";
           }
         }
@@ -11656,6 +11704,10 @@
         + "</div>";
     }
 
+    if (f.aviso_datos) {
+      h += "<div class='card' style='border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;'>"
+        + "<b>⚠️ Dato a revisar</b><p style='margin:6px 0 0; font-size:13px;'>" + esc(f.aviso_datos) + "</p></div>";
+    }
     if (ef.codigo === "TORO" && f.toro_servicio) {
       h += renderToroServicio(f.toro_servicio);
     } else {
@@ -12397,6 +12449,16 @@
       else if (acc === "reanudar-ordeno") {
         e.preventDefault();
         ejecutarReanudarOrdeno(elAcc.getAttribute("data-tag"));
+      }
+      else if (acc === "registrar-secado") {
+        e.preventDefault();
+        var tagSec = elAcc.getAttribute("data-tag");
+        if (!tagSec || !confirm("¿Registrar a " + tagSec + " como seca desde hoy?")) return;
+        elAcc.disabled = true;
+        enviarEventoLt("secado", { animal_tag: tagSec, motivo: "Confirmada seca desde la ficha" }).then(function () {
+          mostrarToast("✓ " + tagSec + " registrada como seca.", "verde");
+          abrirFichaDesdeTag(tagSec, "leche");
+        });
       }
     }
   });

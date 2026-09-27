@@ -324,6 +324,8 @@ class Database:
         self._asegurar_columna("potreros", "geom_wkt_4326", "TEXT")
         self._asegurar_columna("potreros", "centroide_lat", "REAL")
         self._asegurar_columna("potreros", "centroide_lon", "REAL")
+        # Lote de ordeño (engine/lactancia.py): 1 sí, 0 no, NULL automático.
+        self._asegurar_columna("potreros", "ordeno", "INTEGER")
         # Columnas de auditoría (quién y cuándo registró cada evento) para
         # poder listar y deshacer registros equivocados (comando /deshacer).
         # Las tablas creadas antes de esta migración no tenían estas columnas.
@@ -1624,47 +1626,18 @@ class Database:
         )
 
     def resumen_ordeno(self) -> dict:
-        """Cuenta, sobre el hato ACTIVO, cuántas vacas están en etapa de
-        ordeño (paridas, <300 días desde el último parto y sin secado
-        confirmado -- mismo criterio que la ficha individual, ver
-        `dashboard_data.datos_ficha`) vs cuántas de esas se están ordeñando
-        de verdad (restando las que tienen una pausa abierta). Este último
-        número es el que debe dividir los litros vendidos para sacar el
-        promedio de litros/vaca/día."""
-        hembras = self.query(
-            "SELECT id_animal FROM animales WHERE estado = 'ACTIVO' "
-            "AND (LOWER(sexo) LIKE 'h%' OR LOWER(sexo) LIKE 'f%')"
-        )
-        en_ordeno_ids: list[int] = []
-        for r in hembras:
-            aid = r["id_animal"]
-            parto = self.ultimo_parto(aid)
-            if not parto or not parto["fecha"]:
-                continue
-            f_parto = to_date(parto["fecha"])
-            if not f_parto:
-                continue
-            del_dias = (date.today() - f_parto).days
-            if del_dias < 0 or del_dias >= 300:
-                continue
-            secado_row = self.query_one(
-                "SELECT id FROM secados WHERE animal_id = ? AND fecha >= ? LIMIT 1",
-                (aid, parto["fecha"]),
-            )
-            if secado_row:
-                continue
-            en_ordeno_ids.append(aid)
-
-        if not en_ordeno_ids:
-            return {"en_ordeno": 0, "en_pausa": 0, "ordenandose": 0}
-
-        marcas = ",".join("?" * len(en_ordeno_ids))
-        en_pausa = self.query_one(
-            f"SELECT COUNT(*) AS n FROM pausas_ordeno "
-            f"WHERE fecha_fin IS NULL AND animal_id IN ({marcas})",
-            tuple(en_ordeno_ids),
-        )["n"]
-        en_ordeno = len(en_ordeno_ids)
+        """Cuenta, sobre el hato ACTIVO, cuántas vacas están en ordeño vs
+        cuántas de esas se están ordeñando de verdad (restando las pausas
+        abiertas). Mismo criterio que la ficha y la lista "Secar"
+        (engine/lactancia.py). El último número es el que debe dividir los
+        litros vendidos para sacar el promedio de litros/vaca/día."""
+        try:
+            from ..engine.lactancia import estados_lactancia
+        except ImportError:  # ejecución directa
+            from src.engine.lactancia import estados_lactancia  # type: ignore
+        estados = [e["estado"] for e in estados_lactancia(self).values()]
+        en_pausa = estados.count("PAUSADA")
+        en_ordeno = estados.count("EN_ORDENO") + en_pausa
         return {"en_ordeno": en_ordeno, "en_pausa": en_pausa, "ordenandose": en_ordeno - en_pausa}
 
     def cria_activa_de_madre(self, madre_tag) -> Optional[dict]:

@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS potreros (
     dias_ocupacion INTEGER,
     geom_wkt_4326 TEXT,
     centroide_lat REAL,
-    centroide_lon REAL
+    centroide_lon REAL,
+    ordeno INTEGER  -- lote de ordeño: 1 sí, 0 no, NULL automático (engine/lactancia.py)
 );
 
 CREATE TABLE IF NOT EXISTS animales (
