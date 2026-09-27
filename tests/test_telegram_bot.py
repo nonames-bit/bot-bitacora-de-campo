@@ -570,6 +570,24 @@ def test_construir_application_y_teclado_buscar(db, tmp_path):
     assert app is not None
 
 
+def test_bot_escribe_latido_para_alerta_de_salud(db, tmp_path, monkeypatch):
+    pytest.importorskip("telegram")
+    import asyncio
+
+    from src.server.auth import Auth
+
+    latido = tmp_path / ".latido_bot"
+    monkeypatch.setenv("BOT_LATIDO", str(latido))
+    app = construir_application(token="123456789:ABCdefGHIjklMNOpqrsTUVwxyz", db=db,
+                                auth=Auth(str(tmp_path / "users.json")))
+    if not app.job_queue:
+        pytest.skip("job_queue no disponible")
+    jobs = [j for j in app.job_queue.jobs() if j.callback.__name__ == "_latido"]
+    assert jobs
+    asyncio.run(jobs[0].callback(None))
+    assert latido.read_text()
+
+
 def test_filtros_busqueda_sql_queries(db):
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2020-01-01")
     db.registrar_animal("TORO1", sexo="Macho", estado="ACTIVO")

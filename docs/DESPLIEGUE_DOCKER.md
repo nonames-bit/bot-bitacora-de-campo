@@ -12,7 +12,7 @@ AWS, GCP, etc.) y para **migrar el servidor actual** (systemd + nginx en
 | `docker-compose.yml` | Servicios `app` (PWA), `bot` (Telegram), `tareas` (respaldos, mercado, satélite), `caddy` (HTTPS) y `litestream` (réplica). |
 | `deploy/Caddyfile` | HTTPS automático con Let's Encrypt y las mismas cabeceras de seguridad que tenía nginx. |
 | `deploy/litestream.yml` | Copia la base en tiempo real a un almacenamiento S3 fuera del servidor. |
-| `scripts/programador.py` | Reemplaza el cron: respaldo 03:00, mercado 06:00, NDVI cada 3 días, lluvia los lunes. |
+| `scripts/programador.py` | Reemplaza el cron: respaldo 03:00, mercado 06:00, NDVI cada 3 días, lluvia los lunes y **alerta de salud** cada 15 min. |
 | `scripts/endurecer_vps.sh` | Firewall, SSH solo con llave, fail2ban, actualizaciones automáticas e instalación de Docker. |
 | `.github/workflows/docker.yml` | Cuando los tests pasan en `main`: verifica que la imagen se construye y (opcional) le pide al servidor que se actualice; el servidor arma la imagen (sin registro de paquetes, costo $0). |
 
@@ -231,6 +231,25 @@ docker compose up -d
 ```
 
 ---
+
+## Alerta de salud
+
+El servicio `tareas` revisa cada 15 minutos (empieza 5 min después de
+arrancar) y avisa por **Telegram a los usuarios OWNER** una sola vez por
+problema, y otra vez con ✅ cuando se resuelve:
+
+| Revisa | Avisa si |
+|---|---|
+| La PWA por dentro (`http://app:8080`) | no responde |
+| La PWA desde internet (`https://DOMINIO`) | no responde (Caddy o certificado caídos) |
+| El bot de Telegram | no actualiza `data/.latido_bot` en 15 min (caído o colgado) |
+| Disco | uso ≥ 90 % |
+| Base de datos | sin cambios en 72 h |
+| Respaldo local | no hay uno de las últimas 26 h |
+
+Ver lo que ha revisado: `docker compose logs tareas | grep SALUD`.
+Cambiar la frecuencia: `SALUD_MINUTOS` en `.env` (`0` la apaga).
+`scripts/healthcheck_vps.sh` es la versión vieja para systemd; en Docker no se usa.
 
 ## Operación diaria
 
