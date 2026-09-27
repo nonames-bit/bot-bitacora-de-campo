@@ -154,9 +154,25 @@ docker compose --profile replica run --rm litestream \
 docker compose up -d
 ```
 
-Las fotos (`media/`) no las copia Litestream. Para ellas se puede seguir
-usando `scripts/respaldo_drive.sh` (rclone) desde el cron del servidor sobre
-`/opt/bitacora/media` y `/opt/bitacora/backups`.
+### Fotos y usuarios
+
+Litestream solo copia la base. El servicio `fotos` (mismo perfil `replica`,
+mismas llaves) sube `media/` y `data/users.json` a `<bucket>/fotos/` al
+arrancar y luego cada 6 horas. Solo sube lo nuevo, y una foto borrada en el
+servidor **se conserva** en la nube. Usa `deploy/fotos_r2.sh`.
+
+```bash
+docker compose --profile replica up -d      # arranca litestream y fotos
+docker compose logs fotos --tail 20         # debe decir "Copia completa"
+```
+
+**Restaurar las fotos** (servidor nuevo o carpeta dañada):
+
+```bash
+docker compose --profile replica run --rm --no-deps \
+  -e FOTOS_SOLO_CONFIG=1 -v "$PWD/media:/restaurar" --entrypoint sh fotos -c \
+  '. /deploy/fotos_r2.sh && rclone copy "r2:$DESTINO/media" /restaurar -v'
+```
 
 ---
 

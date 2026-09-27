@@ -81,6 +81,28 @@ services:
       - ./data:/app/data
       - ./deploy/litestream.yml:/etc/litestream.yml:ro
 
+  # Fotos y users.json al mismo bucket de Litestream (Litestream solo copia la
+  # base). Solo lectura sobre las carpetas; sube lo nuevo cada 6 h.
+  fotos:
+    image: rclone/rclone:1.68
+    profiles: ["replica"]
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file: .env
+    entrypoint: ["sh", "/deploy/fotos_r2.sh"]
+    volumes:
+      - ./media:/origen/media:ro
+      - ./data:/origen/data:ro
+      - ./deploy/fotos_r2.sh:/deploy/fotos_r2.sh:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ultima-copia-ok"]
+      interval: 5m
+      start_period: 15m
+
 volumes:
   caddy_datos:
   caddy_config:
