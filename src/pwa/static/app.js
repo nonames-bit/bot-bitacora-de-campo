@@ -495,14 +495,6 @@
       + "</div>";
   }
   function bindTablero() {
-    qa(".btn-ir-tareas, .kpi-link").forEach(function (b) {
-      b.addEventListener("click", function () {
-        window.__ltAbrir = b.getAttribute("data-lt") || null;
-        irAVista(b.getAttribute("data-vista"));
-        cargar(true);
-        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
-      });
-    });
     var btnVerTodos = document.getElementById("btn-ver-todos-eventos-tablero");
     if (btnVerTodos) {
       btnVerTodos.addEventListener("click", function () {
@@ -699,12 +691,11 @@
       + "<div style='display:flex; gap:6px; align-items:center;'>" + pdfBtn + "</div>"
       + "</div>";
     // KPIs tocables: llevan a la vista (y a la lista de trabajo) de cada dato.
-    function kpiLink(html, vista, lt) {
-      return "<div class='kpi-link' role='button' tabindex='0' data-vista='" + vista + "'" + (lt ? " data-lt='" + lt + "'" : "") + ">" + html + "</div>";
-    }
+    function kpiLink(html, vista, lt, sec) { return kpiIr(html, { vista: vista, lt: lt, sec: sec }); }
     h += "<div class='kpis'>"
-      + kpiLink(kpi(d.activos, "Activos"), "inventario") + kpiLink(kpi(d.hembras, "Hembras"), "inventario")
-      + kpiLink(kpi(d.machos, "Machos"), "inventario")
+      + kpiLink(kpi(d.activos, "Activos"), "inventario", null, "Estructura del hato")
+      + kpiLink(kpi(d.hembras, "Hembras"), "inventario", null, "Estructura del hato")
+      + kpiLink(kpi(d.machos, "Machos"), "inventario", null, "Estructura del hato")
       + kpiLink(kpi(d.partos_7d, "Partos 7d", d.partos_7d > 0 ? "alerta" : ""), "repro", "partos")
       + kpiLink(kpi(d.celos_7d, "Celos 7d"), "repro", "celos") + kpiLink(kpi(d.servicios_7d, "Serv. 7d"), "repro", "palpar")
       + kpiLink(kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : ""), "sanidad", "tratamientos") + "</div>";
@@ -1124,6 +1115,85 @@
       });
   });
 
+  // ---------- Recuadros (KPI) tocables en todas las vistas ----------
+  // kpiIr(html, {vista, lt, sec, tab, filtro}): vista = ir a otra pantalla;
+  // lt = abrir esa lista de trabajo; sec = texto del título de la sección a
+  // la que se baja; tab = pestaña de la ficha; filtro = filtro de la agenda
+  // de pesaje (NUNCA / VENCIDO).
+  function kpiIr(html, dest) {
+    dest = dest || {};
+    var attrs = "";
+    ["vista", "lt", "sec", "tab", "filtro"].forEach(function (k) {
+      if (dest[k]) attrs += " data-" + k + "='" + esc(dest[k]) + "'";
+    });
+    return "<div class='kpi-link' role='button' tabindex='0'" + attrs + ">" + html + "</div>";
+  }
+  // Busca el título de sección por su texto propio (sin contar el de sus
+  // hijos, para no confundirlo con el contenedor de toda la vista).
+  function irASeccion(texto) {
+    if (!texto) return;
+    var cont = document.getElementById("vista") || document.body;
+    var t = String(texto).toLowerCase();
+    var todos = cont.querySelectorAll("h3, h4, summary, b, div, span, p");
+    for (var j = 0; j < todos.length; j++) {
+      var el = todos[j];
+      if (el.closest(".kpi-link, .kpis")) continue;
+      var propio = "";
+      for (var n = 0; n < el.childNodes.length; n++) {
+        if (el.childNodes[n].nodeType === 3) propio += el.childNodes[n].nodeValue;
+      }
+      if (propio.toLowerCase().indexOf(t) === -1) continue;
+      // Resaltar la tarjeta de la sección, salvo que sea la de toda la vista.
+      var card = el.closest(".card, details");
+      var marco = (card && !card.querySelector(".kpis")) ? card : el;
+      var y = el.getBoundingClientRect().top + window.pageYOffset - 80;
+      try { window.scrollTo({ top: y, behavior: "smooth" }); } catch (e) { window.scrollTo(0, y); }
+      marco.classList.add("kpi-destacado");
+      setTimeout(function () { marco.classList.remove("kpi-destacado"); }, 1800);
+      return;
+    }
+  }
+  function aplicarDestinoLocal(lt, filtro, sec) {
+    if (lt) {
+      var bl = q(".lt-card .btn-lt[data-lt='" + lt + "']");
+      if (bl) { bl.click(); if (!sec) { var card = bl.closest(".lt-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); } }
+    }
+    if (filtro) {
+      var bf = q(".btn-filtro-pes[data-filtro='est'][data-valor='" + filtro + "']");
+      if (bf) bf.click();
+    }
+    if (sec) irASeccion(sec);
+  }
+  function irADestinoKpi(el) {
+    var v = el.getAttribute("data-vista"), lt = el.getAttribute("data-lt"),
+        sec = el.getAttribute("data-sec"), tab = el.getAttribute("data-tab"),
+        filtro = el.getAttribute("data-filtro");
+    if (tab) {
+      var bt = q("#ficha-tabs button[data-tab='" + tab + "']");
+      if (bt) { bt.click(); try { bt.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) { /* noop */ } }
+      if (sec) setTimeout(function () { irASeccion(sec); }, 60);
+      return;
+    }
+    if (v && v !== actual) {
+      window.__ltAbrir = lt || null;
+      window.__kpiDestino = (sec || filtro) ? { sec: sec, filtro: filtro } : null;
+      irAVista(v);
+      cargar(true);
+      try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
+      return;
+    }
+    aplicarDestinoLocal(lt, filtro, sec);
+  }
+  document.addEventListener("click", function (e) {
+    var el = e.target && e.target.closest ? e.target.closest(".kpi-link, .btn-ir-tareas") : null;
+    if (el) irADestinoKpi(el);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    var el = e.target && e.target.classList && e.target.classList.contains("kpi-link") ? e.target : null;
+    if (el) { e.preventDefault(); irADestinoKpi(el); }
+  });
+
   // Tarjeta "Tareas de hoy" del Tablero: conteos por vista.
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
@@ -1180,10 +1250,10 @@
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
-      + kpi("<span class='chip " + semNitr + "' style='font-size:13px; font-weight:700;'><b>" + esc(txtNitr) + "</b></span>", "Termo Nitrógeno Líquido", termo && termo.dias_restantes <= 3 ? "alerta" : "ok")
-      + kpi(esc(totalPaj) + " pajillas", "Stock Total de Semen", "ok")
-      + kpi(esc(pajuelas.length) + " toros activos", "Reproductores Disponibles")
-      + (alertasPaj.length ? kpi("<span class='chip rojo'><b>" + alertasPaj.length + " en riesgo</b></span>", "Alertas Stock ≤ 3 pajillas", "alerta") : "")
+      + kpiIr(kpi("<span class='chip " + semNitr + "' style='font-size:13px; font-weight:700;'><b>" + esc(txtNitr) + "</b></span>", "Termo Nitrógeno Líquido", termo && termo.dias_restantes <= 3 ? "alerta" : "ok"), { sec: "Banco de Semen" })
+      + kpiIr(kpi(esc(totalPaj) + " pajillas", "Stock Total de Semen", "ok"), { sec: "Banco de Semen" })
+      + kpiIr(kpi(esc(pajuelas.length) + " toros activos", "Reproductores Disponibles"), { sec: "Banco de Semen" })
+      + (alertasPaj.length ? kpiIr(kpi("<span class='chip rojo'><b>" + alertasPaj.length + " en riesgo</b></span>", "Alertas Stock ≤ 3 pajillas", "alerta"), { sec: "Banco de Semen" }) : "")
       + "</div>";
 
     if (pajuelas.length) {
@@ -1252,10 +1322,10 @@
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
-      + kpi(esc(metricasIatf.lotes_en_curso || 0) + " activo(s)", "Lotes en Curso", (metricasIatf.lotes_en_curso > 0 ? "ok" : ""))
-      + kpi(esc(metricasIatf.total_hembras_sincronizadas || 0) + " vientres", "Hembras Sincronizadas", "ok")
-      + kpi((metricasIatf.total_prenadas || 0) + " / " + (metricasIatf.total_diagnosticadas || 0), "Preñadas IATF Confirmadas")
-      + kpi(metricasIatf.tasa_prenez_global_pct != null ? (metricasIatf.tasa_prenez_global_pct + "%") : "—", "Tasa Preñez IATF", metricasIatf.tasa_prenez_global_pct != null && metricasIatf.tasa_prenez_global_pct >= 50 ? "ok" : "")
+      + kpiIr(kpi(esc(metricasIatf.lotes_en_curso || 0) + " activo(s)", "Lotes en Curso", (metricasIatf.lotes_en_curso > 0 ? "ok" : "")), { sec: "Sincronizaciones IATF" })
+      + kpiIr(kpi(esc(metricasIatf.total_hembras_sincronizadas || 0) + " vientres", "Hembras Sincronizadas", "ok"), { sec: "Sincronizaciones IATF" })
+      + kpiIr(kpi((metricasIatf.total_prenadas || 0) + " / " + (metricasIatf.total_diagnosticadas || 0), "Preñadas IATF Confirmadas"), { sec: "Sincronizaciones IATF" })
+      + kpiIr(kpi(metricasIatf.tasa_prenez_global_pct != null ? (metricasIatf.tasa_prenez_global_pct + "%") : "—", "Tasa Preñez IATF", metricasIatf.tasa_prenez_global_pct != null && metricasIatf.tasa_prenez_global_pct >= 50 ? "ok" : ""), { sec: "Sincronizaciones IATF" })
       + "</div>";
 
     if (lotesIatf.length) {
@@ -1405,13 +1475,13 @@
     h += "<h4>" + icon("chartBar") + "Indicadores del hato</h4>";
     var pm = d.perdidas || {};
     h += "<div class='kpis'>"
-      + kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio")
-      + kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : "")
-      + kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción")
-      + kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok")
-      + kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto")
-      + kpi((pm.tasa_perdida_pct != null ? pm.tasa_perdida_pct + "%" : "—"), "Pérdidas gestacionales (" + (pm.perdidas || 0) + ")", (pm.tasa_perdida_pct || 0) >= 5 ? "alerta" : "")
-      + kpi((pm.tasa_distocia_pct != null ? pm.tasa_distocia_pct + "%" : "—"), "Partos difíciles (" + (pm.distocias || 0) + ")", (pm.tasa_distocia_pct || 0) >= 10 ? "alerta" : "")
+      + kpiIr(kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio"), { sec: "Intervalo Entre Partos" })
+      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción"), { sec: "Efectividad de Inseminadores" })
+      + kpiIr(kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok"), { sec: "Efectividad de Inseminadores" })
+      + kpiIr(kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto"), { sec: "Novillas entoradas" })
+      + kpiIr(kpi((pm.tasa_perdida_pct != null ? pm.tasa_perdida_pct + "%" : "—"), "Pérdidas gestacionales (" + (pm.perdidas || 0) + ")", (pm.tasa_perdida_pct || 0) >= 5 ? "alerta" : ""), { sec: "Diagnósticos de gestación recientes" })
+      + kpiIr(kpi((pm.tasa_distocia_pct != null ? pm.tasa_distocia_pct + "%" : "—"), "Partos difíciles (" + (pm.distocias || 0) + ")", (pm.tasa_distocia_pct || 0) >= 10 ? "alerta" : ""), { sec: "Diagnósticos de gestación recientes" })
       + "</div>";
 
     // Pérdidas gestacionales y distocias (cierre Fase 5.2): últimas
@@ -1599,12 +1669,12 @@
 
     var k = d.kpis || {};
     h += "<div class='kpis' style='margin-bottom:14px;'>"
-      + kpi(esc(k.sin_pesar_nunca || 0), "Nunca pesados", (k.sin_pesar_nunca > 0 ? "alerta" : "ok"))
-      + kpi(esc(k.sin_pesar_vencidos || 0), "Sin pesar > 60 d", (k.sin_pesar_vencidos > 0 ? "alerta" : "ok"))
-      + kpi(esc(k.a_pesar_edad || 0), "Pendientes de pesar", (k.a_pesar_edad > 0 ? "alerta" : "ok"))
-      + kpi(esc(k.destetes_12m || 0), "Destetes (12m)")
-      + kpi(esc(k.proyeccion_destetes || 0), "Destetes proyectados")
-      + kpi(esc(k.prueba_n || 0), "En prueba")
+      + kpiIr(kpi(esc(k.sin_pesar_nunca || 0), "Nunca pesados", (k.sin_pesar_nunca > 0 ? "alerta" : "ok")), { sec: "Agenda de pesaje", filtro: "NUNCA" })
+      + kpiIr(kpi(esc(k.sin_pesar_vencidos || 0), "Sin pesar > 60 d", (k.sin_pesar_vencidos > 0 ? "alerta" : "ok")), { sec: "Agenda de pesaje", filtro: "VENCIDO" })
+      + kpiIr(kpi(esc(k.a_pesar_edad || 0), "Pendientes de pesar", (k.a_pesar_edad > 0 ? "alerta" : "ok")), { sec: "Agenda de pesaje" })
+      + kpiIr(kpi(esc(k.destetes_12m || 0), "Destetes (12m)"), { sec: "Destete / Índice productivo" })
+      + kpiIr(kpi(esc(k.proyeccion_destetes || 0), "Destetes proyectados"), { sec: "Proyección de destetes" })
+      + kpiIr(kpi(esc(k.prueba_n || 0), "En prueba"), { sec: "Prueba de comportamiento" })
       + "</div>";
     h += renderListaTrabajo(d.tareas, ltClaves("carne"), "Lista de trabajo · Carne");
 
@@ -1988,15 +2058,15 @@
       if (simple) {
         var etiquetaEstado = ndviProm == null ? "Sin datos" : Number(ndviProm) >= 0.6 ? "Excelente" : Number(ndviProm) >= 0.4 ? "Regular" : "Bajo";
         h += "<div class='kpis'>"
-          + kpi("<span class='chip " + chipNdvi + "' style='font-size:16px; padding:6px 14px;'><b>" + esc(etiquetaEstado) + "</b></span>", "Estado general del pasto")
+          + kpiIr(kpi("<span class='chip " + chipNdvi + "' style='font-size:16px; padding:6px 14px;'><b>" + esc(etiquetaEstado) + "</b></span>", "Estado general del pasto"), { sec: "Tablero Integral de Potreros" })
           + "</div>";
       } else {
         h += "<div class='kpis'>"
-          + kpi("<span class='chip " + chipNdvi + "' style='font-size:14px;'><b>" + esc(ndviProm != null ? ndviProm : "—") + "</b></span>", "NDVI Promedio Finca")
-          + kpi(esc(sat.modo_activo || "Radar SAR"), "Sensor Principal")
-          + (sat.promedio_biomasa_kg_ha != null ? kpi(esc(Math.round(sat.promedio_biomasa_kg_ha).toLocaleString()) + " kg/ha", "Biomasa Promedio MS") : "")
-          + (sat.promedio_aforo_kg_m2 != null ? kpi(esc(sat.promedio_aforo_kg_m2) + " kg/m²", "Aforo Promedio MV") : "")
-          + kpi(esc(sat.cobertura_clima || "100% Todo Clima"), "Cobertura Climática", "ok")
+          + kpiIr(kpi("<span class='chip " + chipNdvi + "' style='font-size:14px;'><b>" + esc(ndviProm != null ? ndviProm : "—") + "</b></span>", "NDVI Promedio Finca"), { sec: "Visualización Gráfica de Potreros" })
+          + kpiIr(kpi(esc(sat.modo_activo || "Radar SAR"), "Sensor Principal"), { sec: "Visualización Gráfica de Potreros" })
+          + (sat.promedio_biomasa_kg_ha != null ? kpiIr(kpi(esc(Math.round(sat.promedio_biomasa_kg_ha).toLocaleString()) + " kg/ha", "Biomasa Promedio MS"), { sec: "Tablero Integral de Potreros" }) : "")
+          + (sat.promedio_aforo_kg_m2 != null ? kpiIr(kpi(esc(sat.promedio_aforo_kg_m2) + " kg/m²", "Aforo Promedio MV"), { sec: "Tablero Integral de Potreros" }) : "")
+          + kpiIr(kpi(esc(sat.cobertura_clima || "100% Todo Clima"), "Cobertura Climática", "ok"), { sec: "Pluviómetro Local" })
           + "</div>";
       }
     }
@@ -2758,11 +2828,11 @@
 
     // 1. KPIs Ejecutivos de Producción
     h += "<div class='kpis'>"
-      + kpi(totalLitros.toLocaleString("es-CO") + " L", "Total período (" + diasCount + " días)", "ok")
-      + kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok")
-      + (pico ? kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")") : "")
-      + (piso ? kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")") : "")
-      + (litrosPorVaca != null ? kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Promedio litros/vaca/día") : "")
+      + kpiIr(kpi(totalLitros.toLocaleString("es-CO") + " L", "Total período (" + diasCount + " días)", "ok"), { sec: "Detalle de Entregas Diarias" })
+      + kpiIr(kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok"), { sec: "Curva de Producción Diaria" })
+      + (pico ? kpiIr(kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
+      + (piso ? kpiIr(kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
+      + (litrosPorVaca != null ? kpiIr(kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Promedio litros/vaca/día"), { sec: "Vacas paridas" }) : "")
       + "</div>";
 
     // 1b. Vacas en ordeño vs realmente ordeñándose -- el "litros/vaca/día"
@@ -2943,9 +3013,9 @@
       + "</div>";
 
     h += "<div class='kpis'>"
-      + kpi(fmtMoneda(r.total_ingresos), "Ingresos " + esc(d.desde || "") + " a " + esc(d.hasta || ""), "ok")
-      + kpi(fmtMoneda(r.total_egresos), "Egresos", "alerta")
-      + kpi(fmtMoneda(r.utilidad), "Utilidad", r.utilidad >= 0 ? "ok" : "alerta")
+      + kpiIr(kpi(fmtMoneda(r.total_ingresos), "Ingresos " + esc(d.desde || "") + " a " + esc(d.hasta || ""), "ok"), { sec: "Movimientos recientes" })
+      + kpiIr(kpi(fmtMoneda(r.total_egresos), "Egresos", "alerta"), { sec: "Desglose por categoría" })
+      + kpiIr(kpi(fmtMoneda(r.utilidad), "Utilidad", r.utilidad >= 0 ? "ok" : "alerta"), { sec: "Indicadores de rentabilidad" })
       + "</div>";
 
     var kf = d.kpis || {};
@@ -3006,9 +3076,9 @@
 
     // Resumen Global de Rentabilidad
     h += "<div class='kpis'>"
-      + kpi(kf.margen_utilidad_pct != null ? kf.margen_utilidad_pct + "%" : "—", "Margen global de utilidad", kf.margen_utilidad_pct != null && kf.margen_utilidad_pct < 0 ? "alerta" : "ok")
-      + kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza hato (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)")
-      + kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta")
+      + kpiIr(kpi(kf.margen_utilidad_pct != null ? kf.margen_utilidad_pct + "%" : "—", "Margen global de utilidad", kf.margen_utilidad_pct != null && kf.margen_utilidad_pct < 0 ? "alerta" : "ok"), { sec: "Línea de Producción: Leche" })
+      + kpiIr(kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza hato (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)"), { sec: "Desglose por categoría" })
+      + kpiIr(kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta"), { sec: "Movimientos recientes" })
       + "</div>";
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
       h += "<p class='aviso' style='margin-top:-6px;'>⚠️ Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
@@ -4944,12 +5014,12 @@
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("cow") + "Inventario y Población</h3>"
       + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + barraDescargaSeccion("inventario", "Inventario") + expBtn + "</div>"
       + "</div>" + erroresHtml(d);
-    h += "<div class='kpis'>" + kpi(d.total_activos, "Activos totales")
-      + kpi(d.total_hembras, "Hembras") + kpi(d.total_machos, "Machos")
-      + kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio")
-      + kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : "")
-      + kpi(d.terneros_menor_12m, "Crías <12m")
-      + (d.tasa_descarte ? kpi(d.tasa_descarte.pct + "%", "Tasa de descarte " + d.tasa_descarte.ano, d.tasa_descarte.pct > 20 ? "alerta" : "") : "")
+    h += "<div class='kpis'>" + kpiIr(kpi(d.total_activos, "Activos totales"), { sec: "Estructura del hato" })
+      + kpiIr(kpi(d.total_hembras, "Hembras"), { sec: "Pirámide de edades" }) + kpiIr(kpi(d.total_machos, "Machos"), { sec: "Pirámide de edades" })
+      + kpiIr(kpi(d.edad_promedio != null ? d.edad_promedio + "a" : "—", "Edad promedio"), { sec: "Distribución por Categorías de Edad" })
+      + kpiIr(kpi(d.total_sin_sexo, "Sin clasificar", d.total_sin_sexo > 0 ? "alerta" : ""), { sec: "Animales sin" })
+      + kpiIr(kpi(d.terneros_menor_12m, "Crías <12m"), { sec: "Pirámide de edades" })
+      + (d.tasa_descarte ? kpiIr(kpi(d.tasa_descarte.pct + "%", "Tasa de descarte " + d.tasa_descarte.ano, d.tasa_descarte.pct > 20 ? "alerta" : ""), { vista: "carne", lt: "descarte" }) : "")
       + "</div>";
     h += grafico("waterfall_inventario", "Movimientos del hato (entradas/salidas)");
     var eh = d.estructura_hato;
@@ -5058,9 +5128,9 @@
 
     // 1. KPIs
     h += "<div class='kpis'>"
-      + kpi(totalAct, "Hato activo")
-      + kpi(tip, "Con desglose racial (" + pctTip + "%)", "ok")
-      + kpi(d.indeterminados || 0, "Sin desglose (base SG)")
+      + kpiIr(kpi(totalAct, "Hato activo"), { sec: "Grados de sangre" })
+      + kpiIr(kpi(tip, "Con desglose racial (" + pctTip + "%)", "ok"), { sec: "Pool genético" })
+      + kpiIr(kpi(d.indeterminados || 0, "Sin desglose (base SG)"), { sec: "Familias de cruce" })
       + "</div>";
 
     // 2. Grados de sangre: barra apilada + leyenda (clic = filtra familias)
@@ -9277,8 +9347,8 @@
       + kpi(ramTxt, ramSub, ramClase)
       + kpi(diskTxt, diskSub, diskClase)
       + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
-      + kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo", "ok")
-      + (d.en_linea_count !== undefined ? kpi(String(d.en_linea_count), "Usuarios en Línea", d.en_linea_count > 0 ? "ok" : "") : "")
+      + kpiIr(kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo", "ok"), { vista: "inventario" })
+      + (d.en_linea_count !== undefined ? kpiIr(kpi(String(d.en_linea_count), "Usuarios en Línea", d.en_linea_count > 0 ? "ok" : ""), { vista: "usuarios" }) : "")
       + "</div>";
 
     // 1. Sincronización Software Ganadero (SG)
@@ -11561,20 +11631,20 @@
       }
 
       h += "<div class='kpis' style='margin-bottom:14px;'>"
-        + kpi(reproKpiVal, "Estado Repro", reproKpiClase)
-        + kpi(daOgestVal, daOgestLabel, (daOgestLabel === "Días Abiertos" && er.dias_abiertos > 90) ? "alerta" : "")
-        + kpi(lacKpiVal, "Lactancia")
-        + kpi(potreroKpiVal, potreroKpiLabel)
-        + kpi(f.en_retiro ? "EN RETIRO" : ultPesoTxt, f.en_retiro ? "Inocuidad" : "Último Pesaje", f.en_retiro ? "alerta" : "")
+        + kpiIr(kpi(reproKpiVal, "Estado Repro", reproKpiClase), { tab: "repro" })
+        + kpiIr(kpi(daOgestVal, daOgestLabel, (daOgestLabel === "Días Abiertos" && er.dias_abiertos > 90) ? "alerta" : ""), { tab: "repro" })
+        + kpiIr(kpi(lacKpiVal, "Lactancia"), { tab: "leche" })
+        + kpiIr(kpi(potreroKpiVal, potreroKpiLabel), { sec: "Últimos movimientos de potrero" })
+        + kpiIr(kpi(f.en_retiro ? "EN RETIRO" : ultPesoTxt, f.en_retiro ? "Inocuidad" : "Último Pesaje", f.en_retiro ? "alerta" : ""), { tab: "pesos" })
         + "</div>";
     } else {
       var rolKpi = esc(ef.badge || f.categoria_sg || "Activo");
       h += "<div class='kpis' style='margin-bottom:14px;'>"
-        + kpi(rolKpi, "Categoría / Estado")
-        + kpi(potreroKpiVal, potreroKpiLabel)
+        + kpiIr(kpi(rolKpi, "Categoría / Estado"), { tab: "genealogia" })
+        + kpiIr(kpi(potreroKpiVal, potreroKpiLabel), { sec: "Últimos movimientos de potrero" })
         + kpi(f.edad_str ? esc(f.edad_str) : (f.edad_dias != null ? f.edad_dias + " d" : "—"), "Edad")
-        + kpi(ultPesoTxt, "Último Pesaje")
-        + kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok")
+        + kpiIr(kpi(ultPesoTxt, "Último Pesaje"), { tab: "pesos" })
+        + kpiIr(kpi(f.en_retiro ? "EN RETIRO" : "APTO", "Inocuidad Sanitaria", f.en_retiro ? "alerta" : "ok"), { tab: "sanidad" })
         + "</div>";
     }
 
@@ -13531,6 +13601,11 @@
       if (actual === "agenda") bindAgenda();
       if (actual === "sanidad") bindSanidad();
       if (actual === "genetica") bindGenetica(d);
+      if (window.__kpiDestino) {
+        var kd = window.__kpiDestino;
+        window.__kpiDestino = null;
+        setTimeout(function () { aplicarDestinoLocal(null, kd.filtro, kd.sec); }, 80);
+      }
     }, animar ? vista : null);
   }
 
