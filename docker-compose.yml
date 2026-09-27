@@ -11,8 +11,16 @@ x-bitacora: &bitacora
   build: .
   restart: unless-stopped
   env_file: .env
+  # Rutas dentro del contenedor: se fijan aquí para que un .env heredado de
+  # la instalación sin Docker (USERS_FILE=src/server/users.json,
+  # PWA_HOST=127.0.0.1, ...) no las pise. "environment" gana sobre "env_file".
   environment:
+    BITACORA_DB: /app/data/bitacora.db
+    USERS_FILE: /app/data/users.json
+    MEDIA_DIR: media
     LOG_FILE: /app/data/bot.log
+    PWA_HOST: 0.0.0.0
+    PWA_PORT: "8080"
   volumes:
     - ./data:/app/data
     - ./media:/app/media
