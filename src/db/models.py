@@ -157,6 +157,20 @@ CREATE TABLE IF NOT EXISTS secados (
 -- fecha_fin es NULL la pausa está abierta (la vaca no se está ordeñando);
 -- se usa para no contarla en el promedio de litros/vaca/día del recibo de
 -- quincena (ver Database.resumen_ordeno).
+-- Manejo de campo por animal: topizado, castración, marcación (hierro) y
+-- vacunas de ciclo (aftosa, brucelosis). Alimenta las listas de trabajo.
+CREATE TABLE IF NOT EXISTS manejos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    animal_id INTEGER NOT NULL,
+    fecha TEXT,
+    tipo TEXT NOT NULL,
+    producto TEXT,
+    lote_producto TEXT,
+    notas TEXT,
+    creado_en TEXT,
+    registrado_por INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS pausas_ordeno (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     animal_id INTEGER NOT NULL,
@@ -334,6 +348,7 @@ CREATE TABLE IF NOT EXISTS monitoreo_satelital_ndvi (
 );
 
 CREATE INDEX IF NOT EXISTS idx_animales_tag ON animales(tag);
+CREATE INDEX IF NOT EXISTS idx_manejos_animal_tipo ON manejos(animal_id, tipo);
 CREATE INDEX IF NOT EXISTS idx_animales_estado ON animales(estado);
 CREATE INDEX IF NOT EXISTS idx_animales_potrero ON animales(potrero_id);
 CREATE INDEX IF NOT EXISTS idx_partos_vaca_fecha ON partos(vaca_id, fecha);
@@ -646,7 +661,7 @@ CREATE INDEX IF NOT EXISTS idx_composicion_raza ON composicion_racial(raza);
 # Orden de creación (potreros y animales antes que sus referencias).
 TABLAS = [
     "potreros", "animales", "partos", "muertes", "servicios", "celos",
-    "tratamientos", "traslados", "destetes", "secados", "pausas_ordeno", "pesajes", "movimientos", "condicion_corporal",
+    "tratamientos", "traslados", "destetes", "secados", "manejos", "pausas_ordeno", "pesajes", "movimientos", "condicion_corporal",
     "produccion_leche", "alertas", "fotos", "import_sg_historial", "consultas_animal",
     "recordatorios_programados", "diagnosticos_gestacion", "pajuelas_inventario",
     "termo_nitrogeno", "pluviometria", "aforos_historico", "aforos_ronda", "monitoreo_satelital_ndvi",

@@ -239,6 +239,15 @@ def _calcular_novillas_entoradas(vientres, hoy: date) -> list[dict]:
     return out
 
 
+def datos_lista_trabajo(db: Database, hoy: Optional[date] = None, usar_cache: bool = False) -> dict:
+    """Listas de trabajo del día (ver ``engine/tareas.py``)."""
+    try:
+        from .tareas import datos_tareas
+    except ImportError:  # ejecución directa
+        from src.engine.tareas import datos_tareas  # type: ignore
+    return datos_tareas(db, hoy, usar_cache=usar_cache)
+
+
 def _inventario_por_potrero_real(db: Database) -> list[dict]:
     """Inventario presente: solo potreros reales (geom WGS84), solo ACTIVOS,
     por potrero vigente (potrero_id y, si falta, último traslado: POTRERO_ACTUAL_EXPR). Añade "Sin potrero" solo si hay
@@ -643,6 +652,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "celos_7d": celos_7d,
         "servicios_7d": servicios_7d,
         "retiros_activos": retiros,
+        "tareas_conteos": (datos_lista_trabajo(db, hoy, usar_cache=True).get("conteos") or {}),
         "por_potrero": por_potrero,
         "potrero_filtro": potrero,
         "eventos_recientes": eventos_recientes,
@@ -993,6 +1003,7 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "servicios_rango": {"desde": desde_d.isoformat(), "hasta": hasta_d.isoformat()},
         "novillas_entoradas": novillas_entoradas,
         "reproductores_estado": reproductores_estado,
+        "lista_trabajo": datos_lista_trabajo(db, hoy),
     }
     if errores:
         out["errores"] = errores
@@ -1247,6 +1258,7 @@ def datos_carne(db: Database, desde: Optional[str] = None, hasta: Optional[str] 
         "indice_productivo": indice_productivo,
         "proyeccion_destetes": proyeccion_destetes,
         "proyeccion_destetes_mes": proyeccion_destetes_mes,
+        "tareas": datos_lista_trabajo(db, hoy),
         "prueba_comportamiento": {
             "desde": desde_d.isoformat(), "hasta": hasta_d.isoformat(),
             "animales": prueba_animales, "gmd_promedio": prueba_promedio,
@@ -1311,7 +1323,8 @@ def datos_sanidad(db: Database) -> dict:
         logger.error("seccion ultimos_tratamientos fallo", exc_info=True)
         errores["ultimos_tratamientos"] = str(e)
         ultimos = []
-    out: dict[str, Any] = {"retiros": retiros, "ultimos_tratamientos": ultimos}
+    out: dict[str, Any] = {"retiros": retiros, "ultimos_tratamientos": ultimos,
+                           "tareas": datos_lista_trabajo(db)}
     if errores:
         out["errores"] = errores
     return out
@@ -2234,6 +2247,7 @@ def datos_leche(db: Database) -> dict:
         "serie_tanque": serie,
         "resumen": resumen,
         "resumen_ordeno": resumen_ordeno,
+        "tareas": datos_lista_trabajo(db),
         "controles": controles_modernos,
         "ranking_vacas": ranking,
         "fotos_recibos": fotos_recibos,
@@ -3930,7 +3944,8 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
 
     try:
         retiros = _cnt_retiros_activos()
-        sanidad = retiros
+        c_san = datos_lista_trabajo(db, hoy, usar_cache=True).get("conteos") or {}
+        sanidad = retiros + c_san.get("vac_brucelosis", 0)
     except Exception as e:
         logger.error("seccion badges_sanidad fallo", exc_info=True)
         errores["sanidad"] = str(e)
@@ -3950,6 +3965,8 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
         )
         repro = int(r1["n"]) if r1 else 0
         repro += int(r2["n"]) if r2 else 0
+        c = datos_lista_trabajo(db, hoy, usar_cache=True).get("conteos") or {}
+        repro += sum(c.get(k, 0) for k in ("palpar", "secar", "servir", "novillas", "partos", "repetidoras"))
     except Exception as e:
         logger.error("seccion badges_repro fallo", exc_info=True)
         errores["repro"] = str(e)

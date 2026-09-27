@@ -4345,3 +4345,27 @@ body.modo-campo #vista { font-size: 15px; }
 .fila-pes-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 3px; }
 .fila-pes-cab small, .fila-pes small { color: var(--texto-suave); }
 .fila-pes-cab > small { flex: none; }
+
+/* ---- Lista de trabajo reproductiva ---- */
+.lt-card, .lt-card-leche, .lt-chequeo { padding: 16px; margin-bottom: 14px; background: var(--superficie); border-left: 5px solid var(--verde-marca); }
+.lt-card[hidden] { display: none !important; }
+.lt-titulo { font-size: 14px; font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.lt-panel[hidden], .chk-meses[hidden], .chk-ok[hidden], .chk-acciones[hidden] { display: none !important; }
+.lt-chequeo-aviso { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; border-radius: 8px; background: var(--color-ambar-bg); color: var(--color-ambar-txt); font-size: 13px; }
+.lt-chequeo-aviso span { flex: 1 1 220px; }
+.lt-chequeo-cab { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.lt-chequeo-cab b:first-child { font-size: 15px; flex: 1; }
+.lt-progreso { font-size: 13px; color: var(--texto-suave); }
+.chk-acciones, .chk-meses { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.chk-acciones .chip, .chk-meses .chip { cursor: pointer; min-height: 36px; min-width: 40px; padding: 4px 12px; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--texto); }
+.chk-seca { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; margin-left: 4px; }
+.chk-seca input { width: 20px; height: 20px; }
+.fila-chk.hecha { opacity: .75; }
+.chk-ok { margin-top: 4px; font-weight: 700; color: var(--color-verde-txt); font-size: 13px; }
+.lt-card-tablero { padding: 12px 16px; margin-bottom: 14px; background: var(--superficie); border-left: 5px solid var(--verde-marca); }
+.lt-card-tablero .chip { cursor: pointer; min-height: 36px; padding: 4px 12px; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--texto); }
+.lt-grupo-accion { padding: 6px 10px 2px 14px; margin-left: 6px; }
+.lt-grupo-accion .chip, .chk-acciones .btn-lt-hecho { cursor: pointer; min-height: 34px; padding: 4px 12px; border: 1px solid var(--verde-marca); background: var(--color-verde-bg); color: var(--color-verde-txt); font-weight: 600; }
+.lt-producto { display: flex; gap: 6px; margin-bottom: 8px; }
+.lt-producto input { flex: 1; min-width: 0; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--borde-fuerte); font-size: 14px; }
+.fila-lt.hecha { opacity: .75; }

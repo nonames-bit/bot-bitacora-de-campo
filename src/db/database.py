@@ -1532,6 +1532,37 @@ class Database:
                                               notas="Al secado", registrado_por=registrado_por)
         return sid
 
+    TIPOS_MANEJO = ("TOPIZADO", "CASTRACION", "ENTERO", "MARCACION",
+                    "VACUNA_AFTOSA", "VACUNA_BRUCELOSIS", "VACUNA_OTRA")
+
+    def registrar_manejo(self, animal_tag, tipo, fecha=None, producto=None,
+                         lote_producto=None, notas=None, registrado_por=None) -> Optional[int]:
+        """Registra un manejo de campo (topizado, castración, marcación o
+        vacuna de ciclo). Idempotente por animal + tipo + fecha. En una
+        MARCACION con ``notas`` (el hierro) completa ``animales.hierro`` si
+        estaba vacío."""
+        tipo_n = str(tipo or "").strip().upper()
+        if tipo_n not in self.TIPOS_MANEJO:
+            raise ValueError(f"tipo de manejo no válido: {tipo}")
+        animal_id = self.resolve_animal(animal_tag)
+        if animal_id is None:
+            return None
+        f = iso(fecha) or date.today().isoformat()
+        existente = self._id_si_ya_existe("manejos", {"animal_id": animal_id, "tipo": tipo_n, "fecha": f})
+        if existente:
+            return existente
+        mid = self.insert("manejos", dict(
+            animal_id=animal_id, fecha=f, tipo=tipo_n, producto=producto,
+            lote_producto=lote_producto, notas=notas,
+            creado_en=self._ahora(), registrado_por=registrado_por,
+        ))
+        if tipo_n == "MARCACION" and notas:
+            self.execute(
+                "UPDATE animales SET hierro = ? WHERE id_animal = ? AND (hierro IS NULL OR TRIM(hierro) = '')",
+                (str(notas).strip(), animal_id),
+            )
+        return mid
+
     def registrar_pausa_ordeno(self, vaca_tag, fecha_inicio=None, motivo=None,
                                notas=None, registrado_por=None) -> Optional[int]:
         """Marca que una vaca en ordeño dejó de ordeñarse TEMPORALMENTE (ej.
