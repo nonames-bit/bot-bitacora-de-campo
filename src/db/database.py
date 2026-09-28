@@ -1721,6 +1721,32 @@ class Database:
             animal_id=aid, fecha=f, litros=float(litros or 0.0), notas=notas,
         ))
 
+    def registrar_control_leche(self, animal_tag, fecha=None, litros_am=None, litros_pm=None,
+                                registrado_por=None) -> Optional[int]:
+        """Control lechero de una vaca (ordeño de la mañana + la tarde).
+
+        Idempotente por vaca y fecha: repetir el control del día reemplaza el
+        anterior (corregir un dato no duplica la fila). No toca las filas
+        del tanque (animal_id NULL). Devuelve None si no hay litros."""
+        def _num(v):
+            try:
+                return max(0.0, float(str(v).replace(",", "."))) if v not in (None, "") else None
+            except (TypeError, ValueError):
+                return None
+        am, pm = _num(litros_am), _num(litros_pm)
+        if am is None and pm is None:
+            return None
+        aid = self.resolve_animal(animal_tag)
+        if aid is None:
+            raise ValueError(f"No existe el animal {animal_tag}")
+        f = iso(fecha) or date.today().isoformat()
+        total = round((am or 0.0) + (pm or 0.0), 2)
+        partes = [f"AM {am:g}" if am is not None else "", f"PM {pm:g}" if pm is not None else ""]
+        notas = "Control lechero " + " · ".join(x for x in partes if x)
+        self.execute("DELETE FROM produccion_leche WHERE animal_id = ? AND fecha = ? AND notas LIKE 'Control lechero%'",
+                     (aid, f))
+        return self.insert("produccion_leche", dict(animal_id=aid, fecha=f, litros=total, notas=notas))
+
     def registrar_movimiento(self, animal_tag, fecha=None, tipo_movimiento=None,
                              procedencia_destino=None, precio=None, notas=None,
                              registrado_por=None) -> int:

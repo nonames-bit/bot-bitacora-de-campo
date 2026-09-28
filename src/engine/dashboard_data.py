@@ -2199,6 +2199,20 @@ def _lotes_ordeno(db: Database) -> list[dict]:
         return []
 
 
+def _control_lechero(db: Database) -> dict:
+    """Vacas para el control lechero (AM + PM) y resumen del último control
+    (ver engine/control_lechero.py)."""
+    try:
+        try:
+            from .control_lechero import resumen_control, vacas_para_control
+        except ImportError:  # ejecución directa
+            from src.engine.control_lechero import resumen_control, vacas_para_control  # type: ignore
+        return {"vacas": vacas_para_control(db), "resumen": resumen_control(db)}
+    except Exception:
+        logger.error("control_lechero fallo", exc_info=True)
+        return {"vacas": [], "resumen": None}
+
+
 def datos_leche(db: Database) -> dict:
     """Leche: producción total diaria de la finca (tanque / recibos de quincena) +
     controles zootécnicos.
@@ -2390,6 +2404,7 @@ def datos_leche(db: Database) -> dict:
         "resumen": resumen,
         "resumen_ordeno": resumen_ordeno,
         "lotes_ordeno": _lotes_ordeno(db),
+        "control_lechero": _control_lechero(db),
         "tareas": datos_lista_trabajo(db),
         "controles": controles_modernos,
         "ranking_vacas": ranking,

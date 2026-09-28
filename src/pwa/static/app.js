@@ -849,6 +849,7 @@
     vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
     tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
     pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
+    control_leche: { nombre: "Control lechero", icono: "🥛", vacio: "Todas las vacas en ordeño tienen control del último mes." },
     bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
     venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
     descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
@@ -870,6 +871,7 @@
       case "destetar": return edad + (a.madre ? " · madre " + esc(a.madre) : "");
       case "vac_aftosa": return a.ultima ? "Última aftosa " + esc(fechaCorta(a.ultima)) : "Sin aftosa registrada";
       case "tratamientos": return esc(a.detalle);
+      case "control_leche": return esc(a.motivo) + (a.del_dias != null ? " · " + esc(a.del_dias) + " DEL" : "");
       case "pausas": return "Sin ordeñar desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
       case "bajo_peso": return esc(a.gmd_g) + " g/día · " + esc(a.peso_kg) + " kg (" + esc(fechaCorta(a.fecha)) + ")";
       case "venta": return esc(a.peso_kg) + " kg" + (edad ? " · " + edad : "");
@@ -1232,7 +1234,7 @@
   // Tarjeta "Tareas de hoy" del Tablero: conteos por vista.
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
-    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas"] },
+    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas", "control_leche"] },
     { vista: "carne", nombre: "Carne", claves: ["destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
     { vista: "sanidad", nombre: "Sanidad", claves: ["vac_brucelosis", "vac_aftosa", "tratamientos"] }
   ];
@@ -2871,6 +2873,91 @@
     });
   }
 
+  // Control lechero (AM + PM, mensual): captura en el corral y resumen del
+  // último control con listas para actuar (engine/control_lechero.py).
+  function renderControlLechero(cl) {
+    if (!cl) return "";
+    var vacas = cl.vacas || [], r = cl.resumen || {}, u = r.ultimo;
+    var h = "<div class='card' id='card-control-lechero'><h4 style='margin:0 0 6px;'>🥛 Control lechero</h4>";
+    if (u) {
+      h += "<p style='margin:0 0 8px; font-size:13px;'>Último control <b>" + esc(fechaCorta(u.fecha)) + "</b>: "
+        + esc(u.vacas) + " vacas · <b>" + esc(u.promedio) + " L/vaca</b> · total " + esc(u.total_litros) + " L"
+        + (u.tanque_litros ? " (tanque " + esc(u.tanque_litros) + " L, " + esc(u.cobertura_pct) + " %)" : "") + "</p>";
+    } else {
+      h += "<p class='aviso' style='margin:0 0 8px;'>Todavía no hay controles por vaca. Un control al mes (ordeño de la mañana y de la tarde) da el promedio real por vaca, la curva de lactancia y avisa las vacas que bajan.</p>";
+    }
+    h += "<button type='button' class='tema-btn' id='btn-hacer-control'" + (vacas.length ? "" : " disabled") + ">"
+      + "Hacer control (" + vacas.length + " vacas en ordeño)</button>";
+    h += "<div id='control-captura' hidden style='margin-top:10px;'>"
+      + "<label style='font-size:13px;'>Fecha del control <input type='date' id='control-fecha' value='" + new Date().toISOString().slice(0, 10) + "'></label>"
+      + "<p style='font-size:12px; color:var(--texto-suave); margin:6px 0;'>Litros por vaca. Deje vacío si no se ordeñó.</p>";
+    var porPot = {}, pots = [];
+    vacas.forEach(function (v) { if (!porPot[v.potrero]) { porPot[v.potrero] = []; pots.push(v.potrero); } porPot[v.potrero].push(v); });
+    pots.forEach(function (p) {
+      h += "<div style='font-weight:700; margin:10px 0 4px;'>" + esc(p) + " · " + porPot[p].length + "</div>";
+      porPot[p].forEach(function (v) {
+        h += "<div class='fila-control' data-tag='" + esc(v.tag) + "' style='display:grid; grid-template-columns:1fr 72px 72px; gap:6px; align-items:center; padding:4px 0; border-bottom:1px solid var(--borde);'>"
+          + "<span>" + enlaceFicha(v.tag) + (v.pausada ? " <small>(pausada)</small>" : "") + "<br><small>" + esc(v.del_dias) + " DEL"
+          + (v.ultimo_litros != null ? " · antes " + esc(v.ultimo_litros) + " L" : "") + "</small></span>"
+          + "<input type='number' inputmode='decimal' step='0.1' min='0' class='ctrl-am' placeholder='AM' aria-label='Litros mañana " + esc(v.tag) + "' style='min-height:44px; font-size:16px;'>"
+          + "<input type='number' inputmode='decimal' step='0.1' min='0' class='ctrl-pm' placeholder='PM' aria-label='Litros tarde " + esc(v.tag) + "' style='min-height:44px; font-size:16px;'>"
+          + "</div>";
+      });
+    });
+    h += "<p id='control-total' style='font-weight:700; margin:10px 0;'>Total: 0 L · 0 vacas</p>"
+      + "<button type='button' class='tema-btn' id='btn-guardar-control'>Guardar control</button></div>";
+    var listas = [["caida", "📉 Caída fuerte (posible mastitis)"], ["baja_produccion", "🔻 Baja producción"], ["sin_control", "⏰ Sin control"]];
+    if (r.top && r.top.length) {
+      h += "<div style='margin-top:10px;'><b>🏆 Mejores</b> " + r.top.map(function (t) { return enlaceFicha(t.tag) + " " + esc(t.litros) + " L"; }).join(" · ") + "</div>";
+    }
+    listas.forEach(function (par) {
+      var filas = r[par[0]] || [];
+      if (!filas.length) return;
+      h += "<details style='margin-top:8px;'><summary><b>" + par[1] + " · " + filas.length + "</b></summary>"
+        + filas.slice(0, 30).map(function (f) {
+          return "<div class='fila-pes'><span>" + enlaceFicha(f.tag) + (f.nombre ? " <small>" + esc(f.nombre) + "</small>" : "")
+            + "</span><small>" + esc(f.motivo || "") + "</small></div>";
+        }).join("") + "</details>";
+    });
+    return h + "</div>";
+  }
+  function bindControlLechero() {
+    var btn = document.getElementById("btn-hacer-control"), cap = document.getElementById("control-captura");
+    if (!btn || !cap) return;
+    btn.addEventListener("click", function () { cap.hidden = !cap.hidden; });
+    function num(inp) { var v = parseFloat(String(inp.value || "").replace(",", ".")); return isNaN(v) || v < 0 ? null : v; }
+    function recalcular() {
+      var total = 0, n = 0;
+      cap.querySelectorAll(".fila-control").forEach(function (f) {
+        var am = num(f.querySelector(".ctrl-am")), pm = num(f.querySelector(".ctrl-pm"));
+        if (am !== null || pm !== null) { n++; total += (am || 0) + (pm || 0); }
+      });
+      document.getElementById("control-total").textContent = "Total: " + (Math.round(total * 10) / 10) + " L · " + n + " vacas";
+    }
+    cap.addEventListener("input", recalcular);
+    document.getElementById("btn-guardar-control").addEventListener("click", function () {
+      var regs = [];
+      cap.querySelectorAll(".fila-control").forEach(function (f) {
+        var am = num(f.querySelector(".ctrl-am")), pm = num(f.querySelector(".ctrl-pm"));
+        if (am !== null || pm !== null) regs.push({ tag: f.getAttribute("data-tag"), am: am, pm: pm });
+      });
+      if (!regs.length) { mostrarToast("Anote los litros de al menos una vaca.", "ambar"); return; }
+      var b = this, fecha = document.getElementById("control-fecha").value;
+      b.disabled = true;
+      var ev = { tipo: "control_leche", payload: { registros: regs }, fecha: fecha };
+      var envio = navigator.onLine === false ? encolarOffline(ev.tipo, ev.payload, fecha)
+        : fetch("/api/sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ eventos: [ev] }) })
+          .then(function (r) { return r.json(); })
+          .then(function (res) { if (!(res.ok && res.procesados > 0)) return encolarOffline(ev.tipo, ev.payload, fecha); })
+          .catch(function () { return encolarOffline(ev.tipo, ev.payload, fecha); });
+      Promise.resolve(envio).then(function () {
+        mostrarToast("✓ Control guardado: " + regs.length + " vacas.", "verde");
+        vibrarConfirmacion();
+        cargar(true);
+      });
+    });
+  }
+
   function renderLeche(d) {
     var serie = d.serie_tanque || [];
     var res = d.resumen || {};
@@ -2894,6 +2981,7 @@
       + "</div>" + erroresHtml(d);
     h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
     h += renderLotesOrdeno(d.lotes_ordeno);
+    h += renderControlLechero(d.control_lechero);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
       h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
@@ -3037,6 +3125,7 @@
   function bindLeche() {
     bindListaTrabajo();
     bindLotesOrdeno();
+    bindControlLechero();
     var btnIa = document.getElementById("btn-ir-captura-leche");
     if (btnIa) {
       btnIa.addEventListener("click", function () {

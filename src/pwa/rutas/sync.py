@@ -303,6 +303,23 @@ def registrar(app, ctx, h):
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                    elif tipo == "control_leche":
+                        # Control lechero de varias vacas (AM + PM). Idempotente
+                        # por vaca y fecha: reenviar desde la cola offline no duplica.
+                        regs = payload.get("registros") if isinstance(payload.get("registros"), list) else []
+                        for reg in regs[:500]:
+                            if not isinstance(reg, dict) or not reg.get("tag"):
+                                continue
+                            try:
+                                db_sync.registrar_control_leche(
+                                    animal_tag=str(reg["tag"]), fecha=fecha, litros_am=reg.get("am"),
+                                    litros_pm=reg.get("pm"), registrado_por=uid,
+                                )
+                            except ValueError:
+                                errores.append(f"Control lechero: no existe la vaca {reg.get('tag')}")
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
                     elif tipo == "gasto":
                         tipo_fin = str(payload.get("tipo_finanza") or "EGRESO").strip().upper()
                         try:

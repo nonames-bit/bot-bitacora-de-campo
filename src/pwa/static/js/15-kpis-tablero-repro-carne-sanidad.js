@@ -80,7 +80,7 @@
   // Tarjeta "Tareas de hoy" del Tablero: conteos por vista.
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
-    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas"] },
+    { vista: "leche", nombre: "Leche", claves: ["secar", "pausas", "control_leche"] },
     { vista: "carne", nombre: "Carne", claves: ["destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
     { vista: "sanidad", nombre: "Sanidad", claves: ["vac_brucelosis", "vac_aftosa", "tratamientos"] }
   ];
