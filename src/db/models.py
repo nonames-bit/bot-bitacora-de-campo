@@ -562,6 +562,26 @@ CREATE TABLE IF NOT EXISTS mensajes_equipo (
 
 CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_creado ON mensajes_equipo(creado_en);
 
+-- Chat de la PWA (src/engine/chat_pwa.py): cada mensaje con su tipo detectado
+-- y, si es un registro, los eventos interpretados en espera de que el usuario
+-- toque "Confirmar" (token de un solo uso, 10 minutos). Nada se escribe en las
+-- tablas de dominio hasta la confirmación.
+CREATE TABLE IF NOT EXISTS chat_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT UNIQUE,
+    user_id TEXT,
+    canal TEXT NOT NULL,
+    texto TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    eventos_json TEXT,
+    estado TEXT NOT NULL,
+    latencia_ms INTEGER,
+    creado_en TEXT NOT NULL,
+    resuelto_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_log_creado ON chat_log(creado_en);
+
 -- Idempotencia de /api/sync (P0.1, auditoría 2026-09-23): el cliente offline
 -- genera un id_local único por evento encolado (app.js) y reintenta el POST si
 -- la respuesta se pierde (conexión rural intermitente). Sin esta tabla, un

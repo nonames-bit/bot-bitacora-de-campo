@@ -1,6 +1,7 @@
 """Interfaz principal del bot: enrutamiento de mensajes y registro de eventos."""
 from __future__ import annotations
 
+import re
 from datetime import date
 from typing import Optional
 
@@ -16,6 +17,9 @@ from ..parsers.media_handler import (MediaError, extract_image_info,
                                      transcribe_audio)
 from ..utils import add_days, iso, to_date
 
+MSG_NO_ENTENDI = ("No pude interpretar ese mensaje. Intente una nota como "
+                  "'pario la 47, ternero macho' o una pregunta.")
+
 
 class Bot:
     """Procesa mensajes (texto, audio, imagen), guarda en SQLite y responde."""
@@ -30,24 +34,30 @@ class Bot:
     # Entradas
     # ------------------------------------------------------------------ #
     def procesar_texto(self, texto: str, user_id: Optional[int] = None) -> str:
+        """Interpreta y registra de una vez (Telegram). La PWA separa los dos
+        pasos (``interpretar_texto`` + ``registrar_eventos``) para pedir
+        confirmación antes de escribir."""
+        respuestas, pendientes = self.interpretar_texto(texto)
+        if pendientes:
+            respuestas = respuestas + self.registrar_eventos(pendientes, user_id)
+        if not respuestas:
+            return MSG_NO_ENTENDI
+        return "\n".join(respuestas)
+
+    def interpretar_texto(self, texto: str) -> tuple[list[str], list[ParsedEvent]]:
+        """Parsea sin escribir: (respuestas inmediatas, eventos a registrar).
+
+        Las consultas se responden aquí; los registros quedan pendientes."""
         resultado = self.parser.parse(texto)
         eventos = resultado if isinstance(resultado, list) else [resultado]
-
-        # Agrupa partos GEMELAR de la misma vaca/fecha dentro de un mismo
-        # mensaje (ej. "pario mellizos, la 47 tuvo cria macho y cria hembra"
-        # -> el LLM puede emitir dos eventos 'parto' separados con
-        # tipo_evento=GEMELAR): el primero fija el grupo, el segundo lo
-        # referencia. Vive solo durante esta llamada (no cruza mensajes).
-        grupo_gemelar: dict[tuple, int] = {}
-
         respuestas: list[str] = []
+        pendientes: list[ParsedEvent] = []
         for ev in eventos:
             if ev.tipo == "consulta":
                 respuestas.append(self.queries.responder(ev.texto or texto))
             elif ev.tipo == "desconocido":
                 if len(eventos) == 1:
-                    return "No pude interpretar ese mensaje. Intente una nota como " \
-                           "'pario la 47, ternero macho' o una pregunta."
+                    return [MSG_NO_ENTENDI], []
             elif ev.tipo == "diagnostico_gestacion" and not ev.datos.get("resultado"):
                 # Sin resultado explícito no se registra nada: asumir PREÑADA
                 # generaba gestaciones falsas (y FEP/secados) en vacas vacías.
@@ -57,14 +67,31 @@ class Bot:
                     f"por ejemplo 'palpé la {ev.animal_tag or '47'}, preñada' o '..., vacía'."
                 )
             else:
-                self._registrar(ev, user_id, grupo_gemelar)
-                self._generar_alertas(ev)
-                respuestas.append(self._confirmacion(ev))
+                pendientes.append(ev)
+        return respuestas, pendientes
 
-        if not respuestas:
-            return "No pude interpretar ese mensaje. Intente una nota como " \
-                   "'pario la 47, ternero macho' o una pregunta."
-        return "\n".join(respuestas)
+    def registrar_eventos(self, eventos: list[ParsedEvent], user_id: Optional[int] = None) -> list[str]:
+        """Escribe los eventos ya interpretados y devuelve una confirmación por cada uno."""
+        # Agrupa partos GEMELAR de la misma vaca/fecha dentro de un mismo
+        # mensaje (ej. "pario mellizos, la 47 tuvo cria macho y cria hembra"
+        # -> el LLM puede emitir dos eventos 'parto' separados con
+        # tipo_evento=GEMELAR): el primero fija el grupo, el segundo lo
+        # referencia. Vive solo durante esta llamada (no cruza mensajes).
+        grupo_gemelar: dict[tuple, int] = {}
+        respuestas = []
+        for ev in eventos:
+            self._registrar(ev, user_id, grupo_gemelar)
+            self._generar_alertas(ev)
+            respuestas.append(self._confirmacion(ev))
+        return respuestas
+
+    def resumen_evento(self, ev: ParsedEvent) -> str:
+        """Texto para la tarjeta "¿Registro esto?" (la confirmación sin "Registrado")."""
+        txt = re.sub(r"^(🌧️ )?Registrad[oa] ", r"\1", self._confirmacion(ev))
+        txt = txt[:1].upper() + txt[1:]
+        if ev.fecha and ev.fecha != iso(self.hoy) and ev.fecha not in txt:
+            txt = txt.rstrip(".") + f" · {ev.fecha}."
+        return txt
 
     def procesar_audio(self, audio_path: str, user_id: Optional[int] = None) -> str:
         try:

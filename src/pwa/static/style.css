@@ -1677,6 +1677,34 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .chat-msg-borrar { cursor: pointer; opacity: .8; }
 .chat-msg-borrar:hover { opacity: 1; }
 
+/* Tarjeta "¿Registro esto?" del chat: nada se escribe hasta Confirmar. */
+.chat-confirmar {
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-ambar-txt);
+  background: var(--color-ambar-bg);
+  color: var(--texto);
+  border-radius: 10px;
+}
+.chat-confirmar ul { margin: 6px 0 8px; padding-left: 18px; }
+.chat-confirmar li { margin: 2px 0; }
+.chat-confirmar-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-chat-confirmar {
+  flex: 1 1 120px;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--verde-marca);
+  background: var(--verde-marca);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-chat-confirmar.secundario { background: var(--superficie); color: var(--verde-marca); }
+.btn-chat-confirmar:disabled { opacity: .55; cursor: wait; }
+.chat-confirmar.hecho { border-color: var(--color-verde-txt); background: var(--color-verde-bg); }
+.chat-confirmar.cerrado { border-color: var(--borde-fuerte); background: var(--color-gris-bg); }
+
 /* Modal de animales por potrero */
 .modal-potrero-kpis {
   display: flex;

@@ -9,6 +9,7 @@ from datetime import date
 import logging
 from flask import abort, jsonify, request, send_file, session
 from .. import app as _base
+from ...engine import chat_pwa as _chat
 from ...utils import to_date
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
@@ -203,6 +204,38 @@ def registrar(app, ctx, h):
         finally:
             db_q.close()
 
+    @app.post("/api/chat/mensaje")
+    @_limite_api("chat")
+    def api_chat_mensaje():
+        # Chat de la PWA: consultas se responden; los registros vuelven como
+        # tarjeta "¿Registro esto?" y NO se escriben hasta /api/chat/confirmar.
+        datos = request.get_json(silent=True) or {}
+        texto = str(datos.get("texto") or "").strip()
+        if not texto:
+            return jsonify({"error": "Debe enviar 'texto'."}), 400
+        if len(texto) > 2000:
+            return jsonify({"error": "El mensaje es demasiado largo (máx. 2000 caracteres)."}), 400
+        db_c = _db(db_path)
+        try:
+            return jsonify({"ok": True, **_chat.procesar_mensaje(db_c, texto, session.get("user_id"))})
+        except Exception as e:
+            logger.exception("Error en el chat de la PWA: %s", e)
+            return _error_interno(500)
+        finally:
+            db_c.close()
+
+    @app.post("/api/chat/confirmar")
+    @_limite_api("chat")
+    def api_chat_confirmar():
+        datos = request.get_json(silent=True) or {}
+        db_c = _db(db_path)
+        try:
+            res = _chat.confirmar(db_c, str(datos.get("token") or ""), session.get("user_id"),
+                                  aceptar=datos.get("aceptar", True) is not False)
+            return jsonify(res), (200 if res.get("ok") else 409)
+        finally:
+            db_c.close()
+
     @app.post("/api/voz")
     @_limite_api("voz")
     def api_voz():
@@ -232,19 +265,12 @@ def registrar(app, ctx, h):
             if not texto_transcripto:
                 return jsonify({"ok": False, "error": "No se detectó voz clara en el audio."})
 
+            # Mismo flujo que el chat escrito: un registro dictado también
+            # pide confirmación antes de escribirse.
             db_v = _db(db_path)
             try:
-                try:
-                    from ...bot.bot_interface import Bot
-                except ImportError:
-                    from src.bot.bot_interface import Bot  # type: ignore
-                bot_inst = Bot(db_v)
-                respuesta = bot_inst.procesar_texto(texto_transcripto, user_id=session.get("user_id"))
-                return jsonify({
-                    "ok": True,
-                    "transcripcion": texto_transcripto,
-                    "respuesta": respuesta,
-                })
+                res = _chat.procesar_mensaje(db_v, texto_transcripto, session.get("user_id"), canal="voz")
+                return jsonify({"ok": True, "transcripcion": texto_transcripto, **res})
             finally:
                 db_v.close()
         finally:

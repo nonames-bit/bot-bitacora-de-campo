@@ -1,3 +1,115 @@
+  /* ---------- Chat: consultas y registros con confirmación ----------
+     /api/chat/mensaje (y /api/voz) responden las consultas de una vez; un
+     registro vuelve como tarjeta "¿Registro esto?" y solo se escribe al
+     tocar Confirmar (/api/chat/confirmar). Sin señal, la nota escrita se
+     guarda en el celular y se envía sola al volver la conexión. */
+  var CLAVE_CHAT_OFFLINE = "chatNotasOffline";
+
+  function horaCortaActual() {
+    try {
+      return new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
+    } catch (e) {
+      var d = new Date();
+      var hh = d.getHours(), mm = d.getMinutes();
+      return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
+    }
+  }
+
+  function htmlRespuestaChat(d) {
+    var html = d && d.respuesta ? formatearMensajeChat(d.respuesta) : "";
+    if (d && d.token && d.confirmar && d.confirmar.length) {
+      html += (html ? "<br>" : "") +
+        "<div class='chat-confirmar' data-token='" + esc(d.token) + "'>" +
+          "<b>¿Registro esto?</b>" +
+          "<ul>" + d.confirmar.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") + "</ul>" +
+          "<div class='chat-confirmar-btns'>" +
+            "<button type='button' class='btn-chat-confirmar' data-aceptar='1'>✅ Confirmar</button>" +
+            "<button type='button' class='btn-chat-confirmar secundario' data-aceptar='0'>✏️ Corregir</button>" +
+          "</div>" +
+        "</div>";
+    }
+    return html || "Sin respuesta.";
+  }
+
+  function resolverConfirmacionChat(caja, aceptar) {
+    var botones = qa("button", caja);
+    botones.forEach(function (b) { b.disabled = true; });
+    fetch("/api/chat/confirmar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: caja.getAttribute("data-token"), aceptar: aceptar })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        var ok = d && d.ok;
+        var msg = ok ? (d.respuesta || "Listo.") : "⚠️ " + ((d && d.error) || "No se pudo registrar.");
+        caja.className = "chat-confirmar " + (ok && aceptar ? "hecho" : "cerrado");
+        caja.innerHTML = formatearMensajeChat(msg);
+        if (ok && aceptar) actualizarBadges();
+        if (ok && !aceptar) {
+          var inp = document.getElementById("chat-input");
+          if (inp) inp.focus();
+        }
+      }).catch(function () {
+        botones.forEach(function (b) { b.disabled = false; });
+        mostrarToast("Sin conexión: toque Confirmar otra vez cuando haya señal.", "rojo");
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var btn = e.target && e.target.closest ? e.target.closest(".btn-chat-confirmar") : null;
+    var caja = btn ? btn.closest(".chat-confirmar") : null;
+    if (caja && !btn.disabled) resolverConfirmacionChat(caja, btn.getAttribute("data-aceptar") === "1");
+  });
+
+  function leerChatOffline() {
+    try { return JSON.parse(localStorage.getItem(CLAVE_CHAT_OFFLINE) || "[]"); } catch (e) { return []; }
+  }
+  function guardarChatOffline(lista) {
+    try { localStorage.setItem(CLAVE_CHAT_OFFLINE, JSON.stringify(lista)); } catch (e) { /* sin almacenamiento */ }
+  }
+
+  function pintarRespuestaChat(burbuja, html) {
+    burbuja.innerHTML = "<div class='chat-msg-texto'>" + html + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div>";
+    var hist = document.getElementById("chat-historial");
+    if (hist) hist.scrollTop = hist.scrollHeight;
+  }
+
+  function enviarTextoChat(txt, burbuja) {
+    if (!navigator.onLine) {
+      var cola = leerChatOffline();
+      cola.push(txt);
+      guardarChatOffline(cola);
+      if (burbuja) pintarRespuestaChat(burbuja, "📴 Sin señal: guardé la nota y la envío cuando vuelva la conexión.");
+      return;
+    }
+    fetch("/api/chat/mensaje", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ texto: txt })
+    }).then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (burbuja) pintarRespuestaChat(burbuja, d && d.ok ? htmlRespuestaChat(d) : "⚠️ " + esc((d && d.error) || "Sin respuesta."));
+      }).catch(function (err) {
+        if (burbuja) pintarRespuestaChat(burbuja, "❌ Error de conexión: " + esc(err.message));
+      });
+  }
+
+  // Al volver la señal, se mandan las notas guardadas; cada una trae su
+  // respuesta (y su tarjeta de confirmación si es un registro).
+  window.addEventListener("online", function () {
+    var cola = leerChatOffline();
+    var hist = document.getElementById("chat-historial");
+    if (!cola.length || !hist) return;
+    guardarChatOffline([]);
+    cola.forEach(function (txt) {
+      var b = document.createElement("div");
+      b.className = "chat-msg bot";
+      b.innerHTML = "<div class='chat-msg-texto'><i>Enviando nota guardada: \"" + esc(txt) + "\"...</i></div>";
+      hist.appendChild(b);
+      enviarTextoChat(txt, b);
+    });
+  });
+
   /* ---------- Asistente IA (Chat Natural) ---------- */
   function formatearMensajeChat(raw) {
     if (!raw) return "";
@@ -152,15 +264,6 @@
     var equipoUltimoId = 0;
     var equipoUltimoVistoId = parseInt(localStorage.getItem(LS_EQUIPO_VISTO) || "0", 10) || 0;
 
-    function horaCortaActual() {
-      try {
-        return new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" });
-      } catch (e) {
-        var d = new Date();
-        var hh = d.getHours(), mm = d.getMinutes();
-        return (hh < 10 ? "0" : "") + hh + ":" + (mm < 10 ? "0" : "") + mm;
-      }
-    }
 
     function formatearHora(iso) {
       if (!iso) return horaCortaActual();
@@ -271,7 +374,7 @@
       if (hist) hist.style.display = cual === "ia" ? "" : "none";
       if (histEquipo) histEquipo.style.display = cual === "equipo" ? "" : "none";
       if (btnMic) btnMic.style.display = cual === "ia" ? "" : "none";
-      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa 🎙️..." : "Escribe un aviso para el equipo...";
+      if (inp) inp.placeholder = cual === "ia" ? "Pregunta o escribe una nota…" : "Escribe un aviso para el equipo...";
       if (cual === "equipo") {
         equipoMarcarVisto(equipoUltimoId);
         if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
@@ -329,7 +432,7 @@
 
     if (btnLimpiar && hist) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Pregúntame por el ganado o escríbeme una nota («parió la 47, hembra»); antes de guardar te pido confirmación 🎙️.</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
       });
     }
 
@@ -378,28 +481,14 @@
           hist.innerHTML += "<div class='chat-msg user'><div class='chat-msg-texto'>" + esc(txt) + "</div><div class='chat-msg-hora'>" + hUser + "</div></div>";
           botPlaceholder = document.createElement("div");
           botPlaceholder.className = "chat-msg bot";
-          botPlaceholder.innerHTML = "<div class='chat-msg-texto'><i>Consultando información ganadera...</i></div>";
+          botPlaceholder.innerHTML = "<div class='chat-msg-texto'><i>Procesando...</i></div>";
           hist.appendChild(botPlaceholder);
           hist.scrollTop = hist.scrollHeight;
         }
 
         if (inp) inp.value = "";
 
-        fetch("/api/preguntar", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ pregunta: txt })
-        }).then(function (r) { return r.json(); })
-          .then(function (d) {
-            var resp = d.respuesta || d.error || "Sin respuesta.";
-            var formateada = formatearMensajeChat(resp);
-            var hBot = horaCortaActual();
-            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formateada + "</div><div class='chat-msg-hora'>" + hBot + "</div>";
-            if (hist) hist.scrollTop = hist.scrollHeight;
-          }).catch(function (err) {
-            var hErr = horaCortaActual();
-            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
-          });
+        enviarTextoChat(txt, botPlaceholder);
       });
     }
 
@@ -529,8 +618,7 @@
               var hBot = horaCortaActual();
               if (data.ok) {
                 userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formatearMensajeChat(data.respuesta || "Registrado correctamente.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
-                actualizarBadges();
+                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + htmlRespuestaChat(data) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               } else {
                 userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
                 botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ " + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
@@ -608,9 +696,8 @@
               if (data.ok) {
                 if (estado) estado.textContent = "Nota procesada con éxito.";
                 resBox.innerHTML = "<b>Transcripción:</b> <i>\"" + esc(data.transcripcion) + "\"</i><br><br>"
-                  + "<b>Respuesta del Bot:</b><br>" + formatearMensajeChat(data.respuesta || "Registrado.");
+                  + "<b>Respuesta del Bot:</b><br>" + htmlRespuestaChat(data);
                 if (btnAccion) btnAccion.innerHTML = icon("mic", 14) + "Grabar Otra Nota";
-                actualizarBadges();
               } else {
                 if (estado) estado.textContent = "⚠️ " + esc(data.error || "No se pudo procesar");
                 if (btnAccion) btnAccion.textContent = "Reintentar";

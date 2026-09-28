@@ -887,6 +887,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         "grafico": (40, 60.0),
         "sync": (40, 60.0),
         "mensajes": (90, 60.0),
+        "chat": (40, 60.0),
     }
 
     def _limite_api(bucket: str):
