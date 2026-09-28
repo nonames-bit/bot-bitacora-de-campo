@@ -171,15 +171,22 @@ def generar_excel_inventario(db: Database) -> openpyxl.Workbook:
     ws = wb.active
     ws.title = "Hato Activo"
 
-    fila_ini = _aplicar_cabecera_hoja(ws, "Informe de Inventario de Ganado", "Hato Activo (estado = 'ACTIVO')")
-    columnas = ["Arete / Tag", "Nombre", "Sexo", "Categoría SG", "Raza", "Potrero Actual", "Peso (kg)", "Edad (meses)", "Hierro / Marca", "Color"]
+    fila_ini = _aplicar_cabecera_hoja(ws, "Informe de Inventario y Valoración de Ganado", "Hato Activo (estado = 'ACTIVO') con Valoración Comercial")
+    columnas = [
+        "Arete / Tag", "Nombre", "Sexo", "Categoría SG", "Raza", "Potrero Actual",
+        "Peso (kg)", "Edad (meses)", "Estado Reproductivo", "Valor Comercial Est. ($ COP)", "Hierro / Marca", "Color"
+    ]
+
+    pm = db.precio_referencia_hoy("BOGOTA", "MACHO_GORDO") if hasattr(db, "precio_referencia_hoy") else None
+    precio_kg = float(pm["precio"]) if pm and pm.get("precio") else 9200.0
 
     # Regla de oro de inventario: siempre estado = 'ACTIVO'
     filas_db = db.query("""
-        SELECT a.tag, a.nombre, a.sexo, a.raza,
+        SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.raza,
                COALESCE(p.nombre, a.potrero_id, 'Sin potrero') AS potrero,
                (SELECT pes.peso_kg FROM pesajes pes WHERE pes.animal_id = a.id_animal ORDER BY pes.fecha DESC, pes.id DESC LIMIT 1) AS ult_peso,
                ROUND((julianday('now') - julianday(a.fecha_nacimiento)) / 30.4375, 1) AS edad_meses,
+               (SELECT d.resultado FROM diagnosticos_gestacion d WHERE d.vaca_id = a.id_animal ORDER BY d.fecha DESC LIMIT 1) AS ult_diag,
                a.hierro, a.color, a.fecha_nacimiento
         FROM animales a
         LEFT JOIN potreros p ON p.id = a.potrero_id OR p.codigo = a.potrero_id
@@ -188,9 +195,17 @@ def generar_excel_inventario(db: Database) -> openpyxl.Workbook:
     """)
 
     datos = []
+    total_peso = 0.0
+    total_valor = 0.0
     for r in filas_db:
         categoria = _categoria_sg(r["sexo"], r["fecha_nacimiento"],
                                   f"{r['nombre'] or ''} {r['tag'] or ''}")
+        peso = float(r["ult_peso"]) if r["ult_peso"] is not None else None
+        valor_est = round(peso * precio_kg) if peso else None
+        if peso:
+            total_peso += peso
+        if valor_est:
+            total_valor += valor_est
         datos.append([
             str(r["tag"] or ""),
             str(r["nombre"] or ""),
@@ -198,15 +213,29 @@ def generar_excel_inventario(db: Database) -> openpyxl.Workbook:
             categoria,
             str(r["raza"] or ""),
             str(r["potrero"] or ""),
-            float(r["ult_peso"]) if r["ult_peso"] is not None else None,
+            peso,
             float(r["edad_meses"]) if r["edad_meses"] is not None else None,
+            str(r["ult_diag"] or "—").upper(),
+            valor_est,
             str(r["hierro"] or ""),
             str(r["color"] or ""),
         ])
 
-    align_map = {1: ALIGN_CENTER, 3: ALIGN_CENTER, 4: ALIGN_CENTER, 7: ALIGN_RIGHT, 8: ALIGN_RIGHT}
-    num_map = {7: "#,##0.0", 8: "#,##0.0"}
+    align_map = {1: ALIGN_CENTER, 3: ALIGN_CENTER, 4: ALIGN_CENTER, 7: ALIGN_RIGHT, 8: ALIGN_RIGHT, 9: ALIGN_CENTER, 10: ALIGN_RIGHT}
+    num_map = {7: "#,##0.0", 8: "#,##0.0", 10: "$#,##0"}
     _estilizar_tabla(ws, fila_ini, columnas, datos, align_map, num_map)
+
+    fila_fin = fila_ini + len(datos) + 1
+    ws.cell(row=fila_fin, column=1, value="TOTAL HATO ACTIVO").font = FONT_BOLD
+    ws.cell(row=fila_fin, column=2, value=f"{len(datos)} cabezas").font = FONT_BOLD
+    ws.cell(row=fila_fin, column=7, value=round(total_peso, 1)).font = FONT_BOLD
+    ws.cell(row=fila_fin, column=7).number_format = "#,##0.0"
+    ws.cell(row=fila_fin, column=10, value=round(total_valor)).font = FONT_BOLD
+    ws.cell(row=fila_fin, column=10).number_format = "$#,##0"
+    for col_idx in range(1, len(columnas) + 1):
+        ws.cell(row=fila_fin, column=col_idx).fill = FILL_SUBTOTAL
+        ws.cell(row=fila_fin, column=col_idx).border = BORDER_THIN
+
     return wb
 
 

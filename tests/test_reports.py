@@ -1,4 +1,5 @@
 """Pruebas de la generación de reportes PDF (recolección pura y documento)."""
+import os
 from datetime import date
 
 from src.reports import generar_pdf, recolectar_datos
@@ -205,4 +206,45 @@ def test_recolectar_datos_incluye_potreros_sg(db):
     assert "ORDENO" in datos["potreros_sg"][0]["display"]
     assert datos["potreros_sg"][0]["vp"] == 1
     assert datos["potreros_sg"][0]["total"] == 1
+
+
+def test_censo_ica_pdf_generacion(db, tmp_path):
+    from src.reports.pdf_report import generar_pdf
+
+    db.registrar_animal("V10", sexo="HEMBRA", estado="ACTIVO", fecha_nacimiento="2022-01-15")
+    db.registrar_animal("M20", sexo="MACHO", estado="ACTIVO", fecha_nacimiento="2024-05-10")
+    db.registrar_pesaje("V10", fecha="2026-09-01", peso_kg=480.0)
+
+    salida = str(tmp_path / "censo_ica.pdf")
+    res = generar_pdf(db, dias=30, ruta_salida=salida, seccion="censo_ica")
+    assert res == salida
+    assert os.path.exists(salida)
+    assert os.path.getsize(salida) > 1000
+
+
+def test_exportar_excel_inventario_con_valoracion(db):
+    from src.reports.excel_report import exportar_excel_bytes
+
+    db.registrar_animal("V11", sexo="HEMBRA", estado="ACTIVO", fecha_nacimiento="2021-03-10")
+    db.registrar_pesaje("V11", fecha="2026-09-01", peso_kg=520.0)
+
+    data = exportar_excel_bytes(db, seccion="inventario")
+    assert isinstance(data, bytes)
+    assert len(data) > 1000
+
+
+def test_datos_ficha_animal_costeo_zootecnico(db):
+    from src.engine.dashboard_data import datos_ficha_animal
+
+    db.registrar_animal("V12", sexo="HEMBRA", estado="ACTIVO", fecha_nacimiento="2022-01-01")
+    db.registrar_pesaje("V12", fecha="2026-09-10", peso_kg=400.0)
+
+    ficha = datos_ficha_animal(db, "V12")
+    assert "costeo_zootecnico" in ficha
+    cz = ficha["costeo_zootecnico"]
+    assert cz["disponible"] is True
+    assert cz["peso_kg"] == 400.0
+    assert cz["valor_comercial_estimado"] is not None
+    assert cz["valor_comercial_estimado"] > 0
+    assert cz["margen_bruto_estimado"] is not None
 

@@ -32,7 +32,16 @@
   var icon = window.JA.icon;
 
   function barraDescargaSeccion(seccion, nombre) {
+    var extraBtn = "";
+    if (seccion === "inventario") {
+      extraBtn = "<a href='/api/reporte.pdf?seccion=censo_ica' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; color:#1d4ed8; background:rgba(37,99,235,0.08); border:1px solid #3b82f6;' target='_blank' title='Descargar Censo Oficial ICA para movilización y vacunación'>"
+        + icon("filePdf", 12) + "Censo ICA (PDF)</a>";
+    } else if (seccion === "reproduccion") {
+      extraBtn = "<a href='/api/reporte.pdf?seccion=reproduccion&periodo=mensual' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; color:#b45309; background:rgba(245,158,11,0.08); border:1px solid #f59e0b;' target='_blank' title='Descargar Informe Reproductivo Mensual (PDF)'>"
+        + icon("calendar", 12) + "Repro Mensual (PDF)</a>";
+    }
     return "<div class='descarga-seccion-barra' style='display:inline-flex; align-items:center; gap:6px;'>"
+      + extraBtn
       + "<a href='/api/reporte.pdf?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;' target='_blank' title='Descargar reporte PDF de " + esc(nombre) + "'>"
       + icon("download", 12) + "PDF</a>"
       + "<a href='/api/reporte.xlsx?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--verde-marca); border:1px solid var(--verde-marca);' target='_blank' title='Descargar datos en Excel de " + esc(nombre) + "'>"
@@ -11343,7 +11352,7 @@
     head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Buscar otra ficha de animal (Ctrl+K)'>"
       + icon("search", 14) + "Buscar otro</button>"
-      + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/qr.pdf' target='_blank' download class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center;'>"
+      + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/pdf' target='_blank' class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; box-shadow:0 1px 3px rgba(0,0,0,0.12);' title='Descargar Ficha Técnica Oficial (PDF) con semáforo zootécnico y genealogía'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
       + btnEditar
       + btnRectificar
@@ -11985,6 +11994,61 @@
     h += "</div>";
 
     h += "</div>";
+
+    // 3.2 Tarjeta de Costeo Zootécnico & Valoración Comercial en Pie
+    var cz = f.costeo_zootecnico;
+    if (cz && cz.disponible) {
+      var valPieHtml = (cz.valor_comercial_estimado != null)
+        ? ("<span style='font-size:20px; font-weight:800; color:var(--verde-marca);'>" + fmtMoneda(cz.valor_comercial_estimado) + "</span>")
+        : "<span class='meta' style='font-size:13px;'>Requiere pesaje reciente</span>";
+      var subValHtml = (cz.peso_kg != null)
+        ? (cz.peso_kg + " kg @ " + fmtMoneda(cz.precio_kg_mercado) + "/kg")
+        : ("Precio ref: " + fmtMoneda(cz.precio_kg_mercado) + "/kg");
+
+      var margenHtml = "";
+      if (cz.margen_bruto_estimado != null) {
+        var mColor = cz.margen_bruto_estimado >= 0 ? "var(--verde-marca)" : "var(--color-rojo-txt)";
+        var mPctStr = cz.margen_bruto_pct != null ? (" (" + cz.margen_bruto_pct + "%)") : "";
+        margenHtml = "<span style='font-size:18px; font-weight:800; color:" + mColor + ";'>" + fmtMoneda(cz.margen_bruto_estimado) + "</span>"
+          + "<span class='chip verde' style='font-size:11px; padding:2px 6px; font-weight:700; margin-left:6px;'>" + mPctStr + "</span>";
+      } else {
+        margenHtml = "<span class='meta' style='font-size:13px;'>Calculable tras pesaje</span>";
+      }
+
+      h += "<div class='card card-costeo-animal' style='padding:16px; margin-top:14px; margin-bottom:14px; border-left:5px solid #10b981; background:var(--superficie); border-radius:8px;'>"
+        + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
+        + "<h4 style='margin:0; font-size:14px; display:flex; align-items:center; gap:8px; color:var(--texto);'>"
+        + icon("receipt", 16) + "<span>Valoración Comercial en Pie & Costeo Zootécnico</span></h4>"
+        + "<span class='chip' style='background:rgba(16,185,129,0.1); color:var(--verde-marca); border:1px solid rgba(16,185,129,0.3); font-weight:700; font-size:11px;'>"
+        + icon("flame", 12) + esc(cz.fuente_mercado) + "</span>"
+        + "</div>"
+        + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:10px;'>"
+        + "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>"
+        + "<div style='font-size:11px; text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.04em; color:var(--texto-suave); margin-bottom:4px;'>Valor Estimado en Pie</div>"
+        + "<div style='margin-bottom:4px;'>" + valPieHtml + "</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave);'>" + esc(subValHtml) + "</div>"
+        + "</div>"
+        + "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>"
+        + "<div style='font-size:11px; text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.04em; color:var(--texto-suave); margin-bottom:4px;'>Costos Directos Acumulados</div>"
+        + "<div style='font-size:18px; font-weight:800; color:var(--texto); margin-bottom:4px;'>" + fmtMoneda(cz.costo_total_acumulado) + "</div>"
+        + "<div style='display:flex; flex-wrap:wrap; gap:4px; font-size:11px;'>"
+        + (cz.costo_inseminacion > 0 ? ("<span class='chip gris' title='Pajuelas e IATF'>IA: " + fmtMoneda(cz.costo_inseminacion) + "</span>") : "")
+        + (cz.costo_tratamientos > 0 ? ("<span class='chip gris' title='Fármacos y tratamientos'>Sanidad: " + fmtMoneda(cz.costo_tratamientos) + "</span>") : "")
+        + (cz.costo_sostenimiento > 0 ? ("<span class='chip gris' title='Pasturas y sales mineralizadas'>Manejo: " + fmtMoneda(cz.costo_sostenimiento) + "</span>") : "")
+        + "</div>"
+        + "</div>"
+        + "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>"
+        + "<div style='font-size:11px; text-transform:uppercase; font-family:var(--font-mono); letter-spacing:0.04em; color:var(--texto-suave); margin-bottom:4px;'>Margen Bruto Estimado</div>"
+        + "<div style='display:flex; align-items:center; gap:6px; margin-bottom:4px; flex-wrap:wrap;'>" + margenHtml + "</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave);'>Margen sobre costos directos</div>"
+        + "</div>"
+        + "</div>"
+        + "<div style='font-size:11.5px; color:var(--texto-suave); display:flex; align-items:center; gap:5px;'>"
+        + icon("info", 13) + "Cotización de subastas de la región (actualizada a " + esc(fechaCorta(cz.fecha_mercado)) + ")."
+        + "</div>"
+        + "</div>";
+    }
+
     // 4. Traslados de potrero recientes
     if (f.traslados && f.traslados.length) {
       h += "<h4>" + icon("truck") + "Últimos movimientos de potrero</h4>"

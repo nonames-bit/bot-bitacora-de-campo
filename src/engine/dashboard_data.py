@@ -3343,6 +3343,62 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     historial_bajas.sort(key=lambda x: str(x.get("fecha") or ""), reverse=True)
     base["historial_bajas"] = historial_bajas
 
+    # 13. Costeo zootécnico y valoración comercial en pie
+    try:
+        ref_mercado = db.precio_referencia_hoy("BOGOTA", "MACHO_GORDO")
+        precio_kg = float(ref_mercado["precio"]) if ref_mercado and ref_mercado.get("precio") else 9200.0
+        fuente_mercado = ref_mercado.get("plaza_label") if ref_mercado else "Bogotá · Frig. Guadalupe"
+        fecha_mercado = ref_mercado.get("fecha") if ref_mercado else hoy_iso
+
+        peso_kg = None
+        if base.get("ultimo_peso") and base["ultimo_peso"].get("peso_kg"):
+            peso_kg = float(base["ultimo_peso"]["peso_kg"])
+
+        valor_comercial = round(peso_kg * precio_kg, 0) if peso_kg else None
+
+        # Costos acumulados directos
+        c_insem = 0.0
+        for s in (base.get("servicios") or []):
+            toro_cod = (s.get("toro_pajilla") or "").strip()
+            if toro_cod:
+                row_p = db.query_one("SELECT costo FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) AND costo > 0 LIMIT 1", (toro_cod,))
+                if row_p and row_p.get("costo"):
+                    c_insem += float(row_p["costo"])
+                else:
+                    c_insem += 45000.0
+            else:
+                c_insem += 35000.0
+
+        cnt_t = db.query_one("SELECT COUNT(*) AS n FROM tratamientos WHERE animal_id = ?", (aid,))
+        n_trats = cnt_t["n"] if cnt_t else len(base.get("tratamientos") or [])
+        c_trat = float(n_trats * 18000.0)
+
+        meses_vida = max(1, round(edad_dias / 30.44)) if edad_dias else 12
+        c_sostenimiento = float(min(meses_vida, 36) * 28000.0)
+
+        costo_total = round(c_insem + c_trat + c_sostenimiento, 0)
+        margen_bruto = round(valor_comercial - costo_total, 0) if valor_comercial is not None else None
+        margen_pct = round((margen_bruto / valor_comercial) * 100, 1) if (valor_comercial and margen_bruto is not None) else None
+
+        base["costeo_zootecnico"] = {
+            "disponible": True,
+            "peso_kg": peso_kg,
+            "precio_kg_mercado": precio_kg,
+            "fuente_mercado": fuente_mercado,
+            "fecha_mercado": fecha_mercado,
+            "valor_comercial_estimado": valor_comercial,
+            "costo_inseminacion": c_insem,
+            "costo_tratamientos": c_trat,
+            "costo_sostenimiento": c_sostenimiento,
+            "costo_total_acumulado": costo_total,
+            "margen_bruto_estimado": margen_bruto,
+            "margen_bruto_pct": margen_pct,
+        }
+    except Exception as e:
+        logger.error("seccion costeo_zootecnico fallo", exc_info=True)
+        errores["costeo_zootecnico"] = str(e)
+        base["costeo_zootecnico"] = None
+
     if errores:
         base["errores"] = errores
     return base

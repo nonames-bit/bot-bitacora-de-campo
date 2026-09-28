@@ -94,7 +94,11 @@ def potreros_ordeno(db, hoy: Optional[date] = None, vacas: Optional[list] = None
                 and 0 <= (hoy - v["parto"]).days <= DEL_RECIEN_PARIDA:
             recien[v["pid"]] = recien.get(v["pid"], 0) + 1
     out: dict[int, dict] = {}
-    for p in db.query("SELECT id, COALESCE(nombre, codigo) nombre, ordeno FROM potreros"):
+    try:
+        rows = db.query("SELECT id, COALESCE(nombre, codigo) nombre, ordeno FROM potreros")
+    except Exception:
+        rows = db.query("SELECT id, COALESCE(nombre, codigo) nombre, NULL AS ordeno FROM potreros")
+    for p in rows:
         nombre = str(p["nombre"] or "")
         n = recien.get(p["id"], 0)
         if p["ordeno"] is not None:

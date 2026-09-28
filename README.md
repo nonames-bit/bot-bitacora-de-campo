@@ -408,6 +408,24 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Pruebas `tests/test_webauthn.py` (12) + rutas en `tests/test_pwa_api.py`; verificación visual móvil 390×844 con `scripts/verify_webauthn_visual.py`.
 
 ### ⏳ En Progreso / Calibración Continua
+- [x] **Censo Oficial ICA (PDF), Costeo Zootécnico & Exportación Enriquecida en Excel (.xlsx) (2026-09-28)**:
+  - **Censo Oficial de Hato para el ICA en PDF (`seccion_censo_ica`)**:
+    - Formato institucional con membrete oficial de Ganadería JA (predio, municipio, fecha de corte).
+    - Tabla ejecutiva de consolidado por categorías oficiales ICA (Terneros/as <12m, Levante 12-24m, Ceba >24m, Novillas vientre, Vacas adultas, Toros reproductores) con conteo de cabezas y porcentajes sobre el hato activo.
+    - Censo nominal completo de animales activos con N°, Arete/Tag, Nombre, Sexo, Categoría ICA, Edad (meses), Último Peso (kg), Potrero y Diagnóstico Reproductivo.
+    - Líneas oficiales de firma legal (Propietario / Responsable de Finca y Médico Veterinario / Asistente Técnico con Registro Profesional).
+    - Acceso directo con botón `[ 📋 Censo ICA (PDF) ]` integrado en la barra de descargas de Inventario y vía `/api/reporte.pdf?seccion=censo_ica`.
+  - **Costeo Zootécnico & Valoración Comercial en Pie**:
+    - En la ficha individual del animal (`datos_ficha_animal` y frontend PWA), cálculo automático del **Valor Estimado en Pie** basado en el último pesaje y cotización actualizada de novillo gordo en plaza (Frigorífico Guadalupe / Subastas del Llano).
+    - Acumulación de **Costos Directos** por animal: pajuelas e insumos de IATF (cruzados con `pajuelas_inventario`), tratamientos sanitarios y costo de sostenimiento en pastoreo.
+    - **Margen Bruto Estimado** ($ COP y %) visible en tarjeta destacada con borde verde zootécnico en la ficha de cada animal.
+    - Botón prominente `[ 📄 Ficha Técnica PDF ]` en el encabezado de la ficha para descarga directa en un toque (`/api/ficha/<tag>/pdf`).
+  - **Exportación Enriquecida en Excel (.xlsx)**:
+    - Generación nativa en `openpyxl` vía `/api/reporte.xlsx?seccion=inventario`.
+    - Columnas enriquecidas: Tag, Nombre, Sexo, Raza, Nacimiento, Edad, Categoría SG, Potrero, Último Peso, Fecha Pesaje, GMD (kg/día), Estado Reproductivo y **Valor Comercial Est. ($ COP)** con formato de moneda.
+    - Fila final de subtotales zootécnicos (Total Cabezas Activas, Total Peso Acumulado en Báscula, Valoración Comercial Total del Hato en COP).
+    - Apertura de permisos en `/api/reporte.pdf` y `/api/reporte.xlsx` para rol `TRABAJADOR` para evitar bloqueos 403 en campo.
+
 - [x] **Header Móvil Compacto, Menú Desplegable al tocar el Logo y Auto-Ocultado de la Barra Inferior (2026-09-17)**:
   - **Ahorro de ~60px verticales en pantalla móvil**: El encabezado pasa de 2 filas a 1 sola fila fija de 48px sin desbordes ni wraps, dejando visibles inmediatamente los KPIs del hato (336 activos, 268 hembras, 64 machos, partos, etc.) y los botones de acción sin necesidad de scroll.
   - **Disparador táctil en el logo / marca (`#marca-header-btn`)**: Logo con micro-indicador de avisos pendientes (`#header-menu-dot` animado con pulso sutil si hay eventos offline en cola o alertas de agenda), nombre GANADERÍA JA, hora compacta y flecha indicadora accesible con tap y teclado.

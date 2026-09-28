@@ -32,6 +32,8 @@ from .estilo_ja import (
     COLOR_ROJO_ALERTA,
     COLOR_ALERTA_BG,
     COLOR_ALERTA_TXT,
+    COLOR_LINEA,
+    COLOR_TOTALES_BG,
     COLOR_VERDE_OK,
     COLOR_VERDE_OK_BG,
     SeccionFlowable,
@@ -998,6 +1000,167 @@ def tablero_ejecutivo(ctx: ContextoReporte) -> list:
     return _encabezado("TABLERO EJECUTIVO DE LA FINCA", ctx.ancho) + [t, Spacer(1, 6)]
 
 
+def seccion_censo_ica(ctx: ContextoReporte) -> list:
+    """Censo oficial de hato bovino en formato institucional para ICA / Asocebú.
+
+    Genera la relación pormenorizada de todos los animales activos del predio,
+    discriminados por categoría zootécnica oficial, raza, potrero y estado
+    reproductivo, con tabla resumen consolidada y espacio para firmas."""
+    db = ctx.db
+    filas_db = db.query("""
+        SELECT a.tag, a.nombre, a.sexo, a.raza, a.fecha_nacimiento,
+               COALESCE(p.nombre, a.potrero_id, 'Sin potrero') AS potrero,
+               (SELECT pes.peso_kg FROM pesajes pes WHERE pes.animal_id = a.id_animal ORDER BY pes.fecha DESC, pes.id DESC LIMIT 1) AS ult_peso,
+               (SELECT d.resultado FROM diagnosticos_gestacion d WHERE d.vaca_id = a.id_animal ORDER BY d.fecha DESC LIMIT 1) AS ult_diag
+        FROM animales a
+        LEFT JOIN potreros p ON p.id = a.potrero_id OR p.codigo = a.potrero_id
+        WHERE a.estado = 'ACTIVO'
+        ORDER BY a.tag ASC
+    """)
+    total_animales = len(filas_db)
+
+    conteos_cat: dict[str, int] = {}
+    filas_tabla = []
+
+    def _to_date(val: Any) -> Optional[date]:
+        if not val:
+            return None
+        if isinstance(val, date):
+            return val
+        try:
+            return date.fromisoformat(str(val)[:10])
+        except Exception:
+            return None
+
+    def _cat_ica(sexo: str, fec_nac: Any, nom: str, tag: str) -> str:
+        s = str(sexo or "").upper().strip()
+        edad_meses = None
+        d_nac = _to_date(fec_nac)
+        if d_nac:
+            try:
+                edad_meses = (ctx.hoy - d_nac).days / 30.44
+            except Exception:
+                pass
+        nombre_tag = f"{nom} {tag}".upper()
+        if "TORO" in nombre_tag or "REPRODUCTOR" in nombre_tag:
+            return "Toro reproductor"
+        if s == "MACHO":
+            if edad_meses is not None and edad_meses < 12:
+                return "Ternero (<12m)"
+            elif edad_meses is not None and edad_meses <= 24:
+                return "Macho levante (12-24m)"
+            return "Macho ceba (>24m)"
+        else:
+            if edad_meses is not None and edad_meses < 12:
+                return "Ternera (<12m)"
+            elif edad_meses is not None and edad_meses <= 24:
+                return "Novilla levante (12-24m)"
+            elif edad_meses is not None and edad_meses <= 36:
+                return "Novilla vientre (24-36m)"
+            return "Vaca adulta"
+
+    for idx, r in enumerate(filas_db, start=1):
+        cat = _cat_ica(r["sexo"], r["fecha_nacimiento"], r["nombre"] or "", r["tag"] or "")
+        conteos_cat[cat] = conteos_cat.get(cat, 0) + 1
+        edad_txt = "—"
+        d_nac_r = _to_date(r["fecha_nacimiento"])
+        if d_nac_r:
+            try:
+                m = round((ctx.hoy - d_nac_r).days / 30.44, 1)
+                edad_txt = f"{m} m"
+            except Exception:
+                pass
+        peso_txt = f"{float(r['ult_peso']):.1f} kg" if r["ult_peso"] else "—"
+        diag_txt = str(r["ult_diag"] or "—").upper()
+
+        filas_tabla.append([
+            str(idx),
+            str(r["tag"] or ""),
+            str(r["nombre"] or "—")[:15],
+            str(r["sexo"] or "—")[:1],
+            cat,
+            str(r["raza"] or "—")[:10],
+            edad_txt,
+            peso_txt,
+            str(r["potrero"] or "—")[:12],
+            diag_txt,
+        ])
+
+    out = _encabezado("CENSO GENERAL DE HATO BOVINO (FORMATO OFICIAL ICA)", ctx.ancho)
+
+    meta_data = [
+        ["Predio:", "Ganadería JA", "Propietario / Titular:", "Jaime", "Fecha de Emisión:", ctx.hoy.isoformat()],
+        ["Total Hato Activo:", f"{total_animales} cabezas", "Departamento / Municipio:", "Colombia", "Estado Sanitario:", "Vigente / Oficial"],
+    ]
+    t_meta = Table(meta_data, colWidths=[28 * mm, 34 * mm, 36 * mm, 32 * mm, 32 * mm, ctx.ancho - 162 * mm])
+    t_meta.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTNAME", (4, 0), (4, -1), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0, 0), (-1, -1), COLOR_MARCA),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 3),
+        ("LINEBELOW", (0, -1), (-1, -1), 1, COLOR_LINEA),
+    ]))
+    out.append(t_meta)
+    out.append(Spacer(1, 8))
+
+    resumen_filas = [["Categoría Zootécnica", "Cabezas", "% del Hato"]]
+    for cat_nom in sorted(conteos_cat.keys()):
+        cnt = conteos_cat[cat_nom]
+        pct = round(cnt / total_animales * 100, 1) if total_animales else 0
+        resumen_filas.append([cat_nom, str(cnt), f"{pct}%"])
+    resumen_filas.append(["TOTAL INVENTARIO", str(total_animales), "100.0%"])
+
+    t_res = Table(resumen_filas, colWidths=[60 * mm, 30 * mm, 30 * mm])
+    t_res.setStyle(tabla_style_moderna())
+    t_res.setStyle(TableStyle([
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), COLOR_TOTALES_BG),
+    ]))
+    out.append(Paragraph("<b>Resumen Consolidado por Categoría</b>", estilo_subseccion_grafico()))
+    out.append(Spacer(1, 4))
+    out.append(t_res)
+    out.append(Spacer(1, 10))
+
+    cabecera_det = [["#", "Arete", "Nombre", "S", "Categoría", "Raza", "Edad", "Últ. Peso", "Potrero", "Reprod."]]
+    col_w = [10 * mm, 18 * mm, 24 * mm, 8 * mm, 36 * mm, 20 * mm, 16 * mm, 18 * mm, 22 * mm, ctx.ancho - 172 * mm]
+    t_det = Table(cabecera_det + filas_tabla, colWidths=col_w, repeatRows=1)
+    t_det.setStyle(tabla_style_moderna())
+    t_det.setStyle(TableStyle([
+        ("FONTSIZE", (0, 0), (-1, -1), 7.5),
+        ("ALIGN", (0, 0), (0, -1), "CENTER"),
+        ("ALIGN", (3, 0), (3, -1), "CENTER"),
+        ("ALIGN", (6, 0), (7, -1), "RIGHT"),
+        ("ALIGN", (9, 0), (9, -1), "CENTER"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+    ]))
+    out.append(Paragraph("<b>Detalle Nominal de Animales en Predio</b>", estilo_subseccion_grafico()))
+    out.append(Spacer(1, 4))
+    out.append(t_det)
+    out.append(Spacer(1, 14))
+
+    firmas_data = [
+        ["_______________________________________", "_______________________________________"],
+        ["Propietario / Representante Legal", "Médico Veterinario / Zootecnista"],
+        ["C.C.", "T.P. No."],
+    ]
+    t_firmas = Table(firmas_data, colWidths=[ctx.ancho / 2, ctx.ancho / 2])
+    t_firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("TEXTCOLOR", (0, 0), (-1, -1), COLOR_MARCA),
+        ("TOPPADDING", (0, 0), (-1, 0), 20),
+    ]))
+    out.append(t_firmas)
+    return out
+
+
 SECCIONES: dict[str, Callable[..., list]] = {
     "leche": seccion_leche,
     "produccion": seccion_leche,
@@ -1011,4 +1174,6 @@ SECCIONES: dict[str, Callable[..., list]] = {
     "caja": seccion_finanzas,
     "inventario": seccion_inventario,
     "hato": seccion_inventario,
+    "censo_ica": seccion_censo_ica,
+    "censo": seccion_censo_ica,
 }
