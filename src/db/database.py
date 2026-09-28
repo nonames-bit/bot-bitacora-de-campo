@@ -4673,6 +4673,10 @@ class Database:
                 )
             """)
             self.conn.execute("CREATE INDEX IF NOT EXISTS idx_push_user ON push_suscripciones(user_id)")
+            # Avisos push ya enviados por el programador (clave única por
+            # evento): así un parto atrasado o un retiro no se repite cada 30 min.
+            self.conn.execute(
+                "CREATE TABLE IF NOT EXISTS push_enviados (clave TEXT PRIMARY KEY, enviado_en TEXT)")
         except Exception:
             pass
 
@@ -4699,11 +4703,26 @@ class Database:
         cursor = self.execute("DELETE FROM push_suscripciones WHERE endpoint = ?", (endpoint,))
         return cursor.rowcount > 0
 
-    def listar_push_suscripciones(self, excluir_user_id: Optional[Any] = None) -> list[dict[str, Any]]:
+    def listar_push_suscripciones(self, excluir_user_id: Optional[Any] = None,
+                                  solo_user_ids: Optional[list] = None) -> list[dict[str, Any]]:
         """Retorna las suscripciones push activas, opcionalmente excluyendo
         a un usuario (ej. el autor de un mensaje de chat no necesita
-        notificarse a sí mismo de su propio mensaje)."""
+        notificarse a sí mismo de su propio mensaje) o solo de ciertos
+        usuarios (``solo_user_ids``; ``None`` en la lista = suscripciones sin
+        usuario, las de quien entra con la contraseña maestra)."""
         self._ensure_push_table()
+        if solo_user_ids is not None:
+            ids = [str(u) for u in solo_user_ids if u is not None]
+            conds = []
+            if ids:
+                conds.append("user_id IN (" + ",".join("?" * len(ids)) + ")")
+            if any(u is None for u in solo_user_ids):
+                conds.append("user_id IS NULL")
+            if not conds:
+                return []
+            filas = self.query(
+                "SELECT * FROM push_suscripciones WHERE " + " OR ".join(conds) + " ORDER BY id DESC", tuple(ids))
+            return [dict(f) for f in filas]
         if excluir_user_id is not None:
             filas = self.query(
                 "SELECT * FROM push_suscripciones WHERE user_id IS NULL OR user_id != ? ORDER BY id DESC",
@@ -4712,6 +4731,15 @@ class Database:
         else:
             filas = self.query("SELECT * FROM push_suscripciones ORDER BY id DESC")
         return [dict(f) for f in filas]
+
+    def push_ya_enviado(self, clave: str) -> bool:
+        self._ensure_push_table()
+        return self.query_one("SELECT 1 FROM push_enviados WHERE clave = ?", (clave,)) is not None
+
+    def marcar_push_enviado(self, clave: str) -> None:
+        self._ensure_push_table()
+        self.execute("INSERT OR IGNORE INTO push_enviados (clave, enviado_en) VALUES (?, ?)",
+                     (clave, datetime.now(timezone.utc).isoformat()))
 
     def alertas_pendientes_push(self) -> list[dict[str, Any]]:
         """Genera la lista de notificaciones de alta prioridad para campo (retiros, celos, Voisin, termo)."""

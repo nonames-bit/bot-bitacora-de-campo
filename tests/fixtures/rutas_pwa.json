@@ -561,6 +561,13 @@
 ]
 ],
 [
+"/api/push/estado",
+"api_push_estado",
+[
+"GET"
+]
+],
+[
 "/api/push/probar",
 "api_push_probar",
 [

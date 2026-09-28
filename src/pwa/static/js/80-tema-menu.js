@@ -80,6 +80,12 @@
       if (nA > 0) sub.textContent = nA + " aviso(s) pendientes";
       else sub.textContent = "Sin avisos";
     }
+    // Número sobre el ícono de la app instalada (Android/escritorio).
+    try {
+      if (navigator.setAppBadge) {
+        if (nA > 0) navigator.setAppBadge(nA); else navigator.clearAppBadge();
+      }
+    } catch (e) { /* sin soporte */ }
     if (badge) {
       if (nA > 0) {
         badge.textContent = nA > 99 ? "99+" : String(nA);

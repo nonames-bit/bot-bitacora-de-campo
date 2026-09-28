@@ -40,6 +40,8 @@ def enviar_push(
     tag: str = "bitacora-push",
     icono: str = "/static/icon-192.png",
     excluir_user_id: Optional[Any] = None,
+    user_ids: Optional[list] = None,
+    urgente: bool = False,
 ) -> dict[str, int]:
     """Envía una notificación Web Push a todos los suscriptores guardados.
 
@@ -51,6 +53,10 @@ def enviar_push(
     esto. Limpia automáticamente las suscripciones que el push service
     reporta como vencidas (404/410 Gone), para no reintentar sobre
     endpoints muertos en cada mensaje nuevo.
+
+    ``user_ids``: enviar solo a esos usuarios (``None`` en la lista = las
+    suscripciones sin usuario, de la contraseña maestra). ``urgente``: el
+    service worker la deja fija en pantalla y vibra más (sw.js).
     """
     resumen = {"enviados": 0, "fallidos": 0, "vencidas_limpiadas": 0}
 
@@ -60,10 +66,11 @@ def enviar_push(
 
     priv = os.getenv("VAPID_PRIVATE_KEY", "")
     email = os.getenv("VAPID_CLAIMS_EMAIL", "")
-    payload = json.dumps({"titulo": titulo, "cuerpo": cuerpo, "url": url, "tag": tag, "icono": icono})
+    payload = json.dumps({"titulo": titulo, "cuerpo": cuerpo, "url": url, "tag": tag, "icono": icono,
+                          "urgente": bool(urgente)})
 
     try:
-        suscripciones = db.listar_push_suscripciones(excluir_user_id=excluir_user_id)
+        suscripciones = db.listar_push_suscripciones(excluir_user_id=excluir_user_id, solo_user_ids=user_ids)
     except Exception:
         logger.exception("enviar_push: no se pudo leer push_suscripciones")
         return resumen

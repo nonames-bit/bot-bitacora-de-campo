@@ -506,6 +506,7 @@
       + "</div>";
   }
   function bindTablero() {
+    mostrarBannerAvisos();
     var btnVerTodos = document.getElementById("btn-ver-todos-eventos-tablero");
     if (btnVerTodos) {
       btnVerTodos.addEventListener("click", function () {
@@ -5644,7 +5645,8 @@
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.ready.then(function (reg) {
         if (reg && reg.showNotification) {
-          reg.showNotification(titulo, opts);
+          var pr = reg.showNotification(titulo, opts);
+          if (pr && pr.catch) pr.catch(function () { /* permiso revocado: se ignora */ });
         } else {
           new Notification(titulo, opts);
         }
@@ -5722,17 +5724,21 @@
                 if (sub) {
                   var sJson = sub.toJSON ? sub.toJSON() : {};
                   registrarSuscripcionPushEnServidor(sub.endpoint, sJson.keys);
-                } else {
-                  suscribirPushReal(reg).catch(devEndpointFallback);
+                  return true;
                 }
-              }).catch(devEndpointFallback);
+                return suscribirPushReal(reg).then(function () { return true; });
+              }).catch(function () { devEndpointFallback(); return false; })
+                .then(function (real) {
+                  if (!mostrarFeedback) return;
+                  // Solo se confirma "activadas" si quedó una suscripción real:
+                  // antes salía el aviso aunque el servidor no pudiera enviar nada.
+                  if (real) {
+                    mostrarToast("✓ Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
+                  } else {
+                    mostrarToast("⚠️ Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
+                  }
+                });
             }
-          });
-        }
-        if (mostrarFeedback) {
-          mostrarNotificacionNativa("🔔 Notificaciones Activadas", {
-            body: "¡Listo! Recibirás alertas sanitarias, celos AM-PM, avisos de potrero y mensajes nuevos del chat de equipo en este dispositivo.",
-            tag: "push-bienvenida"
           });
         }
         verificarAlertasPush();
@@ -5740,6 +5746,71 @@
         alert("Las notificaciones fueron denegadas o bloqueadas.");
       }
       return perm;
+    });
+  }
+
+  // Estado real de los avisos: permiso del navegador + si este celular tiene
+  // una suscripción push + si el servidor puede enviar (llaves VAPID).
+  // ok = llegan con la app cerrada.
+  function estadoAvisos() {
+    var est = { soporta: "Notification" in window && "serviceWorker" in navigator && "PushManager" in window,
+                permiso: ("Notification" in window) ? Notification.permission : "no", suscrito: false,
+                servidor_listo: false, ok: false };
+    if (!est.soporta) return Promise.resolve(est);
+    var pServ = fetch("/api/push/estado").then(function (r) { return r.json(); })
+      .then(function (d) { est.servidor_listo = !!(d && d.servidor_listo); est.reales = d && d.suscripciones_reales; })
+      .catch(function () {});
+    var pSub = navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }).then(function (sub) { est.suscrito = !!sub; }).catch(function () {});
+    return Promise.all([pServ, pSub]).then(function () {
+      est.ok = est.permiso === "granted" && est.suscrito && est.servidor_listo;
+      return est;
+    });
+  }
+
+  function textoEstadoAvisos(est) {
+    if (!est.soporta) return "<span style='color:var(--texto-suave);'>❌ Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
+    if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
+    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
+    if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
+    return "<span style='color:var(--verde-marca); font-weight:600;'>✅ Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
+  }
+
+  // Tablero: si este celular no recibe avisos con la app cerrada, lo dice
+  // arriba con un botón para activarlos. "Ahora no" lo oculta 7 días.
+  var CLAVE_BANNER_AVISOS = "ja_banner_avisos_oculto_hasta";
+  function mostrarBannerAvisos() {
+    var oculto = 0;
+    try { oculto = parseInt(localStorage.getItem(CLAVE_BANNER_AVISOS) || "0", 10) || 0; } catch (e) { /* sin almacenamiento */ }
+    if (Date.now() < oculto) return;
+    estadoAvisos().then(function (est) {
+      if (est.ok || !est.soporta || document.getElementById("banner-avisos")) return;
+      var vistaEl = document.getElementById("vista");
+      if (!vistaEl || actual !== "tablero") return;
+      var div = document.createElement("div");
+      div.id = "banner-avisos";
+      div.className = "card";
+      div.style.cssText = "border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;";
+      var puedeActivar = est.permiso !== "denied" && est.servidor_listo;
+      div.innerHTML = "<b>🔔 Avisos al celular</b><p style='margin:6px 0 8px; font-size:13px;'>" + textoEstadoAvisos(est) + "</p>"
+        + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        + (puedeActivar ? "<button type='button' class='tema-btn' id='btn-banner-activar-avisos'>Activar avisos</button>" : "")
+        + "<button type='button' class='tema-btn' id='btn-banner-ocultar-avisos' style='background:var(--bg-suave); color:var(--texto-base);'>Ahora no</button></div>";
+      vistaEl.insertBefore(div, vistaEl.firstChild);
+      var bAct = document.getElementById("btn-banner-activar-avisos");
+      if (bAct) bAct.addEventListener("click", function () {
+        bAct.disabled = true;
+        iniciarWebPush(true).then(function () {
+          setTimeout(function () {
+            estadoAvisos().then(function (e2) { if (e2.ok) div.remove(); else bAct.disabled = false; });
+          }, 1500);
+        }).catch(function () { bAct.disabled = false; });
+      });
+      document.getElementById("btn-banner-ocultar-avisos").addEventListener("click", function () {
+        try { localStorage.setItem(CLAVE_BANNER_AVISOS, String(Date.now() + 7 * 86400000)); } catch (e) { /* sin almacenamiento */ }
+        div.remove();
+      });
     });
   }
 
@@ -5997,6 +6068,14 @@
 
     function actualizarTextoEstado() {
       if (!estadoEl) return;
+      estadoAvisos().then(function (est) {
+        estadoEl.innerHTML = textoEstadoAvisos(est);
+        if (btnActivar) {
+          btnActivar.disabled = est.permiso === "denied";
+          btnActivar.textContent = est.ok ? "Re-sincronizar" : "Activar";
+        }
+      });
+      return;
       if (!("Notification" in window)) {
         estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>❌ Tu navegador no soporta notificaciones nativas.</span>";
         if (btnActivar) btnActivar.style.display = "none";
@@ -6039,19 +6118,25 @@
       });
     }
 
+    // Prueba REAL: el servidor envía por el servicio push. Si llega con la
+    // app cerrada, todo funciona (antes era una notificación local que decía
+    // "prueba exitosa" aunque el servidor no pudiera enviar nada).
     function lanzarPruebaPush() {
       fetch("/api/push/probar", { method: "POST" })
         .then(function (r) { return r.json(); })
         .then(function (res) {
-          if (res && res.notificacion) {
-            var n = res.notificacion;
-            mostrarNotificacionNativa(n.titulo, {
-              body: n.cuerpo,
-              tag: n.tag,
-              data: { url: n.url }
-            });
+          if (res && res.ok) {
+            mostrarToast("✓ Enviada a " + res.enviados + " dispositivo(s). Debe llegar en segundos; cierre la app para comprobarlo.", "verde");
+          } else if (res && res.motivo === "sin_suscripcion") {
+            mostrarToast("⚠️ Este celular no está suscrito: toque «Activar».", "ambar");
+          } else if (res && res.motivo === "servidor_sin_llaves") {
+            mostrarToast("⚠️ El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
+          } else {
+            mostrarToast("❌ No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
           }
-        });
+          actualizarTextoEstado();
+        })
+        .catch(function () { mostrarToast("Sin conexión con el servidor.", "rojo"); });
     }
   }
 
@@ -14491,6 +14576,12 @@
       if (nA > 0) sub.textContent = nA + " aviso(s) pendientes";
       else sub.textContent = "Sin avisos";
     }
+    // Número sobre el ícono de la app instalada (Android/escritorio).
+    try {
+      if (navigator.setAppBadge) {
+        if (nA > 0) navigator.setAppBadge(nA); else navigator.clearAppBadge();
+      }
+    } catch (e) { /* sin soporte */ }
     if (badge) {
       if (nA > 0) {
         badge.textContent = nA > 99 ? "99+" : String(nA);
