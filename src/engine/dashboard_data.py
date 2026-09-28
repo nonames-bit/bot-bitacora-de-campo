@@ -3362,7 +3362,7 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             toro_cod = (s.get("toro_pajilla") or "").strip()
             if toro_cod:
                 row_p = db.query_one("SELECT costo FROM pajuelas_inventario WHERE UPPER(codigo_toro) = UPPER(?) AND costo > 0 LIMIT 1", (toro_cod,))
-                if row_p and row_p.get("costo"):
+                if row_p and row_p["costo"]:
                     c_insem += float(row_p["costo"])
                 else:
                     c_insem += 45000.0
