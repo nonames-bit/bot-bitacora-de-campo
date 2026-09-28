@@ -295,6 +295,14 @@ self.addEventListener("push", function (event) {
     renotify: true,
     data: { url: data.url || "/" }
   };
+  // Avisos urgentes (parto atrasado, retiro que termina, salud del
+  // servidor): quedan fijos hasta tocarlos y vibran más fuerte.
+  if (data.urgente) {
+    options.requireInteraction = true;
+    options.vibrate = [300, 120, 300, 120, 600];
+  } else {
+    options.vibrate = [150, 80, 150];
+  }
   event.waitUntil(
     self.registration.showNotification(data.titulo || data.title || "Bitácora JA", options)
   );

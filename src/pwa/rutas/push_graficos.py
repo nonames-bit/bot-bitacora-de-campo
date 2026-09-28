@@ -79,19 +79,53 @@ def registrar(app, ctx, h):
         finally:
             db_p.close()
 
-    @app.post("/api/push/probar")
-    def api_push_probar():
-        """Genera un aviso de prueba para verificar el funcionamiento en el celular."""
+    def _suscripciones_del_usuario(db_p) -> list:
+        uid = session.get("user_id")
+        return [s_ for s_ in db_p.listar_push_suscripciones(solo_user_ids=[uid])
+                if str(s_.get("endpoint") or "").startswith("http") and s_.get("p256dh") and s_.get("auth")]
+
+    @app.get("/api/push/estado")
+    def api_push_estado():
+        """Diagnóstico real: ¿el servidor puede enviar push (llaves VAPID y
+        pywebpush) y este usuario tiene suscripciones reales? Antes la PWA
+        solo miraba el permiso del navegador y decía "activas" aunque el
+        servidor no pudiera enviar nada."""
+        from ...server import push_sender
+        db_p = _db(db_path)
+        try:
+            reales = _suscripciones_del_usuario(db_p)
+        finally:
+            db_p.close()
         return jsonify({
             "ok": True,
-            "notificacion": {
-                "titulo": "🔔 Notificación Bitácora JA",
-                "cuerpo": "¡Prueba exitosa! Las notificaciones nativas de campo están activas en tu celular.",
-                "tag": "prueba-pwa",
-                "icono": "/static/icon-192.png",
-                "url": "/",
-            }
+            "servidor_listo": push_sender.vapid_configurado(),
+            "vapid_publica": bool(os.getenv("VAPID_PUBLIC_KEY")),
+            "libreria": push_sender.webpush is not None,
+            "suscripciones_reales": len(reales),
         })
+
+    @app.post("/api/push/probar")
+    def api_push_probar():
+        """Envía un push REAL (por el servicio de notificaciones del
+        navegador) solo a los dispositivos del usuario en sesión: si llega
+        con la app cerrada, toda la cadena funciona."""
+        from ...server import push_sender
+        if not push_sender.vapid_configurado():
+            return jsonify({"ok": False, "motivo": "servidor_sin_llaves",
+                            "error": "El servidor no tiene llaves VAPID: no puede enviar notificaciones."})
+        db_p = _db(db_path)
+        try:
+            if not _suscripciones_del_usuario(db_p):
+                return jsonify({"ok": False, "motivo": "sin_suscripcion",
+                                "error": "Este usuario no tiene ningún celular suscrito. Toque «Activar»."})
+            resumen = push_sender.enviar_push(
+                db_p, "🔔 Prueba de Bitácora JA",
+                "Si ves esto con la app cerrada, los avisos de campo te van a llegar.",
+                url="/", tag="prueba-push", user_ids=[session.get("user_id")], urgente=True,
+            )
+        finally:
+            db_p.close()
+        return jsonify({"ok": resumen["enviados"] > 0, **resumen})
 
 
 

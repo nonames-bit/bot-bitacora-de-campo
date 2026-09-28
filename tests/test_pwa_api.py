@@ -2115,11 +2115,13 @@ def test_api_push_suscribir_alertas_y_desuscribir(client):
     assert res_alt["ok"] is True
     assert "alertas" in res_alt
 
-    # Probar endpoint de prueba
+    # Probar: ya no "aprueba" sin enviar nada. Sin llaves VAPID (entorno de
+    # test) el servidor lo dice en vez de fingir una prueba exitosa; el envío
+    # real está cubierto en tests/test_avisos_push.py.
     r_prb = client.post("/api/push/probar")
     assert r_prb.status_code == 200
-    assert r_prb.get_json()["ok"] is True
-    assert "notificacion" in r_prb.get_json()
+    assert r_prb.get_json()["ok"] is False
+    assert r_prb.get_json()["motivo"] == "servidor_sin_llaves"
 
     # Desuscribir
     r_del = client.post("/api/push/desuscribir", json={

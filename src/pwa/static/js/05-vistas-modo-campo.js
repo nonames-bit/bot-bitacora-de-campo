@@ -55,6 +55,7 @@
       + "</div>";
   }
   function bindTablero() {
+    mostrarBannerAvisos();
     var btnVerTodos = document.getElementById("btn-ver-todos-eventos-tablero");
     if (btnVerTodos) {
       btnVerTodos.addEventListener("click", function () {
