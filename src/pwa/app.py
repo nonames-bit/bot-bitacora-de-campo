@@ -4242,8 +4242,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/reporte.pdf")
     def api_reporte_pdf():
-        if _rol_actual() not in ("OWNER", "ADMIN", "TRABAJADOR"):
-            return jsonify({"error": "Se requiere inicio de sesión para descargar reportes PDF."}), 403
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Se requiere rol ADMIN u OWNER para descargar reportes PDF."}), 403
 
         import time
         seccion = request.args.get("seccion")
@@ -4283,8 +4283,8 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
 
     @app.get("/api/reporte.xlsx")
     def api_reporte_xlsx():
-        if _rol_actual() not in ("OWNER", "ADMIN", "TRABAJADOR"):
-            return jsonify({"error": "Se requiere inicio de sesión para exportar datos en Excel."}), 403
+        if _rol_actual() not in ("OWNER", "ADMIN"):
+            return jsonify({"error": "Se requiere rol ADMIN u OWNER para exportar datos en Excel."}), 403
 
         import io
         seccion = request.args.get("seccion") or "inventario"

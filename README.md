@@ -423,8 +423,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Exportación Enriquecida en Excel (.xlsx)**:
     - Generación nativa en `openpyxl` vía `/api/reporte.xlsx?seccion=inventario`.
     - Columnas enriquecidas: Tag, Nombre, Sexo, Raza, Nacimiento, Edad, Categoría SG, Potrero, Último Peso, Fecha Pesaje, GMD (kg/día), Estado Reproductivo y **Valor Comercial Est. ($ COP)** con formato de moneda.
-    - Fila final de subtotales zootécnicos (Total Cabezas Activas, Total Peso Acumulado en Báscula, Valoración Comercial Total del Hato en COP).
-    - Apertura de permisos en `/api/reporte.pdf` y `/api/reporte.xlsx` para rol `TRABAJADOR` para evitar bloqueos 403 en campo.
+    - Protección RBAC estricta en `/api/reporte.pdf` y `/api/reporte.xlsx` para roles `OWNER` y `ADMIN` (datos patrimoniales y consolidados), mientras que la Ficha Técnica PDF individual del animal (`/api/ficha/<tag>/pdf`) está habilitada para todo el equipo en campo.
 
 - [x] **Header Móvil Compacto, Menú Desplegable al tocar el Logo y Auto-Ocultado de la Barra Inferior (2026-09-17)**:
   - **Ahorro de ~60px verticales en pantalla móvil**: El encabezado pasa de 2 filas a 1 sola fila fija de 48px sin desbordes ni wraps, dejando visibles inmediatamente los KPIs del hato (336 activos, 268 hembras, 64 machos, partos, etc.) y los botones de acción sin necesidad de scroll.
