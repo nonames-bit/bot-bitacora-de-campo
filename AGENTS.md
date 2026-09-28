@@ -24,6 +24,10 @@ Este archivo define las reglas de comportamiento, estándares y herramientas par
   - `docs/`: Documentación técnica, diagramas y especificaciones.
   - `tests/`: Pruebas unitarias, scripts de simulación o validaciones.
   - `scripts/`: Utilidades y scripts de automatización.
+- **Dónde va cada cosa en la PWA (`src/pwa/`)**:
+  - `app.py`: solo arma la app (`crear_app`: base, Flask, cookies, CSP, login obligatorio, límites) y los helpers de módulo (`_db`, `_error_interno`, `datos_*`...). **No agregue rutas aquí.**
+  - `rutas/<dominio>.py`: las rutas, una función `registrar(app, ctx, h)` por módulo (`auth`, `paginas`, `vistas_campo`, `leche_finanzas`, `animales`, `agenda_equipo`, `sync`, `manga_ia`, `insumos_repro`, `sistema`, `push_graficos`). Una ruta nueva va en el módulo de su dominio con `@app.get/post` como las demás. `ctx` trae `db_path`, `users_file`...; `h` los helpers del cierre (`_rol_actual`, `_limite_api`...); `rutas/_comun.py` los compartidos entre módulos.
+  - `tests/test_rutas_mapa.py` compara todas las rutas contra `tests/fixtures/rutas_pwa.json`: si agrega o cambia una ruta a propósito, regenere ese archivo (instrucciones en el test).
 - **Verificación y Navegación Visual de la PWA (Agy / Antigravity)**:
   - Cuando agy trabaje en el proyecto (especialmente en UI, backend que impacte vistas o flujos de usuario), **DEBE revisar, navegar e interactuar activamente con la PWA** (localmente o en producción `https://ganaderiaja.duckdns.org/`).
   - Emular y capturar primordialmente en **viewport móvil (390×844 DPR=2)** además de escritorio, verificando visualmente que los banners, botones, modales, tarjetas y tablas respondan correctamente y sin desbordes ni fallos antes de cerrar la tarea.
