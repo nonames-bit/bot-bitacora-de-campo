@@ -62,6 +62,13 @@ if ! "$PYTHON_CMD" scripts/verificar_csp_templates.py; then
   exit 1
 fi
 
+echo "[pre-push] Validando que app.js este generado desde src/pwa/static/js/..."
+if ! "$PYTHON_CMD" scripts/construir_js.py --verificar; then
+  echo "[pre-push] ABORTADO: app.js no coincide con los fragmentos de src/pwa/static/js/."
+  echo "[pre-push] Edite el fragmento (no app.js) y ejecute: python scripts/construir_js.py"
+  exit 1
+fi
+
 echo "[pre-push] Validando funciones JS duplicadas en el mismo ambito..."
 if ! "$PYTHON_CMD" scripts/verificar_js_duplicados.py; then
   echo "[pre-push] ABORTADO: funcion(es) duplicada(s) en src/pwa/static/*.js."
