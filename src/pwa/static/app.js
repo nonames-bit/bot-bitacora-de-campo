@@ -1,3 +1,5 @@
+/* GENERADO por scripts/construir_js.py desde src/pwa/static/js/*.js -- NO EDITAR ESTE ARCHIVO.
+   Edite el fragmento correspondiente y ejecute: python scripts/construir_js.py */
 /* Dashboard PWA Bitácora JA — JS vainilla (sin framework).
    WS-3: KPIs, chips semáforo, skeleton, banner offline, polling 60s,
    modo oscuro, errores visibles por sección y ficha con pestañas. */
