@@ -16,6 +16,7 @@
     vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
     tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
     pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
+    control_leche: { nombre: "Control lechero", icono: "🥛", vacio: "Todas las vacas en ordeño tienen control del último mes." },
     bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
     venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
     descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
@@ -37,6 +38,7 @@
       case "destetar": return edad + (a.madre ? " · madre " + esc(a.madre) : "");
       case "vac_aftosa": return a.ultima ? "Última aftosa " + esc(fechaCorta(a.ultima)) : "Sin aftosa registrada";
       case "tratamientos": return esc(a.detalle);
+      case "control_leche": return esc(a.motivo) + (a.del_dias != null ? " · " + esc(a.del_dias) + " DEL" : "");
       case "pausas": return "Sin ordeñar desde " + esc(fechaCorta(a.desde)) + " (" + esc(a.dias) + " d)" + (a.motivo ? " · " + esc(a.motivo) : "");
       case "bajo_peso": return esc(a.gmd_g) + " g/día · " + esc(a.peso_kg) + " kg (" + esc(fechaCorta(a.fecha)) + ")";
       case "venta": return esc(a.peso_kg) + " kg" + (edad ? " · " + edad : "");

@@ -27,8 +27,10 @@ try:
         _filas_dict,
         to_date_safe,
     )
+    from .control_lechero import sin_control
     from .lactancia import estados_lactancia, parto_imposible
 except ImportError:  # ejecución directa
+    from src.engine.control_lechero import sin_control  # type: ignore
     from src.engine.lactancia import estados_lactancia, parto_imposible  # type: ignore
     from src.engine.dashboard_data import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -81,7 +83,7 @@ CACHE_SEGUNDOS = 60
 CLAVES = (
     "chequeo", "palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras",
     "destetar", "topizar", "castrar", "marcar", "vac_brucelosis", "vac_aftosa",
-    "tratamientos", "pausas", "bajo_peso", "venta", "descarte", "categoria",
+    "tratamientos", "pausas", "bajo_peso", "venta", "descarte", "categoria", "control_leche",
 )
 
 _RE_REPRODUCTOR = re.compile(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b")
@@ -508,6 +510,11 @@ def datos_tareas(db: Database, hoy: Optional[date] = None, usar_cache: bool = Fa
         except Exception as e:
             logger.error("datos_tareas: seccion %s fallo", nombre, exc_info=True)
             out.setdefault("errores", {})[nombre] = str(e)
+    try:  # vacas en ordeño sin control lechero hace > 35 días (engine/control_lechero.py)
+        out["control_leche"] = sin_control(db, hoy, estados=datos["lactancia"])
+    except Exception as e:
+        logger.error("datos_tareas: seccion control_leche fallo", exc_info=True)
+        out.setdefault("errores", {})["control_leche"] = str(e)
 
     out["palpar"].sort(key=lambda x: -x["dias"])
     out["secar"].sort(key=lambda x: (x["dias_para_parto"] is None, x["dias_para_parto"] or 0))
