@@ -96,6 +96,9 @@
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
           box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "" + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          // El aviso se quita solo para no dejar ocupado el espacio de arriba.
+          var aviso = box.firstChild;
+          setTimeout(function () { if (aviso && aviso.parentNode === box) box.innerHTML = ""; }, 6000);
           return;
         }
         var pot = d.potrero || {};

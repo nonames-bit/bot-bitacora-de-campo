@@ -536,6 +536,9 @@
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
           box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "" + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          // El aviso se quita solo para no dejar ocupado el espacio de arriba.
+          var aviso = box.firstChild;
+          setTimeout(function () { if (aviso && aviso.parentNode === box) box.innerHTML = ""; }, 6000);
           return;
         }
         var pot = d.potrero || {};
@@ -6568,19 +6571,18 @@
       { id: "tarea", nom: "Asignar Tarea", ico: "calendar" }
     ];
 
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+    // GPS y Manga van como dos botones chicos (ícono arriba, texto abajo,
+    // igual que la barra inferior) para no gastar media pantalla del celular.
+    var h = "<div class='cap-cabecera'>"
       + "<h3 style='margin:0;'>" + icon("clipboard") + "Registrar evento</h3>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-      + "<button type='button' id='btn-cap-gps-ronda' class='tema-btn' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-      + icon("pin", 16) + "Estoy en el potrero (GPS)"
-      + "</button>"
-      + "<button type='button' id='btn-cap-ir-manga' class='btn-guardar-manga' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-      + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
-      + "</button>"
+      + "<div class='cap-atajos'>"
+      + "<button type='button' id='btn-cap-gps-ronda' class='cap-atajo' title='Guardar dónde estoy (ronda GPS)'>"
+      + icon("pin", 20) + "<span>Estoy en el potrero</span></button>"
+      + "<button type='button' id='btn-cap-ir-manga' class='cap-atajo' title='Procesar o pesar varios animales seguidos en lote'>"
+      + icon("manga", 20) + "<span>Manga corral</span></button>"
       + "</div>"
       + "</div>"
       + "<div id='gps-ronda-box'></div>";
-    h += "<p class='aviso' style='margin:4px 0 10px; font-size:12.5px;'>Para procesar o pesar varios animales seguidos en lote, usa <b>Manga Corral</b>.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.

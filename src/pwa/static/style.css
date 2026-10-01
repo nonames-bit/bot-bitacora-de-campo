@@ -4493,3 +4493,15 @@ button.btn-peligro:hover { background: rgba(220, 38, 38, 0.08); }
 .resp-confirmar[hidden] { display: none; }
 .resp-confirmar-fila { display: flex; gap: 6px; flex-wrap: wrap; }
 .resp-confirmar-fila input { flex: 1; min-width: 0; font-family: var(--font-mono); letter-spacing: 1px; }
+
+/* ---------- Registrar: GPS y Manga como botones chicos ---------- */
+.cap-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.cap-atajos { display: flex; gap: 6px; flex: 0 0 auto; }
+button.cap-atajo {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  width: 74px; min-height: 52px; padding: 6px 4px; border-radius: 10px;
+  background: var(--superficie); color: var(--verde-marca); border: 1px solid var(--borde-fuerte);
+  font-size: 10.5px; font-weight: 600; line-height: 1.15; text-align: center;
+}
+button.cap-atajo:hover { background: var(--verde-marca-pastel); border-color: var(--verde-marca); }
+button.cap-atajo .svg-icon { margin: 0; }
