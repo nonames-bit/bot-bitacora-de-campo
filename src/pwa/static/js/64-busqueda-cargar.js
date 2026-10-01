@@ -320,7 +320,6 @@
   function cargar(animar) {
     if (animar === undefined) animar = true;
     actualizarFabGlobal();
-    try { document.body.classList.toggle("modo-campo", actual === "campo"); } catch (eBody) {}
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
@@ -366,15 +365,6 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
-      }
-      return;
-    }
-
-    if (actual === "campo") {
-      if (!animar) return; // En polling silencioso no resetear el resumen
-      if (vista) {
-        montarVista(vista, renderCampo(), animar);
-        bindCampo();
       }
       return;
     }

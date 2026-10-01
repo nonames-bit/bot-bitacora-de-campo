@@ -22,11 +22,17 @@
     ];
 
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
-      + "<h3 style='margin:0;'>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>"
+      + "<h3 style='margin:0;'>" + icon("clipboard") + "Registrar evento</h3>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<button type='button' id='btn-cap-gps-ronda' class='tema-btn' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+      + icon("pin", 16) + "Estoy en el potrero (GPS)"
+      + "</button>"
       + "<button type='button' id='btn-cap-ir-manga' class='btn-guardar-manga' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
       + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
       + "</button>"
-      + "</div>";
+      + "</div>"
+      + "</div>"
+      + "<div id='gps-ronda-box'></div>";
     h += "<p class='aviso' style='margin:4px 0 10px; font-size:12.5px;'>Para procesar o pesar varios animales seguidos en lote, usa <b>Manga Corral</b>.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).

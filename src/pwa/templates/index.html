@@ -47,26 +47,27 @@
   </span>
 </header>
 <nav id="nav-principal" aria-label="Navegación principal">
-<div class="nav-grupo" data-grupo="campo"><span class="nav-grupo-titulo" aria-hidden="true">Campo</span>
-<button data-v="manga" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/></svg><span class="nav-txt">Manga Corral</span></button>
-<button data-v="captura" class="nav-primario nav-btn-captura" title="Registrar evento o tarea rápida (+)"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="9.5"/><line x1="12" y1="7.5" x2="12" y2="16.5"/><line x1="7.5" y1="12" x2="16.5" y2="12"/></svg><span class="nav-txt">Captura</span></button>
-<button data-v="campo" id="btn-nav-campo" class="nav-primario" style="display:none" title="Modo campo: 4 botones grandes para el corral"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg><span class="nav-txt">Campo</span></button>
-<button data-v="mapa" id="btn-nav-mapa" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><span class="nav-txt">Mapa &amp; GPS</span></button>
+<div class="nav-grupo" data-grupo="inicio"><span class="nav-grupo-titulo" aria-hidden="true">Inicio</span>
+<button data-v="tablero" class="nav-primario act"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="nav-txt">Tablero</span></button>
 <button data-v="agenda" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span class="nav-txt">Agenda</span></button>
 </div>
-<div class="nav-grupo" data-grupo="ganaderia"><span class="nav-grupo-titulo" aria-hidden="true">Ganadería</span>
-<button data-v="tablero" class="nav-primario act"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span class="nav-txt">Tablero</span></button>
+<div class="nav-grupo" data-grupo="registrar"><span class="nav-grupo-titulo" aria-hidden="true">Registrar</span>
+<button data-v="captura" class="nav-primario nav-btn-captura" title="Registrar evento o tarea rápida (+)"><svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="9.5"/><line x1="12" y1="7.5" x2="12" y2="16.5"/><line x1="7.5" y1="12" x2="16.5" y2="12"/></svg><span class="nav-txt">Registrar</span></button>
+<button data-v="manga" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/></svg><span class="nav-txt">Manga Corral</span></button>
+</div>
+<div class="nav-grupo" data-grupo="hato"><span class="nav-grupo-titulo" aria-hidden="true">Hato</span>
 <button data-v="inventario" class="nav-primario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span class="nav-txt">Inventario</span></button>
-<button data-v="genetica" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg><span class="nav-txt">Genética</span></button>
+<button data-v="ficha" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-txt">Ficha</span></button>
 <button data-v="repro" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g></svg><span class="nav-txt">Reproducción</span></button>
-
-<button data-v="carne" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg><span class="nav-txt">Carne</span></button>
+<button data-v="genetica" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg><span class="nav-txt">Genética</span></button>
 <button data-v="sanidad" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/></svg><span class="nav-txt">Sanidad</span></button>
-<button data-v="pasturas" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg><span class="nav-txt">Pasturas</span></button>
+<button data-v="carne" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg><span class="nav-txt">Carne</span></button>
 <button data-v="leche" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/></svg><span class="nav-txt">Leche</span></button>
+<button data-v="pasturas" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg><span class="nav-txt">Pasturas</span></button>
+<button data-v="mapa" id="btn-nav-mapa" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg><span class="nav-txt">Mapa &amp; GPS</span></button>
 </div>
 <div class="nav-grupo" data-grupo="gestion"><span class="nav-grupo-titulo" aria-hidden="true">Gestión</span>
-<button data-v="finanzas" class="nav-primario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span class="nav-txt">Finanzas</span></button><button data-v="ficha" class="nav-secundario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><span class="nav-txt">Ficha</span></button>
+<button data-v="finanzas" class="nav-primario"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg><span class="nav-txt">Finanzas</span></button>
 <button data-v="usuarios" id="btn-nav-usuarios" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span class="nav-txt">Usuarios</span></button>
 <button data-v="sistema" id="btn-nav-sistema" class="nav-secundario" style="display:none"><svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span class="nav-txt">Sistema</span></button>
 </div>
@@ -369,25 +370,16 @@
     </div>
     
     <div class="sheet-body">
-      <!-- Grupo 1: Trabajo de Campo & Operaciones -->
       <div class="modulo-seccion">
-        <div class="modulo-seccion-titulo">📋 Trabajo de Campo &amp; Manga</div>
+        <div class="modulo-seccion-titulo">Registrar y agenda</div>
         <div class="modulos-grid">
-          <button class="modulo-item" data-v="campo" id="sheet-item-campo">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span>
-            <div class="modulo-info">
-              <b>Modo Campo</b>
-              <small>4 botones grandes para el corral</small>
-            </div>
-          </button>
           <button class="modulo-item" data-v="captura">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></span>
             <div class="modulo-info">
-              <b>Captura Rápida</b>
+              <b>Registrar evento</b>
               <small>Partos, celos, pesajes y notas</small>
             </div>
           </button>
-          
           <button class="modulo-item" data-v="manga">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M4 4v16"/><path d="M12 4v16"/><path d="M20 4v16"/><path d="M2 9h20"/><path d="M2 15h20"/><path d="m2 4 2-2 2 2"/><path d="m10 4 2-2 2 2"/><path d="m18 4 2-2 2 2"/></svg></span>
             <div class="modulo-info">
@@ -395,7 +387,6 @@
               <small>Pesaje masivo y lectura RFID/QR</small>
             </div>
           </button>
-          
           <button class="modulo-item" data-v="agenda">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
             <div class="modulo-info">
@@ -403,7 +394,67 @@
               <small>Palpaciones, secados y tareas</small>
             </div>
           </button>
-
+        </div>
+      </div>
+      <div class="modulo-seccion">
+        <div class="modulo-seccion-titulo">Hato</div>
+        <div class="modulos-grid">
+          <button class="modulo-item" data-v="inventario">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+            <div class="modulo-info">
+              <b>Inventario Hato</b>
+              <small>Población, edades y potreros</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="ficha">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+            <div class="modulo-info">
+              <b>Ficha Animal</b>
+              <small>Historial técnico individual y QR</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="repro">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g></svg></span>
+            <div class="modulo-info">
+              <b>Reproducción</b>
+              <small>Servicios IA, celos y palpación</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="carne">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg></span>
+            <div class="modulo-info">
+              <b>Carne &amp; Destete</b>
+              <small>Pesajes, destete e índice productivo</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="leche">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/></svg></span>
+            <div class="modulo-info">
+              <b>Producción Leche</b>
+              <small>Ordeño, recibos quincenales e IA</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="sanidad">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/></svg></span>
+            <div class="modulo-info">
+              <b>Sanidad Animal</b>
+              <small>Retiros activos y tratamientos</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="pasturas">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span>
+            <div class="modulo-info">
+              <b>Pasturas &amp; Voisin</b>
+              <small>Rotación, aforos y días de reposo</small>
+            </div>
+          </button>
+          <button class="modulo-item" data-v="genetica">
+            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg></span>
+            <div class="modulo-info">
+              <b>Genética &amp; Pedigree</b>
+              <small>Consanguinidad 3G y genealogía</small>
+            </div>
+          </button>
           <button class="modulo-item" data-v="mapa" id="sheet-item-mapa" style="display:none">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg></span>
             <div class="modulo-info">
@@ -413,80 +464,8 @@
           </button>
         </div>
       </div>
-
-      <!-- Grupo 2: Ganadería & Producción -->
       <div class="modulo-seccion">
-        <div class="modulo-seccion-titulo">🐄 Ganadería &amp; Producción</div>
-        <div class="modulos-grid">
-          <button class="modulo-item" data-v="inventario">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-            <div class="modulo-info">
-              <b>Inventario Hato</b>
-              <small>Población, edades y potreros</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="ficha">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-            <div class="modulo-info">
-              <b>Ficha Animal</b>
-              <small>Historial técnico individual y QR</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="repro">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><g transform="scale(.5)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><path d="M18.237 24.475c1.856 1.299 2.33 2.674 3.609 3.57c1.4.98 2.947 1.5 4.169 1.014c2.307-.916 3.976-3.908 6.011-6.815c3.96-5.655 3.954-14.385.26-16.971c-3.692-2.586-11.843.433-15.802 6.088c-1.935 2.763-4.47 6.445-4.317 8.002c.129 1.311.57 2.042 1.958 3.275s2.132.45 4.112 1.837Z" clip-rule="evenodd"/><path stroke-linecap="round" d="M13.618 22.317q-5.312 5.847-1.403 8.885q3.908 3.038 9.815-2.995"/><path stroke-linecap="round" d="M12.239 31.227q-4.645 5.081-1.71 9.477c2.937 4.396 8.755 4.155 11.595.879s8.184-11.396 14.059-9.727s4.877 8.088.939 8.762"/></g></svg></span>
-            <div class="modulo-info">
-              <b>Reproducción</b>
-              <small>Servicios IA, celos y palpación</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="carne">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 3v18"/><path d="m19 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M3 7h1a17 17 0 0 0 8-2 17 17 0 0 0 8 2h1"/><path d="m5 8 3 8a5 5 0 0 1-6 0zV7"/><path d="M7 21h10"/></svg></span>
-            <div class="modulo-info">
-              <b>Carne &amp; Destete</b>
-              <small>Pesajes, destete e índice productivo</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="leche">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M8 2h8"/><path d="M9 2v2.789a4 4 0 0 1-.672 2.219l-.656.984A4 4 0 0 0 7 10.212V20a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-9.789a4 4 0 0 0-.672-2.219l-.656-.984A4 4 0 0 1 15 4.788V2"/><path d="M7 15a6.472 6.472 0 0 1 5 0 6.47 6.47 0 0 0 5 0"/></svg></span>
-            <div class="modulo-info">
-              <b>Producción Leche</b>
-              <small>Ordeño, recibos quincenales e IA</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="sanidad">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M9 12h6"/><path d="M12 9v6"/></svg></span>
-            <div class="modulo-info">
-              <b>Sanidad Animal</b>
-              <small>Retiros activos y tratamientos</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="pasturas">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 20c0-6 3-10 6-12m-6 12c0-8-3-12-7-14m7 14V4"/></svg></span>
-            <div class="modulo-info">
-              <b>Pasturas &amp; Voisin</b>
-              <small>Rotación, aforos y días de reposo</small>
-            </div>
-          </button>
-
-          <button class="modulo-item" data-v="genetica">
-            <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M7 3C7 8 17 8 17 12C17 16 7 16 7 21M17 3C17 8 7 8 7 12C7 16 17 16 17 21M8 6.5h8M7 12h10M8 17.5h8"/></svg></span>
-            <div class="modulo-info">
-              <b>Genética &amp; Pedigree</b>
-              <small>Consanguinidad 3G y genealogía</small>
-            </div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Grupo 3: Gestión & Administración -->
-      <div class="modulo-seccion">
-        <div class="modulo-seccion-titulo">💼 Gestión &amp; Administración</div>
+        <div class="modulo-seccion-titulo">Gestión</div>
         <div class="modulos-grid">
           <button class="modulo-item" data-v="finanzas">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg></span>
@@ -495,7 +474,6 @@
               <small>Ingresos, gastos y balance anual</small>
             </div>
           </button>
-
           <button class="modulo-item" data-v="mercado" id="sheet-item-mercado">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg></span>
             <div class="modulo-info">
@@ -503,7 +481,6 @@
               <small>Granada, Guamal, Catama, Bogotá</small>
             </div>
           </button>
-
           <button class="modulo-item" data-v="usuarios" id="sheet-item-usuarios" style="display:none">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
             <div class="modulo-info">
@@ -511,7 +488,6 @@
               <small>Gestión de personal y accesos</small>
             </div>
           </button>
-
           <button class="modulo-item" data-v="sistema" id="sheet-item-sistema" style="display:none">
             <span class="modulo-ico"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
             <div class="modulo-info">
@@ -519,7 +495,6 @@
               <small>Estado VPS, copias y diagnóstico</small>
             </div>
           </button>
-
           <button class="modulo-item" id="sheet-item-deshacer" type="button" style="display:none">
             <span class="modulo-ico" style="background:rgba(220,38,38,0.12); color:#DC2626;"><svg class="svg-icon" viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></span>
             <div class="modulo-info">

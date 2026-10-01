@@ -171,11 +171,10 @@
   var VISTAS_PRIMARIAS = ["tablero", "captura", "inventario", "finanzas"];
   var NOMBRES_VISTA = {
     tablero: "Tablero",
-    captura: "Captura",
+    captura: "Registrar",
     inventario: "Inventario",
     finanzas: "Finanzas",
     mapa: "Mapa & GPS",
-    campo: "Campo",
     manga: "Manga",
     agenda: "Agenda",
     repro: "Repro",
@@ -447,6 +446,7 @@
 
   // Cambia de pestaña activa sin recargar
   function irAVista(v) {
+    var vistaPrevia = actual;
     if (actual === "mapa" && v !== "mapa") {
       if (_mapaTimerRefresh) {
         clearInterval(_mapaTimerRefresh);
@@ -465,6 +465,9 @@
       }
     }
     actual = v;
+    if (_historialListo && !_navegandoHistorial && v !== vistaPrevia) {
+      try { window.history.pushState({ ja: "vista", v: v }, ""); } catch (eHist) {}
+    }
     actualizarFabGlobal();
     var navEl = document.getElementById("nav-principal");
     if (navEl) navEl.classList.remove("nav-hidden");
@@ -497,6 +500,101 @@
       else { it.classList.remove("act"); it.removeAttribute("aria-current"); }
     });
   }
+  /* ---------- Botón atrás del celular (historial de pantallas) ----------
+     Cada cambio de vista deja una entrada en el historial del navegador, así
+     la flecha atrás de Android vuelve a la vista anterior en vez de cerrar
+     la app. Antes de cambiar de vista, atrás cierra lo que esté abierto
+     encima (modal, menú "Más", visor de fotos, chat) o retrocede un paso de
+     Registrar. Desde la vista de inicio avisa y el siguiente atrás sale.
+     Pila: [raiz, vista inicial, vista 2, ...]; "raiz" es la entrada de
+     guarda que recibe el último atrás. */
+  var _historialListo = false;
+  var _navegandoHistorial = false;
+
+  function vistaInicio() {
+    var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
+    return rol === "TRABAJADOR" ? "captura" : "tablero";
+  }
+
+  function iniciarHistorial() {
+    if (_historialListo || !window.history || !window.history.pushState) return;
+    if (!document.getElementById("nav-principal")) return;
+    try {
+      window.history.replaceState({ ja: "raiz" }, "");
+      window.history.pushState({ ja: "vista", v: actual }, "");
+      _historialListo = true;
+    } catch (eIni) {}
+  }
+
+  function capaVisible(el) {
+    if (!el || !el.isConnected) return false;
+    try { return window.getComputedStyle(el).display !== "none"; } catch (eCs) { return false; }
+  }
+
+  // Cierra la capa abierta más arriba. Devuelve true si cerró algo.
+  function cerrarCapaAbierta() {
+    var lb = document.getElementById("lightbox-visor");
+    if (lb && lb.isConnected) {
+      var lbCerrar = lb.querySelector("#lb-btn-cerrar");
+      if (lbCerrar) lbCerrar.click();
+      if (lb.isConnected) { lb.remove(); document.body.style.overflow = ""; }
+      return true;
+    }
+    var abiertos = qa(".modal-overlay").filter(function (m) { return m.id !== "chat-dock" && capaVisible(m); });
+    if (abiertos.length) {
+      var m = abiertos[abiertos.length - 1];
+      var cerrar = m.querySelector(".modal-cerrar, [id^='btn-cerrar'], .btn-cerrar, [data-cerrar], [aria-label='Cerrar']");
+      if (cerrar) cerrar.click();
+      if (capaVisible(m)) m.style.display = "none";
+      return true;
+    }
+    var dock = document.getElementById("chat-dock");
+    if (dock && dock.classList.contains("expandido")) {
+      var btnCol = document.getElementById("btn-colapsar-chat");
+      if (btnCol) btnCol.click();
+      else { dock.classList.remove("expandido"); dock.classList.add("colapsado"); }
+      return true;
+    }
+    if (actual === "captura") {
+      var paso3 = q(".cap-paso-3.act");
+      var paso2 = q(".cap-paso-2.act");
+      var btnAtras = paso3 ? document.getElementById("btn-cap-atras3") : (paso2 ? document.getElementById("btn-cap-atras2") : null);
+      if (btnAtras) { btnAtras.click(); return true; }
+    }
+    return false;
+  }
+
+  window.addEventListener("popstate", function (e) {
+    if (!_historialListo) return;
+    var st = e.state || {};
+    if (cerrarCapaAbierta()) {
+      // El atrás se gastó cerrando la capa: se repone la entrada de la vista actual.
+      try { window.history.pushState({ ja: "vista", v: actual }, ""); } catch (eP) {}
+      return;
+    }
+    if (st.ja === "vista" && st.v) {
+      if (st.v !== actual) {
+        _navegandoHistorial = true;
+        try { irAVista(st.v); } finally { _navegandoHistorial = false; }
+        cargar();
+        try { window.scrollTo(0, 0); } catch (eSc) {}
+      }
+      return;
+    }
+    // Entrada de guarda: si no está en el inicio, va al inicio; si ya está,
+    // avisa y deja que el siguiente atrás cierre la app.
+    var inicio = vistaInicio();
+    if (actual !== inicio) {
+      _navegandoHistorial = true;
+      try { irAVista(inicio); } finally { _navegandoHistorial = false; }
+      cargar();
+      try { window.history.pushState({ ja: "vista", v: inicio }, ""); } catch (eP2) {}
+      try { window.scrollTo(0, 0); } catch (eSc2) {}
+      return;
+    }
+    mostrarToast("Toca atrás otra vez para salir", "verde");
+  });
+
   // Cargar manual (botón o Enter): el tag manda a Ficha y el potrero manda a
   // Tablero (únicas vistas que usan esos campos), sin importar qué pestaña
   // estaba activa antes.

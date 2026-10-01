@@ -688,6 +688,8 @@
     }
 
     function wireStepperCap() {
+      var bGps = document.getElementById("btn-cap-gps-ronda");
+      if (bGps) bGps.addEventListener("click", localizarGPSRonda);
       var bManga = document.getElementById("btn-cap-ir-manga");
       if (bManga) {
         bManga.addEventListener("click", function () {
