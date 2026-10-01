@@ -911,6 +911,21 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - Al guardar un parto con cría viva, la notificación de éxito ofrece el botón `[🏷️ Registrar Arete de la Cría]`, abriendo el formulario de alta de nuevo animal con Madre, Fecha de nacimiento, Potrero y Sexo de la cría prellenados automáticamente.
     - **Verificación Visual y Suite de Pruebas**:
         - Validado con `browser_subagent` en emulación móvil (390×844) verificando Ficha, Listas de Trabajo, Potrero y redirección con prellenado a Captura Paso 2. Tests de JavaScript construido y suite general en verde.
+- [x] **Actualización de Foto de Perfil en la Ficha del Animal (2026-09-30)** 📷🐄:
+    - **Endpoint Backend dedicado (`src/pwa/rutas/animales.py`)**:
+        - Implementado `POST /api/animal/<tag>/foto`: recibe imagen en Base64, valida integridad con PIL (`_es_imagen_valida`), guarda en `media/perfil_<tag>_<timestamp>_<uuid>.jpg` y registra la entrada en la tabla `fotos` con usuario y notas de auditoría.
+        - Por la lógica de ordenamiento `ORDER BY id DESC`, la foto subida se convierte de inmediato en la foto principal del animal en todas las consultas del hato.
+    - **Frontend PWA y Compresión en Cliente (`55-ficha.js`, `60-carga-datos.js`, `62-rectificar-composicion.js`)**:
+        - **Avatar Interactivo con Badge de Cámara**: La foto/avatar principal en la cabecera cuenta con un badge flotante táctil (`.btn-cambiar-foto-badge`) con icono de cámara y feedback háptico.
+        - **Acción Rápida en Cabecera**: Botón `[📷 Foto]` en `.ficha-head-acciones` junto a `Ficha PDF` y `Editar`.
+        - **Registro Fotográfico en Pestaña General**: Encabezado enriquecido con botón `[📷 Subir Foto]` para agregar nuevas tomas históricas.
+        - **Compresión ultrarrápida HTML5 Canvas**: Redimensiona a máx 1200px y comprime a JPEG ~85 KB antes de transmitir, ideal para subida fluida con conectividad 3G en potreros.
+        - **Modal Interactivo de Confirmación**: Muestra vista previa en alta resolución, peso optimizado, campo opcional de pie de foto/nota y botones para tomar otra o guardar.
+        - **Actualización reactiva en vivo**: Reemplaza instantáneamente el avatar en el DOM y lo añade a la galería sin requerir recargar la página.
+    - **Validación Automatizada y Visual**:
+        - Pruebas unitarias en `tests/test_pwa_api.py` (`test_subir_foto_animal_exitoso`, `test_subir_foto_animal_no_existente_devuelve_404`, `test_subir_foto_animal_imagen_invalida_devuelve_400`).
+        - Regenerado y validado mapa de rutas en `tests/test_rutas_mapa.py` y build de JS con `test_js_construido.py`.
+        - Verificación y capturas visuales en viewport móvil (390×844) con `browser_subagent`.
 
 
 ---

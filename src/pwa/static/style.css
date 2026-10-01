@@ -2076,6 +2076,34 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   transform: scale(1.01);
 }
 
+/* Ficha Animal: Avatar con Badge de Foto */
+.ficha-avatar-wrap {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  transition: transform .15s ease;
+}
+.ficha-avatar-wrap:hover {
+  transform: scale(1.02);
+}
+.ficha-avatar-placeholder {
+  transition: opacity .15s ease, filter .15s ease;
+}
+.ficha-avatar-placeholder:hover {
+  filter: brightness(0.96);
+}
+.btn-cambiar-foto-badge {
+  transition: transform .18s cubic-bezier(0.2, 0.8, 0.2, 1), background .15s ease, box-shadow .15s ease;
+}
+.btn-cambiar-foto-badge:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  background: var(--verde-marca-oscuro, #213c24) !important;
+}
+.btn-cambiar-foto-badge:active {
+  transform: scale(0.92);
+}
+
 /* Captura Rápida: Foto Opcional de Campo */
 .cap-foto-box {
   background: var(--superficie);

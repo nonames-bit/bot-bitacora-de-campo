@@ -547,6 +547,54 @@ def test_crear_y_editar_animal_requiere_rol_admin_u_owner(tmp_path, db_file):
     assert r_editar.status_code == 403
 
 
+def test_subir_foto_animal_exitoso(client):
+    import io
+    import base64
+    from PIL import Image
+
+    buf = io.BytesIO()
+    img = Image.new("RGB", (64, 64), color="blue")
+    img.save(buf, format="JPEG")
+    b64_str = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+
+    r = client.post("/api/animal/47/foto", json={
+        "foto_base64": b64_str,
+        "caption": "Foto frontal de prueba",
+    })
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["ok"] is True
+    assert res["tag"] == "47"
+    assert "/media/perfil_47_" in res["url"]
+    assert res["foto_id"] > 0
+
+    ficha = client.get("/api/ficha/47").get_json()
+    assert ficha["existe"] is True
+    assert len(ficha["fotos"]) >= 1
+    assert ficha["fotos"][0]["url"] == res["url"]
+
+
+def test_subir_foto_animal_no_existente_devuelve_404(client):
+    import io
+    import base64
+    from PIL import Image
+
+    buf = io.BytesIO()
+    img = Image.new("RGB", (64, 64), color="green")
+    img.save(buf, format="JPEG")
+    b64_str = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    r = client.post("/api/animal/NO-EXISTE-TAG-999/foto", json={"foto_base64": b64_str})
+    assert r.status_code == 404
+    assert r.get_json()["ok"] is False
+
+
+def test_subir_foto_animal_imagen_invalida_devuelve_400(client):
+    r = client.post("/api/animal/47/foto", json={"foto_base64": "datos_corruptos_no_imagen"})
+    assert r.status_code == 400
+    assert r.get_json()["ok"] is False
+
+
 def test_api_poblacion_sigue_disponible_como_alias(client):
     r = client.get("/api/poblacion")
     assert r.status_code == 200

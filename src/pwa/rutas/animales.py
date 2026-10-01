@@ -13,6 +13,7 @@ from ...engine.genetic_engine import normalizar_nombre_raza as _normalizar_nombr
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
     _error_interno,
+    _es_imagen_valida,
     _invalidar_tareas,
     datos_ficha,
     datos_genetica,
@@ -101,6 +102,88 @@ def registrar(app, ctx, h):
             return jsonify({"ok": True, "tag": tag})
         except Exception as e:
             logger.exception("Error al editar animal %s: %s", tag, e)
+            return _error_interno(500)
+        finally:
+            try:
+                db_a.close()
+            except Exception:
+                pass
+
+    @app.post("/api/animal/<tag>/foto")
+    def api_animal_foto_subir(tag):
+        """Sube o actualiza la foto de perfil de un animal desde la ficha.
+        Guarda la imagen en media/ y registra la entrada en fotos para que
+        se convierta de inmediato en la foto principal."""
+        if _rol_actual() not in ("OWNER", "ADMIN", "MAYORDOMO", "TRABAJADOR"):
+            return jsonify({"ok": False, "error": "Acceso denegado. Se requiere un rol activo de campo o administración."}), 403
+
+        datos = request.get_json(silent=True) or {}
+        foto_b64 = datos.get("foto_base64")
+        caption = str(datos.get("caption") or f"Foto de perfil · {tag}").strip()
+
+        if not foto_b64 or not isinstance(foto_b64, str):
+            return jsonify({"ok": False, "error": "No se recibió ninguna imagen o el formato no es válido."}), 400
+
+        import base64
+        import os
+        import re
+        import time
+        import uuid
+        from .. import app as _base
+
+        if "," in foto_b64:
+            foto_b64 = foto_b64.split(",", 1)[1]
+
+        try:
+            raw_bytes = base64.b64decode(foto_b64)
+        except Exception:
+            return jsonify({"ok": False, "error": "Error al decodificar la imagen en base64."}), 400
+
+        if not raw_bytes or not _es_imagen_valida(raw_bytes):
+            return jsonify({"ok": False, "error": "El archivo enviado no es una imagen válida reconocible."}), 400
+
+        db_a = _db(db_path)
+        try:
+            aid = db_a.animal_id(tag)
+            if aid is None:
+                return jsonify({"ok": False, "error": f"No existe ningún animal con el arete/tag '{tag}'."}), 404
+
+            media_dir_abs = os.path.join(_base.RAIZ_PROYECTO, _base.MEDIA_DIR_DEFAULT) if not os.path.isabs(_base.MEDIA_DIR_DEFAULT) else _base.MEDIA_DIR_DEFAULT
+            os.makedirs(media_dir_abs, exist_ok=True)
+
+            tag_clean = re.sub(r"[^A-Za-z0-9_-]+", "_", str(tag))
+            ts = int(time.time())
+            rnd = uuid.uuid4().hex[:6]
+            fname = f"perfil_{tag_clean}_{ts}_{rnd}.jpg"
+            dest_file = os.path.join(media_dir_abs, fname)
+
+            with open(dest_file, "wb") as f_out:
+                f_out.write(raw_bytes)
+
+            ruta_rel = os.path.join("media", fname).replace("\\", "/")
+            uid_user = session.get("user_id")
+            hoy_iso = time.strftime("%Y-%m-%d")
+            usuario_nombre = session.get("nombre") or _rol_actual() or "Usuario"
+
+            fid = db_a.registrar_foto(
+                ruta=ruta_rel,
+                animal_tag=tag,
+                fecha=hoy_iso,
+                caption=caption,
+                user_id=uid_user,
+                notas=f"Actualización de foto de perfil desde ficha PWA ({usuario_nombre})",
+            )
+
+            return jsonify({
+                "ok": True,
+                "tag": tag,
+                "foto_id": fid,
+                "url": f"/media/{fname}",
+                "caption": caption,
+                "mensaje": f"Foto de perfil de {tag} actualizada exitosamente.",
+            })
+        except Exception as e:
+            logger.exception("Error al guardar foto de perfil de %s: %s", tag, e)
             return _error_interno(500)
         finally:
             try:

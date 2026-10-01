@@ -112,8 +112,9 @@
       || (catSg.indexOf("PARIDA") >= 0));
 
     var head = "<div class='ficha-head' style='display:flex; gap:14px; align-items:center; background:var(--superficie); padding:14px; border:1px solid var(--borde); border-radius:10px; margin-bottom:12px;'>";
+    head += "<div class='ficha-avatar-wrap' style='position:relative; flex-shrink:0;'>";
     if (f.fotos && f.fotos.length && f.fotos[0].url) {
-      head += "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; flex-shrink:0; border-radius:8px; overflow:hidden;'>"
+      head += "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; border-radius:8px; overflow:hidden;'>"
         + "<img class='avatar zoomable-img' src='" + esc(f.fotos[0].url) + "' alt='Foto principal " + esc(f.tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
         + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
         + "</div>";
@@ -122,10 +123,14 @@
       // frente a los cientos de KB del WebP/GIF animado).
       var defaultAnim = esTernero ? "/static/ternero.png" : (esToro ? "/static/toro_reproductor.png" : (esParida ? "/static/vaca_con_cria.png" : "/static/vaca_comiendo.png"));
       var defaultTitle = esTernero ? "Ternero / Cría" : (esToro ? "Toro reproductor" : "Bovino");
-      head += "<div style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden;' title='" + defaultTitle + "'>"
+      head += "<div class='ficha-avatar-placeholder' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' style='width:64px; height:64px; border-radius:8px; background:var(--verde-marca-pastel); color:var(--verde-marca); display:flex; align-items:center; justify-content:center; overflow:hidden; cursor:pointer;' title='Toca para tomar o subir foto de perfil'>"
         + "<img src='" + defaultAnim + "' alt='Ilustración' style='width:60px; height:32px; object-fit:contain; display:block;'>"
         + "</div>";
     }
+    head += "<button type='button' class='btn-cambiar-foto-badge' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' title='Cambiar o tomar foto de perfil con la cámara' style='position:absolute; bottom:-3px; right:-3px; background:var(--verde-marca); color:#fff; border:2px solid var(--superficie); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25); z-index:2;'>"
+      + icon("camera", 12)
+      + "</button>";
+    head += "</div>";
     var estadoChip = "";
     var stUpper = String(f.estado || "").toUpperCase();
     if (stUpper === "ACTIVO") {
@@ -216,6 +221,8 @@
       + icon("search", 14) + "Buscar otro</button>"
       + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/pdf' target='_blank' class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; box-shadow:0 1px 3px rgba(0,0,0,0.12);' title='Descargar Ficha Técnica Oficial (PDF) con semáforo zootécnico y genealogía'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
+      + "<button type='button' class='tema-btn' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Tomar con cámara o subir foto de perfil'>"
+      + icon("camera", 14) + "Foto</button>"
       + btnEditar
       + btnRectificar
       + "</div>";
@@ -976,7 +983,12 @@
     } else {
       fotosHtml = vacio("Sin fotos para este animal.");
     }
-    h += "<h4 style='margin-top:16px;'>" + icon("camera") + "Registro Fotográfico (Toca una foto para agrandarla)</h4>" + fotosHtml;
+    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:16px; margin-bottom:8px;'>"
+      + "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("camera") + "Registro Fotográfico (Toca una foto para agrandarla)</h4>"
+      + "<button type='button' class='tema-btn' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:5px 10px; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Subir una nueva fotografía para este animal'>"
+      + icon("camera", 13) + "<span>Subir Foto</span></button>"
+      + "</div>"
+      + fotosHtml;
 
     return h;
   }

@@ -56,6 +56,13 @@
 ]
 ],
 [
+"/api/animal/<tag>/foto",
+"api_animal_foto_subir",
+[
+"POST"
+]
+],
+[
 "/api/animal/<tag>/pausa-ordeno",
 "api_animal_pausa_ordeno",
 [

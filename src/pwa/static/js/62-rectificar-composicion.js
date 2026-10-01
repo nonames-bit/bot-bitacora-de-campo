@@ -1,3 +1,213 @@
+  /* ---------- Subida y Actualización de Foto de Perfil de Animal ---------- */
+  function iniciarCapturaFotoAnimal(tag) {
+    window.iniciarCapturaFotoAnimal = iniciarCapturaFotoAnimal;
+    if (!tag) {
+      tag = (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+    }
+    if (!tag) {
+      if (typeof mostrarToast === "function") mostrarToast("No se especificó animal.", "ambar");
+      return;
+    }
+
+    var inp = document.getElementById("input-foto-animal-directo");
+    if (!inp) {
+      inp = document.createElement("input");
+      inp.type = "file";
+      inp.id = "input-foto-animal-directo";
+      inp.accept = "image/*";
+      inp.capture = "environment";
+      inp.style.display = "none";
+      document.body.appendChild(inp);
+    }
+
+    inp.onchange = function () {
+      var file = inp.files && inp.files[0];
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        var img = new Image();
+        img.onload = function () {
+          var maxDim = 1200;
+          var width = img.width;
+          var height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          var canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          var compressedB64 = canvas.toDataURL("image/jpeg", 0.84);
+          var tamKb = Math.round((compressedB64.length * 3) / 4 / 1024);
+
+          inp.value = "";
+          mostrarModalSubirFotoAnimal(tag, {
+            base64: compressedB64,
+            nombre: file.name || ("foto_" + tag + ".jpg"),
+            tam_kb: tamKb,
+            ancho: width,
+            alto: height
+          });
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    };
+
+    inp.click();
+  }
+  window.iniciarCapturaFotoAnimal = iniciarCapturaFotoAnimal;
+
+  function mostrarModalSubirFotoAnimal(tag, fotoData) {
+    window.mostrarModalSubirFotoAnimal = mostrarModalSubirFotoAnimal;
+    var overlay = document.getElementById("subir-foto-animal-modal");
+    if (overlay) overlay.remove();
+
+    var html = "<div id='subir-foto-animal-modal' class='modal-overlay' style='display:flex; align-items:center; justify-content:center; z-index:1050;'>"
+      + "<div class='modal-contenido' style='max-width:440px; width:92%; max-height:92vh; overflow-y:auto;'>"
+      + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde);'>"
+      + "<b style='display:inline-flex; align-items:center; gap:6px; font-size:15px;'>" + icon("camera", 17) + "Foto de Perfil · Animal " + esc(tag) + "</b>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;'>✕</button>"
+      + "</div>"
+      + "<form id='form-subir-foto-animal' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
+      + "<div style='text-align:center; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:10px;'>"
+      + "<img src='" + fotoData.base64 + "' alt='Vista previa foto " + esc(tag) + "' style='max-height:220px; max-width:100%; border-radius:6px; object-fit:cover; display:block; margin:0 auto; box-shadow:0 2px 8px rgba(0,0,0,0.15);'>"
+      + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;'>"
+      + "<span class='chip verde' style='font-size:10.5px;'>✓ Optimizada (" + fotoData.tam_kb + " KB)</span>"
+      + "<span>" + fotoData.ancho + " × " + fotoData.alto + " px</span>"
+      + "</div>"
+      + "</div>"
+      + "<label style='display:block; font-size:12.5px; font-weight:600;'>Descripción / Nota (opcional)"
+      + "<input id='inp-foto-caption' value='Foto de perfil · " + esc(tag) + "' maxlength='120' style='width:100%; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); margin-top:3px; box-sizing:border-box;'>"
+      + "</label>"
+      + "<p id='foto-form-error' class='aviso' style='display:none; color:var(--color-rojo-txt); background:var(--color-rojo-bg); padding:8px 10px; border-radius:6px;'></p>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; margin-top:4px; flex-wrap:wrap;'>"
+      + "<button type='button' id='btn-otra-foto' class='tema-btn' style='font-size:12px; padding:8px 12px; display:inline-flex; align-items:center; gap:4px;'>"
+      + icon("camera", 13) + "Tomar otra</button>"
+      + "<div style='display:flex; gap:8px;'>"
+      + "<button type='button' id='btn-cancelar-foto' class='tema-btn' style='font-size:12px; padding:8px 12px;'>Cancelar</button>"
+      + "<button type='submit' id='btn-submit-foto' class='tema-btn' style='font-size:12px; padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 1px 3px rgba(0,0,0,0.2);'>"
+      + icon("check", 14) + "<span id='btn-submit-foto-txt'>Guardar Foto</span></button>"
+      + "</div>"
+      + "</div>"
+      + "</form>"
+      + "</div>"
+      + "</div>";
+
+    var wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    document.body.appendChild(wrap.firstChild);
+
+    var ov = document.getElementById("subir-foto-animal-modal");
+    function cerrar() { if (ov) ov.remove(); }
+    var btnC = document.getElementById("btn-cerrar-foto-modal");
+    if (btnC) btnC.addEventListener("click", cerrar);
+    var btnCanc = document.getElementById("btn-cancelar-foto");
+    if (btnCanc) btnCanc.addEventListener("click", cerrar);
+    ov.addEventListener("click", function (e) { if (e.target === ov) cerrar(); });
+
+    var btnOtra = document.getElementById("btn-otra-foto");
+    if (btnOtra) {
+      btnOtra.addEventListener("click", function () {
+        cerrar();
+        iniciarCapturaFotoAnimal(tag);
+      });
+    }
+
+    var form = document.getElementById("form-subir-foto-animal");
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var capEl = document.getElementById("inp-foto-caption");
+      var caption = capEl ? capEl.value.trim() : "";
+      var errEl = document.getElementById("foto-form-error");
+      var btnSubmit = document.getElementById("btn-submit-foto");
+      var btnTxt = document.getElementById("btn-submit-foto-txt");
+
+      if (errEl) { errEl.style.display = "none"; errEl.textContent = ""; }
+      if (btnSubmit) { btnSubmit.disabled = true; }
+      if (btnTxt) { btnTxt.textContent = "Guardando..."; }
+
+      fetch("/api/animal/" + encodeURIComponent(tag) + "/foto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          foto_base64: fotoData.base64,
+          caption: caption || ("Foto de perfil · " + tag)
+        })
+      }).then(function (r) {
+        return r.json().then(function (d) { return { status: r.status, body: d }; });
+      }).then(function (res) {
+        if (res.status === 200 && res.body.ok) {
+          cerrar();
+          if (typeof mostrarToast === "function") {
+            mostrarToast("✓ " + (res.body.mensaje || "Foto de perfil actualizada con éxito."), "verde");
+          }
+          try {
+            if (navigator && navigator.vibrate) navigator.vibrate([35]);
+          } catch (eVib) {}
+
+          var nuevaUrl = res.body.url;
+          var hoy = new Date().toISOString().slice(0, 10);
+          var nuevaFotoObj = { url: nuevaUrl, caption: caption, fecha: hoy };
+
+          if (window.__ultimaFicha && String(window.__ultimaFicha.tag).toUpperCase() === String(tag).toUpperCase()) {
+            if (!Array.isArray(window.__ultimaFicha.fotos)) {
+              window.__ultimaFicha.fotos = [];
+            }
+            window.__ultimaFicha.fotos.unshift(nuevaFotoObj);
+          }
+
+          // Actualizar avatar en vivo en el DOM
+          var avatarWrap = document.querySelector(".ficha-avatar-wrap");
+          if (avatarWrap) {
+            avatarWrap.innerHTML = "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; border-radius:8px; overflow:hidden;'>"
+              + "<img class='avatar zoomable-img' src='" + esc(nuevaUrl) + "' alt='Foto principal " + esc(tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
+              + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
+              + "</div>"
+              + "<button type='button' class='btn-cambiar-foto-badge' data-accion='cambiar-foto-animal' data-tag='" + esc(tag) + "' title='Cambiar o tomar foto de perfil con la cámara' style='position:absolute; bottom:-3px; right:-3px; background:var(--verde-marca); color:#fff; border:2px solid var(--superficie); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25); z-index:2;'>"
+              + icon("camera", 12)
+              + "</button>";
+          }
+
+          // Actualizar galería de fotos en pestaña General si está visible
+          var fotosWrap = document.querySelector(".fotos-wrap");
+          if (fotosWrap) {
+            var nuevaCardHtml = "<div class='foto-card' title='Toca para agrandar imagen'>"
+              + "<img class='zoomable-img' src='" + esc(nuevaUrl) + "' alt='Foto nueva · " + esc(tag) + "' loading='lazy' style='max-height:175px; width:auto; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
+              + "<div class='zoom-hint'>" + icon("search", 12) + "Agrandar</div>"
+              + "</div>";
+            fotosWrap.insertAdjacentHTML("afterbegin", nuevaCardHtml);
+          }
+        } else {
+          if (btnSubmit) btnSubmit.disabled = false;
+          if (btnTxt) btnTxt.textContent = "Guardar Foto";
+          if (errEl) {
+            errEl.textContent = "❌ " + (res.body.error || "No se pudo guardar la foto.");
+            errEl.style.display = "block";
+          }
+        }
+      }).catch(function (err) {
+        if (btnSubmit) btnSubmit.disabled = false;
+        if (btnTxt) btnTxt.textContent = "Guardar Foto";
+        if (errEl) {
+          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.style.display = "block";
+        }
+      });
+    });
+  }
+  window.mostrarModalSubirFotoAnimal = mostrarModalSubirFotoAnimal;
+
   function mostrarModalRectificarTag(tagActual) {
     window.mostrarModalRectificarTag = mostrarModalRectificarTag;
     if (!tagActual) {

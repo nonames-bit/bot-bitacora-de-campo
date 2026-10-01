@@ -428,6 +428,13 @@
         var tTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
         mostrarModalRectificarTag(tTag);
       }
+      else if (acc === "cambiar-foto-animal") {
+        e.preventDefault();
+        var fTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+        if (fTag && typeof window.iniciarCapturaFotoAnimal === "function") {
+          window.iniciarCapturaFotoAnimal(fTag);
+        }
+      }
       else if (acc === "editar-composicion-raza") {
         var cTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
         mostrarModalComposicionRacial(cTag);
