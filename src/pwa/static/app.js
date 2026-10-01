@@ -8259,7 +8259,11 @@
         .then(function (res) {
           if (res.status >= 200 && res.status < 300 && res.body.ok) {
             enviarTelemetriaSilenciosa("captura_traslado_masivo");
-            if (feed) {
+            if (feed && res.body.en_revision) {
+              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>Enviado. El traslado de "
+                + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino)
+                + " queda por revisar: se hace cuando el administrador lo apruebe.</div>";
+            } else if (feed) {
               feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>✅ " + res.body.movidos
                 + " animal(es) movidos de " + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino) + ".</div>";
             }
@@ -8477,13 +8481,14 @@
 
         var feed = document.getElementById("captura-feedback");
 
-        function mostrarExito(online) {
+        function mostrarExito(online, enRevision) {
           enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
           var fotoTxt = payload.foto_base64 ? " 📸 (con foto adjunta)" : "";
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
-              + (online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
-            if (_tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
+              + (enRevision ? "Enviado. Queda por revisar: se registra cuando el administrador lo apruebe."
+                : online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+            if (!enRevision && _tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
               var vMadre = payload.vaca_tag || "";
               var fParto = fecha || new Date().toISOString().slice(0, 10);
               var potMadre = payload.potrero_madre || "";
@@ -8510,7 +8515,7 @@
               }, 50);
             }
           }
-          mostrarToast(online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal", online ? "verde" : "ambar");
+          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
           vibrarConfirmacion();
           // BLOQUE 4: persistir defaults inteligentes (potrero + tag).
           try {
@@ -8543,7 +8548,7 @@
           body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
         }).then(function (r) { return r.json(); })
           .then(function (res) {
-            if (res.ok && res.procesados > 0) mostrarExito(true);
+            if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
             else {
               encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
             }
@@ -10337,6 +10342,139 @@
     exportarTablaCSV("retiros_sanitarios_ja", ".tabla-scroll table");
   };
 
+  /* ---------- Por revisar (OWNER/ADMIN) ----------
+     Partos, muertes, ventas y traslados que registra un TRABAJADOR quedan en
+     pausa hasta que alguien de la oficina los apruebe, los corrija o los
+     rechace (ver src/engine/revision.py). */
+  var ICONO_REVISION = {
+    parto: "parto", muerte: "skull", venta: "banknote", movimiento: "banknote",
+    traslado: "truck", traslado_masivo: "truck"
+  };
+
+  function fechaHoraRevision(iso) {
+    if (!iso) return "";
+    var s = String(iso);
+    var f = s.slice(8, 10) + "/" + s.slice(5, 7);
+    return s.length > 15 ? f + " " + s.slice(11, 16) : f;
+  }
+
+  function tarjetaRevision(p) {
+    var quien = esc(p.registrado_por_nombre || "Trabajador");
+    var meta = quien + " · " + esc(p.canal || "App") + " · enviado " + esc(fechaHoraRevision(p.creado_en));
+    if (p.fecha) meta += " · fecha del evento " + esc(fechaHoraRevision(p.fecha));
+    var h = "<article class='rev-tarjeta' data-id='" + p.id + "'>"
+      + "<div class='rev-cab'><span class='rev-ico'>" + icon(ICONO_REVISION[p.tipo] || "clipboard", 20) + "</span>"
+      + "<div class='rev-txt'><b>" + esc(p.resumen) + "</b><small>" + meta + "</small>"
+      + (p.tiene_foto ? "<small>Trae foto adjunta</small>" : "") + "</div></div>";
+    if (p.campos && p.campos.length) {
+      h += "<div class='rev-campos' hidden>";
+      p.campos.forEach(function (c) {
+        h += "<label class='rev-campo'><span>" + esc(c.etiqueta) + "</span>"
+          + "<input type='text' data-clave='" + esc(c.clave) + "' data-original='" + esc(c.valor) + "' value='" + esc(c.valor) + "'></label>";
+      });
+      h += "</div>";
+    }
+    h += "<div class='rev-rechazo' hidden><label class='rev-campo'><span>Motivo del rechazo (opcional)</span>"
+      + "<input type='text' class='rev-motivo' maxlength='300' placeholder='Ej. esa vaca no está preñada'></label></div>"
+      + "<div class='rev-error' hidden></div>"
+      + "<div class='rev-acciones'>"
+      + "<button type='button' class='rev-btn rev-aprobar' data-accion-rev='aprobar'>Aprobar</button>"
+      + (p.campos && p.campos.length ? "<button type='button' class='rev-btn rev-corregir' data-accion-rev='corregir'>Corregir</button>" : "")
+      + "<button type='button' class='rev-btn rev-rechazar' data-accion-rev='rechazar'>Rechazar</button>"
+      + "</div></article>";
+    return h;
+  }
+
+  function renderRevision(d) {
+    var pend = (d && d.pendientes) || [];
+    var revisados = (d && d.revisados) || [];
+    var h = "<h3>" + icon("clipboard", 20) + "Por revisar</h3>"
+      + "<p class='aviso'>Partos, muertes, ventas y traslados que registran los trabajadores esperan aquí. "
+      + "Al aprobarlos quedan registrados a nombre de quien los envió.</p>";
+    if (!pend.length) {
+      h += "<div class='rev-vacio'>" + icon("clipboard", 22) + "<b>No hay registros por revisar.</b></div>";
+    } else {
+      h += "<div class='rev-lista' id='rev-lista'>" + pend.map(tarjetaRevision).join("") + "</div>";
+    }
+    if (revisados.length) {
+      h += "<h4 class='rev-subtitulo'>Revisados hace poco</h4><div class='rev-historial'>";
+      revisados.forEach(function (p) {
+        var ok = p.estado === "APROBADO";
+        h += "<div class='rev-hist-fila'><span class='chip " + (ok ? "verde" : "rojo") + "'>" + (ok ? "Aprobado" : "Rechazado") + "</span>"
+          + "<div class='rev-txt'><b>" + esc(p.resumen) + "</b><small>" + esc(p.registrado_por_nombre || "Trabajador")
+          + " · revisó " + esc(p.revisado_por_nombre || "") + " " + esc(fechaHoraRevision(p.revisado_en))
+          + (p.nota_revision ? " · " + esc(p.nota_revision) : "") + "</small></div></div>";
+      });
+      h += "</div>";
+    }
+    return h;
+  }
+
+  function bindRevision() {
+    var lista = document.getElementById("rev-lista");
+    if (!lista) return;
+    lista.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-accion-rev]");
+      if (!btn) return;
+      var tarjeta = btn.closest(".rev-tarjeta");
+      var id = tarjeta && tarjeta.getAttribute("data-id");
+      if (!id) return;
+      var accion = btn.getAttribute("data-accion-rev");
+      var campos = tarjeta.querySelector(".rev-campos");
+      var rechazo = tarjeta.querySelector(".rev-rechazo");
+      var errorBox = tarjeta.querySelector(".rev-error");
+
+      if (accion === "corregir") {
+        if (campos) campos.hidden = !campos.hidden;
+        if (rechazo) rechazo.hidden = true;
+        btn.classList.toggle("activo", campos && !campos.hidden);
+        var primero = campos && !campos.hidden && campos.querySelector("input");
+        if (primero) primero.focus();
+        return;
+      }
+      if (accion === "rechazar" && rechazo && rechazo.hidden) {
+        // Primer toque: pedir el motivo. El segundo confirma.
+        rechazo.hidden = false;
+        if (campos) campos.hidden = true;
+        btn.textContent = "Confirmar rechazo";
+        var mot = rechazo.querySelector("input");
+        if (mot) mot.focus();
+        return;
+      }
+
+      var cuerpo = {};
+      if (accion === "aprobar" && campos && !campos.hidden) {
+        var cambios = {};
+        campos.querySelectorAll("input[data-clave]").forEach(function (inp) {
+          if (inp.value !== inp.getAttribute("data-original")) cambios[inp.getAttribute("data-clave")] = inp.value;
+        });
+        cuerpo.cambios = cambios;
+      }
+      if (accion === "rechazar") {
+        var motInp = rechazo && rechazo.querySelector("input");
+        cuerpo.motivo = motInp ? motInp.value : "";
+      }
+      tarjeta.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+      fetch("/api/revision/" + encodeURIComponent(id) + "/" + accion, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(cuerpo)
+      }).then(function (r) { return r.json().then(function (b) { return { ok: r.ok, body: b }; }); })
+        .then(function (res) {
+          if (!res.ok || !res.body.ok) throw new Error((res.body && res.body.error) || "No se pudo guardar.");
+          mostrarToast(accion === "aprobar" ? (res.body.corregido ? "Corregido y registrado" : "Aprobado y registrado") : "Rechazado", "verde");
+          vibrarConfirmacion();
+          tarjeta.classList.add("rev-saliendo");
+          setTimeout(function () {
+            if (tarjeta.parentNode) tarjeta.parentNode.removeChild(tarjeta);
+            if (!document.querySelector(".rev-tarjeta")) cargar(false);
+          }, 250);
+          actualizarBadges();
+        }).catch(function (err) {
+          tarjeta.querySelectorAll("button").forEach(function (b) { b.disabled = false; });
+          if (errorBox) { errorBox.textContent = err && err.message || String(err); errorBox.hidden = false; }
+        });
+    });
+  }
+
   /* ---------- Asistente IA (Chat Natural) ---------- */
   function formatearMensajeChat(raw) {
     if (!raw) return "";
@@ -11135,6 +11273,7 @@
         eliminarDeColaOffline(idsBorrar).then(function () {
           if (mostrarAviso) {
             var msg = "✅ Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
+            if (res.en_revision > 0) msg += "\n" + res.en_revision + " quedaron por revisar: se registran cuando el administrador los apruebe.";
             if (pendientes > 0) msg += "\n⚠️ " + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
             if (res.errores && res.errores.length) {
               msg += "\n⚠️ Avisos: " + res.errores.join("; ");
@@ -12377,7 +12516,8 @@
     gps:       { kpis: 0, graf: 0, tabla: 4 },
     sistema:   { kpis: 4, graf: 0, tabla: 0 },
     mercado:   { kpis: 3, graf: 0, tabla: 8 },
-    usuarios:  { kpis: 0, graf: 0, tabla: 5 }
+    usuarios:  { kpis: 0, graf: 0, tabla: 5 },
+    revision:  { kpis: 0, graf: 0, tabla: 4 }
   };
   function htmlSkeleton(v) {
     var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;
@@ -14160,6 +14300,18 @@
       return;
     }
 
+    if (actual === "revision") {
+      if (animar) skeleton(vista, "revision");
+      fetchJSON("/api/revision/pendientes", function (d) {
+        if (!vista) return;
+        // El polling silencioso no borra lo que el revisor está corrigiendo.
+        if (!animar && vista.querySelector(".rev-campos:not([hidden]), .rev-rechazo:not([hidden])")) return;
+        montarVista(vista, renderRevision(d), animar);
+        bindRevision();
+      }, animar ? vista : null);
+      return;
+    }
+
     if (actual === "usuarios") {
       if (!animar) return; // En polling silencioso no resetear el formulario de usuarios
       if (animar) skeleton(vista, "usuarios");
@@ -14249,7 +14401,7 @@
   }
 
   /* ---------- Badges de contadores en la navegación ---------- */
-  var VISTAS_BADGE = ["agenda", "repro", "sanidad"];
+  var VISTAS_BADGE = ["agenda", "repro", "sanidad", "revision"];
   var badgesCache = {};
   function crearBadgesNav() {
     VISTAS_BADGE.forEach(function (v) {
@@ -14436,6 +14588,7 @@
     gps: "Mapa & GPS",
     usuarios: "Usuarios",
     sistema: "Sistema",
+    revision: "Por revisar",
     mercado: "Subastas",
     ayuda: "Ayuda"
   };

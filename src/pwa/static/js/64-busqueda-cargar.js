@@ -394,6 +394,18 @@
       return;
     }
 
+    if (actual === "revision") {
+      if (animar) skeleton(vista, "revision");
+      fetchJSON("/api/revision/pendientes", function (d) {
+        if (!vista) return;
+        // El polling silencioso no borra lo que el revisor está corrigiendo.
+        if (!animar && vista.querySelector(".rev-campos:not([hidden]), .rev-rechazo:not([hidden])")) return;
+        montarVista(vista, renderRevision(d), animar);
+        bindRevision();
+      }, animar ? vista : null);
+      return;
+    }
+
     if (actual === "usuarios") {
       if (!animar) return; // En polling silencioso no resetear el formulario de usuarios
       if (animar) skeleton(vista, "usuarios");

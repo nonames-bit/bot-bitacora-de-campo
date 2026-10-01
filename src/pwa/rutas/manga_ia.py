@@ -9,6 +9,7 @@ from datetime import date
 import logging
 from flask import abort, jsonify, request, send_file, session
 from .. import app as _base
+from ...engine import revision as _revision
 from ...utils import to_date
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
@@ -19,10 +20,45 @@ from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
 logger = logging.getLogger("src.pwa.app")
 
 
+def _potrero_real(db_t, nombre: str):
+    """Potrero "real" (con geometría georreferenciada) por nombre o código --
+    los códigos numéricos legacy de SG sin mapa no cuentan como ubicación."""
+    return db_t.query_one(
+        "SELECT id, nombre FROM potreros WHERE geom_wkt_4326 IS NOT NULL AND (nombre = ? OR codigo = ?)",
+        (nombre, nombre),
+    )
+
+
+def _ejecutar_traslado_masivo(db_t, nombre_origen, nombre_destino, fecha, motivo, uid, solo_validar=False):
+    """Mueve todos los animales activos de un potrero a otro. Devuelve
+    (ok, cuerpo_json, código_http). Lo usa /api/traslado/masivo y la
+    aprobación de un traslado masivo que quedó por revisar."""
+    fila_origen = _potrero_real(db_t, nombre_origen)
+    fila_destino = _potrero_real(db_t, nombre_destino)
+    if not fila_origen:
+        return False, {"ok": False, "error": f"'{nombre_origen}' no es un potrero real (sin mapa/geometría) o no existe."}, 404
+    if not fila_destino:
+        return False, {"ok": False, "error": f"'{nombre_destino}' no es un potrero real (sin mapa/geometría) o no existe."}, 404
+    if solo_validar:
+        return True, {"ok": True}, 200
+    tags = db_t.animales_activos_en_potrero(fila_origen["id"])
+    for tag in tags:
+        db_t.registrar_traslado(
+            animal_tag=tag, fecha=fecha,
+            potrero_origen=fila_origen["id"], potrero_destino=fila_destino["id"],
+            motivo=motivo, registrado_por=uid,
+        )
+    return True, {
+        "ok": True, "movidos": len(tags), "animales": tags,
+        "potrero_origen": fila_origen["nombre"], "potrero_destino": fila_destino["nombre"],
+    }, 200
+
+
 def registrar(app, ctx, h):
     _limite_api = h._limite_api
     _rol_actual = h._rol_actual
     db_path = ctx.db_path
+    h._ejecutar_traslado_masivo = _ejecutar_traslado_masivo
 
     @app.post("/api/traslado/masivo")
     def api_traslado_masivo():
@@ -43,31 +79,23 @@ def registrar(app, ctx, h):
 
         db_t = _db(db_path)
         try:
-            fila_origen = db_t.query_one(
-                "SELECT id, nombre FROM potreros WHERE geom_wkt_4326 IS NOT NULL AND (nombre = ? OR codigo = ?)",
-                (nombre_origen, nombre_origen),
-            )
-            fila_destino = db_t.query_one(
-                "SELECT id, nombre FROM potreros WHERE geom_wkt_4326 IS NOT NULL AND (nombre = ? OR codigo = ?)",
-                (nombre_destino, nombre_destino),
-            )
-            if not fila_origen:
-                return jsonify({"ok": False, "error": f"'{nombre_origen}' no es un potrero real (sin mapa/geometría) o no existe."}), 404
-            if not fila_destino:
-                return jsonify({"ok": False, "error": f"'{nombre_destino}' no es un potrero real (sin mapa/geometría) o no existe."}), 404
-
-            tags = db_t.animales_activos_en_potrero(fila_origen["id"])
-            uid = session.get("user_id")
-            for tag in tags:
-                db_t.registrar_traslado(
-                    animal_tag=tag, fecha=fecha,
-                    potrero_origen=fila_origen["id"], potrero_destino=fila_destino["id"],
-                    motivo=motivo, registrado_por=uid,
+            if _revision.requiere_revision(_rol_actual(), "traslado_masivo"):
+                # Un trabajador no mueve el lote de una: queda por revisar.
+                datos_rev = {"potrero_origen": nombre_origen, "potrero_destino": nombre_destino, "motivo": motivo}
+                valido, cuerpo, codigo = _ejecutar_traslado_masivo(db_t, nombre_origen, nombre_destino, fecha,
+                                                                   motivo, None, solo_validar=True)
+                if not valido:
+                    return jsonify(cuerpo), codigo
+                _revision.poner_en_revision(
+                    db_t, origen="app", tipo="traslado_masivo", datos=datos_rev, fecha=fecha,
+                    registrado_por=session.get("user_id"), registrado_por_nombre=session.get("nombre"),
+                    canal="App", users_file=ctx.users_file,
                 )
-            return jsonify({
-                "ok": True, "movidos": len(tags), "animales": tags,
-                "potrero_origen": fila_origen["nombre"], "potrero_destino": fila_destino["nombre"],
-            })
+                return jsonify({"ok": True, "en_revision": True, "movidos": 0,
+                                "potrero_origen": nombre_origen, "potrero_destino": nombre_destino})
+            _, cuerpo, codigo = _ejecutar_traslado_masivo(db_t, nombre_origen, nombre_destino, fecha,
+                                                          motivo, session.get("user_id"))
+            return jsonify(cuerpo), codigo
         except Exception:
             logger.exception("Error en traslado masivo por potrero")
             return _error_interno(400)
@@ -239,7 +267,10 @@ def registrar(app, ctx, h):
                 except ImportError:
                     from src.bot.bot_interface import Bot  # type: ignore
                 bot_inst = Bot(db_v)
-                respuesta = bot_inst.procesar_texto(texto_transcripto, user_id=session.get("user_id"))
+                respuesta = bot_inst.procesar_texto(
+                    texto_transcripto, user_id=session.get("user_id"), rol=_rol_actual(),
+                    nombre=session.get("nombre"), canal="App", users_file=ctx.users_file,
+                )
                 return jsonify({
                     "ok": True,
                     "transcripcion": texto_transcripto,

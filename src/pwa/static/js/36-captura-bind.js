@@ -1379,7 +1379,11 @@
         .then(function (res) {
           if (res.status >= 200 && res.status < 300 && res.body.ok) {
             enviarTelemetriaSilenciosa("captura_traslado_masivo");
-            if (feed) {
+            if (feed && res.body.en_revision) {
+              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>Enviado. El traslado de "
+                + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino)
+                + " queda por revisar: se hace cuando el administrador lo apruebe.</div>";
+            } else if (feed) {
               feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>✅ " + res.body.movidos
                 + " animal(es) movidos de " + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino) + ".</div>";
             }
@@ -1597,13 +1601,14 @@
 
         var feed = document.getElementById("captura-feedback");
 
-        function mostrarExito(online) {
+        function mostrarExito(online, enRevision) {
           enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
           var fotoTxt = payload.foto_base64 ? " 📸 (con foto adjunta)" : "";
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
-              + (online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
-            if (_tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
+              + (enRevision ? "Enviado. Queda por revisar: se registra cuando el administrador lo apruebe."
+                : online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+            if (!enRevision && _tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
               var vMadre = payload.vaca_tag || "";
               var fParto = fecha || new Date().toISOString().slice(0, 10);
               var potMadre = payload.potrero_madre || "";
@@ -1630,7 +1635,7 @@
               }, 50);
             }
           }
-          mostrarToast(online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal", online ? "verde" : "ambar");
+          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
           vibrarConfirmacion();
           // BLOQUE 4: persistir defaults inteligentes (potrero + tag).
           try {
@@ -1663,7 +1668,7 @@
           body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
         }).then(function (r) { return r.json(); })
           .then(function (res) {
-            if (res.ok && res.procesados > 0) mostrarExito(true);
+            if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
             else {
               encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
             }

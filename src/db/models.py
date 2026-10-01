@@ -578,6 +578,34 @@ CREATE TABLE IF NOT EXISTS sync_ids_procesados (
 
 CREATE INDEX IF NOT EXISTS idx_sync_ids_procesado_en ON sync_ids_procesados(procesado_en);
 
+-- Bandeja "Por revisar": los eventos delicados (parto, muerte, venta,
+-- traslado...) que registra un TRABAJADOR no se aplican de una; quedan aquí
+-- hasta que un OWNER/ADMIN los apruebe (se registran entonces con
+-- registrado_por = el trabajador), los corrija o los rechace.
+-- origen: 'app' (payload de /api/sync o traslado masivo) o 'bot' (evento ya
+-- interpretado por el bot de Telegram / voz). datos_json guarda lo necesario
+-- para volver a aplicar el evento tal cual al aprobarlo.
+CREATE TABLE IF NOT EXISTS registros_pendientes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    origen TEXT NOT NULL,
+    tipo TEXT NOT NULL,
+    datos_json TEXT NOT NULL,
+    fecha TEXT,
+    animal_tag TEXT,
+    resumen TEXT,
+    registrado_por INTEGER,
+    registrado_por_nombre TEXT,
+    canal TEXT,
+    creado_en TEXT NOT NULL,
+    estado TEXT NOT NULL DEFAULT 'PENDIENTE', -- PENDIENTE, APLICANDO, APROBADO, RECHAZADO
+    revisado_por INTEGER,
+    revisado_por_nombre TEXT,
+    revisado_en TEXT,
+    nota_revision TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_registros_pendientes_estado ON registros_pendientes(estado, creado_en);
+
 -- Catálogo de Inseminadores / Técnicos para registro estandarizado y evaluación zootécnica
 CREATE TABLE IF NOT EXISTS inseminadores (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -691,7 +719,7 @@ TABLAS = [
     "termo_nitrogeno", "pluviometria", "aforos_historico", "aforos_ronda", "monitoreo_satelital_ndvi",
     "monitoreo_satelital_lluvia", "rondas_campo", "telemetria_gps", "usuarios_presencia",
     "finanzas", "climatologia_lluvia_chirps", "monitoreo_spi_sequia", "push_suscripciones",
-    "precios_mercado", "mensajes_equipo", "sync_ids_procesados",
+    "precios_mercado", "mensajes_equipo", "sync_ids_procesados", "registros_pendientes",
     "inseminadores", "protocolos_iatf", "lotes_iatf", "lote_iatf_animales",
     "composicion_racial", "webauthn_credenciales",
 ]

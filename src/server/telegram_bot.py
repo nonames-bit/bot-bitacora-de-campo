@@ -281,6 +281,16 @@ def construir_application(
                 else:
                     raise
 
+    def _datos_revision(user_id: Optional[int]) -> dict:
+        """rol/nombre para Bot.procesar_texto: los eventos delicados de un
+        TRABAJADOR quedan "Por revisar" en vez de registrarse de una."""
+        u = auth.obtener_usuario(user_id) if user_id else None
+        return {
+            "rol": auth.rol_de(user_id) if user_id else None,
+            "nombre": (u or {}).get("nombre"),
+            "users_file": auth.users_file,
+        }
+
     def _tocar_actividad(user_id: Optional[int], nombre_alt: str = "") -> None:
         if not user_id:
             return
@@ -372,7 +382,7 @@ def construir_application(
                 return
             bot_engine = Bot(db)
             raw_text = update.message.text
-            respuesta = bot_engine.procesar_texto(raw_text, user_id=user_id)
+            respuesta = bot_engine.procesar_texto(raw_text, user_id=user_id, **_datos_revision(user_id))
 
             # Fallback inteligente con botones interactivos
             if (
@@ -464,7 +474,7 @@ def construir_application(
                 transcript = transcribe_audio(dest_path)
                 texto_audio = transcript.texto.strip()
                 if texto_audio:
-                    resp_evento = bot_engine.procesar_texto(texto_audio, user_id=user_id)
+                    resp_evento = bot_engine.procesar_texto(texto_audio, user_id=user_id, **_datos_revision(user_id))
                     await update.message.reply_text(
                         f"🎤 Audio transcrito:\n«{texto_audio}»\n\n{resp_evento}"
                     )
@@ -580,7 +590,7 @@ def construir_application(
             # Si el caption o OCR contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
             if texto_consolidado and nlu.clasificar(texto_consolidado) is not None:
                 bot_engine = Bot(db)
-                resp_evento = bot_engine.procesar_texto(texto_consolidado, user_id=user_id)
+                resp_evento = bot_engine.procesar_texto(texto_consolidado, user_id=user_id, **_datos_revision(user_id))
                 msg_resp = f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
             elif tag:
                 msg_resp = f"📷 Foto guardada y vinculada a la {tag}.{str_feedback}"
