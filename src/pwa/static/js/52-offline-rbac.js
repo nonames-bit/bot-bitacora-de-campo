@@ -125,11 +125,11 @@
         var pendientes = lista.length - idsBorrar.length;
         eliminarDeColaOffline(idsBorrar).then(function () {
           if (mostrarAviso) {
-            var msg = "✅ Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
+            var msg = "Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
             if (res.en_revision > 0) msg += "\n" + res.en_revision + " quedaron por revisar: se registran cuando el administrador los apruebe.";
-            if (pendientes > 0) msg += "\n⚠️ " + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
+            if (pendientes > 0) msg += "\n" + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
             if (res.errores && res.errores.length) {
-              msg += "\n⚠️ Avisos: " + res.errores.join("; ");
+              msg += "\nAvisos: " + res.errores.join("; ");
             }
             alert(msg);
           } else if (pendientes > 0) {

@@ -145,7 +145,7 @@
     var filasTabla = simulaciones.map(function (sim) {
       var esGanador = mejor && sim.plaza_key === mejor.plaza_key;
       var claseFila = esGanador ? "calc-resultado-ganador" : "";
-      var badgeGanador = esGanador ? " <span class='chip verde' style='font-size:10.5px; font-weight:700;'>🌟 Mayor Ingreso</span>" : "";
+      var badgeGanador = esGanador ? " <span class='chip verde' style='font-size:10.5px; font-weight:700;'>" + icon("sparkles", 12) + "Mayor Ingreso</span>" : "";
 
       return "<tr class='" + claseFila + "'>"
         + "<td><b>" + esc(sim.nombre) + "</b>" + badgeGanador + "<div style='font-size:11px; color:var(--texto-suave);'>" + sim.distancia_km + " km · ~" + sim.horas_viaje + "h</div></td>"
@@ -286,7 +286,7 @@
 
     var html = "<div id='mercado-fuentes-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:500px;'>"
-      + "<div class='modal-header'><b>" + icon("clipboard", 15) + " Fuentes Oficiales &amp; Metodología</b><button type='button' class='modal-cerrar' id='btn-cerrar-fuentes-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("clipboard", 15) + " Fuentes Oficiales &amp; Metodología</b><button type='button' class='modal-cerrar' id='btn-cerrar-fuentes-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -370,7 +370,7 @@
 
     var html = "<div id='mercado-actualizar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
-      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Actualizar Cotización de Mercado</b><button type='button' class='modal-cerrar' id='btn-cerrar-act-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Actualizar Cotización de Mercado</b><button type='button' class='modal-cerrar' id='btn-cerrar-act-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + formHtml + "</div>"
       + "</div></div>";
 
@@ -433,10 +433,10 @@
             cerrar();
             cargar(true);
           } else {
-            if (errEl) { errEl.textContent = "❌ " + (res.body.error || "No se pudo actualizar el precio."); errEl.style.display = "block"; }
+            if (errEl) { errEl.textContent = (res.body.error || "No se pudo actualizar el precio."); errEl.style.display = "block"; }
           }
         }).catch(function (err) {
-          if (errEl) { errEl.textContent = "❌ Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
         });
     });
   }
@@ -493,7 +493,7 @@
 
     var html = "<div id='inseminador-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:440px;'>"
-      + "<div class='modal-header'><b>" + icon("userPlus", 16) + " Registrar Inseminador Oficial</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("userPlus", 16) + " Registrar Inseminador Oficial</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<form id='form-nuevo-inseminador' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label style='font-size:12.5px; font-weight:600;'>Nombre Completo del Inseminador / Técnico:*<br>"

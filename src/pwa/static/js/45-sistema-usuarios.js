@@ -29,9 +29,9 @@
     h += "<div><h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("clipboard", 16) + "Actividad de Campo & Auditoría de Usuarios</h4>";
     h += "<span style='font-size:11.5px; color:var(--texto-suave);'>Registro en vivo de lo que anotaron mayordomos, administradores y personal de corral</span></div>";
     h += "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>";
-    h += "<button type='button' class='btn-filtro-act act tema-btn' data-f='todos' style='font-size:11px; padding:3px 8px;'>🌐 Todos</button>";
-    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='campo' style='font-size:11px; padding:3px 8px;'>🤠 Campo / Mayordomos</button>";
-    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='admin' style='font-size:11px; padding:3px 8px;'>🛡️ Administradores</button>";
+    h += "<button type='button' class='btn-filtro-act act tema-btn' data-f='todos' style='font-size:11px; padding:3px 8px;'>" + icon("globe", 12) + "Todos</button>";
+    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='campo' style='font-size:11px; padding:3px 8px;'>" + icon("cowboy", 12) + "Campo / Mayordomos</button>";
+    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='admin' style='font-size:11px; padding:3px 8px;'>" + icon("shieldPlus", 12) + "Administradores</button>";
     h += "</div></div>";
 
     if (actList.length) {
@@ -89,7 +89,7 @@
       h += "<tr style='border-bottom:1px solid var(--borde); text-align:left; color:var(--texto-suave); font-size:11px;'><th style='padding:5px 8px;'>Usuario</th><th style='padding:5px 8px;'>Rol</th><th style='padding:5px 8px; text-align:center;'>Canal</th><th style='padding:5px 8px;'>Última Actividad</th><th style='padding:5px 8px; text-align:center;'>Estado</th></tr>";
       presList.forEach(function (p) {
         var onCls = p.en_linea ? "chip verde" : "chip gris";
-        var onTxt = p.en_linea ? "🟢 En línea" : "⚪ Desconectado";
+        var onTxt = p.en_linea ? dot("verde") + "En línea" : dot("gris") + "Desconectado";
         h += "<tr style='border-bottom:1px solid var(--borde);'>";
         h += "<td style='padding:6px 8px;'><b>" + esc(p.nombre || ("ID " + p.user_id)) + "</b></td>";
         h += "<td style='padding:6px 8px;'><span style='font-size:11px;'>" + esc(p.rol || "—") + "</span></td>";
@@ -114,9 +114,9 @@
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
-      + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>🌐 Todos</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>🤖 Telegram</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>🐮 PWA Web</button>"
+      + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>" + icon("globe", 12) + "Todos</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>" + icon("bot", 12) + "Telegram</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>" + icon("cow", 12) + "PWA Web</button>"
       + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:11.5px; padding:4px 10px; margin-left:6px;'>" + icon("refresh", 13) + "Refrescar</button>"
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
@@ -569,10 +569,10 @@
               if (btnCancelar) btnCancelar.style.display = "none";
               setTimeout(function () { cargar(false); }, 700);
             } else {
-              if (feed) feed.innerHTML = "<div class='chip rojo'>❌ " + esc(res.error || "No se pudo guardar") + "</div>";
+              if (feed) feed.innerHTML = "<div class='chip rojo'>" + icon("xCircle", 12) + esc(res.error || "No se pudo guardar") + "</div>";
             }
           }).catch(function (err) {
-            if (feed) feed.innerHTML = "<div class='chip rojo'>❌ Error de conexión: " + esc(err.message) + "</div>";
+            if (feed) feed.innerHTML = "<div class='chip rojo'>" + icon("xCircle", 12) + "Error de conexión: " + esc(err.message) + "</div>";
           });
       });
     }

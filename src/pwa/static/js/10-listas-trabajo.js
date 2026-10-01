@@ -1,26 +1,26 @@
   // ---------- Listas de trabajo (todas las vistas) + chequeo del hato ----------
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
-    palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
-    servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca parida pendiente de servir." },
-    novillas: { nombre: "Novillas a entorar", icono: "🐄", vacio: "Ninguna novilla lista para entorar." },
-    partos: { nombre: "Partos", icono: "🐣", vacio: "Ningún parto próximo ni atrasado." },
-    celos: { nombre: "Celos", icono: "💗", vacio: "Ningún celo esperado en los próximos días." },
-    repetidoras: { nombre: "Repetidoras", icono: "⚠️", vacio: "Ninguna vaca con problema reproductivo." },
-    destetar: { nombre: "Destetar", icono: "🐮", vacio: "Ninguna cría pendiente de destete." },
-    topizar: { nombre: "Topizar", icono: "✂️", vacio: "Ningún ternero pendiente de topizar.", manejo: "TOPIZADO" },
-    castrar: { nombre: "Castrar", icono: "🔪", vacio: "Ningún macho pendiente de castrar.", manejo: "CASTRACION" },
-    marcar: { nombre: "Marcar", icono: "🔥", vacio: "Ningún animal pendiente de marcar.", manejo: "MARCACION" },
-    vac_brucelosis: { nombre: "Brucelosis", icono: "💉", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
-    vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
-    tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
-    pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
-    control_leche: { nombre: "Control lechero", icono: "🥛", vacio: "Todas las vacas en ordeño tienen control del último mes." },
-    bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
-    venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
-    descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
-    categoria: { nombre: "Cambio de categoría", icono: "🔁", vacio: "Ningún animal cambió de categoría este mes." }
+    palpar: { nombre: "Palpar", icono: "hand", vacio: "Ninguna vaca servida pendiente de palpar." },
+    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
+    servir: { nombre: "Servir", icono: "syringe", vacio: "Ninguna vaca parida pendiente de servir." },
+    novillas: { nombre: "Novillas a entorar", icono: "cow", vacio: "Ninguna novilla lista para entorar." },
+    partos: { nombre: "Partos", icono: "parto", vacio: "Ningún parto próximo ni atrasado." },
+    celos: { nombre: "Celos", icono: "heart", vacio: "Ningún celo esperado en los próximos días." },
+    repetidoras: { nombre: "Repetidoras", icono: "alertTriangle", vacio: "Ninguna vaca con problema reproductivo." },
+    destetar: { nombre: "Destetar", icono: "destete", vacio: "Ninguna cría pendiente de destete." },
+    topizar: { nombre: "Topizar", icono: "scissors", vacio: "Ningún ternero pendiente de topizar.", manejo: "TOPIZADO" },
+    castrar: { nombre: "Castrar", icono: "scissors", vacio: "Ningún macho pendiente de castrar.", manejo: "CASTRACION" },
+    marcar: { nombre: "Marcar", icono: "flame", vacio: "Ningún animal pendiente de marcar.", manejo: "MARCACION" },
+    vac_brucelosis: { nombre: "Brucelosis", icono: "syringe", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
+    vac_aftosa: { nombre: "Aftosa", icono: "syringe", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
+    tratamientos: { nombre: "Tratamientos y retiros", icono: "pill", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
+    pausas: { nombre: "A toda leche / pausadas", icono: "pause", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
+    control_leche: { nombre: "Control lechero", icono: "milk", vacio: "Todas las vacas en ordeño tienen control del último mes." },
+    bajo_peso: { nombre: "Bajo peso", icono: "trendDown", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
+    venta: { nombre: "Venta", icono: "banknote", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
+    descarte: { nombre: "Descarte", icono: "ban", vacio: "Ninguna vaca candidata a descarte." },
+    categoria: { nombre: "Cambio de categoría", icono: "refresh", vacio: "Ningún animal cambió de categoría este mes." }
   };
 
   function ltDetalle(clave, a) {
@@ -59,7 +59,7 @@
       var tags = por[p].map(function (a) { return a.tag; }).join(",");
       return "<details class='gen-grupo pes-grupo'" + (abrir ? " open" : "") + "><summary><span>" + esc(p) + "</span><b>" + por[p].length
         + "</b><small>animales</small></summary>"
-        + (accionGrupo ? "<div class='lt-grupo-accion'><button type='button' class='chip btn-lt-todos' data-tags='" + esc(tags) + "' data-potrero='" + esc(p) + "'>✓ Todos los de " + esc(p) + "</button></div>" : "")
+        + (accionGrupo ? "<div class='lt-grupo-accion'><button type='button' class='chip btn-lt-todos' data-tags='" + esc(tags) + "' data-potrero='" + esc(p) + "'>" + icon("check", 14) + "Todos los de " + esc(p) + "</button></div>" : "")
         + por[p].map(filaHtml).join("") + "</details>";
     }).join("");
   }
@@ -71,23 +71,23 @@
       acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='CASTRACION'>Castrado</button>"
         + "<button type='button' class='chip btn-lt-hecho' data-tipo='ENTERO'>Queda entero</button>";
     } else if (clave === "secar") {
-      acciones = "<button type='button' class='chip btn-lt-secado'>🍼 Secada / ya está seca</button>";
+      acciones = "<button type='button' class='chip btn-lt-secado'>" + icon("milk", 14) + "Secada / ya está seca</button>";
     } else if (clave === "palpar") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(a.tag) + "'>🩺 Diagnosticar Tacto</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(a.tag) + "'>" + icon("stethoscope", 14) + "Diagnosticar Tacto</button>";
     } else if (clave === "partos") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(a.tag) + "'>🍼 Registrar Parto</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(a.tag) + "'>" + icon("parto", 14) + "Registrar Parto</button>";
     } else if (clave === "servir" || clave === "celos") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(a.tag) + "'>🐂 Inseminar / Servir</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(a.tag) + "'>" + icon("sperm", 14) + "Inseminar / Servir</button>";
     } else if (clave === "destetar") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='destete' data-tag='" + esc(a.madre || a.tag) + "'>🐮 Destetar</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='destete' data-tag='" + esc(a.madre || a.tag) + "'>" + icon("destete", 14) + "Destetar</button>";
     } else if (clave === "tratamientos") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(a.tag) + "'>💉 Aplicar Dosis</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(a.tag) + "'>" + icon("syringe", 14) + "Aplicar Dosis</button>";
     } else if (clave === "bajo_peso") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "'>⚖️ Pesar Báscula</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "'>" + icon("scale", 14) + "Pesar Báscula</button>";
     } else if (clave === "venta") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(a.tag) + "' style='background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;'>💰 Vender Animal</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(a.tag) + "' style='background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;'>" + icon("banknote", 14) + "Vender Animal</button>";
     } else if (info.manejo) {
-      acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>✓ Hecho</button>";
+      acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>" + icon("check", 14) + "Hecho</button>";
     }
     return "<div class='fila-pes fila-lt' data-tag='" + esc(a.tag) + "'><div class='fila-pes-cab'><span>" + enlaceFicha(a.tag)
       + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span></div><small>" + ltDetalle(clave, a) + "</small>"
@@ -101,7 +101,7 @@
     var c = t.conteos || {};
     var h = "<div class='card lt-card'>" + datalistResponsables() + "<div class='lt-titulo'>" + icon("calendar", 16) + esc(titulo || "Lista de trabajo") + "</div>";
     if (claves.indexOf("palpar") !== -1 && c.chequeo) {
-      h += "<div class='lt-chequeo-aviso'><span>⚠️ <b>" + esc(c.chequeo) + "</b> hembras sin dato reproductivo en el último año. "
+      h += "<div class='lt-chequeo-aviso'><span>" + icon("alertTriangle", 14) + "<b>" + esc(c.chequeo) + "</b> hembras sin dato reproductivo en el último año. "
         + "Pálpalas y marca su estado para retomar el control.</span>"
         + "<button type='button' class='tema-btn btn-iniciar-chequeo'>Iniciar chequeo del hato</button></div>";
     }
@@ -110,7 +110,7 @@
     h += "<div class='gen-filtros'>";
     claves.forEach(function (k) {
       h += "<button type='button' class='chip btn-lt" + (k === primera ? " act" : "") + "' data-lt='" + k + "'>"
-        + LT_INFO[k].icono + " " + LT_INFO[k].nombre + " " + esc(c[k] || 0) + "</button>";
+        + icon(LT_INFO[k].icono, 14) + LT_INFO[k].nombre + " " + esc(c[k] || 0) + "</button>";
     });
     h += "</div>";
     claves.forEach(function (k) {
@@ -173,7 +173,7 @@
         + "<button type='button' class='chip btn-chk' data-res='VACIA'>Vacía</button>"
         + "<label class='chk-seca'><input type='checkbox' class='chk-seca-input'> Seca</label></div>"
         + "<div class='chk-meses' hidden><small>Meses de preñez:</small> " + meses + "</div>"
-        + "<div class='chk-ok' hidden>✓ Guardado</div></div>";
+        + "<div class='chk-ok' hidden>" + icon("check", 14) + "Guardado</div></div>";
     }, false);
     return h + "</div>";
   }
@@ -194,7 +194,7 @@
     var acc = fila.querySelector(".chk-acciones");
     if (acc) acc.hidden = true;
     var ok = fila.querySelector(".chk-ok");
-    if (ok) { ok.textContent = "✓ " + texto; ok.hidden = false; }
+    if (ok) { ok.textContent = texto; ok.hidden = false; }
   }
 
   function bindListaTrabajo() {
@@ -246,7 +246,7 @@
         enviarEventoLt("manejo", { animal_tags: tags, tipo_manejo: hecho.getAttribute("data-tipo"), producto: ex.producto, lote_producto: ex.lote_producto, responsable: ex.responsable })
           .then(function () {
             b.closest("details").querySelectorAll(".fila-lt").forEach(function (f) { ltMarcarHecha(f, "Hecho"); });
-            b.textContent = "✓ " + tags.length + " marcados";
+            b.textContent = tags.length + " marcados";
           });
       });
     });

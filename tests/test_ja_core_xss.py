@@ -34,8 +34,10 @@ def _chipEstado(valor_js: str) -> str:
     return r.stdout
 
 
-def test_chip_normal_mantiene_emoji_y_texto():
-    assert _chipEstado("'🟢 ÓPTIMO'") == "<span class='chip verde'>🟢 ÓPTIMO</span>"
+def test_chip_normal_cambia_emoji_por_punto_y_mantiene_texto():
+    # Fase C: el emoji semáforo que manda el servidor se pinta como punto del tema.
+    assert _chipEstado("'🟢 ÓPTIMO'") == (
+        "<span class='chip verde'><span class=\"dot-estado dot-verde\" aria-hidden=\"true\"></span>ÓPTIMO</span>")
 
 
 def test_chip_escapa_html_aunque_empiece_con_emoji():

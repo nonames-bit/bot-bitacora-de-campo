@@ -32,6 +32,7 @@
   var fmtMoneda = window.JA.fmtMoneda;
 
   var icon = window.JA.icon;
+  var dot = window.JA.dot;
 
   function barraDescargaSeccion(seccion, nombre) {
     var extraBtn = "";
@@ -373,41 +374,41 @@
 
     var frases = [];
     if (_vacaEstadoActual === "ternero") {
-      frases.push("🍼 ¡Mmuuu! Ternero alegre y vigoroso correteando en el potrero.");
-      frases.push("🌱 Cría lactante con excelente vitalidad y buen peso al destete.");
-      frases.push("🥛 Creciendo fuerte al pie de la madre en Ganadería JA.");
+      frases.push(icon("calf", 14) + "¡Mmuuu! Ternero alegre y vigoroso correteando en el potrero.");
+      frases.push(icon("sprout", 14) + "Cría lactante con excelente vitalidad y buen peso al destete.");
+      frases.push(icon("milk", 14) + "Creciendo fuerte al pie de la madre en Ganadería JA.");
     } else if (_vacaEstadoActual === "toro") {
-      frases.push("🐂 ¡Toro reproductor de alta genética y vigor en el lote!");
-      frases.push("⚡ Padrote activo transmitiendo ganancia de peso y rusticidad.");
+      frases.push(icon("cow", 14) + "¡Toro reproductor de alta genética y vigor en el lote!");
+      frases.push(icon("zap", 14) + "Padrote activo transmitiendo ganancia de peso y rusticidad.");
     } else if (_vacaEstadoActual === "cria") {
-      frases.push("🍼 ¡Amor maternal! Cría al pie con excelente vitalidad.");
-      frases.push("🐮 Vaca madre en óptima nutrición y lactancia.");
+      frases.push(icon("calf", 14) + "¡Amor maternal! Cría al pie con excelente vitalidad.");
+      frases.push(icon("cow", 14) + "Vaca madre en óptima nutrición y lactancia.");
     } else if (_vacaEstadoActual === "noche") {
-      frases.push("🌙 Rumiando en calma bajo la noche llanera.");
-      frases.push("💤 Vacas en descanso nocturno recuperando energías.");
+      frases.push(icon("moon", 14) + "Rumiando en calma bajo la noche llanera.");
+      frases.push(icon("moon", 14) + "Vacas en descanso nocturno recuperando energías.");
     } else {
-      frases.push("🌾 Pastando forraje fresco bajo rotación Voisin.");
-      frases.push("¡Muuu! 🐮 Cero garrapatas y ganado al día.");
+      frases.push(icon("grass", 14) + "Pastando forraje fresco bajo rotación Voisin.");
+      frases.push("¡Muuu! " + icon("cow", 14) + "Cero garrapatas y ganado al día.");
     }
 
     if (_climaEstadoActual === "lluvia" || _climaEstadoActual === "lluvia-noche") {
-      frases.push("🌧️ ¡Lluvia en la finca! Pastos verdes y buen aforo asegurado.");
+      frases.push(icon("rain", 14) + "¡Lluvia en la finca! Pastos verdes y buen aforo asegurado.");
     } else if (_climaEstadoActual === "nublado") {
-      frases.push("⛅ Día fresco y nublado en Mesetas, ideal para el pastoreo.");
+      frases.push(icon("cloud", 14) + "Día fresco y nublado en Mesetas, ideal para el pastoreo.");
     } else if (_climaEstadoActual === "soleado") {
-      frases.push("☀️ Día soleado en la sabana: ganado en pleno pastoreo.");
+      frases.push(icon("sun", 14) + "Día soleado en la sabana: ganado en pleno pastoreo.");
     }
 
     if (totalActivos > 0) {
-      frases.push("📊 Hato activo: " + totalActivos + " cabezas registradas.");
+      frases.push(icon("chartBar", 14) + "Hato activo: " + totalActivos + " cabezas registradas.");
     }
     if (nPotreros > 0) {
-      frases.push("🌱 " + nPotreros + " potreros en descanso y pastoreo.");
+      frases.push(icon("sprout", 14) + nPotreros + " potreros en descanso y pastoreo.");
     }
     if (topDescanso && topDias > 0) {
-      frases.push("🌾 Más reposo: " + esc(topDescanso) + " (" + topDias + " d).");
+      frases.push(icon("grass", 14) + "Más reposo: " + esc(topDescanso) + " (" + topDias + " d).");
     }
-    frases.push("✨ Ganadería JA: genética y trazabilidad 100%.");
+    frases.push(icon("sparkles", 14) + "Ganadería JA: genética y trazabilidad 100%.");
 
     var txt = frases[_vacaFraseIdx % frases.length];
     _vacaFraseIdx++;
@@ -532,10 +533,10 @@
     var box = document.getElementById("gps-ronda-box");
     if (!box) return;
     if (!navigator.geolocation) {
-      box.innerHTML = "<div class='card gps-ronda'>📍 Este equipo no da ubicación GPS.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Este equipo no da ubicación GPS.</div>";
       return;
     }
-    box.innerHTML = "<div class='card gps-ronda'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
+    box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Localizando… acepte el permiso de ubicación del navegador.</div>";
     try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib2) {}
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude;
@@ -546,12 +547,12 @@
         body: JSON.stringify({ lat: lat, lon: lon })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
-          box.innerHTML = "<div class='card gps-ronda'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "" + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
           return;
         }
         var pot = d.potrero || {};
         box.innerHTML = "<div class='card gps-ronda' style='border-left:5px solid var(--verde-marca);'>"
-          + "<div style='font-size:15px; font-weight:800;'>📍 Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
+          + "<div style='font-size:15px; font-weight:800;'>" + icon("pin", 16) + "Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
           + "<div style='font-size:13.5px; color:var(--texto-suave); margin:2px 0 10px;'>"
           + esc(d.total_animales || 0) + " animales aquí · " + esc(Number(lat).toFixed(5)) + ", " + esc(Number(lon).toFixed(5)) + "</div>"
           + "<button type='button' id='btn-gps-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
@@ -566,24 +567,24 @@
             body: JSON.stringify({ lat: lat, lon: lon, potrero_id: pot.id || null, potrero_nombre: pot.nombre || null, punto_control: "recorrido" })
           }).then(function (r2) { return r2.json(); }).then(function (ok) {
             if (ok && ok.ok) {
-              mostrarToast("✅ Ronda guardada en " + (pot.nombre || "campo"), "verde");
+              mostrarToast("Ronda guardada en " + (pot.nombre || "campo"), "verde");
               try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch (eVib3) {}
             } else {
-              mostrarToast("❌ " + ((ok && ok.error) || "No se pudo guardar"), "rojo");
+              mostrarToast(((ok && ok.error) || "No se pudo guardar"), "rojo");
               btnG.disabled = false;
               btnG.textContent = "Guardar ronda aquí";
             }
           }).catch(function (err) {
-            mostrarToast("❌ Sin conexión: " + (err && err.message || err), "rojo");
+            mostrarToast("Sin conexión: " + (err && err.message || err), "rojo");
             btnG.disabled = false;
             btnG.textContent = "Guardar ronda aquí";
           });
         });
       }).catch(function () {
-        box.innerHTML = "<div class='card gps-ronda'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
+        box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Sin conexión: no se pudo detectar el potrero.</div>";
       });
     }, function () {
-      box.innerHTML = "<div class='card gps-ronda'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
     }, { enableHighAccuracy: true, timeout: 15000 });
   }
 
@@ -598,7 +599,7 @@
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='font-size:12px; text-decoration:none; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
-    // Sin botón "Buscar": la lupita flotante (🔍) abre el mismo buscador
+    // Sin botón "Buscar": la lupita flotante abre el mismo buscador
     // con arete Y potrero, para no duplicar controles en el celular.
     var h = "<div class='tablero-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px; font-size:18px;'>" + icon("grid") + "Tablero finca" + pot + "</h3>"
@@ -736,26 +737,26 @@
   // ---------- Listas de trabajo (todas las vistas) + chequeo del hato ----------
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
-    palpar: { nombre: "Palpar", icono: "✋", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "🍼", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
-    servir: { nombre: "Servir", icono: "💉", vacio: "Ninguna vaca parida pendiente de servir." },
-    novillas: { nombre: "Novillas a entorar", icono: "🐄", vacio: "Ninguna novilla lista para entorar." },
-    partos: { nombre: "Partos", icono: "🐣", vacio: "Ningún parto próximo ni atrasado." },
-    celos: { nombre: "Celos", icono: "💗", vacio: "Ningún celo esperado en los próximos días." },
-    repetidoras: { nombre: "Repetidoras", icono: "⚠️", vacio: "Ninguna vaca con problema reproductivo." },
-    destetar: { nombre: "Destetar", icono: "🐮", vacio: "Ninguna cría pendiente de destete." },
-    topizar: { nombre: "Topizar", icono: "✂️", vacio: "Ningún ternero pendiente de topizar.", manejo: "TOPIZADO" },
-    castrar: { nombre: "Castrar", icono: "🔪", vacio: "Ningún macho pendiente de castrar.", manejo: "CASTRACION" },
-    marcar: { nombre: "Marcar", icono: "🔥", vacio: "Ningún animal pendiente de marcar.", manejo: "MARCACION" },
-    vac_brucelosis: { nombre: "Brucelosis", icono: "💉", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
-    vac_aftosa: { nombre: "Aftosa", icono: "💉", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
-    tratamientos: { nombre: "Tratamientos y retiros", icono: "💊", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
-    pausas: { nombre: "A toda leche / pausadas", icono: "⏸️", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
-    control_leche: { nombre: "Control lechero", icono: "🥛", vacio: "Todas las vacas en ordeño tienen control del último mes." },
-    bajo_peso: { nombre: "Bajo peso", icono: "📉", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
-    venta: { nombre: "Venta", icono: "💰", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
-    descarte: { nombre: "Descarte", icono: "🚫", vacio: "Ninguna vaca candidata a descarte." },
-    categoria: { nombre: "Cambio de categoría", icono: "🔁", vacio: "Ningún animal cambió de categoría este mes." }
+    palpar: { nombre: "Palpar", icono: "hand", vacio: "Ninguna vaca servida pendiente de palpar." },
+    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
+    servir: { nombre: "Servir", icono: "syringe", vacio: "Ninguna vaca parida pendiente de servir." },
+    novillas: { nombre: "Novillas a entorar", icono: "cow", vacio: "Ninguna novilla lista para entorar." },
+    partos: { nombre: "Partos", icono: "parto", vacio: "Ningún parto próximo ni atrasado." },
+    celos: { nombre: "Celos", icono: "heart", vacio: "Ningún celo esperado en los próximos días." },
+    repetidoras: { nombre: "Repetidoras", icono: "alertTriangle", vacio: "Ninguna vaca con problema reproductivo." },
+    destetar: { nombre: "Destetar", icono: "destete", vacio: "Ninguna cría pendiente de destete." },
+    topizar: { nombre: "Topizar", icono: "scissors", vacio: "Ningún ternero pendiente de topizar.", manejo: "TOPIZADO" },
+    castrar: { nombre: "Castrar", icono: "scissors", vacio: "Ningún macho pendiente de castrar.", manejo: "CASTRACION" },
+    marcar: { nombre: "Marcar", icono: "flame", vacio: "Ningún animal pendiente de marcar.", manejo: "MARCACION" },
+    vac_brucelosis: { nombre: "Brucelosis", icono: "syringe", vacio: "Ninguna ternera pendiente de vacuna de brucelosis.", manejo: "VACUNA_BRUCELOSIS" },
+    vac_aftosa: { nombre: "Aftosa", icono: "syringe", vacio: "Todo el hato está vacunado de aftosa en este ciclo.", manejo: "VACUNA_AFTOSA" },
+    tratamientos: { nombre: "Tratamientos y retiros", icono: "pill", vacio: "Ningún tratamiento en seguimiento ni retiro por vencer." },
+    pausas: { nombre: "A toda leche / pausadas", icono: "pause", vacio: "Ninguna vaca a toda leche ni con el ordeño pausado." },
+    control_leche: { nombre: "Control lechero", icono: "milk", vacio: "Todas las vacas en ordeño tienen control del último mes." },
+    bajo_peso: { nombre: "Bajo peso", icono: "trendDown", vacio: "Ningún animal con ganancia baja en los últimos pesajes." },
+    venta: { nombre: "Venta", icono: "banknote", vacio: "Ningún macho en peso de venta (≥ 400 kg)." },
+    descarte: { nombre: "Descarte", icono: "ban", vacio: "Ninguna vaca candidata a descarte." },
+    categoria: { nombre: "Cambio de categoría", icono: "refresh", vacio: "Ningún animal cambió de categoría este mes." }
   };
 
   function ltDetalle(clave, a) {
@@ -794,7 +795,7 @@
       var tags = por[p].map(function (a) { return a.tag; }).join(",");
       return "<details class='gen-grupo pes-grupo'" + (abrir ? " open" : "") + "><summary><span>" + esc(p) + "</span><b>" + por[p].length
         + "</b><small>animales</small></summary>"
-        + (accionGrupo ? "<div class='lt-grupo-accion'><button type='button' class='chip btn-lt-todos' data-tags='" + esc(tags) + "' data-potrero='" + esc(p) + "'>✓ Todos los de " + esc(p) + "</button></div>" : "")
+        + (accionGrupo ? "<div class='lt-grupo-accion'><button type='button' class='chip btn-lt-todos' data-tags='" + esc(tags) + "' data-potrero='" + esc(p) + "'>" + icon("check", 14) + "Todos los de " + esc(p) + "</button></div>" : "")
         + por[p].map(filaHtml).join("") + "</details>";
     }).join("");
   }
@@ -806,23 +807,23 @@
       acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='CASTRACION'>Castrado</button>"
         + "<button type='button' class='chip btn-lt-hecho' data-tipo='ENTERO'>Queda entero</button>";
     } else if (clave === "secar") {
-      acciones = "<button type='button' class='chip btn-lt-secado'>🍼 Secada / ya está seca</button>";
+      acciones = "<button type='button' class='chip btn-lt-secado'>" + icon("milk", 14) + "Secada / ya está seca</button>";
     } else if (clave === "palpar") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(a.tag) + "'>🩺 Diagnosticar Tacto</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(a.tag) + "'>" + icon("stethoscope", 14) + "Diagnosticar Tacto</button>";
     } else if (clave === "partos") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(a.tag) + "'>🍼 Registrar Parto</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(a.tag) + "'>" + icon("parto", 14) + "Registrar Parto</button>";
     } else if (clave === "servir" || clave === "celos") {
-      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(a.tag) + "'>🐂 Inseminar / Servir</button>";
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(a.tag) + "'>" + icon("sperm", 14) + "Inseminar / Servir</button>";
     } else if (clave === "destetar") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='destete' data-tag='" + esc(a.madre || a.tag) + "'>🐮 Destetar</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='destete' data-tag='" + esc(a.madre || a.tag) + "'>" + icon("destete", 14) + "Destetar</button>";
     } else if (clave === "tratamientos") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(a.tag) + "'>💉 Aplicar Dosis</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(a.tag) + "'>" + icon("syringe", 14) + "Aplicar Dosis</button>";
     } else if (clave === "bajo_peso") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "'>⚖️ Pesar Báscula</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "'>" + icon("scale", 14) + "Pesar Báscula</button>";
     } else if (clave === "venta") {
-      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(a.tag) + "' style='background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;'>💰 Vender Animal</button>";
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(a.tag) + "' style='background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;'>" + icon("banknote", 14) + "Vender Animal</button>";
     } else if (info.manejo) {
-      acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>✓ Hecho</button>";
+      acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>" + icon("check", 14) + "Hecho</button>";
     }
     return "<div class='fila-pes fila-lt' data-tag='" + esc(a.tag) + "'><div class='fila-pes-cab'><span>" + enlaceFicha(a.tag)
       + (a.nombre ? " <small>" + esc(a.nombre) + "</small>" : "") + "</span></div><small>" + ltDetalle(clave, a) + "</small>"
@@ -836,7 +837,7 @@
     var c = t.conteos || {};
     var h = "<div class='card lt-card'>" + datalistResponsables() + "<div class='lt-titulo'>" + icon("calendar", 16) + esc(titulo || "Lista de trabajo") + "</div>";
     if (claves.indexOf("palpar") !== -1 && c.chequeo) {
-      h += "<div class='lt-chequeo-aviso'><span>⚠️ <b>" + esc(c.chequeo) + "</b> hembras sin dato reproductivo en el último año. "
+      h += "<div class='lt-chequeo-aviso'><span>" + icon("alertTriangle", 14) + "<b>" + esc(c.chequeo) + "</b> hembras sin dato reproductivo en el último año. "
         + "Pálpalas y marca su estado para retomar el control.</span>"
         + "<button type='button' class='tema-btn btn-iniciar-chequeo'>Iniciar chequeo del hato</button></div>";
     }
@@ -845,7 +846,7 @@
     h += "<div class='gen-filtros'>";
     claves.forEach(function (k) {
       h += "<button type='button' class='chip btn-lt" + (k === primera ? " act" : "") + "' data-lt='" + k + "'>"
-        + LT_INFO[k].icono + " " + LT_INFO[k].nombre + " " + esc(c[k] || 0) + "</button>";
+        + icon(LT_INFO[k].icono, 14) + LT_INFO[k].nombre + " " + esc(c[k] || 0) + "</button>";
     });
     h += "</div>";
     claves.forEach(function (k) {
@@ -908,7 +909,7 @@
         + "<button type='button' class='chip btn-chk' data-res='VACIA'>Vacía</button>"
         + "<label class='chk-seca'><input type='checkbox' class='chk-seca-input'> Seca</label></div>"
         + "<div class='chk-meses' hidden><small>Meses de preñez:</small> " + meses + "</div>"
-        + "<div class='chk-ok' hidden>✓ Guardado</div></div>";
+        + "<div class='chk-ok' hidden>" + icon("check", 14) + "Guardado</div></div>";
     }, false);
     return h + "</div>";
   }
@@ -929,7 +930,7 @@
     var acc = fila.querySelector(".chk-acciones");
     if (acc) acc.hidden = true;
     var ok = fila.querySelector(".chk-ok");
-    if (ok) { ok.textContent = "✓ " + texto; ok.hidden = false; }
+    if (ok) { ok.textContent = texto; ok.hidden = false; }
   }
 
   function bindListaTrabajo() {
@@ -981,7 +982,7 @@
         enviarEventoLt("manejo", { animal_tags: tags, tipo_manejo: hecho.getAttribute("data-tipo"), producto: ex.producto, lote_producto: ex.lote_producto, responsable: ex.responsable })
           .then(function () {
             b.closest("details").querySelectorAll(".fila-lt").forEach(function (f) { ltMarcarHecha(f, "Hecho"); });
-            b.textContent = "✓ " + tags.length + " marcados";
+            b.textContent = tags.length + " marcados";
           });
       });
     });
@@ -1165,8 +1166,8 @@
       var n = v.claves.reduce(function (s, k) { return s + (c[k] || 0); }, 0);
       h += "<button type='button' class='chip btn-ir-tareas' data-vista='" + v.vista + "'>" + esc(v.nombre) + " <b>" + n + "</b></button>";
     });
-    if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>⚠️ Chequeo <b>" + esc(c.chequeo) + "</b></button>";
-    if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>🧹 Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
+    if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>" + icon("alertTriangle", 14) + "Chequeo <b>" + esc(c.chequeo) + "</b></button>";
+    if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>" + icon("eraser", 14) + "Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
     return h + "</div></div>";
   }
 
@@ -1198,9 +1199,9 @@
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='palpacion' style='font-size:11.5px; padding:5px 10px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
       + icon("stethoscope", 13) + "Tacto / Palpación</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='pajuela' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("sperm", 13) + "➕ Entrada Pajillas</button>"
+      + icon("sperm", 13) + "Entrada Pajillas</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='nitrogeno' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("snowflake", 13) + "❄️ Recarga Nitrógeno</button>"
+      + icon("snowflake", 13) + "Recarga Nitrógeno</button>"
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
@@ -1229,13 +1230,13 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
+      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «Entrada Pajillas» para registrar compras nuevas.");
     }
 
     if (pajuelasInactivas.length) {
       h += "<details style='margin-top:14px; background:var(--superficie-2); border-radius:8px; padding:10px 14px; border:1px solid var(--borde-suave);'>"
         + "<summary style='cursor:pointer; font-weight:700; font-size:12px; color:var(--texto-suave);'>"
-        + "📁 Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
+        + icon("folder", 14) + "Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
         + "</summary>"
         + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico 2013–2018 archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
         + "<div class='tabla-scroll' style='max-height:240px; overflow-y:auto;'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Saldo Ant.</th><th>Procedencia</th><th style='text-align:center;'>Acción</th></tr>"
@@ -1258,7 +1259,7 @@
     window.__lotesIatf = (d.iatf && d.iatf.lotes) || [];
     window.__evaluacionInseminadores = d.evaluacion_inseminadores || [];
 
-    // 🧬 Sincronizaciones IATF (Inseminación Artificial a Tiempo Fijo)
+    // Sincronizaciones IATF (Inseminación Artificial a Tiempo Fijo)
     var iatf = d.iatf || {};
     var lotesIatf = iatf.lotes || [];
     var metricasIatf = iatf.metricas || {};
@@ -1270,9 +1271,9 @@
       + "</div>"
       + "<div style='display:flex; gap:6px; flex-wrap:wrap;'>"
       + "<button type='button' class='tema-btn' id='btn-ver-protocolos-iatf' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; border:1px solid var(--borde-fuerte); background:var(--superficie-elevada); color:var(--texto);'>"
-      + icon("clipboard", 13) + "📖 Protocolos & Marcas</button>"
+      + icon("clipboard", 13) + "Protocolos & Marcas</button>"
       + "<button type='button' class='tema-btn' id='btn-nuevo-lote-iatf' style='font-size:11.5px; padding:5px 10px; background:#0284c7; color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("plus", 13) + "➕ Iniciar Lote IATF</button>"
+      + icon("plus", 13) + "Iniciar Lote IATF</button>"
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
@@ -1302,7 +1303,7 @@
           var esActual = idx === lote.paso_actual && lote.estado === "EN_CURSO";
           var bdrColor = yaPaso ? "var(--verde-marca, #16a34a)" : (esActual ? "#0284c7" : "var(--borde)");
           var bgStep = yaPaso ? "rgba(22,163,74,0.08)" : (esActual ? "rgba(2,132,199,0.1)" : "var(--superficie)");
-          var iconStep = yaPaso ? "✅" : (esActual ? "👉" : "⏳");
+          var iconStep = yaPaso ? icon("checkCircle", 12) : (esActual ? icon("arrowRight", 12) : icon("hourglass", 12));
 
           stepperHtml += "<div style='flex:1; min-width:130px; border:1px solid " + bdrColor + "; background:" + bgStep + "; border-radius:6px; padding:6px 8px; font-size:11px;'>"
             + "<div style='font-weight:700; color:var(--texto); display:flex; justify-content:space-between;'>"
@@ -1317,15 +1318,15 @@
         if (lote.estado === "EN_CURSO") {
           if (lote.paso_actual < 2) {
             btnsAccion += "<button type='button' class='tema-btn btn-paso-iatf' data-lote-id='" + lote.id + "' data-paso-idx='" + lote.paso_actual + "' style='font-size:11.5px; padding:4px 9px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:600;'>"
-              + "💊 Registrar Dosis / Fármaco</button>";
+              + icon("pill", 14) + "Registrar Dosis / Fármaco</button>";
           }
           if (lote.paso_actual === 2 || lote.paso_actual === 1) {
             btnsAccion += "<button type='button' class='tema-btn btn-inseminar-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; background:var(--verde-marca); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:700;'>"
-              + "🧬 Inseminar Lote Completo (1-Toque)</button>";
+              + icon("dna", 14) + "Inseminar Lote Completo (1-Toque)</button>";
           }
         }
         btnsAccion += "<button type='button' class='tema-btn btn-detalle-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; border:1px solid var(--borde-fuerte); border-radius:5px; cursor:pointer; background:var(--superficie); color:var(--texto);'>"
-          + "📋 Ver Hembras (" + (lote.animales_activos || lote.total_animales) + ")</button>";
+          + icon("clipboard", 14) + "Ver Hembras (" + (lote.animales_activos || lote.total_animales) + ")</button>";
         btnsAccion += "</div>";
 
         h += "<div style='border:1px solid var(--borde); background:var(--superficie-elevada, rgba(0,0,0,0.02)); border-radius:8px; padding:12px 14px;'>"
@@ -1346,7 +1347,7 @@
       });
       h += "</div>";
     } else {
-      h += vacio("No hay lotes IATF en curso. Use «➕ Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
+      h += vacio("No hay lotes IATF en curso. Use «Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
     }
     h += "</div>";
 
@@ -1362,7 +1363,7 @@
       ], "Sin palpaciones registradas en el último año.")
       + "</div>";
 
-    // 🏆 Evaluación y Efectividad de Inseminadores
+    // Evaluación y Efectividad de Inseminadores
     var insems = d.evaluacion_inseminadores || [];
 
     h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid #8b5cf6;'>"
@@ -1371,7 +1372,7 @@
       + icon("chartBar", 16) + "Evaluación & Efectividad de Inseminadores"
       + "</div>"
       + "<button type='button' class='tema-btn' id='btn-nuevo-inseminador' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; background:var(--superficie-elevada, #f3f4f6); color:var(--texto); border:1px solid var(--borde-fuerte);'>"
-      + icon("userPlus", 13) + "➕ Nuevo Inseminador</button>"
+      + icon("userPlus", 13) + "Nuevo Inseminador</button>"
       + "</div>"
       + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>"
       + "Monitoreo zootécnico del desempeño por técnico: tasa de concepción y servicios requeridos por preñez."
@@ -1396,7 +1397,7 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay inseminadores registrados. Use el botón «➕ Nuevo Inseminador» para darlos de alta o registre servicios por IA.");
+      h += vacio("No hay inseminadores registrados. Use el botón «Nuevo Inseminador» para darlos de alta o registre servicios por IA.");
     }
     h += "</div>";
 
@@ -1409,7 +1410,7 @@
         + "<div>"
         + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad</div>"
         + "<div style='font-size:28px; font-weight:800; color:" + semColor + "; line-height:1.2; margin:4px 0;'>"
-        + (ifInfo.semaforo || "🟢") + " " + ifInfo.indice_pct + "%"
+        + (ifInfo.semaforo || dot("verde")) + " " + ifInfo.indice_pct + "%"
         + "</div>"
         + "<div style='font-size:13px; font-weight:600; color:var(--texto);'>" + esc(ifInfo.diagnostico || "Eficiencia reproductiva") + "</div>"
         + "</div>"
@@ -1442,13 +1443,13 @@
     // pérdidas y vacas reincidentes que el mayordomo debe vigilar.
     if (pm && (pm.perdidas || pm.distocias)) {
       h += "<div class='card' style='padding:14px 16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--color-rojo-txt, #dc2626);'>"
-        + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>⚠️ Pérdidas gestacionales y partos difíciles</div>"
+        + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>" + icon("alertTriangle", 16) + "Pérdidas gestacionales y partos difíciles</div>"
         + "<div style='font-size:12.5px; color:var(--texto-suave); margin-bottom:8px;'>"
         + esc(pm.partos || 0) + " partos · " + esc(pm.perdidas || 0) + " pérdidas (" + esc(pm.tasa_perdida_pct || 0) + "%) · "
         + esc(pm.distocias || 0) + " difíciles (" + esc(pm.tasa_distocia_pct || 0) + "%) · "
         + esc(pm.crias_muertas_parto || 0) + " crías muertas al nacer</div>";
       if (pm.reincidentes && pm.reincidentes.length) {
-        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🔁 Vacas reincidentes (≥2 pérdidas):</div>"
+        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("refresh", 14) + "Vacas reincidentes (≥2 pérdidas):</div>"
           + "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;'>"
           + pm.reincidentes.map(function (r) {
             return "<a href='#' class='ficha-link chip rojo' data-ir-ficha='" + esc(r.vaca) + "' style='font-size:12px; padding:3px 8px; font-weight:bold; text-decoration:none;'>" + esc(r.vaca) + " ×" + esc(r.perdidas) + "</a>";
@@ -1516,7 +1517,7 @@
         ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
         ["dias_gestacion", "Días gest.", "text", function (v) { return v ? (v + " d") : "—"; }],
-        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFIA" ? "<span class='chip azul' style='font-size:11px;'>📡 Ecografía</span>" : "<span class='chip gris' style='font-size:11px;'>✋ Tacto</span>"; }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFIA" ? "<span class='chip azul' style='font-size:11px;'>" + icon("satellite", 12) + "Ecografía</span>" : "<span class='chip gris' style='font-size:11px;'>" + icon("hand", 12) + "Tacto</span>"; }],
         ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
           var hTxt = v || (r && r.detalle) || "—";
           var toro = (r && r.toro_pajuela) ? ("<br><small style='color:var(--verde-marca); font-weight:600;'>Toro: " + esc(r.toro_pajuela) + "</small>") : "";
@@ -1537,7 +1538,7 @@
         ["tag", "Animal"], ["fecha", "Fecha"],
         ["valor", "Condición CC", "text", function (v) { return "<span class='chip rojo'>" + esc(v) + "</span>"; }],
         ["notas", "Observaciones"]
-      ], "Ningún animal con condición corporal crítica registrada. 🎉");
+      ], "Ningún animal con condición corporal crítica registrada.");
 
     // --- Gaps estilo Software Ganadero (menú Reproducción) ---
     var debieron = d.debieron_parir || [];
@@ -1548,7 +1549,7 @@
         ["toro_pajilla", "Toro / Pajilla"],
         ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
         ["dias_atraso", "Atraso", "text", function (v) { return "<span class='chip rojo'><b>" + esc(v) + " d</b></span>"; }]
-      ], "Ninguna vaca con FEP vencida sin parto registrado. 🎉");
+      ], "Ninguna vaca con FEP vencida sin parto registrado.");
 
     var sinProg = d.sin_programar || [];
     h += "<h4>" + icon("calendar") + "Hembras sin programar (abiertas &gt; 60 días)</h4>"
@@ -1557,7 +1558,7 @@
         ["nombre", "Nombre"],
         ["ultimo_parto", "Último parto", "text", function (v) { return esc(fechaCorta(v)); }],
         ["dias_abiertos", "Días abiertos", "text", function (v) { return "<span class='chip " + (v > 150 ? "rojo" : "ambar") + "'><b>" + esc(v) + " d</b></span>"; }]
-      ], "Todas las vacas abiertas están programadas o dentro del periodo voluntario. 🎉");
+      ], "Todas las vacas abiertas están programadas o dentro del periodo voluntario.");
 
     var celosProx = d.proyeccion_celos || [];
     h += "<h4>" + icon("flame") + "Proyección de celos (próximos 30 días)</h4>"
@@ -1640,10 +1641,10 @@
       + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("scale", 16) + "Agenda de pesaje</div>"
       + "<p class='aviso' style='margin:0 0 8px;'>Frecuencia: crías &lt;8 m cada 30 d · levantes 8-18 m cada 60 d · adultos &gt;18 m cada 90 d.</p>";
     if (!aPesar.length) {
-      h += vacio("Ningún animal activo tiene su pesaje vencido. 🎉");
+      h += vacio("Ningún animal activo tiene su pesaje vencido.");
     } else {
       if (nActivos && aPesar.length >= nActivos * 0.9) {
-        h += "<p class='aviso' style='margin:0 0 10px;'>⚠️ Casi todo el hato (" + esc(aPesar.length) + " de " + esc(nActivos)
+        h += "<p class='aviso' style='margin:0 0 10px;'>" + icon("alertTriangle", 14) + "Casi todo el hato (" + esc(aPesar.length) + " de " + esc(nActivos)
           + ") está sin pesaje reciente. Conviene empezar por las crías y los levantes, que son los que más cambian de peso.</p>";
       }
       var cont = { cat: {}, est: { NUNCA: 0, VENCIDO: 0 } };
@@ -1841,7 +1842,7 @@
       + "</form></div>";
     h += renderListaTrabajo(d.tareas, ltClaves("sanidad"), "Lista de trabajo · Sanidad");
     h += "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
-    if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
+    if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro."); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       h += d.retiros.map(function (r) {
@@ -1881,11 +1882,11 @@
         var via = ((document.getElementById("san-via") || {}).value || "").trim() || null;
         var rLeche = parseInt((document.getElementById("san-ret-leche") || {}).value || 0, 10) || 0;
         var rCarne = parseInt((document.getElementById("san-ret-carne") || {}).value || 0, 10) || 0;
-        if (!tag) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el arete del animal.</span>"; return; }
-        if (!producto) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el producto aplicado.</span>"; return; }
-        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha.</span>"; return; }
+        if (!tag) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba el arete del animal.</span>"; return; }
+        if (!producto) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba el producto aplicado.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Elija la fecha.</span>"; return; }
         if (btn) btn.disabled = true;
-        if (fb) fb.textContent = "⏳ Guardando...";
+        if (fb) fb.textContent = "Guardando...";
         fetch("/api/sanidad/tratamiento", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -1894,7 +1895,7 @@
           .then(function (out) {
             if (btn) btn.disabled = false;
             if (!out.ok || !out.j.ok) {
-              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
               return;
             }
             mostrarToast("Tratamiento guardado", "verde");
@@ -1903,7 +1904,7 @@
             actualizarBadges();
           }).catch(function (err) {
             if (btn) btn.disabled = false;
-            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -1926,7 +1927,7 @@
     }
     var simple = modoPasturasEsSimple();
     var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px; margin-left:8px;'>"
-      + (simple ? "🔬 Ver técnico" : "😊 Ver simple") + "</button>";
+      + (simple ? icon("stethoscope", 14) + "Ver técnico" : "Ver simple") + "</button>";
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("grass", 22) + "Pasturas (Voisin & Aforos)" + btnModo + "</h3>"
       + barraDescargaSeccion("pasturas", "Pasturas")
@@ -1956,7 +1957,7 @@
           + "</div>";
       }
       if (pron.desactualizado_horas != null) {
-        h += "<p class='aviso'>⚠️ Datos del pronóstico de hace " + Math.round(pron.desactualizado_horas) + " h (sin conexión a Open-Meteo en la última actualización).</p>";
+        h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Datos del pronóstico de hace " + Math.round(pron.desactualizado_horas) + " h (sin conexión a Open-Meteo en la última actualización).</p>";
       }
     }
 
@@ -1995,9 +1996,9 @@
     var tieneSat = sat.total_potreros > 0;
 
     var btnSyncSar = "<button type='button' class='tema-btn btn-satelite-sar' id='btn-sync-satelite-sar'>"
-      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (con nubes)" : "📡 Radar SAR (Todo Clima)") + "</button>";
+      + icon("sparkles", 13) + (simple ? "Actualizar (con nubes)" : "Radar SAR (Todo Clima)") + "</button>";
     var btnSyncAuto = "<button type='button' class='tema-btn' id='btn-sync-satelite-auto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
-      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (rápido)" : "⚡ Auto (S2 + S1)") + "</button>";
+      + icon("sparkles", 13) + (simple ? "Actualizar (rápido)" : "Auto (S2 + S1)") + "</button>";
 
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin:18px 0 10px;'>"
       + "<h4 style='margin:0;'>" + icon("chartLine") + (simple ? "Estado del Pasto (satélite)" : "Monitoreo Satelital (Radar SAR Sentinel-1 & Óptico S2)") + "</h4>"
@@ -2028,7 +2029,7 @@
     if (!simple) {
       h += "<div class='card' style='padding:10px 14px; margin-bottom:14px; background:rgba(30, 60, 114, 0.05); border-left:4px solid #2a5298;'>"
         + "<div style='font-size:12.5px; line-height:1.45; color:var(--texto-color);'>"
-        + "<b>📡 Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
+        + "<b>" + icon("satellite", 14) + "Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
         + "El radar SAR emite microondas que penetran nubes, lluvia y neblina, calculando el índice dual de vegetación (RVI) y biomasa estimada sin perder continuidad temporal."
         + "</div></div>";
     }
@@ -2047,9 +2048,9 @@
 
     // 1. Selector de Pestañas de Gráficos (evita apilar 3 gráficos verticales gigantes)
     var graficosPasturas = [
-      { id: "mapa_potreros", nom: "🗺️ Mapa Potreros (Voisin)", desc: "Distribución satelital y rotación" },
-      { id: "ocupacion", nom: "📊 Ocupación y Carga", desc: "Carga animal por potrero" },
-      { id: "aforo", nom: "🌾 Aforos y Forraje", desc: "Disponibilidad de forraje verde" }
+      { id: "mapa_potreros", nom: icon("map", 12) + "Mapa Potreros (Voisin)", desc: "Distribución satelital y rotación" },
+      { id: "ocupacion", nom: icon("chartBar", 12) + "Ocupación y Carga", desc: "Carga animal por potrero" },
+      { id: "aforo", nom: icon("grass", 12) + "Aforos y Forraje", desc: "Disponibilidad de forraje verde" }
     ];
     h += "<div class='card' style='padding:12px; margin:14px 0 10px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
@@ -2082,12 +2083,12 @@
       h += vacio("Sin potreros con geometría registrada.");
     } else {
       function iconoPastoVoisin(dias) {
-        if (dias == null) return "⚪ ";
+        if (dias == null) return dot("gris") + " ";
         var num = Number(dias);
-        if (num < 12) return "<span title='Rebrote tierno (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌱</span>";
-        if (num <= 24) return "<span title='En desarrollo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌿</span>";
-        if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌾</span>";
-        return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🍂</span>";
+        if (num < 12) return "<span title='Rebrote tierno (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("sprout", 14) + "</span>";
+        if (num <= 24) return "<span title='En desarrollo (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("leaf", 14) + "</span>";
+        if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("grass", 14) + "</span>";
+        return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("leaf", 14) + "</span>";
       }
 
       h += "<div class='tabla-scroll'><table>"
@@ -2109,7 +2110,7 @@
         var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "";
 
         var tiempoTxt = nAnim > 0
-          ? "<span style='font-weight:700; color:var(--verde-marca);'>⏳ Ocupado " + (p.dias_ocupacion != null ? p.dias_ocupacion + "d" : "activo") + "</span>"
+          ? "<span style='font-weight:700; color:var(--verde-marca);'>" + icon("hourglass", 14) + "Ocupado " + (p.dias_ocupacion != null ? p.dias_ocupacion + "d" : "activo") + "</span>"
           : (iconoPastoVoisin(p.dias_reposo) + "<span style='color:var(--texto);'>Reposo " + (p.dias_reposo != null ? p.dias_reposo + "d" : "—") + "</span>");
 
         var animCol = nAnim > 0
@@ -2170,7 +2171,7 @@
     });
     h += "<div class='card' style='padding:12px 14px; margin-top:14px; border-left:4px solid var(--verde-marca);'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + "<div><b>🌱 Checklist de Ronda Voisin</b><div style='font-size:12px; color:var(--texto-suave);'>10-15 puntos de aforo por potrero → días de forraje + semáforo</div></div>"
+      + "<div><b>" + icon("sprout", 16) + "Checklist de Ronda Voisin</b><div style='font-size:12px; color:var(--texto-suave);'>10-15 puntos de aforo por potrero → días de forraje + semáforo</div></div>"
       + "<button type='button' class='tema-btn' id='btn-nueva-ronda' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; padding:8px 14px; cursor:pointer;'>+ Nueva Ronda Voisin</button>"
       + "</div><div id='rondas-recientes' style='margin-top:8px; font-size:12.5px;'></div></div>";
     return h;
@@ -2184,7 +2185,7 @@
     }).join("");
     var html = "<div id='ronda-voisin-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:520px;'>"
-      + "<div class='modal-header'><b>🌱 Nueva Ronda Voisin</b><button type='button' class='modal-cerrar' id='btn-cerrar-ronda'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("sprout", 16) + "Nueva Ronda Voisin</b><button type='button' class='modal-cerrar' id='btn-cerrar-ronda' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:14px 16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto;'>"
       + "<label style='font-size:13px;'><b>1. Potrero</b><br><select id='rv-potrero' class='ronda-campo' style='width:100%; margin-top:4px;'>" + opts + "</select></label>"
       + "<label style='font-size:13px;'><b>2. Nº de animales en pastoreo</b><br><input id='rv-num-animales' class='ronda-campo' type='number' min='1' value='1' style='width:100%; margin-top:4px;'></label>"
@@ -2227,10 +2228,10 @@
       var vals = txt.split(/[,;\s]+/).map(function (x) { return parseFloat(x); }).filter(isFinite);
       // El trabajador anota en gramos (ej. 450); la API espera kg MV/m².
       vals = vals.map(function (v) { return v > 10 ? v / 1000 : v; });
-      if (!vals.length) { res.innerHTML = "<p class='aviso'>⚠️ Ingresa al menos una medición válida.</p>"; return; }
+      if (!vals.length) { res.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + "Ingresa al menos una medición válida.</p>"; return; }
       var nAnim = parseInt((document.getElementById("rv-num-animales").value || "1"), 10) || 1;
       btn.disabled = true;
-      res.innerHTML = "⏳ Evaluando...";
+      res.innerHTML = icon("hourglass", 14) + "Evaluando...";
       fetch("/api/pasturas/ronda", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2240,7 +2241,7 @@
         .then(function (out) {
           btn.disabled = false;
           if (!out.ok || !out.j.ok) {
-            res.innerHTML = "<p class='aviso'>❌ " + esc((out.j && out.j.error) || "No se pudo evaluar (¿potrero sin área?).") + "</p>";
+            res.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo evaluar (¿potrero sin área?).") + "</p>";
             return;
           }
           var ronda = out.j.ronda || {};
@@ -2255,7 +2256,7 @@
         })
         .catch(function (err) {
           btn.disabled = false;
-          res.innerHTML = "<p class='aviso'>❌ Error de red: " + esc(err.message || err) + "</p>";
+          res.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + "Error de red: " + esc(err.message || err) + "</p>";
         });
     });
   }
@@ -2276,11 +2277,11 @@
       + icon(icName, 18)
       + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(tituloModal) + "</span>"
       + "</div>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<div id='modal-lista-anim-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
-      + "<div style='font-size:24px; margin-bottom:8px;'>⏳</div>"
+      + "<div style='font-size:24px; margin-bottom:8px;'>" + icon("hourglass", 24) + "</div>"
       + "Consultando animales activos..."
       + "</div>"
       + "</div>"
@@ -2307,7 +2308,7 @@
         var body = document.getElementById("modal-lista-anim-body");
         if (!body) return;
         if (!data || !data.ok) {
-          body.innerHTML = "<p class='aviso'>⚠️ " + esc((data && data.error) || "No se pudo cargar la información de los animales.") + "</p>";
+          body.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + esc((data && data.error) || "No se pudo cargar la información de los animales.") + "</p>";
           return;
         }
         var animales = data.animales || [];
@@ -2330,14 +2331,14 @@
 
         if (!animales.length) {
           content += "<div style='text-align:center; padding:30px 10px; color:var(--texto-suave);'>"
-            + "<div style='font-size:28px; margin-bottom:8px;'>🌾</div>"
+            + "<div style='font-size:28px; margin-bottom:8px;'>" + icon("grass", 28) + "</div>"
             + "No hay animales activos registrados en este grupo actualmente."
             + "</div>";
           body.innerHTML = content;
           return;
         }
 
-        content += "<input type='search' id='filtro-animal-lista' class='modal-potrero-busqueda' placeholder='🔍 Filtrar por número, nombre, potrero o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
+        content += "<input type='search' id='filtro-animal-lista' class='modal-potrero-busqueda' placeholder='Filtrar por número, nombre, potrero o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
 
         var col5Tit = cfg.esPotrero ? "Días" : "Potrero";
 
@@ -2415,7 +2416,7 @@
       .catch(function (err) {
         var body = document.getElementById("modal-lista-anim-body");
         if (body) {
-          body.innerHTML = "<p class='aviso'>❌ Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
+          body.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + "Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
         }
       });
   }
@@ -2494,7 +2495,7 @@
         box.style.border = "1px solid #2a5298";
         box.style.color = "#1e3c72";
         box.innerHTML = "<div style='display:flex; align-items:center; gap:10px;'>"
-          + "<span style='font-size:22px;'>🛰️</span>"
+          + "<span style='font-size:22px;'>" + icon("satellite", 22) + "</span>"
           + "<div><b>Consultando Google Earth Engine en tiempo real...</b><br>"
           + "<span style='font-size:12px;'>Procesando reflectancia " + esc(textoModo) + " para los 20 potreros de la finca. Esto toma ~10-15 segundos.</span></div>"
           + "</div>";
@@ -2519,7 +2520,7 @@
             box.style.background = "rgba(46, 125, 50, 0.1)";
             box.style.border = "1px solid #2e7d32";
             box.style.color = "#1b5e20";
-            box.innerHTML = "<b>✅ " + esc(data.mensaje || "Sincronización satelital exitosa.") + "</b>"
+            box.innerHTML = "<b>" + icon("checkCircle", 14) + esc(data.mensaje || "Sincronización satelital exitosa.") + "</b>"
               + "<div style='font-size:12px; margin-top:4px;'>Refrescando mapa de vigor satelital y tablas...</div>";
           }
           setTimeout(function () {
@@ -2530,7 +2531,7 @@
             box.style.background = "rgba(211, 47, 47, 0.1)";
             box.style.border = "1px solid #d32f2f";
             box.style.color = "#c62828";
-            box.innerHTML = "<b>⚠️ Error:</b> " + esc(data.error || "No se pudo sincronizar");
+            box.innerHTML = "<b>" + icon("alertTriangle", 14) + "Error:</b> " + esc(data.error || "No se pudo sincronizar");
           }
         }
       })
@@ -2541,7 +2542,7 @@
           box.style.background = "rgba(211, 47, 47, 0.1)";
           box.style.border = "1px solid #d32f2f";
           box.style.color = "#c62828";
-          box.innerHTML = "<b>❌ Error de sincronización satelital:</b> " + esc(err.message || err);
+          box.innerHTML = "<b>" + icon("xCircle", 14) + "Error de sincronización satelital:</b> " + esc(err.message || err);
         }
       });
     }
@@ -2773,17 +2774,17 @@
   var LOTE_MODO = { manual: "fijado a mano", nombre: "por el nombre", auto: "hay recién paridas", no: "" };
   function renderLotesOrdeno(lotes) {
     if (!lotes || !lotes.length) return "";
-    var h = "<div class='card'><h4 style='margin:0 0 6px;'>🥛 Lote de ordeño</h4>"
+    var h = "<div class='card'><h4 style='margin:0 0 6px;'>" + icon("milk", 16) + "Lote de ordeño</h4>"
       + "<p class='aviso' style='margin:0 0 8px;'>Solo las vacas de los potreros marcados cuentan como <b>en ordeño</b> "
       + "(lista Secar, ficha y litros/vaca). Las demás paridas se toman como secas. Toque un potrero para corregirlo.</p>"
       + "<div class='gen-filtros'>";
     lotes.forEach(function (p) {
       h += "<button type='button' class='chip btn-lote-ordeno" + (p.ordeno ? " act" : "") + "' data-pid='" + esc(p.id)
         + "' data-modo='" + esc(p.modo) + "' data-ordeno='" + (p.ordeno ? 1 : 0) + "' title='" + esc(LOTE_MODO[p.modo] || "") + "'>"
-        + (p.ordeno ? "🥛 " : "") + esc(p.nombre) + " · " + esc(p.vacas_paridas) + " paridas"
-        + (p.modo === "manual" ? " 📌" : "") + "</button>";
+        + (p.ordeno ? icon("milk", 12) : "") + esc(p.nombre) + " · " + esc(p.vacas_paridas) + " paridas"
+        + (p.modo === "manual" ? " " + icon("pin", 12) : "") + "</button>";
     });
-    return h + "</div><small>📌 = fijado a mano. Toque: automático → sí es ordeño → no es ordeño.</small></div>";
+    return h + "</div><small>" + icon("pin", 12) + "= fijado a mano. Toque: automático → sí es ordeño → no es ordeño.</small></div>";
   }
   function bindLotesOrdeno() {
     qa(".btn-lote-ordeno").forEach(function (b) {
@@ -2807,7 +2808,7 @@
   function renderControlLechero(cl) {
     if (!cl) return "";
     var vacas = cl.vacas || [], r = cl.resumen || {}, u = r.ultimo;
-    var h = "<div class='card' id='card-control-lechero'><h4 style='margin:0 0 6px;'>🥛 Control lechero</h4>";
+    var h = "<div class='card' id='card-control-lechero'><h4 style='margin:0 0 6px;'>" + icon("milk", 16) + "Control lechero</h4>";
     if (u) {
       h += "<p style='margin:0 0 8px; font-size:13px;'>Último control <b>" + esc(fechaCorta(u.fecha)) + "</b>: "
         + esc(u.vacas) + " vacas · <b>" + esc(u.promedio) + " L/vaca</b> · total " + esc(u.total_litros) + " L"
@@ -2835,9 +2836,9 @@
     });
     h += "<p id='control-total' style='font-weight:700; margin:10px 0;'>Total: 0 L · 0 vacas</p>"
       + "<button type='button' class='tema-btn' id='btn-guardar-control'>Guardar control</button></div>";
-    var listas = [["caida", "📉 Caída fuerte (posible mastitis)"], ["baja_produccion", "🔻 Baja producción"], ["sin_control", "⏰ Sin control"]];
+    var listas = [["caida", icon("trendDown", 14) + "Caída fuerte (posible mastitis)"], ["baja_produccion", icon("trendDown", 14) + "Baja producción"], ["sin_control", icon("clock", 14) + "Sin control"]];
     if (r.top && r.top.length) {
-      h += "<div style='margin-top:10px;'><b>🏆 Mejores</b> " + r.top.map(function (t) { return enlaceFicha(t.tag) + " " + esc(t.litros) + " L"; }).join(" · ") + "</div>";
+      h += "<div style='margin-top:10px;'><b>" + icon("award", 14) + "Mejores</b> " + r.top.map(function (t) { return enlaceFicha(t.tag) + " " + esc(t.litros) + " L"; }).join(" · ") + "</div>";
     }
     listas.forEach(function (par) {
       var filas = r[par[0]] || [];
@@ -2880,7 +2881,7 @@
           .then(function (res) { if (!(res.ok && res.procesados > 0)) return encolarOffline(ev.tipo, ev.payload, fecha); })
           .catch(function () { return encolarOffline(ev.tipo, ev.payload, fecha); });
       Promise.resolve(envio).then(function () {
-        mostrarToast("✓ Control guardado: " + regs.length + " vacas.", "verde");
+        mostrarToast("Control guardado: " + regs.length + " vacas.", "verde");
         vibrarConfirmacion();
         cargar(true);
       });
@@ -2912,7 +2913,7 @@
     h += renderLotesOrdeno(d.lotes_ordeno);
     h += renderControlLechero(d.control_lechero);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
-      h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
+      h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
 
     // 1. KPIs Ejecutivos de Producción
@@ -3172,7 +3173,7 @@
       + kpiIr(kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta"), { sec: "Movimientos recientes" })
       + "</div>";
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
-      h += "<p class='aviso' style='margin-top:-6px;'>⚠️ Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
+      h += "<p class='aviso' style='margin-top:-6px;'>" + icon("alertTriangle", 14) + "Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
         + (kf.ventas_sin_peso ? " " + kf.ventas_sin_peso + " venta(s) sin ningún pesaje previo quedaron fuera del cálculo." : "") + "</p>";
     }
     h += grafico("flujo_caja", "Flujo de caja mensual");
@@ -3280,7 +3281,7 @@
 
     var html = "<div id='fin-detalle-modal' class='modal-overlay'>"
       + "<div class='modal-contenido'>"
-      + "<div class='modal-header'><b>" + icon("receipt", 15) + " Detalle del Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-detalle'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("receipt", 15) + " Detalle del Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-detalle' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -3305,11 +3306,11 @@
     if (overlay) overlay.remove();
 
     var opcionesCategoria = ""
-      + "<optgroup label='💰 Ingresos'>"
+      + "<optgroup label='Ingresos'>"
       + "<option value='VENTA_LECHE'>Venta de leche</option>"
       + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
       + "</optgroup>"
-      + "<optgroup label='💸 Egresos'>"
+      + "<optgroup label='Egresos'>"
       + "<option value='INSUMO'>Insumos (sal, alambre, herramienta, etc.)</option>"
       + "<option value='NOMINA'>Nómina / Jornales</option>"
       + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
@@ -3335,7 +3336,7 @@
 
     var html = "<div id='fin-editar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido'>"
-      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Editar Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-editar'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Editar Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-editar' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -3382,11 +3383,11 @@
             cerrarModal();
             cargarFinanzasPeriodo();
           } else if (errorEl) {
-            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.textContent = (res.body.error || "No se pudo guardar.");
             errorEl.style.display = "block";
           }
         }).catch(function (err) {
-          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+          if (errorEl) { errorEl.textContent = String(err && err.message || err); errorEl.style.display = "block"; }
         });
     });
   }
@@ -3400,10 +3401,10 @@
         if (res.status >= 200 && res.status < 300 && res.body.ok) {
           cargarFinanzasPeriodo();
         } else {
-          window.alert("❌ " + (res.body.error || "No se pudo eliminar."));
+          window.alert((res.body.error || "No se pudo eliminar."));
         }
       }).catch(function (err) {
-        window.alert("❌ " + (err && err.message || err));
+        window.alert(String(err && err.message || err));
       });
   }
 
@@ -3610,7 +3611,7 @@
     var filasTabla = simulaciones.map(function (sim) {
       var esGanador = mejor && sim.plaza_key === mejor.plaza_key;
       var claseFila = esGanador ? "calc-resultado-ganador" : "";
-      var badgeGanador = esGanador ? " <span class='chip verde' style='font-size:10.5px; font-weight:700;'>🌟 Mayor Ingreso</span>" : "";
+      var badgeGanador = esGanador ? " <span class='chip verde' style='font-size:10.5px; font-weight:700;'>" + icon("sparkles", 12) + "Mayor Ingreso</span>" : "";
 
       return "<tr class='" + claseFila + "'>"
         + "<td><b>" + esc(sim.nombre) + "</b>" + badgeGanador + "<div style='font-size:11px; color:var(--texto-suave);'>" + sim.distancia_km + " km · ~" + sim.horas_viaje + "h</div></td>"
@@ -3751,7 +3752,7 @@
 
     var html = "<div id='mercado-fuentes-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:500px;'>"
-      + "<div class='modal-header'><b>" + icon("clipboard", 15) + " Fuentes Oficiales &amp; Metodología</b><button type='button' class='modal-cerrar' id='btn-cerrar-fuentes-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("clipboard", 15) + " Fuentes Oficiales &amp; Metodología</b><button type='button' class='modal-cerrar' id='btn-cerrar-fuentes-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -3835,7 +3836,7 @@
 
     var html = "<div id='mercado-actualizar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
-      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Actualizar Cotización de Mercado</b><button type='button' class='modal-cerrar' id='btn-cerrar-act-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Actualizar Cotización de Mercado</b><button type='button' class='modal-cerrar' id='btn-cerrar-act-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + formHtml + "</div>"
       + "</div></div>";
 
@@ -3898,10 +3899,10 @@
             cerrar();
             cargar(true);
           } else {
-            if (errEl) { errEl.textContent = "❌ " + (res.body.error || "No se pudo actualizar el precio."); errEl.style.display = "block"; }
+            if (errEl) { errEl.textContent = (res.body.error || "No se pudo actualizar el precio."); errEl.style.display = "block"; }
           }
         }).catch(function (err) {
-          if (errEl) { errEl.textContent = "❌ Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
+          if (errEl) { errEl.textContent = "Error de conexión: " + (err && err.message || err); errEl.style.display = "block"; }
         });
     });
   }
@@ -3958,7 +3959,7 @@
 
     var html = "<div id='inseminador-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:440px;'>"
-      + "<div class='modal-header'><b>" + icon("userPlus", 16) + " Registrar Inseminador Oficial</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("userPlus", 16) + " Registrar Inseminador Oficial</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<form id='form-nuevo-inseminador' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label style='font-size:12.5px; font-weight:600;'>Nombre Completo del Inseminador / Técnico:*<br>"
@@ -4061,7 +4062,7 @@
 
     var html = "<div id='iatf-protocolos-info-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:640px; max-height:85vh; overflow-y:auto;'>"
-      + "<div class='modal-header'><b>" + icon("clipboard", 16) + " Biblioteca de Protocolos Hormonales IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-prots-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("clipboard", 16) + " Biblioteca de Protocolos Hormonales IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-prots-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<p style='margin:0 0 12px 0; font-size:12.5px; color:var(--texto-suave);'>Protocolos zootécnicos validados con dosis sugeridas y marcas comerciales de referencia (evaluables según respuesta de fertilidad):</p>"
       + htmlProts
@@ -4091,7 +4092,7 @@
 
     var html = "<div id='nuevo-lote-iatf-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:560px; max-height:90vh; overflow-y:auto;'>"
-      + "<div class='modal-header'><b>" + icon("plus", 16) + " Iniciar Nuevo Lote IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-lote-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("plus", 16) + " Iniciar Nuevo Lote IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<form id='form-nuevo-lote-iatf' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label style='font-size:12.5px; font-weight:600;'>Nombre / Identificador del Lote:*<br>"
@@ -4116,7 +4117,7 @@
       + "<div id='lote-conteo-preview' style='font-size:12px; font-weight:700; color:var(--azul-marca);'>0 hembras ingresadas</div>"
       + "<label style='font-size:12.5px; font-weight:600;'>Notas / Observaciones:<br>"
       + "<input id='lote-notas' placeholder='ej. Lote con cría al pie, seleccionadas con CC >= 2.75' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
-      + "<div class='aviso' style='font-size:11.5px; margin:4px 0;'>💡 Al crear el lote, el sistema programará automáticamente las alertas de drogas en la Agenda PWA, notificaciones push y Telegram para los días exactos de aplicación (Día 0, Día 8 y Día 10).</div>"
+      + "<div class='aviso' style='font-size:11.5px; margin:4px 0;'>" + icon("lightbulb", 14) + "Al crear el lote, el sistema programará automáticamente las alertas de drogas en la Agenda PWA, notificaciones push y Telegram para los días exactos de aplicación (Día 0, Día 8 y Día 10).</div>"
       + "<div id='lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
       + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
       + "<button type='button' class='tema-btn' id='btn-cancel-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
@@ -4229,7 +4230,7 @@
 
     var html = "<div id='iatf-paso-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
-      + "<div class='modal-header'><b>💊 Registrar Aplicación de Fármacos</b><button type='button' class='modal-cerrar' id='btn-cerrar-paso-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pill", 16) + "Registrar Aplicación de Fármacos</b><button type='button' class='modal-cerrar' id='btn-cerrar-paso-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<div style='background:rgba(2,132,199,0.08); border-left:4px solid #0284c7; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
       + "<b>Lote:</b> " + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "<br>"
@@ -4318,7 +4319,7 @@
 
     var html = "<div id='iatf-inseminar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:500px;'>"
-      + "<div class='modal-header'><b>🧬 Inseminación Masiva a 1-Toque (IATF)</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-lote-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("dna", 16) + "Inseminación Masiva a 1-Toque (IATF)</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<div style='background:rgba(22,163,74,0.08); border-left:4px solid var(--verde-marca); padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
       + "Se registrará el servicio por IATF para las <b>" + nHembras + " hembras activas</b> de <b>" + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "</b> "
@@ -4437,15 +4438,15 @@
 
         var modalHtml = "<div id='iatf-detalle-modal' class='modal-overlay'>"
           + "<div class='modal-contenido' style='max-width:650px; max-height:85vh; overflow-y:auto;'>"
-          + "<div class='modal-header'><b>📋 Detalle del Lote: " + esc(lote.nombre) + "</b><button type='button' class='modal-cerrar' id='btn-cerrar-det-lote-modal'>✕</button></div>"
+          + "<div class='modal-header'><b>" + icon("clipboard", 16) + "Detalle del Lote: " + esc(lote.nombre) + "</b><button type='button' class='modal-cerrar' id='btn-cerrar-det-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
           + "<div style='padding:16px;'>"
           + "<div style='display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; font-size:12.5px;'>"
           + "<div>Protocolo: <b>" + esc(lote.protocolo_nombre) + "</b> (" + esc(lote.protocolo_categoria) + ")</div>"
           + "<div>Inicio: <b>" + esc(fechaCorta(lote.fecha_inicio)) + "</b> · IATF: <b>" + esc(lote.hora_iatf) + "</b></div>"
           + "</div>"
-          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>💊 Historial de Fármacos, Marcas y Dosis Aplicadas:</div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("pill", 14) + "Historial de Fármacos, Marcas y Dosis Aplicadas:</div>"
           + "<div class='tabla-scroll' style='margin-bottom:14px;'><table><tr><th>Fecha</th><th>Producto</th><th>Marca Usada</th><th>Dosis</th><th>Operario</th></tr>" + histHtml + "</table></div>"
-          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🐄 Hembras del Lote (" + animales.length + "):</div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("cow", 14) + "Hembras del Lote (" + animales.length + "):</div>"
           + "<div class='tabla-scroll'><table><tr><th>Arete</th><th>CC Inicial</th><th>Estado</th><th>Diagnóstico</th><th style='text-align:right;'>Acción</th></tr>" + animsHtml + "</table></div>"
           + "</div></div></div>";
 
@@ -4564,9 +4565,9 @@
 
       var badgePlaza = "";
       if (esGranada) {
-        badgePlaza = " <span class='chip verde' style='font-size:10px; font-weight:700;'>📍 Plaza Local Finca</span>";
+        badgePlaza = " <span class='chip verde' style='font-size:10px; font-weight:700;'>" + icon("pin", 12) + "Plaza Local Finca</span>";
       } else if (esTop) {
-        badgePlaza = " <span class='chip ambar' style='font-size:10px; font-weight:700;'>👑 Mayor Precio</span>";
+        badgePlaza = " <span class='chip ambar' style='font-size:10px; font-weight:700;'>" + icon("crown", 12) + "Mayor Precio</span>";
       } else if (esNal) {
         badgePlaza = " <span class='chip gris' style='font-size:10px; font-weight:600;'>🇨🇴 Consolidado</span>";
       }
@@ -4749,10 +4750,10 @@
     var resTend = d.resumen_tendencias && d.resumen_tendencias[cat];
     var insightHtml = "";
     if (resTend) {
-      var flechaTend = resTend.tendencia === "SUBIENDO" ? "📈" : (resTend.tendencia === "BAJANDO" ? "📉" : "📊");
+      var flechaTend = resTend.tendencia === "SUBIENDO" ? icon("trendUp", 14) : (resTend.tendencia === "BAJANDO" ? icon("trendDown", 14) : icon("chartBar", 14));
       var dirTxt = resTend.tendencia === "SUBIENDO" ? "ALCISTA" : (resTend.tendencia === "BAJANDO" ? "BAJISTA" : "ESTABLE");
       insightHtml = "<div class='mercado-insight-box'>"
-        + "<div><b>" + flechaTend + " Interpretación de Mercado (" + esc(etiquetaMercado(cat)) + "):</b></div>"
+        + "<div><b>" + flechaTend + "Interpretación de Mercado (" + esc(etiquetaMercado(cat)) + "):</b></div>"
         + "<div style='margin-top:4px;'>Tendencia semanal <b>" + dirTxt + "</b> con variación promedio del <b>" + (resTend.variacion_pct > 0 ? "+" : "") + resTend.variacion_pct + "%</b> (" + fmtMoneda(resTend.variacion_pesos) + "/kg). En <b>Granada</b> cotiza a <b>" + fmtMoneda(resTend.precio_granada) + "/kg</b> (" + (resTend.variacion_granada_pct > 0 ? "+" : "") + resTend.variacion_granada_pct + "%). La plaza más alta es <b>" + esc(resTend.plaza_top) + "</b> (" + fmtMoneda(resTend.precio_top) + "/kg).</div>"
         + "</div>";
     }
@@ -4898,7 +4899,7 @@
     }
 
     var avisoReferencia = (d && d.es_datos_referencia)
-      ? "<div class='chip ambar' style='margin-bottom:10px;'>⚠️ Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
+      ? "<div class='chip ambar' style='margin-bottom:10px;'>" + icon("alertTriangle", 12) + "Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
       : "";
 
     return headerHtml + avisoReferencia + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";
@@ -5089,7 +5090,7 @@
       var n = Number(f.total) || 0;
       if (n === 0) {
         h += "<tr><td class='col-cat' title='" + esc(f.ayuda) + "'>" + esc(f.etiqueta) + "</td>"
-          + "<td class='col-cab' style='text-align:center;'><span class='chip verde' style='padding:2px 6px; font-size:11px;'>✓ 0</span></td>"
+          + "<td class='col-cab' style='text-align:center;'><span class='chip verde' style='padding:2px 6px; font-size:11px;'>" + icon("check", 12) + "0</span></td>"
           + "<td class='col-pct' style='text-align:right; color:var(--texto-suave, #64748b);'>0%</td></tr>";
         return;
       }
@@ -5106,11 +5107,11 @@
 
   // Registros imposibles o sospechosos (engine/calidad_datos.py). Se
   // corrigen desde la ficha de cada animal.
-  var GRAVEDAD_ICONO = { alta: "🔴", media: "🟠", baja: "⚪" };
+  var GRAVEDAD_ICONO = { alta: dot("rojo"), media: dot("naranja"), baja: dot("gris") };
   var DR_MAX_FILAS = 30;
   function renderDatosRevisar(lista) {
     if (!lista) return "";
-    var h = "<div class='card lt-card'><h4 style='margin:0 0 6px;'>🧹 Datos a revisar (" + lista.length + ")</h4>";
+    var h = "<div class='card lt-card'><h4 style='margin:0 0 6px;'>" + icon("eraser", 16) + "Datos a revisar (" + lista.length + ")</h4>";
     if (!lista.length) return h + vacio("No se encontraron registros imposibles en el hato activo.") + "</div>";
     h += "<p class='aviso' style='margin:0 0 8px;'>Registros que no pueden ser ciertos (casi siempre errores de digitación "
       + "o de la importación). Abra la ficha y corríjalos: mientras tanto pueden descuadrar listas y conteos.</p>";
@@ -5123,7 +5124,7 @@
     tipos.forEach(function (t, i) {
       var p0 = por[t][0];
       h += "<button type='button' class='chip btn-dr" + (i === 0 ? " act" : "") + "' data-dr='" + esc(t) + "'>"
-        + (GRAVEDAD_ICONO[p0.gravedad] || "") + " " + esc(p0.titulo) + " <b>" + por[t].length + "</b></button>";
+        + (GRAVEDAD_ICONO[p0.gravedad] || "") + esc(p0.titulo) + " <b>" + por[t].length + "</b></button>";
     });
     h += "</div>";
     tipos.forEach(function (t, i) {
@@ -5250,9 +5251,9 @@
     cyan: "#1f9aa6", lima: "#8fa82a", naranja: "#e0782a", gris: "#9aa19b"
   };
   var GEN_ICONO_GRADO = {
-    PURO: "🌟", F1_1_2: "🧬", "3_4": "📐", "5_8": "⚖️", "7_8": "🎯", "15_16": "🏅",
-    "13_16": "📐", "11_16": "📐", "9_16": "📐", "1_2": "🌿", MULTI: "🔄",
-    PARCIAL: "🧩", CEBU: "🐂", TAURINO: "🐄", INDET: "❓", SIN_CLASIFICAR: "❔"
+    PURO: icon("sparkles", 12), F1_1_2: icon("dna", 12), "3_4": icon("ruler", 12), "5_8": icon("scale", 12), "7_8": icon("target", 12), "15_16": icon("award", 12),
+    "13_16": icon("ruler", 12), "11_16": icon("ruler", 12), "9_16": icon("ruler", 12), "1_2": icon("leaf", 12), MULTI: icon("refresh", 12),
+    PARCIAL: icon("grid", 12), CEBU: icon("cow", 12), TAURINO: icon("cow", 12), INDET: icon("help", 12), SIN_CLASIFICAR: icon("help", 12)
   };
   // Grados sin raza confiable: al final, en gris y cerrados por defecto.
   var GEN_SIN_DESGLOSE = { PARCIAL: 1, CEBU: 1, TAURINO: 1, INDET: 1, SIN_CLASIFICAR: 1 };
@@ -5320,7 +5321,7 @@
       });
       h += "</div>";
       if (Number(d.pool_sin_dato_pct) > 0) {
-        h += "<p class='aviso'>🧩 Además, el " + esc(d.pool_sin_dato_pct) + "% de la sangre de estos animales no tiene dato (padre o madre sin raza registrada); no se cuenta como raza.</p>";
+        h += "<p class='aviso'>" + icon("grid", 14) + "Además, el " + esc(d.pool_sin_dato_pct) + "% de la sangre de estos animales no tiene dato (padre o madre sin raza registrada); no se cuenta como raza.</p>";
       }
     }
 
@@ -5330,10 +5331,10 @@
       h += "<h4>" + icon("dna") + "Familias de cruce</h4>"
         + "<div class='gen-filtros'><button type='button' class='chip btn-filtro-gen act' data-grado='TODOS'>Todos</button>";
       grados.forEach(function (g) {
-        h += "<button type='button' class='chip btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>" + (GEN_ICONO_GRADO[g.codigo] || "") + " " + esc(g.chip) + "</button>";
+        h += "<button type='button' class='chip btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>" + (GEN_ICONO_GRADO[g.codigo] || "") + esc(g.chip) + "</button>";
       });
       h += "</div>"
-        + "<input id='buscar-genetica-input' class='gen-buscar' type='search' placeholder='🔍 Buscar cruce, raza o arete (ej: Gyr, 3/4, JA45)'>";
+        + "<input id='buscar-genetica-input' class='gen-buscar' type='search' placeholder='Buscar cruce, raza o arete (ej: Gyr, 3/4, JA45)'>";
 
       var grupos = [], porGrado = {};
       patrones.forEach(function (p) {
@@ -5351,7 +5352,7 @@
         var abierto = !GEN_SIN_DESGLOSE[gr.codigo];
         h += "<details class='gen-grupo' data-grado='" + esc(gr.codigo) + "'" + (abierto ? " open" : "") + ">"
           + "<summary><i style='background:" + (GEN_COLOR_GRADO[gr.color] || GEN_COLOR_GRADO.gris) + ";'></i>"
-          + "<span>" + (GEN_ICONO_GRADO[gr.codigo] || "") + " " + esc(res.nombre || gr.nombre) + "</span>"
+          + "<span>" + (GEN_ICONO_GRADO[gr.codigo] || "") + esc(res.nombre || gr.nombre) + "</span>"
           + "<b>" + esc(gr.cabezas) + "</b><small>" + esc(res.pct_hato != null ? res.pct_hato + "%" : "") + "</small></summary>";
         gr.items.forEach(function (p) {
           var tags = p.animales || [];
@@ -5389,7 +5390,7 @@
     var pjinact = d.pajillas_inactivas || d.pajuelas_inactivas || [];
     if (pjinact.length) {
       h += "<details style='margin-top:10px; font-size:12px; background:var(--superficie-2); border:1px solid var(--borde-suave); border-radius:8px; padding:8px 12px;'>"
-        + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>📦 Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
+        + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>" + icon("package", 14) + "Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
         + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico archivados para no generar falsas alertas en el termo actual.</p>"
         + "<div class='tabla-scroll' style='max-height:200px; overflow-y:auto; margin-top:6px;'>"
         + tabla(pjinact, [
@@ -5406,7 +5407,7 @@
     if (te && te.vencido) {
       var dv = Number(te.dias_vencido) || 0;
       var hace = dv >= 730 ? Math.floor(dv / 365) + " años" : dv >= 60 ? Math.floor(dv / 30) + " meses" : dv + " días";
-      h += "<p><span class='chip rojo'>⚠️ Recarga vencida hace " + esc(hace) + "</span> <small class='aviso'>Registra la última recarga para retomar el control.</small></p>";
+      h += "<p><span class='chip rojo'>" + icon("alertTriangle", 12) + "Recarga vencida hace " + esc(hace) + "</span> <small class='aviso'>Registra la última recarga para retomar el control.</small></p>";
     }
     h += tabla(d.termo_nitrogeno, [
       ["fecha_recarga", "Última recarga", "text", function (v) { return esc(fechaCorta(v)); }],
@@ -5488,9 +5489,9 @@
       + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
       + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div style='display:flex; gap:8px;'>"
-      + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
-      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
-      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>" + icon("leaf", 14) + "Potrero</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>" + icon("clipboard", 14) + "General</button>"
       + "</div>"
       + "<input type='hidden' id='ag-obj-tipo' value='animal'>"
       + "<div id='ag-wrap-animal'>"
@@ -5506,13 +5507,13 @@
       + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
       + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Tipo de Tarea:<br>"
       + "<select id='ag-tipo-tarea' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
-      + "<option value='MEDICAMENTO'>💉 Aplicar medicamento</option>"
-      + "<option value='FUMIGAR'>🌿 Fumigar</option>"
-      + "<option value='REVISION'>🔍 Revisión / Chequeo</option>"
-      + "<option value='TRASLADO'>🚚 Traslado</option>"
-      + "<option value='CERCA'>⚡ Arreglo de cerca</option>"
-      + "<option value='PESAJE'>⚖️ Pesaje</option>"
-      + "<option value='GENERAL'>📋 General</option>"
+      + "<option value='MEDICAMENTO'>Aplicar medicamento</option>"
+      + "<option value='FUMIGAR'>Fumigar</option>"
+      + "<option value='REVISION'>Revisión / Chequeo</option>"
+      + "<option value='TRASLADO'>Traslado</option>"
+      + "<option value='CERCA'>Arreglo de cerca</option>"
+      + "<option value='PESAJE'>Pesaje</option>"
+      + "<option value='GENERAL'>General</option>"
       + "</select></label>"
       + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Adjudicar / Asignar a:<br>"
       + "<input id='ag-asignado' list='dl-equipo-agenda' placeholder='ej. Encargado o Administrador' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
@@ -5529,7 +5530,7 @@
       + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
       + "<label style='flex:1; min-width:130px; font-size:13px; font-weight:600;'>Fecha límite<br><input id='ag-fecha' type='date' value='" + hoyIso + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
       + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Hora (opcional)<br><input id='ag-hora' type='time' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
-      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Prioridad<br><select id='ag-prioridad' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Prioridad<br><select id='ag-prioridad' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'><option value='NORMAL'>Normal</option><option value='URGENTE'>Urgente</option></select></label>"
       + "</div>"
       + "<button type='submit' id='btn-ag-guardar' class='btn-guardar-manga' style='margin-top:4px; font-size:14px;'>" + icon("plus", 14) + "Asignar Tarea / Programar Evento</button>"
       + "<div id='ag-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
@@ -5552,16 +5553,16 @@
       recs.forEach(function (rc) {
         var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
         var objChip = "";
-        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
-        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
 
-        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>👤 " + esc(rc.asignado_a) + "</span> ") : "";
-        var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>🚨 URGENTE</span> " : "";
+        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + esc(rc.asignado_a) + "</span> ") : "";
+        var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>" + icon("alertTriangle", 12) + "URGENTE</span> " : "";
 
         h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "'>"
           + "<div class='tarea-card-header'>"
           + "<div>" + objChip + asigChip + prioChip + chipUrg(rc) + "</div>"
-          + "<small style='color:var(--texto-suave); font-weight:600;'>📅 " + fh + "</small>"
+          + "<small style='color:var(--texto-suave); font-weight:600;'>" + icon("calendar", 14) + fh + "</small>"
           + "</div>"
           + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
@@ -5574,7 +5575,7 @@
       });
       h += "</div>";
     } else {
-      h += "<p class='aviso'>🎉 Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+      h += "<p class='aviso'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
     }
 
     if (recsComp.length) {
@@ -5583,8 +5584,8 @@
       recsComp.forEach(function (rc) {
         var fechaComp = esc(rc.completado_en || rc.fecha || "—");
         var objChip = "";
-        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
-        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
         var quien = esc(rc.completado_por || rc.asignado_a || "Equipo");
 
         var fotoHtml = "";
@@ -5596,12 +5597,12 @@
 
         h += "<div style='padding:10px 14px; border:1px solid var(--borde); border-radius:8px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
           + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
-          + "<div>" + objChip + "<span class='chip verde' style='font-size:11px;'>✓ REALIZADO</span></div>"
-          + "<small style='color:var(--texto-suave);'>🕒 " + fechaComp + "</small>"
+          + "<div>" + objChip + "<span class='chip verde' style='font-size:11px;'>" + icon("check", 12) + "REALIZADO</span></div>"
+          + "<small style='color:var(--texto-suave);'>" + icon("clock", 14) + fechaComp + "</small>"
           + "</div>"
           + "<div style='font-weight:600; font-size:13.5px; margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
-          + "<div style='font-size:12.5px; color:var(--texto-suave);'>👤 Ejecutado por: <b>" + quien + "</b></div>"
-          + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>💬 " + esc(rc.notas_completado) + "</div>") : "")
+          + "<div style='font-size:12.5px; color:var(--texto-suave);'>" + icon("user", 14) + "Ejecutado por: <b>" + quien + "</b></div>"
+          + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>" + icon("chat", 14) + esc(rc.notas_completado) + "</div>") : "")
           + fotoHtml
           + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<div style='display:flex; justify-content:flex-end; margin-top:6px;'><button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea realizada: " + esc(rc.mensaje || "") + "' title='Eliminar registro de tarea' style='font-size:11.5px; color:var(--color-rojo-txt);'>" + icon("trash", 12) + " Eliminar del historial</button></div>") : "")
           + "</div>";
@@ -5751,9 +5752,9 @@
                   // Solo se confirma "activadas" si quedó una suscripción real:
                   // antes salía el aviso aunque el servidor no pudiera enviar nada.
                   if (real) {
-                    mostrarToast("✓ Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
+                    mostrarToast("Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
                   } else {
-                    mostrarToast("⚠️ Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
+                    mostrarToast("Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
                   }
                 });
             }
@@ -5788,11 +5789,11 @@
   }
 
   function textoEstadoAvisos(est) {
-    if (!est.soporta) return "<span style='color:var(--texto-suave);'>❌ Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
-    if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
-    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
-    if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
-    return "<span style='color:var(--verde-marca); font-weight:600;'>✅ Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
+    if (!est.soporta) return "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
+    if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
+    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
+    if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
+    return "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
   }
 
   // Tablero: si este celular no recibe avisos con la app cerrada, lo dice
@@ -5811,7 +5812,7 @@
       div.className = "card";
       div.style.cssText = "border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;";
       var puedeActivar = est.permiso !== "denied" && est.servidor_listo;
-      div.innerHTML = "<b>🔔 Avisos al celular</b><p style='margin:6px 0 8px; font-size:13px;'>" + textoEstadoAvisos(est) + "</p>"
+      div.innerHTML = "<b>" + icon("bell", 16) + "Avisos al celular</b><p style='margin:6px 0 8px; font-size:13px;'>" + textoEstadoAvisos(est) + "</p>"
         + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         + (puedeActivar ? "<button type='button' class='tema-btn' id='btn-banner-activar-avisos'>Activar avisos</button>" : "")
         + "<button type='button' class='tema-btn' id='btn-banner-ocultar-avisos' style='background:var(--bg-suave); color:var(--texto-base);'>Ahora no</button></div>";
@@ -5910,14 +5911,14 @@
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
         var prioridad = (document.getElementById("ag-prioridad") || {}).value || "NORMAL";
 
-        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba qué hay que hacer.</span>"; return; }
-        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha de la tarea.</span>"; return; }
+        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Elija la fecha de la tarea.</span>"; return; }
 
         var prefix = (objTipo === "animal" && tag.trim()) ? (tag.trim() + ": ") : ((objTipo === "potrero" && pot.trim()) ? (pot.trim() + ": ") : "");
         var mensajeFinal = prefix + desc;
 
         if (btn) btn.disabled = true;
-        if (fb) fb.textContent = "⏳ Guardando tarea...";
+        if (fb) fb.textContent = "Guardando tarea...";
         fetch("/api/agenda/recordatorio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -5936,16 +5937,16 @@
           .then(function (out) {
             if (btn) btn.disabled = false;
             if (!out.ok || !out.j.ok) {
-              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
               return;
             }
-            mostrarToast("Tarea asignada y agendada ✓", "verde");
+            mostrarToast("Tarea asignada y agendada", "verde");
             vibrarConfirmacion();
             cargar(true);
             actualizarBadges();
           }).catch(function (err) {
             if (btn) btn.disabled = false;
-            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -6035,7 +6036,7 @@
         if (inpAckId) inpAckId.value = rid;
         if (txtAckInfo) {
           var asigInfo = asig ? ("<br><small style='color:var(--texto-suave);'>Asignado a: <b>" + esc(asig) + "</b></small>") : "";
-          txtAckInfo.innerHTML = "<b>📌 " + esc(msg) + "</b>" + asigInfo;
+          txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
@@ -6052,7 +6053,7 @@
         var btnConf = document.getElementById("btn-confirmar-ack");
         var fbAck = document.getElementById("ack-feedback");
         if (btnConf) btnConf.disabled = true;
-        if (fbAck) fbAck.textContent = "⏳ Registrando cumplimiento...";
+        if (fbAck) fbAck.textContent = "Registrando cumplimiento...";
         var payloadAck = {
           notas: (inpAckNotas && inpAckNotas.value || "").trim(),
           completado_por: (inpAckPor && inpAckPor.value || "").trim(),
@@ -6067,16 +6068,16 @@
             if (btnConf) btnConf.disabled = false;
             if (res && res.ok) {
               cerrarModalAck();
-              mostrarToast("¡Tarea marcada como realizada ✓!", "verde");
+              mostrarToast("¡Tarea marcada como realizada!", "verde");
               vibrarConfirmacion();
               cargar(true);
               actualizarBadges();
             } else {
-              if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((res && res.error) || "Error al completar.") + "</span>";
+              if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((res && res.error) || "Error al completar.") + "</span>";
             }
           }).catch(function (err) {
             if (btnConf) btnConf.disabled = false;
-            if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Error de conexión: " + esc(err.message || err) + "</span>";
+            if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -6095,19 +6096,19 @@
       });
       return;
       if (!("Notification" in window)) {
-        estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>❌ Tu navegador no soporta notificaciones nativas.</span>";
+        estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Tu navegador no soporta notificaciones nativas.</span>";
         if (btnActivar) btnActivar.style.display = "none";
         if (btnProbar) btnProbar.style.display = "none";
         return;
       }
       if (Notification.permission === "granted") {
-        estadoEl.innerHTML = "<span style='color:var(--verde-marca); font-weight:600;'>✅ Notificaciones activas en este dispositivo.</span> Recibirás alertas de retiros de carne/leche, celos AM-PM, termo criogénico y Voisin.";
+        estadoEl.innerHTML = "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Notificaciones activas en este dispositivo.</span> Recibirás alertas de retiros de carne/leche, celos AM-PM, termo criogénico y Voisin.";
         if (btnActivar) btnActivar.textContent = "Re-sincronizar";
       } else if (Notification.permission === "denied") {
-        estadoEl.innerHTML = "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Notificaciones bloqueadas.</span> Habilita los permisos en la barra de direcciones o ajustes del navegador.";
+        estadoEl.innerHTML = "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Notificaciones bloqueadas.</span> Habilita los permisos en la barra de direcciones o ajustes del navegador.";
         if (btnActivar) btnActivar.disabled = true;
       } else {
-        estadoEl.innerHTML = "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Desactivadas.</span> Actívalas para recibir alertas de retiros sanitarios, celos e inventario crítico.";
+        estadoEl.innerHTML = "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Desactivadas.</span> Actívalas para recibir alertas de retiros sanitarios, celos e inventario crítico.";
         if (btnActivar) btnActivar.disabled = false;
       }
     }
@@ -6144,13 +6145,13 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (res && res.ok) {
-            mostrarToast("✓ Enviada a " + res.enviados + " dispositivo(s). Debe llegar en segundos; cierre la app para comprobarlo.", "verde");
+            mostrarToast("Enviada a " + res.enviados + " dispositivo(s). Debe llegar en segundos; cierre la app para comprobarlo.", "verde");
           } else if (res && res.motivo === "sin_suscripcion") {
-            mostrarToast("⚠️ Este celular no está suscrito: toque «Activar».", "ambar");
+            mostrarToast("Este celular no está suscrito: toque «Activar».", "ambar");
           } else if (res && res.motivo === "servidor_sin_llaves") {
-            mostrarToast("⚠️ El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
+            mostrarToast("El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
           } else {
-            mostrarToast("❌ No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
+            mostrarToast("No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
           }
           actualizarTextoEstado();
         })
@@ -6238,7 +6239,7 @@
       var chipGmd = f.gmd != null && !isNaN(f.gmd)
         ? "<span class='chip " + (Number(f.gmd) >= 600 ? "verde" : Number(f.gmd) > 0 ? "ambar" : "rojo") + "'>" + (Number(f.gmd) > 0 ? "+" : "") + Number(f.gmd).toFixed(0) + " g/d</span>"
         : (f.gmd || "—");
-      h += "<tr><td>" + esc(f.hora) + "</td><td><b>" + esc(f.tag) + "</b></td><td><b>" + esc(f.peso) + " kg</b></td><td>" + chipGmd + "</td><td>" + esc(f.estado) + "</td></tr>";
+      h += "<tr><td>" + esc(f.hora) + "</td><td><b>" + esc(f.tag) + "</b></td><td><b>" + esc(f.peso) + " kg</b></td><td>" + chipGmd + "</td><td>" + (f.estado === "Guardado" ? dot("verde") : f.estado === "Offline" ? icon("save", 12) : "") + esc(f.estado) + "</td></tr>";
     });
     h += "</table></div>";
     return h;
@@ -6318,7 +6319,7 @@
 
           if (resBox) {
             resBox.style.display = "block";
-            resBox.innerHTML = "<b>✅ Pesaje Registrado:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b><br>"
+            resBox.innerHTML = "<b>" + icon("checkCircle", 14) + "Pesaje Registrado:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b><br>"
               + (data.peso_anterior != null
                 ? "Anterior: <b>" + esc(data.peso_anterior) + " kg</b> (hace " + esc(data.dias_entre_pesajes) + " días) · GMD: " + chipGmd
                 : "Primer pesaje registrado para este animal.");
@@ -6329,7 +6330,7 @@
             tag: tag,
             peso: peso,
             gmd: gmd,
-            estado: "🟢 Guardado"
+            estado: "Guardado"
           });
           var wrap = document.getElementById("manga-historial-wrap");
           if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -6343,14 +6344,14 @@
             if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
-              resBox.innerHTML = "<b>💾 Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
+              resBox.innerHTML = "<b>" + icon("save", 14) + "Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
             }
             _sesionManga.unshift({
               hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
               tag: tag,
               peso: peso,
               gmd: "—",
-              estado: "💾 Offline"
+              estado: "Offline"
             });
             var wrap = document.getElementById("manga-historial-wrap");
             if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -6375,14 +6376,14 @@
             if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff2) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
-              resBox.innerHTML = "<b>💾 Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
+              resBox.innerHTML = "<b>" + icon("save", 14) + "Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
             }
             _sesionManga.unshift({
               hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
               tag: tag,
               peso: peso,
               gmd: "—",
-              estado: "💾 Offline"
+              estado: "Offline"
             });
             var wrap = document.getElementById("manga-historial-wrap");
             if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -6434,7 +6435,7 @@
         }).then(function (r) { return r.json(); })
           .then(function (res) {
             if (res.ok) {
-              alert("✅ Tratamiento aplicado a " + res.procesados + " animales con éxito.");
+              alert("Tratamiento aplicado a " + res.procesados + " animales con éxito.");
               if (q("#manga-lote-producto")) q("#manga-lote-producto").value = "";
               if (q("#manga-lote-tags")) q("#manga-lote-tags").value = "";
               actualizarBadges();
@@ -6450,15 +6451,15 @@
       btnBle.addEventListener("click", function () {
         var estado = document.getElementById("manga-ble-estado");
         if (!navigator.bluetooth) {
-          if (estado) estado.innerHTML = "❌ Tu navegador no soporta Web Bluetooth.<br><small>Recomendado: Chrome o Edge en Android o PC con Bluetooth activo.</small>";
+          if (estado) estado.innerHTML = icon("xCircle", 14) + "Tu navegador no soporta Web Bluetooth.<br><small>Recomendado: Chrome o Edge en Android o PC con Bluetooth activo.</small>";
           return;
         }
-        if (estado) estado.textContent = "🔍 Buscando báscula o bastón RFID Bluetooth...";
+        if (estado) estado.textContent = "Buscando báscula o bastón RFID Bluetooth...";
         navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ["0000181d-0000-1000-8000-00805f9b34fb", "battery_service"]
         }).then(function (device) {
-          if (estado) estado.innerHTML = "🟢 Conectado a <b>" + esc(device.name || "Dispositivo BLE") + "</b>.<br>Listo para recibir lecturas.";
+          if (estado) estado.innerHTML = dot("verde") + "Conectado a <b>" + esc(device.name || "Dispositivo BLE") + "</b>.<br>Listo para recibir lecturas.";
         }).catch(function (err) {
           if (estado) estado.textContent = "Conexión BLE cancelada o no disponible (" + err.message + ").";
         });
@@ -6655,13 +6656,13 @@
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
         + "<label>Código Toro / Pajilla: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;'>➕</button></div><datalist id='dl-inseminadores'></datalist></label>";
+        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>💡 Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
+        + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>" + icon("lightbulb", 14) + "Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
         + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Ordeño del día, control tanque, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "venta") {
-      h += "<div class='aviso' style='margin:2px 0 8px; font-size:12px;'>💰 <b>Venta de Animal:</b> El semoviente pasa automáticamente a estado <b>VENDIDO</b> (sale del inventario activo) y el monto se registra como ingreso en Finanzas.</div>"
+      h += "<div class='aviso' style='margin:2px 0 8px; font-size:12px;'>" + icon("banknote", 14) + "<b>Venta de Animal:</b> El semoviente pasa automáticamente a estado <b>VENDIDO</b> (sale del inventario activo) y el monto se registra como ingreso en Finanzas.</div>"
         + "<label>Arete / Tag del animal vendido: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Comprador / Destino: <input id='cap-venta-comprador' placeholder='ej. Frigorífico del Llano, Finca San José, Subasta' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
@@ -6678,11 +6679,11 @@
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "gasto") {
       h += "<label>Categoría: <select id='cap-fin-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<optgroup label='💰 Ingresos'>"
+        + "<optgroup label='Ingresos'>"
         + "<option value='VENTA_LECHE'>Venta de leche</option>"
         + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
         + "</optgroup>"
-        + "<optgroup label='💸 Egresos'>"
+        + "<optgroup label='Egresos'>"
         + "<option value='INSUMO' selected>Insumos (sal, alambre, herramienta, etc.)</option>"
         + "<option value='NOMINA'>Nómina / Jornales</option>"
         + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
@@ -6731,7 +6732,7 @@
         + "<label>Procedencia / Casa Genética: <input id='cap-paj-procedencia' placeholder='ej. Ciale, Semex, Ganadería El Oasis' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Notas adicionales: <input id='cap-notas' placeholder='ej. Registro Asocebú 89123' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "nitrogeno") {
-      h += "<div class='aviso' style='margin:2px 0 8px;'>❄️ Registro de recarga de nitrógeno líquido en termo criogénico para mantener la viabilidad del semen.</div>"
+      h += "<div class='aviso' style='margin:2px 0 8px;'>" + icon("snowflake", 14) + "Registro de recarga de nitrógeno líquido en termo criogénico para mantener la viabilidad del semen.</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Intervalo de autonomía (días estimados): <input type='number' min='1' max='90' id='cap-nitr-intervalo' value='21' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Próxima recarga calculada: <input type='date' id='cap-nitr-prox' readonly style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo-card); font-weight:700;'></label></div>"
@@ -6839,9 +6840,9 @@
 
     if (tipo === "tarea") {
       h += "<div style='display:flex; gap:8px; margin-bottom:10px;'>"
-        + "<button type='button' class='tema-btn cap-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
-        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
-        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>" + icon("leaf", 14) + "Potrero</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>" + icon("clipboard", 14) + "General</button>"
         + "</div>"
         + "<input type='hidden' id='cap-tarea-obj' value='animal'>"
         + "<div id='cap-wrap-obj-animal'>"
@@ -6852,13 +6853,13 @@
         + "</div>"
         + "<label style='margin-top:6px;'>Tipo de Acción / Tarea: "
         + "<select id='cap-tarea-tipo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<option value='MEDICAMENTO'>💉 Aplicar medicamento / Tratamiento</option>"
-        + "<option value='FUMIGAR'>🌿 Fumigar maleza / Potrero</option>"
-        + "<option value='REVISION'>🔍 Revisión veterinaria / Chequeo</option>"
-        + "<option value='TRASLADO'>🚚 Traslado de potrero</option>"
-        + "<option value='CERCA'>⚡ Arreglar cerca / Mantenimiento</option>"
-        + "<option value='PESAJE'>⚖️ Pesaje de control</option>"
-        + "<option value='OTRO'>📋 Otra tarea / General</option>"
+        + "<option value='MEDICAMENTO'>Aplicar medicamento / Tratamiento</option>"
+        + "<option value='FUMIGAR'>Fumigar maleza / Potrero</option>"
+        + "<option value='REVISION'>Revisión veterinaria / Chequeo</option>"
+        + "<option value='TRASLADO'>Traslado de potrero</option>"
+        + "<option value='CERCA'>Arreglar cerca / Mantenimiento</option>"
+        + "<option value='PESAJE'>Pesaje de control</option>"
+        + "<option value='OTRO'>Otra tarea / General</option>"
         + "</select></label>"
         + "<label style='margin-top:6px;'>Indicación / Descripción de la tarea: <input id='cap-tarea-desc' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar borde cerca' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label style='margin-top:6px;'>Adjudicar / Asignar a: "
@@ -6870,7 +6871,7 @@
         + "<option value='Trabajador'></option>"
         + "</datalist></label>"
         + "<div style='display:flex; gap:10px; margin-top:6px;'>"
-        + "<div style='flex:1;'><label>Prioridad: <select id='cap-tarea-prioridad' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label></div>"
+        + "<div style='flex:1;'><label>Prioridad: <select id='cap-tarea-prioridad' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NORMAL'>Normal</option><option value='URGENTE'>Urgente</option></select></label></div>"
         + "<div style='flex:1;'><label>Hora límite (opc): <input type='time' id='cap-tarea-hora' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>";
     }
@@ -6925,7 +6926,7 @@
           fTagDef.dispatchEvent(new Event("change"));
         }
         var chipTag = document.getElementById("cap-tag-chip");
-        if (chipTag) chipTag.innerHTML = "<span class='chip azul'>📋 Animal: " + esc(tagIni) + "</span>";
+        if (chipTag) chipTag.innerHTML = "<span class='chip azul'>" + icon("clipboard", 12) + "Animal: " + esc(tagIni) + "</span>";
         window.__capTagPendiente = null;
       }
       var potIni = window.__capPotreroPendiente || null;
@@ -7218,7 +7219,7 @@
                 : "<span class='chip verde' style='padding:1px 6px; font-size:10.5px; font-weight:700;'>" + iconoMetodo + " " + esc(s.tipo_servicio || "IA") + "</span>";
 
               var html = "<div style='display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; background:rgba(217, 119, 6, 0.09); border:1px solid rgba(217, 119, 6, 0.35); border-radius:6px; padding:5px 8px; margin-top:2px;'>"
-                + "<span style='font-weight:700; color:var(--texto); font-size:11.5px;'>💡 Sugerencia de Padre:</span> "
+                + "<span style='font-weight:700; color:var(--texto); font-size:11.5px;'>" + icon("lightbulb", 12) + "Sugerencia de Padre:</span> "
                 + badgeMetodo
                 + "<b style='color:var(--texto); font-size:12px;'>" + esc(tagToro + nomToro) + "</b>"
                 + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(s.explicacion) + ")</small>"
@@ -7297,7 +7298,7 @@
         var toroPadre = obtenerToroPadreSeleccionado();
 
         h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
-          + "🐮 " + esc(nombreTipoCap(_capTipo)) + " · " + esc(tipoEv)
+          + icon("cow", 14) + esc(nombreTipoCap(_capTipo)) + " · " + esc(tipoEv)
           + "</div>"
           + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
@@ -7313,7 +7314,7 @@
         if (!esPerdida) {
           h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
             + "<div style='font-size:13px; color:var(--texto);'>"
-            + "👶 <b>Número de la Cría:</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(criaTag) + "</span>"
+            + icon("calf", 14) + "<b>Número de la Cría:</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(criaTag) + "</span>"
             + "</div>"
             + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
             + "Sexo: <b>" + esc(d["cap-sexo"] || "Hembra") + "</b>"
@@ -7326,7 +7327,7 @@
             var cria2Tag = d["cap-cria2-tag"] || "(sin arete)";
             h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
               + "<div style='font-size:13px; color:var(--texto);'>"
-              + "👶 <b>Número de Cría 2 (Gemelo):</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(cria2Tag) + "</span>"
+              + icon("calf", 14) + "<b>Número de Cría 2 (Gemelo):</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(cria2Tag) + "</span>"
               + "</div>"
               + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
               + "Sexo: <b>" + esc(d["cap-sexo2"] || "Hembra") + "</b>"
@@ -7339,22 +7340,22 @@
 
         if (toroPadre) {
           h += "<div style='margin-bottom:6px; font-size:13px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>"
-            + "🐂 <b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
+            + icon("cow", 14) + "<b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
             + "</div>";
         }
         if (!esPerdida && (d["cap-distocia"] === "SI")) {
           h += "<div style='margin-bottom:6px; font-size:13px; background:rgba(220,38,38,0.08); padding:6px 10px; border-radius:6px; border-left:4px solid var(--color-rojo-txt, #dc2626);'>"
-            + "⚠️ <b>Parto difícil (distocia):</b> vigilar la vaca en el postparto."
+            + icon("alertTriangle", 14) + "<b>Parto difícil (distocia):</b> vigilar la vaca en el postparto."
             + "</div>";
         }
         if (d["cap-pot-cria"] || d["cap-pot-madre"]) {
           h += "<div style='margin-bottom:6px; font-size:12.5px; color:var(--texto-suave);'>"
-            + "📍 " + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
+            + icon("pin", 14) + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
             + (d["cap-pot-cria"] ? ("· Cría en <b>" + esc(d["cap-pot-cria"]) + "</b>") : "")
             + "</div>";
         }
         if (d["cap-notas"]) {
-          h += "<div style='margin-top:4px; font-size:12px; font-style:italic; color:var(--texto-suave);'>💬 " + esc(d["cap-notas"]) + "</div>";
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic; color:var(--texto-suave);'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         }
         return h;
       }
@@ -7362,10 +7363,11 @@
       if (_capTipo === "palpacion") {
         var vacaP = d["cap-tag"] || "—";
         var resP = d["cap-palp-resultado"] || "PREÑADA";
-        var metP = d["cap-palp-metodo"] === "ECOGRAFO" ? "📟 Ecógrafo" : "🖐️ Manual (Tacto)";
+        var metP = d["cap-palp-metodo"] === "ECOGRAFO" ? "Ecógrafo" : "Manual (Tacto)";
+        var metIco = d["cap-palp-metodo"] === "ECOGRAFO" ? icon("phone", 14) : icon("hand", 14);
         var chipP = resP === "PREÑADA" ? "verde" : (resP === "VACIA" ? "rojo" : "ambar");
         h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
-          + "🖐️ " + esc(nombreTipoCap(_capTipo)) + " · <span class='chip " + chipP + "'>" + esc(resP) + "</span>"
+          + icon("hand", 14) + esc(nombreTipoCap(_capTipo)) + " · <span class='chip " + chipP + "'>" + esc(resP) + "</span>"
           + "</div>"
           + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
@@ -7374,19 +7376,19 @@
           + "</div>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
           + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Método:</small>"
-          + "<b style='font-size:13px; color:var(--texto);'>" + esc(metP) + "</b>"
+          + "<b style='font-size:13px; color:var(--texto);'>" + metIco + esc(metP) + "</b>"
           + "</div>"
           + "</div>";
         if (resP === "PREÑADA") {
           h += "<div style='background:rgba(46,125,50,0.09); border-left:4px solid #2e7d32; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
-            + "<div style='font-size:13px;'>🤰 <b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
+            + "<div style='font-size:13px;'>" + icon("egg", 14) + "<b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
             + (d["cap-palp-fep"] ? (" · FEP: <b>" + esc(fechaCorta(d["cap-palp-fep"])) + "</b>") : "")
             + "</div>"
-            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>🐂 Toro/Pajilla: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
+            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>" + icon("cow", 14) + "Toro/Pajilla: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
             + "</div>";
         }
         if (d["cap-palp-hallazgo"]) {
-          h += "<div style='margin-bottom:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>🔬 Hallazgo: <b>" + esc(d["cap-palp-hallazgo"]) + "</b></div>";
+          h += "<div style='margin-bottom:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>" + icon("stethoscope", 14) + "Hallazgo: <b>" + esc(d["cap-palp-hallazgo"]) + "</b></div>";
         }
         if (d["cap-cc"] || d["cap-peso"]) {
           h += "<div style='margin-bottom:6px; font-size:12px; color:var(--texto-suave);'>"
@@ -7395,36 +7397,36 @@
             + "</div>";
         }
         if (d["cap-palp-responsable"]) {
-          h += "<div style='font-size:12px; color:var(--texto-suave);'>👨‍⚕️ Profesional: <b>" + esc(d["cap-palp-responsable"]) + "</b></div>";
+          h += "<div style='font-size:12px; color:var(--texto-suave);'>" + icon("stethoscope", 12) + "Profesional: <b>" + esc(d["cap-palp-responsable"]) + "</b></div>";
         }
         if (d["cap-notas"]) {
-          h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         }
         return h;
       }
 
       if (_capTipo === "pajuela") {
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("snowflake", 14) + esc(nombreTipoCap(_capTipo)) + "</div>"
           + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
-          + "<div style='font-size:14px;'>🐂 <b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
+          + "<div style='font-size:14px;'>" + icon("cow", 14) + "<b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
           + (d["cap-paj-raza"] ? (" (" + esc(d["cap-paj-raza"]) + ")") : "") + "</div>"
           + "<div style='font-size:12.5px; margin-top:3px;'>Canastilla: <b>" + esc(d["cap-paj-canastilla"] || "—") + "</b> · Entrada: <b>" + esc(d["cap-paj-cant"] || "1") + " pajillas</b>"
           + (d["cap-paj-costo"] ? (" · Costo unit: <b>" + fmtMoneda(Number(d["cap-paj-costo"])) + "</b>") : "") + "</div>"
           + (d["cap-paj-procedencia"] ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Procedencia: " + esc(d["cap-paj-procedencia"]) + "</div>") : "")
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
       if (_capTipo === "nitrogeno") {
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("snowflake", 14) + esc(nombreTipoCap(_capTipo)) + "</div>"
           + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
           + "<div style='font-size:13px;'>Intervalo estimado: <b>" + esc(d["cap-nitr-intervalo"] || "21") + " días</b>"
           + (d["cap-nitr-prox"] ? (" · Próxima recarga: <b>" + esc(fechaCorta(d["cap-nitr-prox"])) + "</b>") : "") + "</div>"
           + (d["cap-nitr-proveedor"] ? ("<div style='font-size:12.5px; margin-top:3px;'>Proveedor: <b>" + esc(d["cap-nitr-proveedor"]) + "</b></div>") : "")
           + (d["cap-nitr-costo"] ? ("<div style='font-size:12.5px; margin-top:2px;'>Costo: <b>" + fmtMoneda(Number(d["cap-nitr-costo"])) + "</b></div>") : "")
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
@@ -7434,14 +7436,14 @@
         var vPrecio = d["cap-venta-precio"] ? fmtMoneda(Number(d["cap-venta-precio"])) : "Sin precio";
         var vPeso = d["cap-venta-peso"] ? (d["cap-venta-peso"] + " kg") : null;
         var vMot = d["cap-venta-motivo"] || "Venta";
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>💰 Venta de Semoviente</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("banknote", 14) + "Venta de Semoviente</div>"
           + "<div style='background:rgba(217,119,6,0.08); border-left:4px solid #D97706; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
           + "<div style='font-size:14px;'>Animal / Tag: <b style='font-family:var(--font-mono); font-size:16px; color:#D97706;'>" + esc(vTag) + "</b> · Fecha: <b>" + esc(fechaCorta(fechaR)) + "</b></div>"
           + "<div style='font-size:13px; margin-top:4px;'>Comprador / Destino: <b>" + esc(vComp) + "</b></div>"
           + "<div style='font-size:13px; margin-top:2px;'>Monto Venta: <b style='color:#16a34a; font-size:15px;'>" + esc(vPrecio) + "</b>" + (vPeso ? (" · Peso báscula: <b>" + esc(vPeso) + "</b>") : "") + "</div>"
           + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Motivo: <b>" + esc(vMot) + "</b> · <i>El animal cambiará a estado VENDIDO.</i></div>"
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
@@ -7460,7 +7462,7 @@
         var vacaS = (d["cap-tag"] || "").trim();
         var toroS = (d["cap-toro"] || "").trim();
         if (vacaS && toroS) {
-          h += "<div id='sim-consang-box' style='margin-top:8px; font-size:13px;'>⏳ Evaluando consanguinidad 3G…</div>";
+          h += "<div id='sim-consang-box' style='margin-top:8px; font-size:13px;'>" + icon("hourglass", 14) + "Evaluando consanguinidad 3G…</div>";
           programarSimConsang(vacaS, toroS);
         }
       }
@@ -7493,29 +7495,29 @@
         .catch(function () {
           if (key !== _simConsangPend) return;
           var box2 = document.getElementById("sim-consang-box");
-          if (box2) box2.innerHTML = "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ Sin conexión: no se pudo evaluar consanguinidad.</span>";
+          if (box2) box2.innerHTML = "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("alertTriangle", 12) + "Sin conexión: no se pudo evaluar consanguinidad.</span>";
         });
     }
     function htmlSimConsang(sim, vaca, toro) {
       if (!sim || !sim.ok) {
-        return "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ No se pudo evaluar consanguinidad.</span>";
+        return "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("alertTriangle", 12) + "No se pudo evaluar consanguinidad.</span>";
       }
       if (!sim.evaluable) {
         return "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:6px; padding:8px 10px; margin-top:4px;'>"
-          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip gris'>NO EVALUABLE</span>"
+          + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip gris'>NO EVALUABLE</span>"
           + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>" + esc(sim.detalle || "") + "</div></div>";
       }
       if (sim.apto) {
         return "<div style='background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:8px 10px; border-radius:6px; margin-top:4px;'>"
-          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip verde'>APTO</span> <span style='font-size:12px;'>" + esc(vaca) + " × " + esc(toro) + "</span>"
-          + (sim.advertencia ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>⚠️ " + esc(sim.advertencia) + "</div>") : "")
+          + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip verde'>APTO</span> <span style='font-size:12px;'>" + esc(vaca) + " × " + esc(toro) + "</span>"
+          + (sim.advertencia ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>" + icon("alertTriangle", 12) + esc(sim.advertencia) + "</div>") : "")
           + "</div>";
       }
       var anc = (sim.ancestros_comunes || []).map(function (a) {
         return esc(a.tag) + " (" + esc(a.parentesco_vaca) + "/" + esc(a.parentesco_toro) + ")";
       }).join(", ");
       return "<div style='background:rgba(220,38,38,0.08); border-left:4px solid var(--color-rojo-txt, #dc2626); padding:8px 10px; border-radius:6px; margin-top:4px;'>"
-        + "🧬 <b>Consanguinidad 3G:</b> <span class='chip rojo'>NO RECOMENDADO</span>"
+        + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip rojo'>NO RECOMENDADO</span>"
         + "<div style='font-size:12.5px; margin-top:2px;'>" + esc(sim.detalle || "") + "</div>"
         + (anc ? ("<div style='font-size:12px; color:var(--texto-suave);'>En común: " + anc + "</div>") : "")
         + (sim.relacion_directa ? ("<div style='font-size:12px; color:var(--texto-suave);'>" + esc(sim.relacion_directa) + "</div>") : "")
@@ -7777,7 +7779,7 @@
               + "<td><input type='date' class='inp-ia-fecha' value='" + esc(ultimaFecha) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='0' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='text' class='inp-ia-notas' value='' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>";
+              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
             tbody.appendChild(tr);
             var nuevoInpL = tr.querySelector(".inp-ia-litros");
             if (nuevoInpL) nuevoInpL.addEventListener("input", recalcularSuma);
@@ -7825,7 +7827,7 @@
             }
 
             btnGuardarQ.disabled = true;
-            btnGuardarQ.innerHTML = "⏳ Guardando " + listaDias.length + " días...";
+            btnGuardarQ.innerHTML = icon("hourglass", 14) + "Guardando " + listaDias.length + " días...";
 
             var inpMonto = document.getElementById("ia-monto-pagado");
             var montoPagado = inpMonto && inpMonto.value ? parseFloat(inpMonto.value) : null;
@@ -7867,7 +7869,7 @@
                   ? "También se registró el <b>ingreso en Finanzas</b> (Venta de leche) con esa misma foto como respaldo."
                   : "La foto quedó archivada como respaldo en el historial.";
                 estadoIa.innerHTML = "<div style='padding:12px; background:rgba(47,82,51,0.12); border-left:4px solid var(--verde-marca); border-radius:6px;'>"
-                  + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>🎉 ¡Quincena guardada con éxito!</div>"
+                  + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>" + icon("sparkles", 14) + "¡Quincena guardada con éxito!</div>"
                   + "<div style='margin-top:4px; font-size:12.5px;'>Se registraron <b>" + data.guardados + " días</b> con un total de <b>" + data.total_litros + " Litros</b>. " + msgIngreso + "</div>"
                   + "<div style='margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;'>"
                   + "<button type='button' id='btn-ia-ir-leche' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:bold; padding:6px 12px; font-size:12px; border:none; border-radius:4px; cursor:pointer;'>" + icon("milk", 13) + "Ver en Producción de Leche</button>"
@@ -7922,13 +7924,13 @@
         }
 
         var hEstado = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
-          + "<div><span class='chip verde'>✓ Lectura Exitosa</span> <b>" + esc(per) + "</b> · " + dias.length + " días leídos</div>"
+          + "<div><span class='chip verde'>" + icon("check", 12) + "Lectura Exitosa</span> <b>" + esc(per) + "</b> · " + dias.length + " días leídos</div>"
           + "<div style='font-size:11px; color:var(--texto-suave);'>Motor: " + esc(motor) + "</div>"
           + "</div>";
 
         if (res.discrepancia_total) {
           hEstado += "<div style='margin-top:6px; padding:6px 10px; background:rgba(217,119,6,0.1); border-left:3px solid #d97706; border-radius:4px; font-size:12px;'>"
-            + "⚠️ <b>Discrepancia en la suma:</b> La suma de los días da <b>" + sumaInicial + " L</b> pero en el papel dice <b>" + totDetectado + " L</b>. Por favor revisa los días abajo y ajusta cualquier número si es necesario."
+            + icon("alertTriangle", 14) + "<b>Discrepancia en la suma:</b> La suma de los días da <b>" + sumaInicial + " L</b> pero en el papel dice <b>" + totDetectado + " L</b>. Por favor revisa los días abajo y ajusta cualquier número si es necesario."
             + "</div>";
         }
         if (estadoIa) estadoIa.innerHTML = hEstado;
@@ -7960,7 +7962,7 @@
             + "<td><input type='date' class='inp-ia-fecha' value='" + esc(fIso) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='" + esc(lts) + "' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='text' class='inp-ia-notas' value='" + esc(not) + "' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
             + "</tr>";
         });
 
@@ -8011,7 +8013,7 @@
         if (previewIa) {
           previewIa.style.display = "block";
           previewIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--verde-marca);'>"
-            + "✅ <b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
+            + icon("checkCircle", 14) + "<b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
             + (res.observaciones ? "<br><small>" + esc(res.observaciones) + "</small>" : "")
             + "</div>";
         }
@@ -8025,13 +8027,13 @@
           }
           var esGasto = _tipoCapturaActual === "gasto";
           btnAnalizarIa.disabled = true;
-          btnAnalizarIa.innerHTML = "⏳ Analizando...";
+          btnAnalizarIa.innerHTML = icon("hourglass", 14) + "Analizando...";
           if (estadoIa) {
             var txtEsperaIa = esGasto
               ? "<b style='color:var(--verde-marca);'>Digitalizando factura con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo monto, fecha, proveedor y categoría. Esto toma 5-10 segundos.</small>"
               : "<b style='color:var(--verde-marca);'>Digitalizando recibo con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo días, fechas y litros de las anotaciones manuscritas. Esto toma 5-10 segundos.</small>";
             estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:10px; padding:10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
-              + "<span style='font-size:18px;'>⏳</span><div>" + txtEsperaIa + "</div></div>";
+              + "<span style='font-size:18px;'>" + icon("hourglass", 20) + "</span><div>" + txtEsperaIa + "</div></div>";
           }
           if (previewIa) previewIa.style.display = "none";
 
@@ -8055,14 +8057,14 @@
             btnAnalizarIa.innerHTML = icon("sparkles", 14) + (esGasto ? "Re-analizar Factura" : "Re-analizar Recibo");
 
             if (!res.ok) {
-              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ <b>Error:</b> " + esc(res.error || "No se pudo procesar la imagen.") + "</div>";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>" + icon("xCircle", 14) + "<b>Error:</b> " + esc(res.error || "No se pudo procesar la imagen.") + "</div>";
               return;
             }
 
             if (esGasto) {
               if (!res.es_factura) {
                 var obsF = res.observaciones || "No se detectó una factura o recibo legible en la imagen.";
-                if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece una factura válida:</b><br><small style='color:var(--texto);'>" + esc(obsF) + "</small></div>";
+                if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>" + icon("alertTriangle", 14) + "<b>No parece una factura válida:</b><br><small style='color:var(--texto);'>" + esc(obsF) + "</small></div>";
                 return;
               }
               rellenarCamposFactura(res);
@@ -8071,7 +8073,7 @@
 
             if (!res.es_recibo_leche || !res.dias || !res.dias.length) {
               var obs = res.observaciones || "No se detectaron anotaciones numéricas de producción lechera diaria.";
-              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece un recibo de leche válido:</b><br><small style='color:var(--texto);'>" + esc(obs) + "</small></div>";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>" + icon("alertTriangle", 14) + "<b>No parece un recibo de leche válido:</b><br><small style='color:var(--texto);'>" + esc(obs) + "</small></div>";
               return;
             }
 
@@ -8080,7 +8082,7 @@
           .catch(function (err) {
             btnAnalizarIa.disabled = false;
             btnAnalizarIa.innerHTML = icon("sparkles", 14) + "Reintentar";
-            if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ Error de conexión: " + esc(err.message) + "</div>";
+            if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div>";
           });
         });
       }
@@ -8136,7 +8138,7 @@
           .then(function (res) {
             if (res && res.encontrada) {
               fCria.value = res.cria_tag;
-              info.textContent = "✓ Cría encontrada: " + res.cria_tag;
+              info.textContent = "Cría encontrada: " + res.cria_tag;
             } else {
               info.textContent = "No se encontró cría activa sin destetar para esta vaca -- escriba el arete manualmente.";
             }
@@ -8247,11 +8249,11 @@
       var motivo = (q("#cap-motivo") && q("#cap-motivo").value) || null;
       var feed = document.getElementById("captura-feedback");
       if (!origen || !destino) {
-        if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ Elegí Potrero Origen y Potrero Destino.</div>";
+        if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + "Elegí Potrero Origen y Potrero Destino.</div>";
         return;
       }
       if (!window.confirm("¿Mover TODOS los animales activos de \"" + origen + "\" a \"" + destino + "\"?")) return;
-      if (feed) feed.innerHTML = "<div class='chip ambar' style='font-size:14px; padding:8px 12px;'>⏳ Moviendo animales...</div>";
+      if (feed) feed.innerHTML = "<div class='chip ambar' style='font-size:14px; padding:8px 12px;'>" + icon("hourglass", 14) + "Moviendo animales...</div>";
       fetch("/api/traslado/masivo", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ potrero_origen: origen, potrero_destino: destino, motivo: motivo, fecha: fecha }),
@@ -8264,7 +8266,7 @@
                 + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino)
                 + " queda por revisar: se hace cuando el administrador lo apruebe.</div>";
             } else if (feed) {
-              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>✅ " + res.body.movidos
+              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>" + icon("checkCircle", 14) + res.body.movidos
                 + " animal(es) movidos de " + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino) + ".</div>";
             }
             var formEl = document.getElementById("form-captura");
@@ -8272,10 +8274,10 @@
             refrescarCamposCap();
             actualizarBadges();
           } else if (feed) {
-            feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
+            feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
           }
         }).catch(function (err) {
-          if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc(err && err.message || err) + "</div>";
+          if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + esc(err && err.message || err) + "</div>";
         });
     }
 
@@ -8483,18 +8485,18 @@
 
         function mostrarExito(online, enRevision) {
           enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
-          var fotoTxt = payload.foto_base64 ? " 📸 (con foto adjunta)" : "";
+          var fotoTxt = payload.foto_base64 ? " " + icon("camera", 14) + "(con foto adjunta)" : "";
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
               + (enRevision ? "Enviado. Queda por revisar: se registra cuando el administrador lo apruebe."
-                : online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+                : online ? icon("checkCircle", 14) + "Evento" + fotoTxt + " registrado en el servidor." : icon("save", 14) + "Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
             if (!enRevision && _tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
               var vMadre = payload.vaca_tag || "";
               var fParto = fecha || new Date().toISOString().slice(0, 10);
               var potMadre = payload.potrero_madre || "";
               var crSexo = payload.sexo_cria || "";
               feed.innerHTML += "<div style='margin-top:10px; padding:10px; background:var(--superficie); border-radius:8px; border:1px solid var(--borde); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;'>"
-                + "<span>🐣 <b>¿Deseas registrar la cría en el inventario ahora?</b></span>"
+                + "<span>" + icon("calf", 14) + "<b>¿Deseas registrar la cría en el inventario ahora?</b></span>"
                 + "<button type='button' class='tema-btn' id='btn-crear-cria-parto' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:5px;'>"
                 + icon("cowCalf", 14) + "Registrar Arete de la Cría</button>"
                 + "</div>";
@@ -8515,7 +8517,7 @@
               }, 50);
             }
           }
-          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
+          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
           vibrarConfirmacion();
           // BLOQUE 4: persistir defaults inteligentes (potrero + tag).
           try {
@@ -8572,7 +8574,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("download", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>📲 Cómo Instalar la App en tu Celular o PC</h4>"
+      + "<h4 style='margin:0;'>" + icon("phone", 16) + "Cómo Instalar la App en tu Celular o PC</h4>"
       + "<small style='color:var(--texto-suave);'>Instálala como aplicación nativa, pantalla completa y sin barra de navegador</small>"
       + "</div>"
       + "</div>"
@@ -8596,7 +8598,7 @@
       h += "<p><b>En iPhone o iPad (usando Safari):</b></p>"
         + "<ol style='padding-left:18px; margin:6px 0;'>"
         + "<li>Abre <b>Safari</b> e ingresa a <code>https://ganaderiaja.duckdns.org/</code>.</li>"
-        + "<li>Toca el botón <b>Compartir</b> (el icono de un cuadro con una flecha hacia arriba <b>⎋</b> en la barra inferior de Safari).</li>"
+        + "<li>Toca el botón <b>Compartir</b> (el icono de un cuadro con una flecha hacia arriba en la barra inferior de Safari).</li>"
         + "<li>Desplaza hacia abajo en la lista y toca <b>'Agregar al inicio'</b> (o <i>'Add to Home Screen'</i> <b>+</b>).</li>"
         + "<li>Toca <b>'Agregar'</b> arriba a la derecha. La app se abrirá sin barras ni pestañas de navegador, como app nativa.</li>"
         + "</ol>";
@@ -8616,7 +8618,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("cloud", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>📶 Modo Offline Real (Sin Cobertura Celular)</h4>"
+      + "<h4 style='margin:0;'>" + icon("wifi", 16) + "Modo Offline Real (Sin Cobertura Celular)</h4>"
       + "<small style='color:var(--texto-suave);'>Trabaja con total confianza en el potrero o la manga</small>"
       + "</div>"
       + "</div>"
@@ -8634,7 +8636,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("scale", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>⚖️ Trabajo en Manga & Pesaje Continuo</h4>"
+      + "<h4 style='margin:0;'>" + icon("scale", 16) + "Trabajo en Manga & Pesaje Continuo</h4>"
       + "<small style='color:var(--texto-suave);'>Flujo rápido para jornadas de pesaje de hato completo</small>"
       + "</div>"
       + "</div>"
@@ -8654,7 +8656,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("camera", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>📸 Captura Rápida & Respaldo Fotográfico</h4>"
+      + "<h4 style='margin:0;'>" + icon("camera", 16) + "Captura Rápida & Respaldo Fotográfico</h4>"
       + "<small style='color:var(--texto-suave);'>Eventos de manejo y campo con foto de evidencia opcional</small>"
       + "</div>"
       + "</div>"
@@ -8674,7 +8676,7 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("mic", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>🎙️ Dictado por Voz con Inteligencia Artificial</h4>"
+      + "<h4 style='margin:0;'>" + icon("mic", 16) + "Dictado por Voz con Inteligencia Artificial</h4>"
       + "<small style='color:var(--texto-suave);'>Registra novedades hablando naturalmente mientras caminas</small>"
       + "</div>"
       + "</div>"
@@ -8692,12 +8694,12 @@
       + "<div class='ayuda-card-header'>"
       + "<div class='ayuda-badge-ico'>" + icon("chat", 20) + "</div>"
       + "<div>"
-      + "<h4 style='margin:0;'>🤖 Asistente Inteligente IA & Chat</h4>"
+      + "<h4 style='margin:0;'>" + icon("bot", 16) + "Asistente Inteligente IA & Chat</h4>"
       + "<small style='color:var(--texto-suave);'>Pregunta sobre tus animales o sobre el funcionamiento de la app</small>"
       + "</div>"
       + "</div>"
       + "<div style='margin-top:10px; font-size:13px; line-height:1.5;'>"
-      + "<p>Toca el botón flotante verde <b>🤖</b> abajo a la derecha en cualquier momento:</p>"
+      + "<p>Toca el botón flotante verde <b>" + icon("bot", 14) + "</b> abajo a la derecha en cualquier momento:</p>"
       + "<ul style='padding-left:18px; margin:6px 0;'>"
       + "<li><b>Preguntas de hato:</b> <i>'¿Cuántas vacas activas hay en Guayabal?'</i>, <i>'¿Quiénes están en retiro de leche?'</i>, <i>'Ficha del toro GUZ-01'</i>.</li>"
       + "<li><b>Preguntas de la aplicación:</b> <i>'¿Cómo instalo la app?'</i>, <i>'¿Cómo funciona sin internet?'</i>, <i>'¿Cómo peso en la manga?'</i>.</li>"
@@ -8804,22 +8806,22 @@
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>"
       + icon("grid", 20) + "Mapa Satelital de Potreros &amp; Operarios"
       + "</h3>"
-      + "<span class='meta' style='font-size:12px; font-weight:600;'>🌾 " + totalPot + " potreros · 🤠 " + uActivos.length + " operarios con señal</span>"
+      + "<span class='meta' style='font-size:12px; font-weight:600;'>" + icon("grass", 12) + totalPot + " potreros · " + icon("cowboy", 12) + uActivos.length + " operarios con señal</span>"
       + "</div>";
 
     // Barra de herramientas del Mapa
     h += "<div class='mapa-toolbar'>"
       + "<div class='mapa-grupos'>"
       + "<span style='font-size:12px; font-weight:700; color:var(--texto-suave); margin-right:4px;'>Capa:</span>"
-      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "vigor" ? " act" : "") + "' data-modo-mapa='vigor'>🌿 Vigor NDVI/SAR</button>"
-      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "voisin" ? " act" : "") + "' data-modo-mapa='voisin'>🐄 Ocupación &amp; Voisin</button>"
-      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "satelite" ? " act" : "") + "' data-modo-mapa='satelite'>🛰️ Satelital</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "vigor" ? " act" : "") + "' data-modo-mapa='vigor'>" + icon("leaf", 14) + "Vigor NDVI/SAR</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "voisin" ? " act" : "") + "' data-modo-mapa='voisin'>" + icon("cow", 14) + "Ocupación &amp; Voisin</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaModoActual === "satelite" ? " act" : "") + "' data-modo-mapa='satelite'>" + icon("satellite", 14) + "Satelital</button>"
       + "</div>"
       + "<div class='mapa-grupos'>"
-      + "<button type='button' class='mapa-btn" + (_mapaVerOperarios ? " act" : "") + "' id='btn-toggle-operarios'>🤠 Operarios (" + uActivos.length + ")</button>"
-      + "<button type='button' class='mapa-btn' id='btn-mi-ubicacion-mapa'>📍 Mi GPS</button>"
-      + "<button type='button' class='mapa-btn' id='btn-centrar-finca'>🌾 Toda la Finca</button>"
-      + "<button type='button' class='mapa-btn' id='btn-refrescar-mapa' title='Actualizar posiciones y datos'>🔄</button>"
+      + "<button type='button' class='mapa-btn" + (_mapaVerOperarios ? " act" : "") + "' id='btn-toggle-operarios'>" + icon("cowboy", 14) + "Operarios (" + uActivos.length + ")</button>"
+      + "<button type='button' class='mapa-btn' id='btn-mi-ubicacion-mapa'>" + icon("pin", 14) + "Mi GPS</button>"
+      + "<button type='button' class='mapa-btn' id='btn-centrar-finca'>" + icon("grass", 14) + "Toda la Finca</button>"
+      + "<button type='button' class='mapa-btn' id='btn-refrescar-mapa' title='Actualizar posiciones y datos'>" + icon("refresh", 14) + "</button>"
       + "</div>"
       + "</div>";
 
@@ -8863,8 +8865,8 @@
       uActivos.forEach(function (u, uIdx) {
         var rolClase = (u.rol === "OWNER") ? "rojo" : ((u.rol === "ADMIN") ? "ambar" : "verde");
         var estadoTxt = u.en_linea
-          ? "<span class='chip verde' style='font-size:11px;'>🟢 En línea (" + (u.minutos_hace != null ? "hace " + u.minutos_hace + "m" : "ahora") + ")</span>"
-          : "<span class='chip gris' style='font-size:11px;'>⚪ " + esc(u.fecha) + " " + esc(u.hora ? u.hora.slice(0, 5) : "") + "</span>";
+          ? "<span class='chip verde' style='font-size:11px;'>" + dot("verde") + "En línea (" + (u.minutos_hace != null ? "hace " + u.minutos_hace + "m" : "ahora") + ")</span>"
+          : "<span class='chip gris' style='font-size:11px;'>" + dot("gris") + esc(u.fecha) + " " + esc(u.hora ? u.hora.slice(0, 5) : "") + "</span>";
 
         h += "<div class='card' style='padding:10px; margin:0; border:1px solid var(--borde); display:flex; flex-direction:column; justify-content:space-between;'>"
           + "<div style='display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;'>"
@@ -8872,12 +8874,12 @@
           + estadoTxt
           + "</div>"
           + "<div style='font-size:12.5px; color:var(--texto-suave); margin-bottom:8px;'>"
-          + "📍 Potrero: <b style='color:var(--texto);'>" + esc(u.potrero_actual) + "</b>"
+          + icon("pin", 14) + "Potrero: <b style='color:var(--texto);'>" + esc(u.potrero_actual) + "</b>"
           + (u.precision_m ? " <small>(±" + Math.round(u.precision_m) + "m)</small>" : "")
           + "</div>"
           + "<div style='display:flex; gap:6px;'>"
-          + "<button type='button' class='tema-btn' data-ir-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>🎯 Enfocar</button>"
-          + (u.rastro_hoy && u.rastro_hoy.length ? "<button type='button' class='tema-btn' data-rastro-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>👣 Ver rastro (" + u.rastro_hoy.length + ")</button>" : "")
+          + "<button type='button' class='tema-btn' data-ir-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>" + icon("target", 12) + "Enfocar</button>"
+          + (u.rastro_hoy && u.rastro_hoy.length ? "<button type='button' class='tema-btn' data-rastro-usuario='" + uIdx + "' style='font-size:11.5px; padding:4px 10px; flex:1;'>" + icon("walk", 12) + "Ver rastro (" + u.rastro_hoy.length + ")</button>" : "")
           + "</div>"
           + "</div>";
       });
@@ -8912,8 +8914,8 @@
           + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
           + "<div><b style='font-size:15px;'>" + esc(r.usuario_nombre) + "</b> <span class='chip " + rolBadge + "' style='font-size:10.5px;'>" + esc(r.rol) + "</span></div>"
           + "<div style='display:flex; align-items:center; gap:8px;'>"
-          + "<span style='font-size:12px; color:var(--texto-suave);'>🕒 " + esc(r.hora_inicio || "—") + " a " + esc(r.hora_fin || "—") + " · 📍 <b>" + r.total_puntos + " puntos</b></span>"
-          + (r.puntos && r.puntos.length ? "<button type='button' class='tema-btn' data-trazar-ruta-mapa='" + rIdx + "' style='font-size:11.5px; padding:3px 9px;'>🗺️ Ver rastro en mapa</button>" : "")
+          + "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("clock", 12) + esc(r.hora_inicio || "—") + " a " + esc(r.hora_fin || "—") + " · " + icon("pin", 12) + "<b>" + r.total_puntos + " puntos</b></span>"
+          + (r.puntos && r.puntos.length ? "<button type='button' class='tema-btn' data-trazar-ruta-mapa='" + rIdx + "' style='font-size:11.5px; padding:3px 9px;'>" + icon("map", 12) + "Ver rastro en mapa</button>" : "")
           + "</div>"
           + "</div>";
 
@@ -8923,8 +8925,8 @@
           h += "<span style='font-size:12px; color:var(--texto-suave);'>Sin visitas a potreros registradas</span>";
         } else {
           r.secuencia_potreros.forEach(function (s, sIdx) {
-            if (sIdx > 0) h += "<span class='chip-flecha'>➔</span>";
-            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> 🌾 " + esc(s.potrero) + "</span>";
+            if (sIdx > 0) h += "<span class='chip-flecha'>" + icon("arrowRight", 12) + "</span>";
+            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> " + icon("grass", 12) + esc(s.potrero) + "</span>";
           });
         }
         h += "</div>";
@@ -8932,7 +8934,7 @@
         // Desglose de coordenadas colapsable
         var tablaId = "tabla-pts-" + rIdx;
         h += "<details style='font-size:12px; margin-top:6px;'>"
-          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:3px 0;'>🔍 Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
+          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:3px 0;'>" + icon("search", 14) + "Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
           + "<div class='tabla-scroll' style='margin-top:6px;'>"
           + "<table id='" + tablaId + "'><tr><th>Hora</th><th>Potrero</th><th>Latitud</th><th>Longitud</th><th>Precisión</th><th>Evento</th><th>Google Maps</th></tr>";
         (r.puntos || []).forEach(function (pt) {
@@ -8944,7 +8946,7 @@
             + "<td>" + Number(pt.lon).toFixed(6) + "</td>"
             + "<td>±" + (pt.precision_m ? Math.round(pt.precision_m) + " m" : "—") + "</td>"
             + "<td><span class='chip gris' style='font-size:10.5px;'>" + esc(pt.evento_origen || "auto") + "</span></td>"
-            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:10.5px; text-decoration:none;'>🗺️ Maps</a></td>"
+            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:10.5px; text-decoration:none;'>" + icon("map", 12) + "Maps</a></td>"
             + "</tr>";
         });
         h += "</table></div></details></div>";
@@ -9005,7 +9007,7 @@
     script.onerror = function () {
       _leafletCargando = false;
       var mapEl = document.getElementById("mapa-finca");
-      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>⚠️ No se pudo cargar el componente de mapas. Verifica tu conexión e intenta de nuevo.</p>";
+      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>" + icon("alertTriangle", 14) + "No se pudo cargar el componente de mapas. Verifica tu conexión e intenta de nuevo.</p>";
     };
     document.body.appendChild(script);
   }
@@ -9013,7 +9015,7 @@
   function bindMapa(d) {
     if (typeof L === "undefined") {
       var mapEl = document.getElementById("mapa-finca");
-      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>⚠️ Cargando componente de mapas Leaflet… Si no carga, verifica tu conexión.</p>";
+      if (mapEl) mapEl.innerHTML = "<p class='aviso' style='padding:30px; text-align:center;'>" + icon("alertTriangle", 14) + "Cargando componente de mapas Leaflet… Si no carga, verifica tu conexión.</p>";
       return;
     }
 
@@ -9093,11 +9095,11 @@
           var popHtml = "<div style='font-family:sans-serif; min-width:200px; padding:4px;'>"
             + "<h4 style='margin:0 0 6px 0; color:#1b4d3e; font-size:15px; border-bottom:1px solid #ddd; padding-bottom:4px;'>" + esc(p.nombre) + "</h4>"
             + "<div style='font-size:12px; line-height:1.5;'>"
-            + "📐 <b>Área:</b> " + p.area_has + " ha<br>"
-            + "🐄 <b>Ocupación:</b> " + (nAnim > 0 ? ("<b>" + nAnim + " cabezas</b>") : "Desocupado") + "<br>"
-            + "⏱️ <b>Voisin:</b> " + esc(p.estado_voisin || "—") + "<br>"
-            + "🌿 <b>Vigor NDVI:</b> " + (p.ndvi_valor != null ? ("<b>" + p.ndvi_valor.toFixed(3) + "</b> (" + esc(p.categoria_ndvi) + ")") : "—") + "<br>"
-            + (p.biomasa_kg_ha ? ("🌾 <b>Biomasa:</b> " + Math.round(p.biomasa_kg_ha) + " kg MS/ha<br>") : "")
+            + icon("ruler", 12) + "<b>Área:</b> " + p.area_has + " ha<br>"
+            + icon("cow", 12) + "<b>Ocupación:</b> " + (nAnim > 0 ? ("<b>" + nAnim + " cabezas</b>") : "Desocupado") + "<br>"
+            + icon("hourglass", 12) + "<b>Voisin:</b> " + esc(p.estado_voisin || "—") + "<br>"
+            + icon("leaf", 12) + "<b>Vigor NDVI:</b> " + (p.ndvi_valor != null ? ("<b>" + p.ndvi_valor.toFixed(3) + "</b> (" + esc(p.categoria_ndvi) + ")") : "—") + "<br>"
+            + (p.biomasa_kg_ha ? (icon("grass", 12) + "<b>Biomasa:</b> " + Math.round(p.biomasa_kg_ha) + " kg MS/ha<br>") : "")
             + "</div>";
 
           if (p.animales_tags && p.animales_tags.length) {
@@ -9127,7 +9129,7 @@
         var rolClase = (u.rol === "OWNER") ? "owner" : ((u.rol === "ADMIN") ? "admin" : "trabajador");
         var pulseClase = u.en_linea ? "" : " offline";
         var htmlPin = "<div class='user-marker-pin' data-uidx='" + idx + "'>"
-          + "<div class='user-marker-badge " + rolClase + "'>🤠 " + esc(u.nombre) + "</div>"
+          + "<div class='user-marker-badge " + rolClase + "'>" + icon("cowboy", 12) + esc(u.nombre) + "</div>"
           + "<div class='user-pulse-dot" + pulseClase + "'></div>"
           + "</div>";
 
@@ -9142,9 +9144,9 @@
         var popU = "<div style='font-family:sans-serif; min-width:180px; padding:4px;'>"
           + "<b style='font-size:14px;'>" + esc(u.nombre) + "</b> <span style='font-size:11px;'>(" + esc(u.rol) + ")</span><br>"
           + "<div style='font-size:12px; margin-top:4px; line-height:1.4;'>"
-          + "📍 Potrero: <b>" + esc(u.potrero_actual) + "</b><br>"
-          + "🕒 Hora: <b>" + esc(u.hora || u.fecha) + "</b>" + (u.minutos_hace != null ? " (hace " + u.minutos_hace + "m)" : "") + "<br>"
-          + (u.precision_m ? "📡 Precisión: ±" + Math.round(u.precision_m) + "m<br>" : "")
+          + icon("pin", 12) + "Potrero: <b>" + esc(u.potrero_actual) + "</b><br>"
+          + icon("clock", 12) + "Hora: <b>" + esc(u.hora || u.fecha) + "</b>" + (u.minutos_hace != null ? " (hace " + u.minutos_hace + "m)" : "") + "<br>"
+          + (u.precision_m ? icon("satellite", 12) + "Precisión: ±" + Math.round(u.precision_m) + "m<br>" : "")
           + "</div></div>";
         m.bindPopup(popU);
         _mapaCapaUsuarios.addLayer(m);
@@ -9177,8 +9179,8 @@
       var cFinca = (d.finca && d.finca.centroide) || [3.402, -74.088];
       var distFincaKm = Math.sqrt(Math.pow((myLat - cFinca[0]) * 111.0, 2) + Math.pow((myLon - cFinca[1]) * 111.0, 2));
       var textoUbic = distFincaKm <= 3.5
-        ? "<b>📍 Estás en la Finca</b>"
-        : ("<b>📍 Tu ubicación actual</b><br><small style='color:#666;'>A " + distFincaKm.toFixed(1) + " km de la finca</small>");
+        ? "<b>" + icon("pin", 14) + "Estás en la Finca</b>"
+        : ("<b>" + icon("pin", 14) + "Tu ubicación actual</b><br><small style='color:#666;'>A " + distFincaKm.toFixed(1) + " km de la finca</small>");
 
       _mapaMarkerSelf.bindPopup(
         "<div style='font-family:sans-serif; min-width:160px; padding:4px;'>"
@@ -9271,9 +9273,9 @@
     var btnRefrescar = document.getElementById("btn-refrescar-mapa");
     if (btnRefrescar) {
       btnRefrescar.addEventListener("click", function () {
-        btnRefrescar.textContent = "⏳";
+        btnRefrescar.innerHTML = icon("hourglass", 14);
         fetchJSON("/api/mapa/datos", function (nuevoD) {
-          btnRefrescar.textContent = "🔄";
+          btnRefrescar.innerHTML = icon("refresh", 14);
           d = nuevoD;
           pintarPotreros();
           pintarUsuarios();
@@ -9303,9 +9305,9 @@
           alert("Geolocalización no soportada en este navegador.");
           return;
         }
-        btnMiGps.textContent = "📡 Buscando...";
+        btnMiGps.innerHTML = icon("satellite", 14) + "Buscando...";
         navigator.geolocation.getCurrentPosition(function (pos) {
-          btnMiGps.textContent = "📍 Mi GPS";
+          btnMiGps.innerHTML = icon("pin", 14) + "Mi GPS";
           var myLat = pos.coords.latitude;
           var myLon = pos.coords.longitude;
           var myAcc = pos.coords.accuracy || 0;
@@ -9315,7 +9317,7 @@
             if (_mapaMarkerSelf) _mapaMarkerSelf.openPopup();
           }
         }, function (err) {
-          btnMiGps.textContent = "📍 Mi GPS";
+          btnMiGps.innerHTML = icon("pin", 14) + "Mi GPS";
           alert("No fue posible obtener tu ubicación GPS: " + (err.message || "Permiso denegado."));
         }, { enableHighAccuracy: true, timeout: 10000 });
       });
@@ -9400,7 +9402,7 @@
           alert("Geolocalización no disponible en este dispositivo.");
           return;
         }
-        btnPingManual.textContent = "📡 Obteniendo GPS...";
+        btnPingManual.textContent = "Obteniendo GPS...";
         navigator.geolocation.getCurrentPosition(function (pos) {
           var lat = pos.coords.latitude;
           var lon = pos.coords.longitude;
@@ -9416,13 +9418,13 @@
             })
           }).then(function (r) { return r.json(); })
             .then(function (res) {
-              btnPingManual.textContent = "✅ Posición Registrada";
+              btnPingManual.textContent = "Posición Registrada";
               setTimeout(function () { cargar(false); }, 800);
             }).catch(function (err) {
-              btnPingManual.textContent = "❌ Error: " + err.message;
+              btnPingManual.textContent = "Error: " + err.message;
             });
         }, function (err) {
-          btnPingManual.textContent = "❌ " + err.message;
+          btnPingManual.textContent = "" + err.message;
         }, { enableHighAccuracy: true, timeout: 10000 });
       });
     }
@@ -9513,7 +9515,7 @@
           + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;'>"
           + "<div><b style='font-size:16px;'>" + esc(r.usuario_nombre) + "</b> <span class='chip " + rolBadge + "' style='font-size:11px;'>" + esc(r.rol) + "</span></div>"
           + "<div style='font-size:12.5px; color:var(--texto-suave);'>"
-          + "🕒 Horario: <b>" + esc(r.hora_inicio || "—") + "</b> a <b>" + esc(r.hora_fin || "—") + "</b> · 📍 <b>" + r.total_puntos + " puntos GPS</b>"
+          + icon("clock", 14) + "Horario: <b>" + esc(r.hora_inicio || "—") + "</b> a <b>" + esc(r.hora_fin || "—") + "</b> · " + icon("pin", 14) + "<b>" + r.total_puntos + " puntos GPS</b>"
           + "</div>"
           + "</div>";
 
@@ -9524,8 +9526,8 @@
           h += "<span style='font-size:12px; color:var(--texto-suave);'>Sin visitas a potreros registradas</span>";
         } else {
           r.secuencia_potreros.forEach(function (s, sIdx) {
-            if (sIdx > 0) h += "<span class='chip-flecha'>➔</span>";
-            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> 🌾 " + esc(s.potrero) + "</span>";
+            if (sIdx > 0) h += "<span class='chip-flecha'>" + icon("arrowRight", 12) + "</span>";
+            h += "<span class='chip-ruta'>" + icon("pin", 12) + "<b>" + esc(s.hora) + "</b> " + icon("grass", 12) + esc(s.potrero) + "</span>";
           });
         }
         h += "</div>";
@@ -9533,7 +9535,7 @@
         // Detalle colapsable de puntos exactos
         var tablaId = "tabla-pts-" + idx;
         h += "<details style='margin-top:10px; font-size:13px;'>"
-          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:4px 0;'>🔍 Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
+          + "<summary style='cursor:pointer; font-weight:600; color:var(--verde-marca); padding:4px 0;'>" + icon("search", 14) + "Ver desglose de coordenadas (" + (r.puntos ? r.puntos.length : 0) + " registros)</summary>"
           + "<div class='tabla-scroll' style='margin-top:8px;'>"
           + "<table id='" + tablaId + "'><tr><th>Hora</th><th>Potrero</th><th>Latitud</th><th>Longitud</th><th>Precisión</th><th>Evento</th><th>Google Maps</th></tr>";
 
@@ -9547,7 +9549,7 @@
             + "<td>" + Number(pt.lon).toFixed(6) + "</td>"
             + "<td>±" + (pt.precision_m ? Math.round(pt.precision_m) + " m" : "—") + "</td>"
             + "<td><span class='chip gris' style='font-size:11px;'>" + esc(origen) + "</span></td>"
-            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:11px; text-decoration:none;'>🗺️ Abrir Mapa</a></td>"
+            + "<td><a href='" + esc(mapsUrl) + "' target='_blank' rel='noopener' class='chip azul' style='font-size:11px; text-decoration:none;'>" + icon("map", 12) + "Abrir Mapa</a></td>"
             + "</tr>";
         });
         h += "</table></div></details>";
@@ -9604,7 +9606,7 @@
           alert("Geolocalización no disponible en este dispositivo.");
           return;
         }
-        btnPing.textContent = "📡 Obteniendo GPS...";
+        btnPing.textContent = "Obteniendo GPS...";
         navigator.geolocation.getCurrentPosition(function (pos) {
           var lat = pos.coords.latitude;
           var lon = pos.coords.longitude;
@@ -9620,13 +9622,13 @@
             })
           }).then(function (r) { return r.json(); })
             .then(function (res) {
-              btnPing.textContent = "✅ Posición Registrada";
+              btnPing.textContent = "Posición Registrada";
               setTimeout(function () { cargar(false); }, 700);
             }).catch(function (err) {
-              btnPing.textContent = "❌ Error: " + err.message;
+              btnPing.textContent = "Error: " + err.message;
             });
         }, function (err) {
-          btnPing.textContent = "❌ " + err.message;
+          btnPing.textContent = "" + err.message;
         }, { enableHighAccuracy: true, timeout: 10000 });
       });
     }
@@ -9707,9 +9709,9 @@
     h += "<div><h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("clipboard", 16) + "Actividad de Campo & Auditoría de Usuarios</h4>";
     h += "<span style='font-size:11.5px; color:var(--texto-suave);'>Registro en vivo de lo que anotaron mayordomos, administradores y personal de corral</span></div>";
     h += "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>";
-    h += "<button type='button' class='btn-filtro-act act tema-btn' data-f='todos' style='font-size:11px; padding:3px 8px;'>🌐 Todos</button>";
-    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='campo' style='font-size:11px; padding:3px 8px;'>🤠 Campo / Mayordomos</button>";
-    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='admin' style='font-size:11px; padding:3px 8px;'>🛡️ Administradores</button>";
+    h += "<button type='button' class='btn-filtro-act act tema-btn' data-f='todos' style='font-size:11px; padding:3px 8px;'>" + icon("globe", 12) + "Todos</button>";
+    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='campo' style='font-size:11px; padding:3px 8px;'>" + icon("cowboy", 12) + "Campo / Mayordomos</button>";
+    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='admin' style='font-size:11px; padding:3px 8px;'>" + icon("shieldPlus", 12) + "Administradores</button>";
     h += "</div></div>";
 
     if (actList.length) {
@@ -9767,7 +9769,7 @@
       h += "<tr style='border-bottom:1px solid var(--borde); text-align:left; color:var(--texto-suave); font-size:11px;'><th style='padding:5px 8px;'>Usuario</th><th style='padding:5px 8px;'>Rol</th><th style='padding:5px 8px; text-align:center;'>Canal</th><th style='padding:5px 8px;'>Última Actividad</th><th style='padding:5px 8px; text-align:center;'>Estado</th></tr>";
       presList.forEach(function (p) {
         var onCls = p.en_linea ? "chip verde" : "chip gris";
-        var onTxt = p.en_linea ? "🟢 En línea" : "⚪ Desconectado";
+        var onTxt = p.en_linea ? dot("verde") + "En línea" : dot("gris") + "Desconectado";
         h += "<tr style='border-bottom:1px solid var(--borde);'>";
         h += "<td style='padding:6px 8px;'><b>" + esc(p.nombre || ("ID " + p.user_id)) + "</b></td>";
         h += "<td style='padding:6px 8px;'><span style='font-size:11px;'>" + esc(p.rol || "—") + "</span></td>";
@@ -9792,9 +9794,9 @@
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
-      + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>🌐 Todos</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>🤖 Telegram</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>🐮 PWA Web</button>"
+      + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>" + icon("globe", 12) + "Todos</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>" + icon("bot", 12) + "Telegram</button>"
+      + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>" + icon("cow", 12) + "PWA Web</button>"
       + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:11.5px; padding:4px 10px; margin-left:6px;'>" + icon("refresh", 13) + "Refrescar</button>"
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
@@ -10247,10 +10249,10 @@
               if (btnCancelar) btnCancelar.style.display = "none";
               setTimeout(function () { cargar(false); }, 700);
             } else {
-              if (feed) feed.innerHTML = "<div class='chip rojo'>❌ " + esc(res.error || "No se pudo guardar") + "</div>";
+              if (feed) feed.innerHTML = "<div class='chip rojo'>" + icon("xCircle", 12) + esc(res.error || "No se pudo guardar") + "</div>";
             }
           }).catch(function (err) {
-            if (feed) feed.innerHTML = "<div class='chip rojo'>❌ Error de conexión: " + esc(err.message) + "</div>";
+            if (feed) feed.innerHTML = "<div class='chip rojo'>" + icon("xCircle", 12) + "Error de conexión: " + esc(err.message) + "</div>";
           });
       });
     }
@@ -10492,7 +10494,7 @@
       var seguro = esc(dec.trim());
       pres.push(
         "<div class='chat-pre-wrap'>" +
-          "<button class='btn-pre-copy' type='button' title='Copiar tabla'>📋 Copiar</button>" +
+          "<button class='btn-pre-copy' type='button' title='Copiar tabla'>" + icon("clipboard", 12) + "Copiar</button>" +
           "<pre>" + seguro + "</pre>" +
         "</div>"
       );
@@ -10623,7 +10625,7 @@
     }
 
     /* ---------- Chat de Equipo (canal de avisos entre usuarios conectados) ---------- */
-    var ROL_ICONO_EQUIPO = { OWNER: "👑", ADMIN: "🛡️", TRABAJADOR: "👷" };
+    var ROL_ICONO_EQUIPO = { OWNER: icon("crown", 12), ADMIN: icon("shieldPlus", 12), TRABAJADOR: icon("cowboy", 12) };
     var LS_EQUIPO_VISTO = "ja_chat_equipo_visto_id";
     var equipoTabActiva = false;
     var equipoUltimoId = 0;
@@ -10691,12 +10693,12 @@
       div.setAttribute("data-id", m.id);
       var html = "";
       if (!esMio) {
-        var ic = ROL_ICONO_EQUIPO[m.rol] || "👤";
-        html += "<div class='chat-msg-cabecera'>" + ic + " " + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
+        var ic = ROL_ICONO_EQUIPO[m.rol] || icon("user", 12);
+        html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
-      if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje'>🗑</span>";
+      if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje' aria-label='Borrar mensaje'>" + icon("trash", 12) + "</span>";
       html += "</div>";
       div.innerHTML = html;
       histEquipo.appendChild(div);
@@ -10748,7 +10750,7 @@
       if (hist) hist.style.display = cual === "ia" ? "" : "none";
       if (histEquipo) histEquipo.style.display = cual === "equipo" ? "" : "none";
       if (btnMic) btnMic.style.display = cual === "ia" ? "" : "none";
-      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa 🎙️..." : "Escribe un aviso para el equipo...";
+      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa el micrófono..." : "Escribe un aviso para el equipo...";
       if (cual === "equipo") {
         equipoMarcarVisto(equipoUltimoId);
         if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
@@ -10806,7 +10808,7 @@
 
     if (btnLimpiar && hist) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
       });
     }
 
@@ -10818,9 +10820,9 @@
         var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
         if (pre && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
-            var old = btn.textContent;
-            btn.textContent = "✓ Copiado";
-            setTimeout(function () { btn.textContent = old; }, 1800);
+            var old = btn.innerHTML;
+            btn.textContent = "Copiado";
+            setTimeout(function () { btn.innerHTML = old; }, 1800);
           });
         }
       });
@@ -10875,7 +10877,7 @@
             if (hist) hist.scrollTop = hist.scrollHeight;
           }).catch(function (err) {
             var hErr = horaCortaActual();
-            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
+            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
           });
       });
     }
@@ -10972,7 +10974,7 @@
         var hAudio = horaCortaActual();
         var userMsgPlaceholder = document.createElement("div");
         userMsgPlaceholder.className = "chat-msg user";
-        userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio enviado (procesando nota de voz)...</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+        userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Audio enviado (procesando nota de voz)...</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
         if (hist) {
           hist.appendChild(userMsgPlaceholder);
           hist.scrollTop = hist.scrollHeight;
@@ -10988,8 +10990,8 @@
 
         _chatMediaRecorder.addEventListener("stop", function () {
           if (!_chatAudioChunks.length) {
-            userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio vacío.</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-            botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ No se detectó sonido.</div><div class='chat-msg-hora'>" + esc(horaCortaActual()) + "</div>";
+            userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Audio vacío.</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+            botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("alertTriangle", 14) + "No se detectó sonido.</div><div class='chat-msg-hora'>" + esc(horaCortaActual()) + "</div>";
             detenerAudioGrabacion(true);
             return;
           }
@@ -11005,18 +11007,18 @@
             .then(function (data) {
               var hBot = horaCortaActual();
               if (data.ok) {
-                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
                 botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formatearMensajeChat(data.respuesta || "Registrado correctamente.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
                 actualizarBadges();
               } else {
-                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ " + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("alertTriangle", 14) + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               }
               if (hist) hist.scrollTop = hist.scrollHeight;
             }).catch(function (err) {
               var hBot = horaCortaActual();
-              userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-              botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
+              userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+              botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               if (hist) hist.scrollTop = hist.scrollHeight;
             });
         }, { once: true });
@@ -11051,7 +11053,7 @@
       modal.style.display = "flex";
       if (resBox) { resBox.style.display = "none"; resBox.innerHTML = ""; }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        if (estado) estado.textContent = "❌ Tu navegador no soporta grabación de micrófono.";
+        if (estado) estado.textContent = "Tu navegador no soporta grabación de micrófono.";
         if (btnAccion) btnAccion.style.display = "none";
         return;
       }
@@ -11089,18 +11091,18 @@
                 if (btnAccion) btnAccion.innerHTML = icon("mic", 14) + "Grabar Otra Nota";
                 actualizarBadges();
               } else {
-                if (estado) estado.textContent = "⚠️ " + esc(data.error || "No se pudo procesar");
+                if (estado) estado.textContent = esc(data.error || "No se pudo procesar");
                 if (btnAccion) btnAccion.textContent = "Reintentar";
               }
             }).catch(function (err) {
-              if (estado) estado.textContent = "❌ Error de conexión: " + esc(err.message);
+              if (estado) estado.textContent = "Error de conexión: " + esc(err.message);
               if (btnAccion) btnAccion.textContent = "Reintentar";
             });
         };
         _mediaRecorder.start();
-        if (estado) estado.textContent = "🔴 Grabando... hable ahora con claridad.";
+        if (estado) estado.textContent = "Grabando... hable ahora con claridad.";
       }).catch(function (err) {
-        if (estado) estado.textContent = "❌ No se pudo acceder al micrófono: " + err.message;
+        if (estado) estado.textContent = "No se pudo acceder al micrófono: " + err.message;
         if (btnAccion) btnAccion.style.display = "none";
       });
     });
@@ -11136,9 +11138,9 @@
         var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
         if (pre && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
-            var old = btn.textContent;
-            btn.textContent = "✓ Copiado";
-            setTimeout(function () { btn.textContent = old; }, 1800);
+            var old = btn.innerHTML;
+            btn.textContent = "Copiado";
+            setTimeout(function () { btn.innerHTML = old; }, 1800);
           });
         }
       });
@@ -11272,11 +11274,11 @@
         var pendientes = lista.length - idsBorrar.length;
         eliminarDeColaOffline(idsBorrar).then(function () {
           if (mostrarAviso) {
-            var msg = "✅ Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
+            var msg = "Sincronizados " + (res.procesados || 0) + " eventos con éxito.";
             if (res.en_revision > 0) msg += "\n" + res.en_revision + " quedaron por revisar: se registran cuando el administrador los apruebe.";
-            if (pendientes > 0) msg += "\n⚠️ " + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
+            if (pendientes > 0) msg += "\n" + pendientes + " evento(s) no se pudieron guardar y siguen en la cola local.";
             if (res.errores && res.errores.length) {
-              msg += "\n⚠️ Avisos: " + res.errores.join("; ");
+              msg += "\nAvisos: " + res.errores.join("; ");
             }
             alert(msg);
           } else if (pendientes > 0) {
@@ -11475,7 +11477,7 @@
     if (colapsable) {
       return "<details class='card ident-box' style='margin-top:10px; margin-bottom:12px; padding:10px 14px;'>"
         + "<summary style='cursor:pointer; font-weight:600; font-size:13px; color:var(--texto-suave); user-select:none; display:flex; align-items:center; justify-content:space-between; outline:none;'>"
-        + "<span>" + icon("camera", 15) + " 📷 Identificar otro animal por foto o QR</span>"
+        + "<span>" + icon("camera", 15) + "Identificar otro animal por foto o QR</span>"
         + "<span style='font-size:11px; opacity:0.75;'>▼ desplegar</span>"
         + "</summary>"
         + "<div style='margin-top:10px;'>"
@@ -11725,7 +11727,7 @@
       function nodoAnimal(an, label, icono) {
         if (!an || !an.tag) {
           return "<div style='background:var(--superficie); border:1px dashed var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12px; color:var(--texto-suave);'>"
-            + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:2px;'>" + icono + " " + esc(label) + "</div>"
+            + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:2px;'>" + icono + esc(label) + "</div>"
             + "<div>Desconocido / Sin Registro</div>"
             + "</div>";
         }
@@ -11733,7 +11735,7 @@
         var rz = an.raza ? " [" + esc(an.raza) + "]" : "";
         var hie = an.hierro ? (" <span class='chip ambar' style='font-size:10px; padding:1px 4px;' title='Hierro'>" + esc(an.hierro) + "</span>") : "";
         return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
-          + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
+          + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + esc(label) + "</div>"
           + "<div><a href='#' class='ficha-link' data-ir-ficha=\"" + esc(an.tag) + "\" style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span>" + hie + "</div>"
           + "</div>";
       }
@@ -11745,25 +11747,25 @@
 
         // Línea Paterna
         + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
-        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐂 LÍNEA PATERNA</div>"
-        + nodoAnimal(f.padre, "Padre", "🐂")
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>" + icon("cow", 16) + "LÍNEA PATERNA</div>"
+        + nodoAnimal(f.padre, "Padre", icon("cow", 12))
         + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
-        + nodoAnimal(f.abuelo_pat || g.abuelo_pat, "Abuelo Paterno", "🐂")
-        + (g.bisabuelos && g.bisabuelos.pat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_pat_p, "Bisabuelo (PP)", "🧬") + "</div>" : "")
-        + nodoAnimal(f.abuela_pat || g.abuela_pat, "Abuela Paterna", "🐄")
-        + (g.bisabuelos && g.bisabuelos.pat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_mat_m, "Bisabuela (PM)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuelo_pat || g.abuelo_pat, "Abuelo Paterno", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.pat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_pat_p, "Bisabuelo (PP)", icon("dna", 12)) + "</div>" : "")
+        + nodoAnimal(f.abuela_pat || g.abuela_pat, "Abuela Paterna", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.pat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_mat_m, "Bisabuela (PM)", icon("dna", 12)) + "</div>" : "")
         + "</div>"
         + "</div>"
 
         // Línea Materna
         + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
-        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐄 LÍNEA MATERNA</div>"
-        + nodoAnimal(f.madre, "Madre", "🐄")
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>" + icon("cow", 16) + "LÍNEA MATERNA</div>"
+        + nodoAnimal(f.madre, "Madre", icon("cow", 12))
         + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
-        + nodoAnimal(f.abuelo_mat || g.abuelo_mat, "Abuelo Materno", "🐂")
-        + (g.bisabuelos && g.bisabuelos.mat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_pat_p, "Bisabuelo (MP)", "🧬") + "</div>" : "")
-        + nodoAnimal(f.abuela_mat || g.abuela_mat, "Abuela Materna", "🐄")
-        + (g.bisabuelos && g.bisabuelos.mat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_mat_m, "Bisabuela (MM)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuelo_mat || g.abuelo_mat, "Abuelo Materno", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.mat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_pat_p, "Bisabuelo (MP)", icon("dna", 12)) + "</div>" : "")
+        + nodoAnimal(f.abuela_mat || g.abuela_mat, "Abuela Materna", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.mat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_mat_m, "Bisabuela (MM)", icon("dna", 12)) + "</div>" : "")
         + "</div>"
         + "</div>"
 
@@ -11825,7 +11827,7 @@
         h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:var(--superficie); padding:10px 12px; border-radius:8px; border:1px solid var(--borde);'>"
           + "<div style='font-size:13px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>" + icon("stethoscope", 16) + "Control Reproductivo & Tactos</div>"
           + "<button type='button' class='tema-btn btn-palpar-ficha-directo' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-          + icon("stethoscope", 13) + "🖐️ Palpación / Eco</button>"
+          + icon("stethoscope", 13) + "Palpación / Eco</button>"
           + "</div>";
       }
       var colsPartos = [
@@ -11865,7 +11867,7 @@
       var colsDiag = [
         ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
-        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>📟 Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>🖐️ Tacto</span>"; }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>" + icon("phone", 12) + "Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>" + icon("hand", 12) + "Tacto</span>"; }],
         ["dias_gestacion", "Días", "text", function (v) { return v ? (esc(v) + " d") : "—"; }],
         ["toro_pajuela", "Toro / Pajilla", "text", function (v) { return v ? esc(v) : "—"; }],
         ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
@@ -11910,15 +11912,15 @@
         if (lac.estado === "En ordeño") {
           if (lac.en_pausa) {
             h3 += "<div class='card' style='padding:10px 14px; margin:8px 0; border-left:3px solid var(--color-ambar-txt, #D97706);'>"
-              + "<p style='margin:0 0 8px; font-size:13px;'>⏸ <b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
+              + "<p style='margin:0 0 8px; font-size:13px;'>" + icon("pause", 14) + "<b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
               + (lac.pausa_fecha_inicio ? " (desde " + esc(fechaCorta(lac.pausa_fecha_inicio)) + ")" : "")
               + " — no se cuenta en el promedio litros/vaca/día.</p>"
               + "<button type='button' class='tema-btn' data-accion='reanudar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>▶ Reanudar ordeño</button>"
               + "</div>";
           } else {
             h3 += "<div style='margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;'>"
-              + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>⏸ Pausar ordeño (no se está ordeñando)</button>"
-              + "<button type='button' class='tema-btn' data-accion='registrar-secado' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>🍼 Ya está seca</button>"
+              + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>" + icon("pause", 14) + "Pausar ordeño (no se está ordeñando)</button>"
+              + "<button type='button' class='tema-btn' data-accion='registrar-secado' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>" + icon("milk", 14) + "Ya está seca</button>"
               + "</div>";
           }
         }
@@ -12112,7 +12114,7 @@
     var avisosDatos = (f.aviso_datos ? [f.aviso_datos] : []).concat(f.avisos_datos || []);
     if (avisosDatos.length) {
       h += "<div class='card' style='border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;'>"
-        + "<b>⚠️ " + (avisosDatos.length > 1 ? avisosDatos.length + " datos a revisar" : "Dato a revisar") + "</b>"
+        + "<b>" + icon("alertTriangle", 14) + (avisosDatos.length > 1 ? avisosDatos.length + " datos a revisar" : "Dato a revisar") + "</b>"
         + avisosDatos.map(function (t) { return "<p style='margin:6px 0 0; font-size:13px;'>" + esc(t) + "</p>"; }).join("")
         + "</div>";
     }
@@ -12684,7 +12686,7 @@
     }
     var msg = "¿Seguro que deseas DESHACER / ELIMINAR permanentemente este registro del sistema?\n\n"
       + "• " + (desc || (tipo.toUpperCase() + " #" + id)) + "\n\n"
-      + "⚠️ Esta acción revertirá de forma inteligente estados o potreros derivados si aplica (ej. el animal vuelve a ACTIVO tras una muerte o salida).\n\n¿Continuar?";
+      + "Esta acción revertirá de forma inteligente estados o potreros derivados si aplica (ej. el animal vuelve a ACTIVO tras una muerte o salida).\n\n¿Continuar?";
     if (!window.confirm(msg)) return;
 
     mostrarToast("Deshaciendo evento...", "ambar");
@@ -12701,7 +12703,7 @@
         alert("Error al eliminar evento: " + ((res.data && res.data.error) || ("HTTP " + res.status)));
         return;
       }
-      mostrarToast("✓ " + (res.data.mensaje || "Registro eliminado correctamente"), "verde");
+      mostrarToast((res.data.mensaje || "Registro eliminado correctamente"), "verde");
       vibrarConfirmacion();
       var modalUlt = document.getElementById("modal-ultimos-eventos");
       if (modalUlt && modalUlt.style.display !== "none") {
@@ -12755,15 +12757,15 @@
             + "<div style='display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;'>"
             + "<span class='chip' style='font-size:11px; font-weight:700; text-transform:uppercase; background:rgba(47,82,51,0.08); color:var(--verde-marca);'>" + esc(ev.tabla) + "</span>"
             + (ev.tag ? "<a href='#' class='tag-link' onclick='event.preventDefault(); document.getElementById(\"modal-ultimos-eventos\").style.display=\"none\"; abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-weight:700; color:var(--verde-marca); text-decoration:none; font-size:13px;'>" + tagTxt + "</a>" : "")
-            + "<span style='font-size:11.5px; color:var(--texto-suave);'>📅 " + fechaTxt + "</span>"
+            + "<span style='font-size:11.5px; color:var(--texto-suave);'>" + icon("calendar", 12) + fechaTxt + "</span>"
             + "</div>"
             + "<div style='font-size:13px; font-weight:600; color:var(--texto); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;'>" + resumenTxt + "</div>"
-            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:3px;'>🕒 " + creadoTxt + " " + quienTxt + "</div>"
+            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:3px;'>" + icon("clock", 12) + creadoTxt + " " + quienTxt + "</div>"
             + "</div>";
 
           if (d.puede_deshacer) {
             html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
-              + "🗑️ Deshacer</button>";
+              + icon("trash", 14) + "Deshacer</button>";
           }
           html += "</div>";
         });
@@ -12800,7 +12802,7 @@
           alert("Error al pausar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
           return;
         }
-        mostrarToast("✓ Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
+        mostrarToast("Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
         vibrarConfirmacion();
         abrirFichaDesdeTag(tag, "leche");
       })
@@ -12822,7 +12824,7 @@
           alert("Error al reanudar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
           return;
         }
-        mostrarToast("✓ Ordeño reanudado.", "verde");
+        mostrarToast("Ordeño reanudado.", "verde");
         vibrarConfirmacion();
         abrirFichaDesdeTag(tag, "leche");
       })
@@ -12965,7 +12967,7 @@
         if (!tagSec || !confirm("¿Registrar a " + tagSec + " como seca desde hoy?")) return;
         elAcc.disabled = true;
         enviarEventoLt("secado", { animal_tag: tagSec, motivo: "Confirmada seca desde la ficha" }).then(function () {
-          mostrarToast("✓ " + tagSec + " registrada como seca.", "verde");
+          mostrarToast(tagSec + " registrada como seca.", "verde");
           abrirFichaDesdeTag(tagSec, "leche");
         });
       }
@@ -13018,7 +13020,7 @@
     }).then(function (d) { clearTimeout(to); cb(d); })
       .catch(function (e) {
         clearTimeout(to);
-        if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
+        if (target) target.innerHTML = icon("xCircle", 14) + "No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
       });
   }
   function mostrarFormularioAnimal(f, tagPrellenado, defaults) {
@@ -13047,7 +13049,7 @@
     var html = "<div id='animal-form-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
       + "<div class='modal-header'><b>" + icon(esEdicion ? "pencil" : "plus", 15) + (esEdicion ? "Editar Animal " + val(f.tag) : "Crear Animal Nuevo") + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form'>✕</button></div>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<form id='form-animal' style='padding:16px; display:flex; flex-direction:column; gap:10px; max-height:70vh; overflow-y:auto;'>"
       + campo("an-tag", "Arete / Tag *", val((f && f.tag) || tagPrellenado), esEdicion ? " disabled" : " required autofocus placeholder='ej. 47'")
       + (esEdicion && (window.__usuarioActual && window.__usuarioActual.rol === "OWNER")
@@ -13062,7 +13064,7 @@
       + "<div id='an-toro-wrap' style='display:" + (sexoDef === "Macho" ? "block" : "none") + "; margin:2px 0 4px; padding:8px 12px; background:rgba(34,197,94,0.08); border-radius:6px; border:1px solid rgba(34,197,94,0.25);'>"
       + "<label style='display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; cursor:pointer; margin:0;'>"
       + "<input type='checkbox' id='an-es-toro'" + (esToro ? " checked" : "") + " style='width:16px; height:16px;'> "
-      + "🐂 ¿Es Reproductor / Toro activo de la finca?"
+      + icon("cow", 14) + "¿Es Reproductor / Toro activo de la finca?"
       + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
       + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
@@ -13147,11 +13149,11 @@
             abrirFicha(tag, vista, true);
             irAVista("ficha");
           } else if (errorEl) {
-            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.textContent = (res.body.error || "No se pudo guardar.");
             errorEl.style.display = "block";
           }
         }).catch(function (err) {
-          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+          if (errorEl) { errorEl.textContent = (err && err.message || err); errorEl.style.display = "block"; }
         });
     });
   }
@@ -13235,13 +13237,13 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%; max-height:92vh; overflow-y:auto;'>"
       + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde);'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px; font-size:15px;'>" + icon("camera", 17) + "Foto de Perfil · Animal " + esc(tag) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-subir-foto-animal' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div style='text-align:center; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:10px;'>"
       + "<img src='" + fotoData.base64 + "' alt='Vista previa foto " + esc(tag) + "' style='max-height:220px; max-width:100%; border-radius:6px; object-fit:cover; display:block; margin:0 auto; box-shadow:0 2px 8px rgba(0,0,0,0.15);'>"
       + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + "<span class='chip verde' style='font-size:10.5px;'>✓ Optimizada (" + fotoData.tam_kb + " KB)</span>"
+      + "<span class='chip verde' style='font-size:10.5px;'>" + icon("check", 12) + "Optimizada (" + fotoData.tam_kb + " KB)</span>"
       + "<span>" + fotoData.ancho + " × " + fotoData.alto + " px</span>"
       + "</div>"
       + "</div>"
@@ -13308,7 +13310,7 @@
         if (res.status === 200 && res.body.ok) {
           cerrar();
           if (typeof mostrarToast === "function") {
-            mostrarToast("✓ " + (res.body.mensaje || "Foto de perfil actualizada con éxito."), "verde");
+            mostrarToast((res.body.mensaje || "Foto de perfil actualizada con éxito."), "verde");
           }
           try {
             if (navigator && navigator.vibrate) navigator.vibrate([35]);
@@ -13347,7 +13349,7 @@
           if (btnSubmit) btnSubmit.disabled = false;
           if (btnTxt) btnTxt.textContent = "Guardar Foto";
           if (errEl) {
-            errEl.textContent = "❌ " + (res.body.error || "No se pudo guardar la foto.");
+            errEl.textContent = (res.body.error || "No se pudo guardar la foto.");
             errEl.style.display = "block";
           }
         }
@@ -13355,7 +13357,7 @@
         if (btnSubmit) btnSubmit.disabled = false;
         if (btnTxt) btnTxt.textContent = "Guardar Foto";
         if (errEl) {
-          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.textContent = "Error de conexión: " + (err.message || err);
           errEl.style.display = "block";
         }
       });
@@ -13375,11 +13377,11 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%;'>"
       + "<div class='modal-header'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("tag", 16) + "Rectificar Chapeta / Número</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-rect-modal'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-rect-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-rectificar-tag' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div class='aviso' style='background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.4;'>"
-      + "👑 <b>Exclusivo Propietario (OWNER)</b><br>"
+      + icon("crown", 14) + "<b>Exclusivo Propietario (OWNER)</b><br>"
       + "Utilice este proceso si en campo leyeron o anotaron mal la chapeta (ej. se registró como <b>" + esc(tagActual) + "</b> pero la chapeta real era otra). Todo el historial de eventos se conservará."
       + "</div>"
       + "<label style='display:block; font-size:12.5px; font-weight:600;'>Chapeta / Arete Actual"
@@ -13433,7 +13435,7 @@
 
       if (!tagNv) return;
       if (tagAct.toUpperCase() === tagNv.toUpperCase()) {
-        if (errEl) { errEl.textContent = "❌ El nuevo número es idéntico al actual."; errEl.style.display = "block"; }
+        if (errEl) { errEl.textContent = "El nuevo número es idéntico al actual."; errEl.style.display = "block"; }
         return;
       }
 
@@ -13457,18 +13459,18 @@
         } else if (res.status === 409 && res.body.requiere_confirmacion_fusion) {
           if (boxFusion && msgFusion) {
             boxFusion.style.display = "block";
-            msgFusion.innerHTML = "⚠️ " + esc(res.body.mensaje);
+            msgFusion.innerHTML = icon("alertTriangle", 14) + esc(res.body.mensaje);
             if (btnTxt) btnTxt.textContent = "Confirmar Fusión y Rectificar";
           }
         } else {
           if (errEl) {
-            errEl.textContent = "❌ " + (res.body.error || "No se pudo rectificar el arete.");
+            errEl.textContent = (res.body.error || "No se pudo rectificar el arete.");
             errEl.style.display = "block";
           }
         }
       }).catch(function (err) {
         if (errEl) {
-          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.textContent = "Error de conexión: " + (err.message || err);
           errEl.style.display = "block";
         }
       });
@@ -13601,11 +13603,11 @@
       + "<div class='modal-contenido' style='max-width:480px; width:94%; max-height:85vh; display:flex; flex-direction:column;'>"
       + "<div class='modal-header'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("dna", 16) + "Composición Genética · Arete " + esc(tagActual) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-comp-modal'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-comp-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-comp-racial' style='padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex:1;'>"
       + "<div class='aviso' style='font-size:12.5px; line-height:1.4; margin:0;'>"
-      + "🧬 <b>Ingreso multi-raza & cruces zootécnicos</b><br>"
+      + icon("dna", 14) + "<b>Ingreso multi-raza & cruces zootécnicos</b><br>"
       + "Seleccione las razas del animal e ingrese los porcentajes. El sistema traducirá automáticamente a fracciones estándar (1/2, 3/4, 7/8, PC). La suma total debe ser <b>100%</b>."
       + "</div>"
       + "<datalist id='dl-catalogo-razas'></datalist>"
@@ -13690,10 +13692,10 @@
 
       suma = Math.round(suma * 100) / 100;
       if (Math.abs(suma - 100) <= 0.2) {
-        sumaBadge.innerHTML = "<span class='chip verde' style='font-size:12.5px; font-weight:700;'>Suma: 100% ✅</span>";
+        sumaBadge.innerHTML = "<span class='chip verde' style='font-size:12.5px; font-weight:700;'>" + icon("checkCircle", 12) + "Suma: 100%</span>";
       } else if (suma < 100) {
         var falta = Math.round((100 - suma) * 100) / 100;
-        sumaBadge.innerHTML = "<span class='chip ambar' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Faltan " + falta + "%) ⚠️</span> "
+        sumaBadge.innerHTML = "<span class='chip ambar' style='font-size:12.5px; font-weight:700;'>" + icon("alertTriangle", 12) + "Suma: " + suma + "% (Faltan " + falta + "%)</span> "
           + "<button type='button' id='btn-autocompletar-comp' class='chip' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600;'>Completar 100%</button>";
         var btnAuto = document.getElementById("btn-autocompletar-comp");
         if (btnAuto) {
@@ -13708,7 +13710,7 @@
         }
       } else {
         var exceso = Math.round((suma - 100) * 100) / 100;
-        sumaBadge.innerHTML = "<span class='chip rojo' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Excede por " + exceso + "%) ❌</span>";
+        sumaBadge.innerHTML = "<span class='chip rojo' style='font-size:12.5px; font-weight:700;'>" + icon("xCircle", 12) + "Suma: " + suma + "% (Excede por " + exceso + "%)</span>";
       }
 
       if (resumenPrev) {
@@ -13732,7 +13734,7 @@
         + "<span class='comp-frac-badge chip gris' style='font-size:11px; padding:3px 6px; display:inline-block;'>—</span>"
         + "</div>"
         + "<div>"
-        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza'>🗑️</button>"
+        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
         + "</div>";
 
       var inPct = row.querySelector(".comp-pct-input");
@@ -13841,7 +13843,7 @@
             if (target) abrirFicha(tagActual, target, false, false);
           }
           if (typeof window.mostrarAviso === "function") {
-            window.mostrarAviso("🧬 Composición genética actualizada: " + (res.body.resumen || ""));
+            window.mostrarAviso("Composición genética actualizada: " + (res.body.resumen || ""));
           } else {
             alert("Composición genética guardada: " + (res.body.resumen || ""));
           }
@@ -13868,8 +13870,8 @@
           ? "<button type='button' class='tema-btn' data-accion='crear-animal' data-tag-nuevo='" + esc(tag) + "' style='padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("plus", 15) + "Crear animal " + esc(tag) + "</button>"
           : "";
         var btnBuscarOtro = "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='padding:8px 14px; font-weight:600; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("search", 14) + "Buscar otro animal</button>";
-        if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
-          + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
+        if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>" + icon("xCircle", 14) + "Sin registro para <b>" + esc(tag) + "</b>.</p>"
+          + "<p class='aviso'>" + icon("lightbulb", 14) + "Si viene de escanear un arete, puede que el tag aún no esté en la base. "
           + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>"
           + "<div style='display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;'>"
           + btnCrearNf
@@ -13911,11 +13913,11 @@
     if (res.existe) { abrirFicha(res.tag, vista, true); return; }
     if (res.error) {
       if (mensaje) mensaje.textContent = "";
-      out.innerHTML = "<p class='aviso'>❌ " + esc(res.error) + "</p>";
+      out.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + esc(res.error) + "</p>";
       return;
     }
     if (res.ocr_tag) {
-      if (mensaje) mensaje.textContent = "🔍 OCR leyó: " + esc(res.ocr_tag) + (res.confianza ? " (confianza " + Math.round(res.confianza * 100) + "%)" : "");
+      if (mensaje) mensaje.textContent = "OCR leyó: " + esc(res.ocr_tag) + (res.confianza ? " (confianza " + Math.round(res.confianza * 100) + "%)" : "");
     } else if (mensaje) {
       mensaje.textContent = "";
     }
@@ -14010,14 +14012,14 @@
       var estado = document.getElementById("ident-estado");
       var out = document.getElementById("ident-resultado");
       if (out) out.innerHTML = "";
-      if (estado) estado.textContent = "⏳ Identificando…";
+      if (estado) estado.textContent = "Identificando…";
       if (file.files && file.files[0]) {
         var fd = new FormData();
         fd.append("foto", file.files[0]);
         fetch("/api/identificar", { method: "POST", body: fd })
           .then(function (r) { if (r.status === 401) { window.location = "/login"; throw new Error("no autorizado"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
           .then(pintarSugerencias)
-          .catch(function (e) { if (estado) estado.textContent = "❌ " + (e && e.message || e); });
+          .catch(function (e) { if (estado) estado.textContent = (e && e.message || e); });
       } else {
         var t = obtenerTextoIdent();
         if (!t) { if (estado) estado.textContent = "Escriba el arete/RFID arriba o elija una foto."; return; }
@@ -14026,7 +14028,7 @@
         fetch("/api/identificar", { method: "POST", body: fd2 })
           .then(function (r) { if (r.status === 401) { window.location = "/login"; throw new Error("no autorizado"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
           .then(pintarSugerencias)
-          .catch(function (e) { if (estado) estado.textContent = "❌ " + (e && e.message || e); });
+          .catch(function (e) { if (estado) estado.textContent = (e && e.message || e); });
       }
     });
     if (btnQr) btnQr.addEventListener("click", escanearQRCamara);
@@ -14496,7 +14498,7 @@
     if (document.getElementById("modal-campana-agenda")) return;
     var html = "<div id='modal-campana-agenda' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:520px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden;'>"
-      + "<div class='modal-header'><b>🔔 Pendientes y próximos</b><button type='button' class='modal-cerrar' id='btn-cerrar-campana'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("bell", 16) + "Pendientes y próximos</b><button type='button' class='modal-cerrar' id='btn-cerrar-campana' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div id='campana-cuerpo' style='padding:14px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; font-size:13.5px;'>Cargando agenda...</div>"
       + "<div style='padding:10px 16px; border-top:1px solid var(--borde); display:flex; gap:8px;'>"
       + "<button type='button' id='btn-campana-ver-agenda' class='btn-guardar-manga' style='flex:1;'>Abrir Agenda completa</button>"
@@ -14518,13 +14520,13 @@
       var recs = (d && d.recordatorios) || [];
       var rets = (d && d.retiros) || [];
       if (!evs.length && !recs.length && !rets.length) {
-        cuerpo.innerHTML = "<p class='aviso'>🎉 Sin pendientes en los próximos " + esc((d && d.dias) || 7) + " días.</p>";
+        cuerpo.innerHTML = "<p class='aviso'>" + icon("sparkles", 14) + "Sin pendientes en los próximos " + esc((d && d.dias) || 7) + " días.</p>";
         return;
       }
       var h = "";
       recs.slice(0, 5).forEach(function (rc) {
         h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
-          + "<b>📌 " + esc(rc.mensaje || "Evento") + "</b><br>"
+          + "<b>" + icon("pin", 14) + esc(rc.mensaje || "Evento") + "</b><br>"
           + "<small style='color:var(--texto-suave);'>" + esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "") + " · " + esc(rc.faltan_dias != null ? (rc.faltan_dias <= 0 ? "HOY" : "en " + rc.faltan_dias + "d") : "PENDIENTE") + "</small></div>";
       });
       evs.slice(0, 5).forEach(function (e) {
@@ -14534,12 +14536,12 @@
       });
       rets.slice(0, 3).forEach(function (r) {
         h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
-          + "<b>💊 Retiro: " + esc(r.tag || "") + "</b><br>"
+          + "<b>" + icon("pill", 14) + "Retiro: " + esc(r.tag || "") + "</b><br>"
           + "<small style='color:var(--texto-suave);'>" + esc(r.producto || "") + "</small></div>";
       });
       cuerpo.innerHTML = h;
     }).catch(function () {
-      if (cuerpo) cuerpo.innerHTML = "<p class='aviso'>⚠️ Sin conexión: no se pudo cargar la agenda.</p>";
+      if (cuerpo) cuerpo.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + "Sin conexión: no se pudo cargar la agenda.</p>";
     });
   }
 
@@ -15308,7 +15310,7 @@
           if (res.ok && res.d && res.d.ok) {
             try { localStorage.setItem("ja_huella_preferida", "1"); } catch (e) {}
             actualizarHuellaMenu();
-            alert("✅ Huella activada. La próxima vez puede entrar tocando 'Ingresar con huella'.");
+            alert("Huella activada. La próxima vez puede entrar tocando 'Ingresar con huella'.");
           } else {
             alert((res.d && res.d.error) || "No se pudo activar la huella.");
           }
@@ -15600,7 +15602,7 @@
       + "<img class='lightbox-img' id='lb-img' src='" + esc(src) + "' alt='" + esc(tit) + "' draggable='false'>"
       + "</div>"
       + "<div style='color:rgba(255,255,255,0.75); font-size:11.5px; margin-top:8px; text-align:center; pointer-events:none; user-select:none;'>"
-      + "✋ Arrastra con la mano para mover · 🔍 Rueda o doble toque para zoom · Esc para salir</div>";
+      + icon("hand", 12) + "Arrastra con la mano para mover · " + icon("search", 12) + "Rueda o doble toque para zoom · Esc para salir</div>";
 
     lb.innerHTML = h;
     document.body.appendChild(lb);
@@ -15945,7 +15947,7 @@
                 "</div>" +
                 "<div class='paso-item'>" +
                   "<div class='paso-num'>2</div>" +
-                  "<div class='paso-txt'>Desliza la lista de opciones y toca <b>'Agregar a la pantalla de inicio'</b> ➕.</div>" +
+                  "<div class='paso-txt'>Desliza la lista de opciones y toca " + icon("plus", 14) + "<b>'Agregar a la pantalla de inicio'</b>.</div>" +
                 "</div>" +
                 "<div class='paso-item'>" +
                   "<div class='paso-num'>3</div>" +
@@ -16049,7 +16051,7 @@
           "padding:6px 10px; box-shadow:0 -1px 4px rgba(0,0,0,0.25);";
         document.body.appendChild(el);
       }
-      el.textContent = "⚠️ Sin conexión: " + texto + ". Algunos datos pueden estar desactualizados.";
+      el.textContent = "Sin conexión: " + texto + ". Algunos datos pueden estar desactualizados.";
       el.style.display = "";
     }
     instalarAvisoDatosRancios();

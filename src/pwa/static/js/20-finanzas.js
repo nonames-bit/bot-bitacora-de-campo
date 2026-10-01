@@ -104,7 +104,7 @@
       + kpiIr(kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta"), { sec: "Movimientos recientes" })
       + "</div>";
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
-      h += "<p class='aviso' style='margin-top:-6px;'>⚠️ Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
+      h += "<p class='aviso' style='margin-top:-6px;'>" + icon("alertTriangle", 14) + "Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
         + (kf.ventas_sin_peso ? " " + kf.ventas_sin_peso + " venta(s) sin ningún pesaje previo quedaron fuera del cálculo." : "") + "</p>";
     }
     h += grafico("flujo_caja", "Flujo de caja mensual");
@@ -212,7 +212,7 @@
 
     var html = "<div id='fin-detalle-modal' class='modal-overlay'>"
       + "<div class='modal-contenido'>"
-      + "<div class='modal-header'><b>" + icon("receipt", 15) + " Detalle del Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-detalle'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("receipt", 15) + " Detalle del Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-detalle' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -237,11 +237,11 @@
     if (overlay) overlay.remove();
 
     var opcionesCategoria = ""
-      + "<optgroup label='💰 Ingresos'>"
+      + "<optgroup label='Ingresos'>"
       + "<option value='VENTA_LECHE'>Venta de leche</option>"
       + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
       + "</optgroup>"
-      + "<optgroup label='💸 Egresos'>"
+      + "<optgroup label='Egresos'>"
       + "<option value='INSUMO'>Insumos (sal, alambre, herramienta, etc.)</option>"
       + "<option value='NOMINA'>Nómina / Jornales</option>"
       + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
@@ -267,7 +267,7 @@
 
     var html = "<div id='fin-editar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido'>"
-      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Editar Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-editar'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pencil", 15) + " Editar Movimiento</b><button type='button' class='modal-cerrar' id='btn-cerrar-fin-editar' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>" + cuerpoHtml + "</div>"
       + "</div></div>";
 
@@ -314,11 +314,11 @@
             cerrarModal();
             cargarFinanzasPeriodo();
           } else if (errorEl) {
-            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.textContent = (res.body.error || "No se pudo guardar.");
             errorEl.style.display = "block";
           }
         }).catch(function (err) {
-          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+          if (errorEl) { errorEl.textContent = String(err && err.message || err); errorEl.style.display = "block"; }
         });
     });
   }
@@ -332,10 +332,10 @@
         if (res.status >= 200 && res.status < 300 && res.body.ok) {
           cargarFinanzasPeriodo();
         } else {
-          window.alert("❌ " + (res.body.error || "No se pudo eliminar."));
+          window.alert((res.body.error || "No se pudo eliminar."));
         }
       }).catch(function (err) {
-        window.alert("❌ " + (err && err.message || err));
+        window.alert(String(err && err.message || err));
       });
   }
 

@@ -45,7 +45,7 @@
           fTagDef.dispatchEvent(new Event("change"));
         }
         var chipTag = document.getElementById("cap-tag-chip");
-        if (chipTag) chipTag.innerHTML = "<span class='chip azul'>📋 Animal: " + esc(tagIni) + "</span>";
+        if (chipTag) chipTag.innerHTML = "<span class='chip azul'>" + icon("clipboard", 12) + "Animal: " + esc(tagIni) + "</span>";
         window.__capTagPendiente = null;
       }
       var potIni = window.__capPotreroPendiente || null;
@@ -338,7 +338,7 @@
                 : "<span class='chip verde' style='padding:1px 6px; font-size:10.5px; font-weight:700;'>" + iconoMetodo + " " + esc(s.tipo_servicio || "IA") + "</span>";
 
               var html = "<div style='display:inline-flex; align-items:center; flex-wrap:wrap; gap:6px; background:rgba(217, 119, 6, 0.09); border:1px solid rgba(217, 119, 6, 0.35); border-radius:6px; padding:5px 8px; margin-top:2px;'>"
-                + "<span style='font-weight:700; color:var(--texto); font-size:11.5px;'>💡 Sugerencia de Padre:</span> "
+                + "<span style='font-weight:700; color:var(--texto); font-size:11.5px;'>" + icon("lightbulb", 12) + "Sugerencia de Padre:</span> "
                 + badgeMetodo
                 + "<b style='color:var(--texto); font-size:12px;'>" + esc(tagToro + nomToro) + "</b>"
                 + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(s.explicacion) + ")</small>"
@@ -417,7 +417,7 @@
         var toroPadre = obtenerToroPadreSeleccionado();
 
         h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
-          + "🐮 " + esc(nombreTipoCap(_capTipo)) + " · " + esc(tipoEv)
+          + icon("cow", 14) + esc(nombreTipoCap(_capTipo)) + " · " + esc(tipoEv)
           + "</div>"
           + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
@@ -433,7 +433,7 @@
         if (!esPerdida) {
           h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
             + "<div style='font-size:13px; color:var(--texto);'>"
-            + "👶 <b>Número de la Cría:</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(criaTag) + "</span>"
+            + icon("calf", 14) + "<b>Número de la Cría:</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(criaTag) + "</span>"
             + "</div>"
             + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
             + "Sexo: <b>" + esc(d["cap-sexo"] || "Hembra") + "</b>"
@@ -446,7 +446,7 @@
             var cria2Tag = d["cap-cria2-tag"] || "(sin arete)";
             h += "<div style='background:rgba(34, 197, 94, 0.09); border-left:4px solid #22c55e; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
               + "<div style='font-size:13px; color:var(--texto);'>"
-              + "👶 <b>Número de Cría 2 (Gemelo):</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(cria2Tag) + "</span>"
+              + icon("calf", 14) + "<b>Número de Cría 2 (Gemelo):</b> <span style='font-family:var(--font-mono); font-weight:800; font-size:16px; color:#16a34a; margin-left:4px;'>" + esc(cria2Tag) + "</span>"
               + "</div>"
               + "<div style='font-size:12px; color:var(--texto-suave); margin-top:3px;'>"
               + "Sexo: <b>" + esc(d["cap-sexo2"] || "Hembra") + "</b>"
@@ -459,22 +459,22 @@
 
         if (toroPadre) {
           h += "<div style='margin-bottom:6px; font-size:13px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>"
-            + "🐂 <b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
+            + icon("cow", 14) + "<b>Toro / Padre:</b> <b style='color:var(--azul-marca); font-family:var(--font-mono);'>" + esc(toroPadre) + "</b>"
             + "</div>";
         }
         if (!esPerdida && (d["cap-distocia"] === "SI")) {
           h += "<div style='margin-bottom:6px; font-size:13px; background:rgba(220,38,38,0.08); padding:6px 10px; border-radius:6px; border-left:4px solid var(--color-rojo-txt, #dc2626);'>"
-            + "⚠️ <b>Parto difícil (distocia):</b> vigilar la vaca en el postparto."
+            + icon("alertTriangle", 14) + "<b>Parto difícil (distocia):</b> vigilar la vaca en el postparto."
             + "</div>";
         }
         if (d["cap-pot-cria"] || d["cap-pot-madre"]) {
           h += "<div style='margin-bottom:6px; font-size:12.5px; color:var(--texto-suave);'>"
-            + "📍 " + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
+            + icon("pin", 14) + (d["cap-pot-madre"] ? ("Madre en <b>" + esc(d["cap-pot-madre"]) + "</b> ") : "")
             + (d["cap-pot-cria"] ? ("· Cría en <b>" + esc(d["cap-pot-cria"]) + "</b>") : "")
             + "</div>";
         }
         if (d["cap-notas"]) {
-          h += "<div style='margin-top:4px; font-size:12px; font-style:italic; color:var(--texto-suave);'>💬 " + esc(d["cap-notas"]) + "</div>";
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic; color:var(--texto-suave);'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         }
         return h;
       }
@@ -482,10 +482,11 @@
       if (_capTipo === "palpacion") {
         var vacaP = d["cap-tag"] || "—";
         var resP = d["cap-palp-resultado"] || "PREÑADA";
-        var metP = d["cap-palp-metodo"] === "ECOGRAFO" ? "📟 Ecógrafo" : "🖐️ Manual (Tacto)";
+        var metP = d["cap-palp-metodo"] === "ECOGRAFO" ? "Ecógrafo" : "Manual (Tacto)";
+        var metIco = d["cap-palp-metodo"] === "ECOGRAFO" ? icon("phone", 14) : icon("hand", 14);
         var chipP = resP === "PREÑADA" ? "verde" : (resP === "VACIA" ? "rojo" : "ambar");
         h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>"
-          + "🖐️ " + esc(nombreTipoCap(_capTipo)) + " · <span class='chip " + chipP + "'>" + esc(resP) + "</span>"
+          + icon("hand", 14) + esc(nombreTipoCap(_capTipo)) + " · <span class='chip " + chipP + "'>" + esc(resP) + "</span>"
           + "</div>"
           + "<div style='display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;'>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
@@ -494,19 +495,19 @@
           + "</div>"
           + "<div style='background:var(--superficie); padding:8px 10px; border-radius:6px; border:1px solid var(--borde);'>"
           + "<small style='color:var(--texto-suave); display:block; font-size:11px; font-weight:600;'>Método:</small>"
-          + "<b style='font-size:13px; color:var(--texto);'>" + esc(metP) + "</b>"
+          + "<b style='font-size:13px; color:var(--texto);'>" + metIco + esc(metP) + "</b>"
           + "</div>"
           + "</div>";
         if (resP === "PREÑADA") {
           h += "<div style='background:rgba(46,125,50,0.09); border-left:4px solid #2e7d32; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
-            + "<div style='font-size:13px;'>🤰 <b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
+            + "<div style='font-size:13px;'>" + icon("egg", 14) + "<b>Días de Preñez:</b> <b>" + esc(d["cap-palp-dias"] || "45") + " días</b>"
             + (d["cap-palp-fep"] ? (" · FEP: <b>" + esc(fechaCorta(d["cap-palp-fep"])) + "</b>") : "")
             + "</div>"
-            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>🐂 Toro/Pajilla: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
+            + (d["cap-palp-toro"] ? ("<div style='font-size:12.5px; margin-top:3px;'>" + icon("cow", 14) + "Toro/Pajilla: <b>" + esc(d["cap-palp-toro"]) + "</b></div>") : "")
             + "</div>";
         }
         if (d["cap-palp-hallazgo"]) {
-          h += "<div style='margin-bottom:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>🔬 Hallazgo: <b>" + esc(d["cap-palp-hallazgo"]) + "</b></div>";
+          h += "<div style='margin-bottom:6px; font-size:12.5px; background:var(--superficie); padding:6px 10px; border-radius:6px; border:1px solid var(--borde);'>" + icon("stethoscope", 14) + "Hallazgo: <b>" + esc(d["cap-palp-hallazgo"]) + "</b></div>";
         }
         if (d["cap-cc"] || d["cap-peso"]) {
           h += "<div style='margin-bottom:6px; font-size:12px; color:var(--texto-suave);'>"
@@ -515,36 +516,36 @@
             + "</div>";
         }
         if (d["cap-palp-responsable"]) {
-          h += "<div style='font-size:12px; color:var(--texto-suave);'>👨‍⚕️ Profesional: <b>" + esc(d["cap-palp-responsable"]) + "</b></div>";
+          h += "<div style='font-size:12px; color:var(--texto-suave);'>" + icon("stethoscope", 12) + "Profesional: <b>" + esc(d["cap-palp-responsable"]) + "</b></div>";
         }
         if (d["cap-notas"]) {
-          h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+          h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         }
         return h;
       }
 
       if (_capTipo === "pajuela") {
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("snowflake", 14) + esc(nombreTipoCap(_capTipo)) + "</div>"
           + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
-          + "<div style='font-size:14px;'>🐂 <b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
+          + "<div style='font-size:14px;'>" + icon("cow", 14) + "<b>Toro:</b> <b>" + esc(d["cap-paj-toro"] || "—") + "</b>"
           + (d["cap-paj-raza"] ? (" (" + esc(d["cap-paj-raza"]) + ")") : "") + "</div>"
           + "<div style='font-size:12.5px; margin-top:3px;'>Canastilla: <b>" + esc(d["cap-paj-canastilla"] || "—") + "</b> · Entrada: <b>" + esc(d["cap-paj-cant"] || "1") + " pajillas</b>"
           + (d["cap-paj-costo"] ? (" · Costo unit: <b>" + fmtMoneda(Number(d["cap-paj-costo"])) + "</b>") : "") + "</div>"
           + (d["cap-paj-procedencia"] ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Procedencia: " + esc(d["cap-paj-procedencia"]) + "</div>") : "")
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
       if (_capTipo === "nitrogeno") {
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>❄️ " + esc(nombreTipoCap(_capTipo)) + "</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("snowflake", 14) + esc(nombreTipoCap(_capTipo)) + "</div>"
           + "<div style='background:rgba(30,60,114,0.06); border-left:4px solid var(--azul-marca); padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
           + "<div style='font-size:13px;'>Intervalo estimado: <b>" + esc(d["cap-nitr-intervalo"] || "21") + " días</b>"
           + (d["cap-nitr-prox"] ? (" · Próxima recarga: <b>" + esc(fechaCorta(d["cap-nitr-prox"])) + "</b>") : "") + "</div>"
           + (d["cap-nitr-proveedor"] ? ("<div style='font-size:12.5px; margin-top:3px;'>Proveedor: <b>" + esc(d["cap-nitr-proveedor"]) + "</b></div>") : "")
           + (d["cap-nitr-costo"] ? ("<div style='font-size:12.5px; margin-top:2px;'>Costo: <b>" + fmtMoneda(Number(d["cap-nitr-costo"])) + "</b></div>") : "")
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
@@ -554,14 +555,14 @@
         var vPrecio = d["cap-venta-precio"] ? fmtMoneda(Number(d["cap-venta-precio"])) : "Sin precio";
         var vPeso = d["cap-venta-peso"] ? (d["cap-venta-peso"] + " kg") : null;
         var vMot = d["cap-venta-motivo"] || "Venta";
-        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>💰 Venta de Semoviente</div>"
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>" + icon("banknote", 14) + "Venta de Semoviente</div>"
           + "<div style='background:rgba(217,119,6,0.08); border-left:4px solid #D97706; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
           + "<div style='font-size:14px;'>Animal / Tag: <b style='font-family:var(--font-mono); font-size:16px; color:#D97706;'>" + esc(vTag) + "</b> · Fecha: <b>" + esc(fechaCorta(fechaR)) + "</b></div>"
           + "<div style='font-size:13px; margin-top:4px;'>Comprador / Destino: <b>" + esc(vComp) + "</b></div>"
           + "<div style='font-size:13px; margin-top:2px;'>Monto Venta: <b style='color:#16a34a; font-size:15px;'>" + esc(vPrecio) + "</b>" + (vPeso ? (" · Peso báscula: <b>" + esc(vPeso) + "</b>") : "") + "</div>"
           + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Motivo: <b>" + esc(vMot) + "</b> · <i>El animal cambiará a estado VENDIDO.</i></div>"
           + "</div>";
-        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>" + icon("chat", 12) + esc(d["cap-notas"]) + "</div>";
         return h;
       }
 
@@ -580,7 +581,7 @@
         var vacaS = (d["cap-tag"] || "").trim();
         var toroS = (d["cap-toro"] || "").trim();
         if (vacaS && toroS) {
-          h += "<div id='sim-consang-box' style='margin-top:8px; font-size:13px;'>⏳ Evaluando consanguinidad 3G…</div>";
+          h += "<div id='sim-consang-box' style='margin-top:8px; font-size:13px;'>" + icon("hourglass", 14) + "Evaluando consanguinidad 3G…</div>";
           programarSimConsang(vacaS, toroS);
         }
       }
@@ -613,29 +614,29 @@
         .catch(function () {
           if (key !== _simConsangPend) return;
           var box2 = document.getElementById("sim-consang-box");
-          if (box2) box2.innerHTML = "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ Sin conexión: no se pudo evaluar consanguinidad.</span>";
+          if (box2) box2.innerHTML = "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("alertTriangle", 12) + "Sin conexión: no se pudo evaluar consanguinidad.</span>";
         });
     }
     function htmlSimConsang(sim, vaca, toro) {
       if (!sim || !sim.ok) {
-        return "<span style='font-size:12px; color:var(--texto-suave);'>⚠️ No se pudo evaluar consanguinidad.</span>";
+        return "<span style='font-size:12px; color:var(--texto-suave);'>" + icon("alertTriangle", 12) + "No se pudo evaluar consanguinidad.</span>";
       }
       if (!sim.evaluable) {
         return "<div style='background:var(--superficie); border:1px solid var(--borde); border-radius:6px; padding:8px 10px; margin-top:4px;'>"
-          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip gris'>NO EVALUABLE</span>"
+          + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip gris'>NO EVALUABLE</span>"
           + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>" + esc(sim.detalle || "") + "</div></div>";
       }
       if (sim.apto) {
         return "<div style='background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:8px 10px; border-radius:6px; margin-top:4px;'>"
-          + "🧬 <b>Consanguinidad 3G:</b> <span class='chip verde'>APTO</span> <span style='font-size:12px;'>" + esc(vaca) + " × " + esc(toro) + "</span>"
-          + (sim.advertencia ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>⚠️ " + esc(sim.advertencia) + "</div>") : "")
+          + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip verde'>APTO</span> <span style='font-size:12px;'>" + esc(vaca) + " × " + esc(toro) + "</span>"
+          + (sim.advertencia ? ("<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>" + icon("alertTriangle", 12) + esc(sim.advertencia) + "</div>") : "")
           + "</div>";
       }
       var anc = (sim.ancestros_comunes || []).map(function (a) {
         return esc(a.tag) + " (" + esc(a.parentesco_vaca) + "/" + esc(a.parentesco_toro) + ")";
       }).join(", ");
       return "<div style='background:rgba(220,38,38,0.08); border-left:4px solid var(--color-rojo-txt, #dc2626); padding:8px 10px; border-radius:6px; margin-top:4px;'>"
-        + "🧬 <b>Consanguinidad 3G:</b> <span class='chip rojo'>NO RECOMENDADO</span>"
+        + icon("dna", 14) + "<b>Consanguinidad 3G:</b> <span class='chip rojo'>NO RECOMENDADO</span>"
         + "<div style='font-size:12.5px; margin-top:2px;'>" + esc(sim.detalle || "") + "</div>"
         + (anc ? ("<div style='font-size:12px; color:var(--texto-suave);'>En común: " + anc + "</div>") : "")
         + (sim.relacion_directa ? ("<div style='font-size:12px; color:var(--texto-suave);'>" + esc(sim.relacion_directa) + "</div>") : "")
@@ -897,7 +898,7 @@
               + "<td><input type='date' class='inp-ia-fecha' value='" + esc(ultimaFecha) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='0' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='text' class='inp-ia-notas' value='' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>";
+              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
             tbody.appendChild(tr);
             var nuevoInpL = tr.querySelector(".inp-ia-litros");
             if (nuevoInpL) nuevoInpL.addEventListener("input", recalcularSuma);
@@ -945,7 +946,7 @@
             }
 
             btnGuardarQ.disabled = true;
-            btnGuardarQ.innerHTML = "⏳ Guardando " + listaDias.length + " días...";
+            btnGuardarQ.innerHTML = icon("hourglass", 14) + "Guardando " + listaDias.length + " días...";
 
             var inpMonto = document.getElementById("ia-monto-pagado");
             var montoPagado = inpMonto && inpMonto.value ? parseFloat(inpMonto.value) : null;
@@ -987,7 +988,7 @@
                   ? "También se registró el <b>ingreso en Finanzas</b> (Venta de leche) con esa misma foto como respaldo."
                   : "La foto quedó archivada como respaldo en el historial.";
                 estadoIa.innerHTML = "<div style='padding:12px; background:rgba(47,82,51,0.12); border-left:4px solid var(--verde-marca); border-radius:6px;'>"
-                  + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>🎉 ¡Quincena guardada con éxito!</div>"
+                  + "<div style='font-size:14px; font-weight:bold; color:var(--verde-marca);'>" + icon("sparkles", 14) + "¡Quincena guardada con éxito!</div>"
                   + "<div style='margin-top:4px; font-size:12.5px;'>Se registraron <b>" + data.guardados + " días</b> con un total de <b>" + data.total_litros + " Litros</b>. " + msgIngreso + "</div>"
                   + "<div style='margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;'>"
                   + "<button type='button' id='btn-ia-ir-leche' class='tema-btn' style='background:var(--verde-marca); color:#fff; font-weight:bold; padding:6px 12px; font-size:12px; border:none; border-radius:4px; cursor:pointer;'>" + icon("milk", 13) + "Ver en Producción de Leche</button>"
@@ -1042,13 +1043,13 @@
         }
 
         var hEstado = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
-          + "<div><span class='chip verde'>✓ Lectura Exitosa</span> <b>" + esc(per) + "</b> · " + dias.length + " días leídos</div>"
+          + "<div><span class='chip verde'>" + icon("check", 12) + "Lectura Exitosa</span> <b>" + esc(per) + "</b> · " + dias.length + " días leídos</div>"
           + "<div style='font-size:11px; color:var(--texto-suave);'>Motor: " + esc(motor) + "</div>"
           + "</div>";
 
         if (res.discrepancia_total) {
           hEstado += "<div style='margin-top:6px; padding:6px 10px; background:rgba(217,119,6,0.1); border-left:3px solid #d97706; border-radius:4px; font-size:12px;'>"
-            + "⚠️ <b>Discrepancia en la suma:</b> La suma de los días da <b>" + sumaInicial + " L</b> pero en el papel dice <b>" + totDetectado + " L</b>. Por favor revisa los días abajo y ajusta cualquier número si es necesario."
+            + icon("alertTriangle", 14) + "<b>Discrepancia en la suma:</b> La suma de los días da <b>" + sumaInicial + " L</b> pero en el papel dice <b>" + totDetectado + " L</b>. Por favor revisa los días abajo y ajusta cualquier número si es necesario."
             + "</div>";
         }
         if (estadoIa) estadoIa.innerHTML = hEstado;
@@ -1080,7 +1081,7 @@
             + "<td><input type='date' class='inp-ia-fecha' value='" + esc(fIso) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='" + esc(lts) + "' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='text' class='inp-ia-notas' value='" + esc(not) + "' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila'>✕</button></td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
             + "</tr>";
         });
 
@@ -1131,7 +1132,7 @@
         if (previewIa) {
           previewIa.style.display = "block";
           previewIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--verde-marca);'>"
-            + "✅ <b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
+            + icon("checkCircle", 14) + "<b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
             + (res.observaciones ? "<br><small>" + esc(res.observaciones) + "</small>" : "")
             + "</div>";
         }
@@ -1145,13 +1146,13 @@
           }
           var esGasto = _tipoCapturaActual === "gasto";
           btnAnalizarIa.disabled = true;
-          btnAnalizarIa.innerHTML = "⏳ Analizando...";
+          btnAnalizarIa.innerHTML = icon("hourglass", 14) + "Analizando...";
           if (estadoIa) {
             var txtEsperaIa = esGasto
               ? "<b style='color:var(--verde-marca);'>Digitalizando factura con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo monto, fecha, proveedor y categoría. Esto toma 5-10 segundos.</small>"
               : "<b style='color:var(--verde-marca);'>Digitalizando recibo con Visión Artificial...</b><br><small style='color:var(--texto-suave);'>Extrayendo días, fechas y litros de las anotaciones manuscritas. Esto toma 5-10 segundos.</small>";
             estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:10px; padding:10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
-              + "<span style='font-size:18px;'>⏳</span><div>" + txtEsperaIa + "</div></div>";
+              + "<span style='font-size:18px;'>" + icon("hourglass", 20) + "</span><div>" + txtEsperaIa + "</div></div>";
           }
           if (previewIa) previewIa.style.display = "none";
 
@@ -1175,14 +1176,14 @@
             btnAnalizarIa.innerHTML = icon("sparkles", 14) + (esGasto ? "Re-analizar Factura" : "Re-analizar Recibo");
 
             if (!res.ok) {
-              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ <b>Error:</b> " + esc(res.error || "No se pudo procesar la imagen.") + "</div>";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>" + icon("xCircle", 14) + "<b>Error:</b> " + esc(res.error || "No se pudo procesar la imagen.") + "</div>";
               return;
             }
 
             if (esGasto) {
               if (!res.es_factura) {
                 var obsF = res.observaciones || "No se detectó una factura o recibo legible en la imagen.";
-                if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece una factura válida:</b><br><small style='color:var(--texto);'>" + esc(obsF) + "</small></div>";
+                if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>" + icon("alertTriangle", 14) + "<b>No parece una factura válida:</b><br><small style='color:var(--texto);'>" + esc(obsF) + "</small></div>";
                 return;
               }
               rellenarCamposFactura(res);
@@ -1191,7 +1192,7 @@
 
             if (!res.es_recibo_leche || !res.dias || !res.dias.length) {
               var obs = res.observaciones || "No se detectaron anotaciones numéricas de producción lechera diaria.";
-              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>⚠️ <b>No parece un recibo de leche válido:</b><br><small style='color:var(--texto);'>" + esc(obs) + "</small></div>";
+              if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-ambar);'>" + icon("alertTriangle", 14) + "<b>No parece un recibo de leche válido:</b><br><small style='color:var(--texto);'>" + esc(obs) + "</small></div>";
               return;
             }
 
@@ -1200,7 +1201,7 @@
           .catch(function (err) {
             btnAnalizarIa.disabled = false;
             btnAnalizarIa.innerHTML = icon("sparkles", 14) + "Reintentar";
-            if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>❌ Error de conexión: " + esc(err.message) + "</div>";
+            if (estadoIa) estadoIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--color-rojo-txt);'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div>";
           });
         });
       }
@@ -1256,7 +1257,7 @@
           .then(function (res) {
             if (res && res.encontrada) {
               fCria.value = res.cria_tag;
-              info.textContent = "✓ Cría encontrada: " + res.cria_tag;
+              info.textContent = "Cría encontrada: " + res.cria_tag;
             } else {
               info.textContent = "No se encontró cría activa sin destetar para esta vaca -- escriba el arete manualmente.";
             }
@@ -1367,11 +1368,11 @@
       var motivo = (q("#cap-motivo") && q("#cap-motivo").value) || null;
       var feed = document.getElementById("captura-feedback");
       if (!origen || !destino) {
-        if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ Elegí Potrero Origen y Potrero Destino.</div>";
+        if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + "Elegí Potrero Origen y Potrero Destino.</div>";
         return;
       }
       if (!window.confirm("¿Mover TODOS los animales activos de \"" + origen + "\" a \"" + destino + "\"?")) return;
-      if (feed) feed.innerHTML = "<div class='chip ambar' style='font-size:14px; padding:8px 12px;'>⏳ Moviendo animales...</div>";
+      if (feed) feed.innerHTML = "<div class='chip ambar' style='font-size:14px; padding:8px 12px;'>" + icon("hourglass", 14) + "Moviendo animales...</div>";
       fetch("/api/traslado/masivo", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ potrero_origen: origen, potrero_destino: destino, motivo: motivo, fecha: fecha }),
@@ -1384,7 +1385,7 @@
                 + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino)
                 + " queda por revisar: se hace cuando el administrador lo apruebe.</div>";
             } else if (feed) {
-              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>✅ " + res.body.movidos
+              feed.innerHTML = "<div class='chip verde' style='font-size:14px; padding:8px 12px;'>" + icon("checkCircle", 14) + res.body.movidos
                 + " animal(es) movidos de " + esc(res.body.potrero_origen) + " a " + esc(res.body.potrero_destino) + ".</div>";
             }
             var formEl = document.getElementById("form-captura");
@@ -1392,10 +1393,10 @@
             refrescarCamposCap();
             actualizarBadges();
           } else if (feed) {
-            feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
+            feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + esc((res.body && res.body.error) || "No se pudo mover el lote.") + "</div>";
           }
         }).catch(function (err) {
-          if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>❌ " + esc(err && err.message || err) + "</div>";
+          if (feed) feed.innerHTML = "<div class='chip rojo' style='font-size:14px; padding:8px 12px;'>" + icon("xCircle", 14) + esc(err && err.message || err) + "</div>";
         });
     }
 
@@ -1603,18 +1604,18 @@
 
         function mostrarExito(online, enRevision) {
           enviarTelemetriaSilenciosa("captura_" + _tipoCapturaActual);
-          var fotoTxt = payload.foto_base64 ? " 📸 (con foto adjunta)" : "";
+          var fotoTxt = payload.foto_base64 ? " " + icon("camera", 14) + "(con foto adjunta)" : "";
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
               + (enRevision ? "Enviado. Queda por revisar: se registra cuando el administrador lo apruebe."
-                : online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+                : online ? icon("checkCircle", 14) + "Evento" + fotoTxt + " registrado en el servidor." : icon("save", 14) + "Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
             if (!enRevision && _tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
               var vMadre = payload.vaca_tag || "";
               var fParto = fecha || new Date().toISOString().slice(0, 10);
               var potMadre = payload.potrero_madre || "";
               var crSexo = payload.sexo_cria || "";
               feed.innerHTML += "<div style='margin-top:10px; padding:10px; background:var(--superficie); border-radius:8px; border:1px solid var(--borde); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;'>"
-                + "<span>🐣 <b>¿Deseas registrar la cría en el inventario ahora?</b></span>"
+                + "<span>" + icon("calf", 14) + "<b>¿Deseas registrar la cría en el inventario ahora?</b></span>"
                 + "<button type='button' class='tema-btn' id='btn-crear-cria-parto' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:5px;'>"
                 + icon("cowCalf", 14) + "Registrar Arete de la Cría</button>"
                 + "</div>";
@@ -1635,7 +1636,7 @@
               }, 50);
             }
           }
-          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
+          mostrarToast(enRevision ? "Enviado a revisión" : (online ? "Guardado" : "Guardado offline, se enviará al volver la señal"), online ? "verde" : "ambar");
           vibrarConfirmacion();
           // BLOQUE 4: persistir defaults inteligentes (potrero + tag).
           try {

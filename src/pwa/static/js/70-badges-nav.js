@@ -94,7 +94,7 @@
     if (document.getElementById("modal-campana-agenda")) return;
     var html = "<div id='modal-campana-agenda' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:520px; max-height:86vh; display:flex; flex-direction:column; overflow:hidden;'>"
-      + "<div class='modal-header'><b>🔔 Pendientes y próximos</b><button type='button' class='modal-cerrar' id='btn-cerrar-campana'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("bell", 16) + "Pendientes y próximos</b><button type='button' class='modal-cerrar' id='btn-cerrar-campana' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div id='campana-cuerpo' style='padding:14px 16px; overflow-y:auto; -webkit-overflow-scrolling:touch; font-size:13.5px;'>Cargando agenda...</div>"
       + "<div style='padding:10px 16px; border-top:1px solid var(--borde); display:flex; gap:8px;'>"
       + "<button type='button' id='btn-campana-ver-agenda' class='btn-guardar-manga' style='flex:1;'>Abrir Agenda completa</button>"
@@ -116,13 +116,13 @@
       var recs = (d && d.recordatorios) || [];
       var rets = (d && d.retiros) || [];
       if (!evs.length && !recs.length && !rets.length) {
-        cuerpo.innerHTML = "<p class='aviso'>🎉 Sin pendientes en los próximos " + esc((d && d.dias) || 7) + " días.</p>";
+        cuerpo.innerHTML = "<p class='aviso'>" + icon("sparkles", 14) + "Sin pendientes en los próximos " + esc((d && d.dias) || 7) + " días.</p>";
         return;
       }
       var h = "";
       recs.slice(0, 5).forEach(function (rc) {
         h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
-          + "<b>📌 " + esc(rc.mensaje || "Evento") + "</b><br>"
+          + "<b>" + icon("pin", 14) + esc(rc.mensaje || "Evento") + "</b><br>"
           + "<small style='color:var(--texto-suave);'>" + esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "") + " · " + esc(rc.faltan_dias != null ? (rc.faltan_dias <= 0 ? "HOY" : "en " + rc.faltan_dias + "d") : "PENDIENTE") + "</small></div>";
       });
       evs.slice(0, 5).forEach(function (e) {
@@ -132,12 +132,12 @@
       });
       rets.slice(0, 3).forEach(function (r) {
         h += "<div style='padding:8px 10px; border:1px solid var(--borde); border-radius:8px; margin-bottom:8px;'>"
-          + "<b>💊 Retiro: " + esc(r.tag || "") + "</b><br>"
+          + "<b>" + icon("pill", 14) + "Retiro: " + esc(r.tag || "") + "</b><br>"
           + "<small style='color:var(--texto-suave);'>" + esc(r.producto || "") + "</small></div>";
       });
       cuerpo.innerHTML = h;
     }).catch(function () {
-      if (cuerpo) cuerpo.innerHTML = "<p class='aviso'>⚠️ Sin conexión: no se pudo cargar la agenda.</p>";
+      if (cuerpo) cuerpo.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + "Sin conexión: no se pudo cargar la agenda.</p>";
     });
   }
 

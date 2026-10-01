@@ -25,6 +25,7 @@
   var fmtMoneda = window.JA.fmtMoneda;
 
   var icon = window.JA.icon;
+  var dot = window.JA.dot;
 
   function barraDescargaSeccion(seccion, nombre) {
     var extraBtn = "";
@@ -366,41 +367,41 @@
 
     var frases = [];
     if (_vacaEstadoActual === "ternero") {
-      frases.push("🍼 ¡Mmuuu! Ternero alegre y vigoroso correteando en el potrero.");
-      frases.push("🌱 Cría lactante con excelente vitalidad y buen peso al destete.");
-      frases.push("🥛 Creciendo fuerte al pie de la madre en Ganadería JA.");
+      frases.push(icon("calf", 14) + "¡Mmuuu! Ternero alegre y vigoroso correteando en el potrero.");
+      frases.push(icon("sprout", 14) + "Cría lactante con excelente vitalidad y buen peso al destete.");
+      frases.push(icon("milk", 14) + "Creciendo fuerte al pie de la madre en Ganadería JA.");
     } else if (_vacaEstadoActual === "toro") {
-      frases.push("🐂 ¡Toro reproductor de alta genética y vigor en el lote!");
-      frases.push("⚡ Padrote activo transmitiendo ganancia de peso y rusticidad.");
+      frases.push(icon("cow", 14) + "¡Toro reproductor de alta genética y vigor en el lote!");
+      frases.push(icon("zap", 14) + "Padrote activo transmitiendo ganancia de peso y rusticidad.");
     } else if (_vacaEstadoActual === "cria") {
-      frases.push("🍼 ¡Amor maternal! Cría al pie con excelente vitalidad.");
-      frases.push("🐮 Vaca madre en óptima nutrición y lactancia.");
+      frases.push(icon("calf", 14) + "¡Amor maternal! Cría al pie con excelente vitalidad.");
+      frases.push(icon("cow", 14) + "Vaca madre en óptima nutrición y lactancia.");
     } else if (_vacaEstadoActual === "noche") {
-      frases.push("🌙 Rumiando en calma bajo la noche llanera.");
-      frases.push("💤 Vacas en descanso nocturno recuperando energías.");
+      frases.push(icon("moon", 14) + "Rumiando en calma bajo la noche llanera.");
+      frases.push(icon("moon", 14) + "Vacas en descanso nocturno recuperando energías.");
     } else {
-      frases.push("🌾 Pastando forraje fresco bajo rotación Voisin.");
-      frases.push("¡Muuu! 🐮 Cero garrapatas y ganado al día.");
+      frases.push(icon("grass", 14) + "Pastando forraje fresco bajo rotación Voisin.");
+      frases.push("¡Muuu! " + icon("cow", 14) + "Cero garrapatas y ganado al día.");
     }
 
     if (_climaEstadoActual === "lluvia" || _climaEstadoActual === "lluvia-noche") {
-      frases.push("🌧️ ¡Lluvia en la finca! Pastos verdes y buen aforo asegurado.");
+      frases.push(icon("rain", 14) + "¡Lluvia en la finca! Pastos verdes y buen aforo asegurado.");
     } else if (_climaEstadoActual === "nublado") {
-      frases.push("⛅ Día fresco y nublado en Mesetas, ideal para el pastoreo.");
+      frases.push(icon("cloud", 14) + "Día fresco y nublado en Mesetas, ideal para el pastoreo.");
     } else if (_climaEstadoActual === "soleado") {
-      frases.push("☀️ Día soleado en la sabana: ganado en pleno pastoreo.");
+      frases.push(icon("sun", 14) + "Día soleado en la sabana: ganado en pleno pastoreo.");
     }
 
     if (totalActivos > 0) {
-      frases.push("📊 Hato activo: " + totalActivos + " cabezas registradas.");
+      frases.push(icon("chartBar", 14) + "Hato activo: " + totalActivos + " cabezas registradas.");
     }
     if (nPotreros > 0) {
-      frases.push("🌱 " + nPotreros + " potreros en descanso y pastoreo.");
+      frases.push(icon("sprout", 14) + nPotreros + " potreros en descanso y pastoreo.");
     }
     if (topDescanso && topDias > 0) {
-      frases.push("🌾 Más reposo: " + esc(topDescanso) + " (" + topDias + " d).");
+      frases.push(icon("grass", 14) + "Más reposo: " + esc(topDescanso) + " (" + topDias + " d).");
     }
-    frases.push("✨ Ganadería JA: genética y trazabilidad 100%.");
+    frases.push(icon("sparkles", 14) + "Ganadería JA: genética y trazabilidad 100%.");
 
     var txt = frases[_vacaFraseIdx % frases.length];
     _vacaFraseIdx++;

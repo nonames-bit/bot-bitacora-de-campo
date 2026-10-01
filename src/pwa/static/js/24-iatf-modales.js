@@ -34,7 +34,7 @@
 
     var html = "<div id='iatf-protocolos-info-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:640px; max-height:85vh; overflow-y:auto;'>"
-      + "<div class='modal-header'><b>" + icon("clipboard", 16) + " Biblioteca de Protocolos Hormonales IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-prots-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("clipboard", 16) + " Biblioteca de Protocolos Hormonales IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-prots-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<p style='margin:0 0 12px 0; font-size:12.5px; color:var(--texto-suave);'>Protocolos zootécnicos validados con dosis sugeridas y marcas comerciales de referencia (evaluables según respuesta de fertilidad):</p>"
       + htmlProts
@@ -64,7 +64,7 @@
 
     var html = "<div id='nuevo-lote-iatf-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:560px; max-height:90vh; overflow-y:auto;'>"
-      + "<div class='modal-header'><b>" + icon("plus", 16) + " Iniciar Nuevo Lote IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-lote-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("plus", 16) + " Iniciar Nuevo Lote IATF</b><button type='button' class='modal-cerrar' id='btn-cerrar-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<form id='form-nuevo-lote-iatf' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label style='font-size:12.5px; font-weight:600;'>Nombre / Identificador del Lote:*<br>"
@@ -89,7 +89,7 @@
       + "<div id='lote-conteo-preview' style='font-size:12px; font-weight:700; color:var(--azul-marca);'>0 hembras ingresadas</div>"
       + "<label style='font-size:12.5px; font-weight:600;'>Notas / Observaciones:<br>"
       + "<input id='lote-notas' placeholder='ej. Lote con cría al pie, seleccionadas con CC >= 2.75' style='width:100%; margin-top:4px; padding:9px; border-radius:6px; border:1px solid var(--borde-fuerte); box-sizing:border-box;'></label>"
-      + "<div class='aviso' style='font-size:11.5px; margin:4px 0;'>💡 Al crear el lote, el sistema programará automáticamente las alertas de drogas en la Agenda PWA, notificaciones push y Telegram para los días exactos de aplicación (Día 0, Día 8 y Día 10).</div>"
+      + "<div class='aviso' style='font-size:11.5px; margin:4px 0;'>" + icon("lightbulb", 14) + "Al crear el lote, el sistema programará automáticamente las alertas de drogas en la Agenda PWA, notificaciones push y Telegram para los días exactos de aplicación (Día 0, Día 8 y Día 10).</div>"
       + "<div id='lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
       + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
       + "<button type='button' class='tema-btn' id='btn-cancel-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
@@ -202,7 +202,7 @@
 
     var html = "<div id='iatf-paso-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
-      + "<div class='modal-header'><b>💊 Registrar Aplicación de Fármacos</b><button type='button' class='modal-cerrar' id='btn-cerrar-paso-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("pill", 16) + "Registrar Aplicación de Fármacos</b><button type='button' class='modal-cerrar' id='btn-cerrar-paso-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<div style='background:rgba(2,132,199,0.08); border-left:4px solid #0284c7; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
       + "<b>Lote:</b> " + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "<br>"
@@ -291,7 +291,7 @@
 
     var html = "<div id='iatf-inseminar-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:500px;'>"
-      + "<div class='modal-header'><b>🧬 Inseminación Masiva a 1-Toque (IATF)</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-lote-modal'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("dna", 16) + "Inseminación Masiva a 1-Toque (IATF)</b><button type='button' class='modal-cerrar' id='btn-cerrar-ins-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:16px;'>"
       + "<div style='background:rgba(22,163,74,0.08); border-left:4px solid var(--verde-marca); padding:10px 12px; border-radius:6px; margin-bottom:12px; font-size:12.5px;'>"
       + "Se registrará el servicio por IATF para las <b>" + nHembras + " hembras activas</b> de <b>" + esc(lote ? lote.nombre : ("Lote #" + loteId)) + "</b> "
@@ -410,15 +410,15 @@
 
         var modalHtml = "<div id='iatf-detalle-modal' class='modal-overlay'>"
           + "<div class='modal-contenido' style='max-width:650px; max-height:85vh; overflow-y:auto;'>"
-          + "<div class='modal-header'><b>📋 Detalle del Lote: " + esc(lote.nombre) + "</b><button type='button' class='modal-cerrar' id='btn-cerrar-det-lote-modal'>✕</button></div>"
+          + "<div class='modal-header'><b>" + icon("clipboard", 16) + "Detalle del Lote: " + esc(lote.nombre) + "</b><button type='button' class='modal-cerrar' id='btn-cerrar-det-lote-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
           + "<div style='padding:16px;'>"
           + "<div style='display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; font-size:12.5px;'>"
           + "<div>Protocolo: <b>" + esc(lote.protocolo_nombre) + "</b> (" + esc(lote.protocolo_categoria) + ")</div>"
           + "<div>Inicio: <b>" + esc(fechaCorta(lote.fecha_inicio)) + "</b> · IATF: <b>" + esc(lote.hora_iatf) + "</b></div>"
           + "</div>"
-          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>💊 Historial de Fármacos, Marcas y Dosis Aplicadas:</div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("pill", 14) + "Historial de Fármacos, Marcas y Dosis Aplicadas:</div>"
           + "<div class='tabla-scroll' style='margin-bottom:14px;'><table><tr><th>Fecha</th><th>Producto</th><th>Marca Usada</th><th>Dosis</th><th>Operario</th></tr>" + histHtml + "</table></div>"
-          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🐄 Hembras del Lote (" + animales.length + "):</div>"
+          + "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("cow", 14) + "Hembras del Lote (" + animales.length + "):</div>"
           + "<div class='tabla-scroll'><table><tr><th>Arete</th><th>CC Inicial</th><th>Estado</th><th>Diagnóstico</th><th style='text-align:right;'>Acción</th></tr>" + animsHtml + "</table></div>"
           + "</div></div></div>";
 

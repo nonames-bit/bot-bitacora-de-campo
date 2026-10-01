@@ -811,6 +811,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Pantalla **Por revisar** (menú Gestión, solo OWNER/ADMIN, con contador): cada registro muestra quién lo envió, por dónde y cuándo, con **Aprobar**, **Corregir** (editar los campos y aprobar) y **Rechazar** (con motivo). Al aprobar se registra a nombre del trabajador; el canal del equipo avisa la aprobación o el rechazo.
   - Pruebas: `tests/test_revision_trabajador.py` + verificación en Chromium 390×844 y 1366×860.
 
+- [x] **PWA con íconos propios en vez de emojis (Fase C, 2026-10-01)**:
+  - Los ~550 emojis de pantallas, botones, avisos y menús se cambiaron por los íconos SVG de la app (`icon()` en `ja-core.js`, trazo y color del tema; se añadieron ~45 íconos Lucide que faltaban). Los semáforos 🟢🟡🔴 se pintan como puntos de color del tema (`dot()`); en textos planos (alertas, toasts, placeholders) el emoji simplemente se quitó.
+  - Los emojis que manda el servidor (semáforos de potreros/estado) se siguen leyendo pero se dibujan como punto. Pruebas: `tests/test_iconos_sin_emojis.py`.
+
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [x] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada (2026-09-24)**: Simulador de cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, distocias y pérdidas gestacionales, catálogo y evaluación de técnicos inseminadores, y módulo de sincronizaciones hormonales IATF.

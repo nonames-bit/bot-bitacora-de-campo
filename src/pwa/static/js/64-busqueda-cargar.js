@@ -5,11 +5,11 @@
     if (res.existe) { abrirFicha(res.tag, vista, true); return; }
     if (res.error) {
       if (mensaje) mensaje.textContent = "";
-      out.innerHTML = "<p class='aviso'>❌ " + esc(res.error) + "</p>";
+      out.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + esc(res.error) + "</p>";
       return;
     }
     if (res.ocr_tag) {
-      if (mensaje) mensaje.textContent = "🔍 OCR leyó: " + esc(res.ocr_tag) + (res.confianza ? " (confianza " + Math.round(res.confianza * 100) + "%)" : "");
+      if (mensaje) mensaje.textContent = "OCR leyó: " + esc(res.ocr_tag) + (res.confianza ? " (confianza " + Math.round(res.confianza * 100) + "%)" : "");
     } else if (mensaje) {
       mensaje.textContent = "";
     }
@@ -104,14 +104,14 @@
       var estado = document.getElementById("ident-estado");
       var out = document.getElementById("ident-resultado");
       if (out) out.innerHTML = "";
-      if (estado) estado.textContent = "⏳ Identificando…";
+      if (estado) estado.textContent = "Identificando…";
       if (file.files && file.files[0]) {
         var fd = new FormData();
         fd.append("foto", file.files[0]);
         fetch("/api/identificar", { method: "POST", body: fd })
           .then(function (r) { if (r.status === 401) { window.location = "/login"; throw new Error("no autorizado"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
           .then(pintarSugerencias)
-          .catch(function (e) { if (estado) estado.textContent = "❌ " + (e && e.message || e); });
+          .catch(function (e) { if (estado) estado.textContent = (e && e.message || e); });
       } else {
         var t = obtenerTextoIdent();
         if (!t) { if (estado) estado.textContent = "Escriba el arete/RFID arriba o elija una foto."; return; }
@@ -120,7 +120,7 @@
         fetch("/api/identificar", { method: "POST", body: fd2 })
           .then(function (r) { if (r.status === 401) { window.location = "/login"; throw new Error("no autorizado"); } if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
           .then(pintarSugerencias)
-          .catch(function (e) { if (estado) estado.textContent = "❌ " + (e && e.message || e); });
+          .catch(function (e) { if (estado) estado.textContent = (e && e.message || e); });
       }
     });
     if (btnQr) btnQr.addEventListener("click", escanearQRCamara);

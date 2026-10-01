@@ -185,7 +185,7 @@
     }
     var msg = "¿Seguro que deseas DESHACER / ELIMINAR permanentemente este registro del sistema?\n\n"
       + "• " + (desc || (tipo.toUpperCase() + " #" + id)) + "\n\n"
-      + "⚠️ Esta acción revertirá de forma inteligente estados o potreros derivados si aplica (ej. el animal vuelve a ACTIVO tras una muerte o salida).\n\n¿Continuar?";
+      + "Esta acción revertirá de forma inteligente estados o potreros derivados si aplica (ej. el animal vuelve a ACTIVO tras una muerte o salida).\n\n¿Continuar?";
     if (!window.confirm(msg)) return;
 
     mostrarToast("Deshaciendo evento...", "ambar");
@@ -202,7 +202,7 @@
         alert("Error al eliminar evento: " + ((res.data && res.data.error) || ("HTTP " + res.status)));
         return;
       }
-      mostrarToast("✓ " + (res.data.mensaje || "Registro eliminado correctamente"), "verde");
+      mostrarToast((res.data.mensaje || "Registro eliminado correctamente"), "verde");
       vibrarConfirmacion();
       var modalUlt = document.getElementById("modal-ultimos-eventos");
       if (modalUlt && modalUlt.style.display !== "none") {
@@ -256,15 +256,15 @@
             + "<div style='display:flex; align-items:center; gap:8px; margin-bottom:3px; flex-wrap:wrap;'>"
             + "<span class='chip' style='font-size:11px; font-weight:700; text-transform:uppercase; background:rgba(47,82,51,0.08); color:var(--verde-marca);'>" + esc(ev.tabla) + "</span>"
             + (ev.tag ? "<a href='#' class='tag-link' onclick='event.preventDefault(); document.getElementById(\"modal-ultimos-eventos\").style.display=\"none\"; abrirFichaDesdeTag(\"" + esc(ev.tag) + "\");' style='font-weight:700; color:var(--verde-marca); text-decoration:none; font-size:13px;'>" + tagTxt + "</a>" : "")
-            + "<span style='font-size:11.5px; color:var(--texto-suave);'>📅 " + fechaTxt + "</span>"
+            + "<span style='font-size:11.5px; color:var(--texto-suave);'>" + icon("calendar", 12) + fechaTxt + "</span>"
             + "</div>"
             + "<div style='font-size:13px; font-weight:600; color:var(--texto); text-overflow:ellipsis; overflow:hidden; white-space:nowrap;'>" + resumenTxt + "</div>"
-            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:3px;'>🕒 " + creadoTxt + " " + quienTxt + "</div>"
+            + "<div style='font-size:11px; color:var(--texto-suave); margin-top:3px;'>" + icon("clock", 12) + creadoTxt + " " + quienTxt + "</div>"
             + "</div>";
 
           if (d.puede_deshacer) {
             html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
-              + "🗑️ Deshacer</button>";
+              + icon("trash", 14) + "Deshacer</button>";
           }
           html += "</div>";
         });
@@ -301,7 +301,7 @@
           alert("Error al pausar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
           return;
         }
-        mostrarToast("✓ Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
+        mostrarToast("Ordeño pausado. No se contará en el promedio litros/vaca.", "verde");
         vibrarConfirmacion();
         abrirFichaDesdeTag(tag, "leche");
       })
@@ -323,7 +323,7 @@
           alert("Error al reanudar el ordeño: " + ((res.data && res.data.error) || "Error desconocido"));
           return;
         }
-        mostrarToast("✓ Ordeño reanudado.", "verde");
+        mostrarToast("Ordeño reanudado.", "verde");
         vibrarConfirmacion();
         abrirFichaDesdeTag(tag, "leche");
       })
@@ -466,7 +466,7 @@
         if (!tagSec || !confirm("¿Registrar a " + tagSec + " como seca desde hoy?")) return;
         elAcc.disabled = true;
         enviarEventoLt("secado", { animal_tag: tagSec, motivo: "Confirmada seca desde la ficha" }).then(function () {
-          mostrarToast("✓ " + tagSec + " registrada como seca.", "verde");
+          mostrarToast(tagSec + " registrada como seca.", "verde");
           abrirFichaDesdeTag(tagSec, "leche");
         });
       }
@@ -519,7 +519,7 @@
     }).then(function (d) { clearTimeout(to); cb(d); })
       .catch(function (e) {
         clearTimeout(to);
-        if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
+        if (target) target.innerHTML = icon("xCircle", 14) + "No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
       });
   }
   function mostrarFormularioAnimal(f, tagPrellenado, defaults) {
@@ -548,7 +548,7 @@
     var html = "<div id='animal-form-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:480px;'>"
       + "<div class='modal-header'><b>" + icon(esEdicion ? "pencil" : "plus", 15) + (esEdicion ? "Editar Animal " + val(f.tag) : "Crear Animal Nuevo") + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form'>✕</button></div>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-animal-form' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<form id='form-animal' style='padding:16px; display:flex; flex-direction:column; gap:10px; max-height:70vh; overflow-y:auto;'>"
       + campo("an-tag", "Arete / Tag *", val((f && f.tag) || tagPrellenado), esEdicion ? " disabled" : " required autofocus placeholder='ej. 47'")
       + (esEdicion && (window.__usuarioActual && window.__usuarioActual.rol === "OWNER")
@@ -563,7 +563,7 @@
       + "<div id='an-toro-wrap' style='display:" + (sexoDef === "Macho" ? "block" : "none") + "; margin:2px 0 4px; padding:8px 12px; background:rgba(34,197,94,0.08); border-radius:6px; border:1px solid rgba(34,197,94,0.25);'>"
       + "<label style='display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; cursor:pointer; margin:0;'>"
       + "<input type='checkbox' id='an-es-toro'" + (esToro ? " checked" : "") + " style='width:16px; height:16px;'> "
-      + "🐂 ¿Es Reproductor / Toro activo de la finca?"
+      + icon("cow", 14) + "¿Es Reproductor / Toro activo de la finca?"
       + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
       + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
@@ -648,11 +648,11 @@
             abrirFicha(tag, vista, true);
             irAVista("ficha");
           } else if (errorEl) {
-            errorEl.textContent = "❌ " + (res.body.error || "No se pudo guardar.");
+            errorEl.textContent = (res.body.error || "No se pudo guardar.");
             errorEl.style.display = "block";
           }
         }).catch(function (err) {
-          if (errorEl) { errorEl.textContent = "❌ " + (err && err.message || err); errorEl.style.display = "block"; }
+          if (errorEl) { errorEl.textContent = (err && err.message || err); errorEl.style.display = "block"; }
         });
     });
   }
