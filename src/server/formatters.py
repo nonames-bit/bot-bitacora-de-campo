@@ -1451,9 +1451,9 @@ def formatear_ayuda(rol: Optional[str]) -> str:
             "3. Revisa lo que dice que va a borrar y confirma con /confirmar_deshacer\n"
             "   (o /cancelar_deshacer si te arrepientes)\n"
             "Si el problema es grande (muchos registros dañados, no solo uno), eso ya "
-            "no es para el chat: pide que restauren el respaldo automático de anoche "
-            "desde el VPS (scripts/restaurar_backup.sh) — esa es la otra red de "
-            "seguridad, separada del respaldo general.\n\n"
+            "no es para el chat: restaura la copia automática de anoche en la app "
+            "(Sistema → Copias) o en el servidor con scripts/restaurar_backup.sh. "
+            "Antes de restaurar se guarda la base actual por si hay que volver.\n\n"
             "🏠 <i>Toca /menu o /start para abrir el panel táctil interactivo.</i>"
         )
     if rol == "ADMIN":

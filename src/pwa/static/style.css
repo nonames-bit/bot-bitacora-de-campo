@@ -4480,3 +4480,16 @@ button.btn-peligro:hover { background: rgba(220, 38, 38, 0.08); }
 .rep-btn.rep-btn-sec:hover { background: var(--verde-marca-pastel); border-color: var(--verde-marca); }
 .rep-ficha input { flex: 1; min-width: 0; }
 @media (max-width: 420px) { .rep-lista { grid-template-columns: 1fr; } }
+
+/* ---------- Copias de seguridad (Fase F) ---------- */
+.resp-lista { display: grid; gap: 8px; margin-top: 8px; }
+.resp-item { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+  border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; background: var(--superficie); }
+.resp-info b { display: block; font-size: 13.5px; }
+.resp-info small { color: var(--texto-suave); font-size: 12px; }
+.resp-acciones { display: flex; gap: 6px; flex-wrap: wrap; }
+.resp-acciones .rep-btn, .resp-acciones button { font-size: 12.5px; padding: 5px 11px; min-height: 34px; }
+.resp-confirmar { flex-basis: 100%; display: grid; gap: 6px; font-size: 12.5px; }
+.resp-confirmar[hidden] { display: none; }
+.resp-confirmar-fila { display: flex; gap: 6px; flex-wrap: wrap; }
+.resp-confirmar-fila input { flex: 1; min-width: 0; font-family: var(--font-mono); letter-spacing: 1px; }
