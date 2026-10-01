@@ -38,6 +38,7 @@ try:
     )
     from .growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete
     from .genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg
+    from .finanzas_categorias import CATEGORIAS_EGRESO, CATEGORIAS_INGRESO
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -57,6 +58,7 @@ except ImportError:  # ejecución directa
     )
     from src.engine.growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete  # type: ignore
     from src.engine.genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg  # type: ignore
+    from src.engine.finanzas_categorias import CATEGORIAS_EGRESO, CATEGORIAS_INGRESO  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -2418,8 +2420,8 @@ def datos_leche(db: Database) -> dict:
 
 
 CATEGORIAS_FINANZAS = {
-    "INGRESO": ["VENTA_LECHE", "OTRO_INGRESO"],
-    "EGRESO": ["NOMINA", "INSUMO", "VETERINARIO", "INFRAESTRUCTURA", "COMBUSTIBLE", "OTRO_EGRESO"],
+    "INGRESO": list(CATEGORIAS_INGRESO),
+    "EGRESO": list(CATEGORIAS_EGRESO),
 }
 
 

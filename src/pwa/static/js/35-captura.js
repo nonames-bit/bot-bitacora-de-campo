@@ -230,20 +230,9 @@
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "gasto") {
       h += "<label>Categoría: <select id='cap-fin-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<optgroup label='Ingresos'>"
-        + "<option value='VENTA_LECHE'>Venta de leche</option>"
-        + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
-        + "</optgroup>"
-        + "<optgroup label='Egresos'>"
-        + "<option value='INSUMO' selected>Insumos (sal, alambre, herramienta, etc.)</option>"
-        + "<option value='NOMINA'>Nómina / Jornales</option>"
-        + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
-        + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
-        + "<option value='COMBUSTIBLE'>Combustible</option>"
-        + "<option value='OTRO_EGRESO'>Otro gasto</option>"
-        + "</optgroup>"
+        + opcionesCategoriaFinanza("INSUMO")
         + "</select></label>"
-        + "<label>Concepto: <input id='cap-fin-concepto' placeholder='ej. Sal mineralizada 40kg, Jornal Andrés' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Concepto: <input id='cap-fin-concepto' placeholder='ej. Sal mineralizada 40kg, Ivermectina, Jornal Andrés' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Monto ($): <input type='number' step='1' min='0' id='cap-fin-monto' placeholder='ej. 180000' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-fin-litros-wrap' style='display:none;'><label>Litros vendidos (solo venta de leche): <input type='number' step='0.5' id='cap-fin-litros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<label>Proveedor / Comprador / Trabajador (opcional): <input id='cap-fin-contraparte' placeholder='ej. Agropecuaria X, Andrés' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"

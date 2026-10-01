@@ -3152,13 +3152,29 @@
   /* ---------- Finanzas: Ingresos, Egresos y Utilidad ---------- */
   var _finanzasAno = new Date().getFullYear();
   var _finanzasMovsActuales = [];
+  // Mismo orden y nombres que src/engine/finanzas_categorias.py.
   var CATEGORIAS_FINANZAS_LABEL = {
     VENTA_LECHE: "Venta de leche", VENTA_ANIMAL: "Venta de animales",
-    COMPRA_ANIMAL: "Compra de animales", NOMINA: "Nómina / Jornales",
-    INSUMO: "Insumos (sal, alambre, etc.)", VETERINARIO: "Veterinario / Medicamentos",
-    INFRAESTRUCTURA: "Infraestructura / Mantenimiento", COMBUSTIBLE: "Combustible",
-    OTRO_INGRESO: "Otro ingreso", OTRO_EGRESO: "Otro gasto"
+    COMPRA_ANIMAL: "Compra de animales", OTRO_INGRESO: "Otro ingreso",
+    SAL_MINERALES: "Sal y minerales", MEDICAMENTOS: "Drogas / medicamentos",
+    ALIMENTO: "Concentrado / alimento", FERTILIZANTES: "Abonos, semillas y venenos de potrero",
+    REPRODUCCION: "Pajillas / nitrógeno", INSUMO: "Otros insumos (alambre, herramienta, etc.)",
+    NOMINA: "Nómina / jornales", VETERINARIO: "Veterinario (visita / servicio)",
+    INFRAESTRUCTURA: "Infraestructura / mantenimiento", COMBUSTIBLE: "Combustible",
+    OTRO_EGRESO: "Otro gasto"
   };
+  var CATEGORIAS_INGRESO_LISTA = ["VENTA_LECHE", "OTRO_INGRESO"];
+  var CATEGORIAS_EGRESO_LISTA = ["SAL_MINERALES", "MEDICAMENTOS", "ALIMENTO", "FERTILIZANTES", "REPRODUCCION",
+    "INSUMO", "NOMINA", "VETERINARIO", "INFRAESTRUCTURA", "COMBUSTIBLE", "OTRO_EGRESO"];
+  function opcionesCategoriaFinanza(seleccionada) {
+    function opts(lista) {
+      return lista.map(function (c) {
+        return "<option value='" + c + "'" + (c === seleccionada ? " selected" : "") + ">" + esc(CATEGORIAS_FINANZAS_LABEL[c]) + "</option>";
+      }).join("");
+    }
+    return "<optgroup label='Ingresos'>" + opts(CATEGORIAS_INGRESO_LISTA) + "</optgroup>"
+      + "<optgroup label='Gastos'>" + opts(CATEGORIAS_EGRESO_LISTA) + "</optgroup>";
+  }
   function etiquetaCategoriaFinanza(cat) { return CATEGORIAS_FINANZAS_LABEL[cat] || cat; }
 
   function renderFinanzas(d) {
@@ -3387,19 +3403,7 @@
     var overlay = document.getElementById("fin-editar-modal");
     if (overlay) overlay.remove();
 
-    var opcionesCategoria = ""
-      + "<optgroup label='Ingresos'>"
-      + "<option value='VENTA_LECHE'>Venta de leche</option>"
-      + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
-      + "</optgroup>"
-      + "<optgroup label='Egresos'>"
-      + "<option value='INSUMO'>Insumos (sal, alambre, herramienta, etc.)</option>"
-      + "<option value='NOMINA'>Nómina / Jornales</option>"
-      + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
-      + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
-      + "<option value='COMBUSTIBLE'>Combustible</option>"
-      + "<option value='OTRO_EGRESO'>Otro gasto</option>"
-      + "</optgroup>";
+    var opcionesCategoria = opcionesCategoriaFinanza(null);
 
     var cuerpoHtml = "<form id='form-editar-finanza' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label>Fecha: <input type='date' id='ef-fecha' value='" + esc(fechaCorta(fila.fecha)) + "' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -6792,20 +6796,9 @@
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "gasto") {
       h += "<label>Categoría: <select id='cap-fin-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<optgroup label='Ingresos'>"
-        + "<option value='VENTA_LECHE'>Venta de leche</option>"
-        + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
-        + "</optgroup>"
-        + "<optgroup label='Egresos'>"
-        + "<option value='INSUMO' selected>Insumos (sal, alambre, herramienta, etc.)</option>"
-        + "<option value='NOMINA'>Nómina / Jornales</option>"
-        + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
-        + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
-        + "<option value='COMBUSTIBLE'>Combustible</option>"
-        + "<option value='OTRO_EGRESO'>Otro gasto</option>"
-        + "</optgroup>"
+        + opcionesCategoriaFinanza("INSUMO")
         + "</select></label>"
-        + "<label>Concepto: <input id='cap-fin-concepto' placeholder='ej. Sal mineralizada 40kg, Jornal Andrés' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<label>Concepto: <input id='cap-fin-concepto' placeholder='ej. Sal mineralizada 40kg, Ivermectina, Jornal Andrés' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Monto ($): <input type='number' step='1' min='0' id='cap-fin-monto' placeholder='ej. 180000' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-fin-litros-wrap' style='display:none;'><label>Litros vendidos (solo venta de leche): <input type='number' step='0.5' id='cap-fin-litros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<label>Proveedor / Comprador / Trabajador (opcional): <input id='cap-fin-contraparte' placeholder='ej. Agropecuaria X, Andrés' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -6996,6 +6989,10 @@
     var cCampos = document.getElementById("captura-campos");
     var _fotoActual = null;
     var _facturaIaFotoRuta = null;
+    // Reparto de la factura leída con IA en una categoría por renglón (ej.
+    // sal + droga): si trae más de una, al guardar se anota un movimiento por
+    // categoría en vez de uno solo.
+    var _facturaIaDesglose = null;
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview)
     // + defaults inteligentes (último potrero / tag desde ficha).
@@ -7758,6 +7755,7 @@
         btnQuitar.addEventListener("click", function () {
           _fotoActual = null;
           _facturaIaFotoRuta = null;
+          _facturaIaDesglose = null;
           if (fileInp) fileInp.value = "";
           if (preWrap) preWrap.style.display = "none";
           if (preImg) preImg.src = "";
@@ -7813,6 +7811,7 @@
               if (preWrap) preWrap.style.display = "flex";
 
               _facturaIaFotoRuta = null;
+              _facturaIaDesglose = null;
               if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
                 boxIa.style.display = "block";
                 var txtAyudaIa = _tipoCapturaActual === "leche"
@@ -8111,6 +8110,7 @@
 
       function rellenarCamposFactura(res) {
         _facturaIaFotoRuta = res.foto_ruta || null;
+        _facturaIaDesglose = (res.tipo === "EGRESO" && res.desglose && res.desglose.length > 1) ? res.desglose : null;
         if (estadoIa) estadoIa.innerHTML = "";
         var selCat = document.getElementById("cap-fin-categoria");
         var fConcepto = document.getElementById("cap-fin-concepto");
@@ -8125,9 +8125,26 @@
         if (fFecha && res.fecha) fFecha.value = res.fecha;
         if (previewIa) {
           previewIa.style.display = "block";
+          var hDesglose = "";
+          if (_facturaIaDesglose) {
+            hDesglose = "<div style='margin-top:10px;'>"
+              + "<b>Esta factura trae varias cosas:</b>"
+              + "<ul style='margin:6px 0; padding-left:18px;'>"
+              + _facturaIaDesglose.map(function (g) {
+                return "<li><b>" + esc(etiquetaCategoriaFinanza(g.categoria)) + "</b>: " + esc(fmtMoneda(g.monto))
+                  + (g.concepto ? "<br><small style='color:var(--texto-suave);'>" + esc(g.concepto) + "</small>" : "") + "</li>";
+              }).join("")
+              + "</ul>"
+              + "<label style='display:flex; gap:8px; align-items:flex-start; font-weight:600;'>"
+              + "<input type='checkbox' id='cap-fin-separar' checked style='margin-top:3px; width:18px; height:18px;'>"
+              + "<span>Anotar separado por categoría (" + _facturaIaDesglose.length + " gastos)</span></label>"
+              + "<small style='color:var(--texto-suave); display:block; margin-top:4px;'>Si lo desmarcas se guarda un solo gasto con la categoría y el monto de arriba.</small>"
+              + "</div>";
+          }
           previewIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--verde-marca);'>"
             + icon("checkCircle", 14) + "<b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
             + (res.observaciones ? "<br><small>" + esc(res.observaciones) + "</small>" : "")
+            + hDesglose
             + "</div>";
         }
       }
@@ -8532,6 +8549,11 @@
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
           payload.potrero = (q("#cap-fin-potrero") && q("#cap-fin-potrero").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+          var chkSeparar = q("#cap-fin-separar");
+          if (_facturaIaDesglose && chkSeparar && chkSeparar.checked && payload.tipo_finanza === "EGRESO") {
+            payload.desglose = _facturaIaDesglose;
+            payload.monto = _facturaIaDesglose.reduce(function (t, g) { return t + (Number(g.monto) || 0); }, 0);
+          }
         } else if (_tipoCapturaActual === "tarea") {
           var objTipo = (q("#cap-tarea-obj") && q("#cap-tarea-obj").value) || "animal";
           payload.tipo_objetivo = objTipo.toUpperCase();
@@ -8643,6 +8665,8 @@
             if (tagG) localStorage.setItem("bitacora_ultimo_tag", tagG);
           } catch (eGuard) { /* almacenamiento no disponible */ }
           _fotoActual = null;
+          _facturaIaFotoRuta = null;
+          _facturaIaDesglose = null;
           form.reset();
           refrescarCamposCap();
           actualizarBadges();

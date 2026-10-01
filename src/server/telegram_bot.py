@@ -14,6 +14,7 @@ from typing import Optional
 
 from ..bot.bot_interface import Bot
 from ..db.database import Database
+from ..engine.factura_gasto import pide_leer_factura
 from ..engine.charts import (
     generar_grafico_aforo_potreros,
     generar_grafico_carga_animal_potrero,
@@ -491,6 +492,49 @@ def construir_application(
             if update.message:
                 await update.message.reply_text(f"❌ Error: {e}")
 
+    async def _leer_factura_gasto(context, foto_path: str, avisar_error: bool):
+        """Lee con IA una foto de factura de gasto (sal, drogas, etc.) y deja
+        la propuesta pendiente de confirmar con un botón. Devuelve
+        (texto_html, teclado, ruta_final_de_la_foto); texto None si no era
+        una factura de gasto."""
+        import asyncio
+        import uuid
+
+        from ..engine.factura_gasto import texto_propuesta
+        from ..vision.recibo_gasto_parser import analizar_factura_gasto
+
+        with open(foto_path, "rb") as f:
+            raw = f.read()
+        res = await asyncio.to_thread(analizar_factura_gasto, raw, date.today().isoformat())
+        if not res.get("ok"):
+            # Solo se avisa si el usuario dijo que era factura; si fue el OCR
+            # el que sospechó, la foto sigue su camino normal sin ruido.
+            if avisar_error:
+                return (f"🧾 No pude leer la factura: {html.escape(res.get('error') or '')} "
+                        "La foto quedó guardada."), None, foto_path
+            return None, None, foto_path
+        if not res.get("es_factura") or res.get("tipo") != "EGRESO" or not res.get("monto_total"):
+            return None, None, foto_path
+
+        # Nombre factura_* para que en la PWA solo la vean OWNER/ADMIN
+        # (soporte de pagos, ver /media en rutas/push_graficos.py).
+        ruta_nueva = os.path.join(os.path.dirname(foto_path), f"factura_tg_{int(time.time())}_{uuid.uuid4().hex[:6]}.jpg")
+        try:
+            os.replace(foto_path, ruta_nueva)
+            db.execute("UPDATE fotos SET ruta = ? WHERE ruta = ?", (ruta_nueva, foto_path))
+        except OSError:
+            ruta_nueva = foto_path
+        clave = uuid.uuid4().hex[:8]
+        pendientes = context.user_data.setdefault("facturas_gasto", {})
+        while len(pendientes) >= 10:
+            pendientes.pop(next(iter(pendientes)))
+        pendientes[clave] = {"res": res, "foto_ruta": ruta_nueva.replace("\\", "/")}
+        teclado = InlineKeyboardMarkup([[
+            InlineKeyboardButton("✅ Anotar gasto", callback_data=f"gastofac:ok:{clave}"),
+            InlineKeyboardButton("❌ No anotar", callback_data=f"gastofac:no:{clave}"),
+        ]])
+        return texto_propuesta(res), teclado, ruta_nueva
+
     async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         try:
             if not update.effective_user or not update.message:
@@ -577,7 +621,18 @@ def construir_application(
                         toro=factura_info.toro,
                         cantidad=factura_info.cantidad,
                     )
-            elif ocr_text:
+
+            # Factura de gasto (sal, drogas, concentrado...): se lee con IA y
+            # se propone anotarla en Finanzas, como en la PWA.
+            texto_gasto, teclado_gasto = None, None
+            if not tiene_propuesta_factura and pide_leer_factura(caption, ocr_text):
+                try:
+                    texto_gasto, teclado_gasto, dest_path = await _leer_factura_gasto(
+                        context, dest_path, pide_leer_factura(caption, ""))
+                except Exception:
+                    logger.exception("No se pudo leer la factura de gasto")
+
+            if not (factura_info and getattr(factura_info, "propuesta_mensaje", None)) and not texto_gasto and ocr_text:
                 tiene_numeros = bool(re.search(r"\d", ocr_text))
                 tiene_simbolo_o_nit = bool(re.search(r"(\$|nit|cop)", ocr_text, re.IGNORECASE))
                 if tiene_numeros and tiene_simbolo_o_nit:
@@ -588,7 +643,8 @@ def construir_application(
             str_feedback = ("\n" + "\n".join(ocr_feedback)) if ocr_feedback else ""
 
             # Si el caption o OCR contiene un evento zootécnico (ej. 'pario la 47 macho'), procesarlo también
-            if texto_consolidado and nlu.clasificar(texto_consolidado) is not None:
+            hubo_evento = bool(texto_consolidado and nlu.clasificar(texto_consolidado) is not None)
+            if hubo_evento:
                 bot_engine = Bot(db)
                 resp_evento = bot_engine.procesar_texto(texto_consolidado, user_id=user_id, **_datos_revision(user_id))
                 msg_resp = f"📷 Foto registrada y vinculada a {tag or 'evento'}.{str_feedback}\n\n{resp_evento}"
@@ -602,6 +658,10 @@ def construir_application(
                     msg_resp,
                     reply_markup=teclado_fac,
                 )
+            elif texto_gasto:
+                if hubo_evento:
+                    await update.message.reply_text(msg_resp)
+                await update.message.reply_text(texto_gasto, parse_mode="HTML", reply_markup=teclado_gasto)
             else:
                 await update.message.reply_text(msg_resp)
         except Exception as e:
@@ -3392,6 +3452,30 @@ def construir_application(
                         await query.message.reply_text(msg, parse_mode="HTML", reply_markup=teclado_faq)
                     except Exception:
                         await query.message.reply_text(msg, reply_markup=teclado_faq)
+
+            elif data.startswith("gastofac:"):
+                await query.answer()
+                _, accion, clave = (data.split(":") + ["", ""])[:3]
+                propuesta = (context.user_data.get("facturas_gasto") or {}).pop(clave, None)
+                if not query.message:
+                    pass
+                elif not propuesta:
+                    await query.message.edit_text("⚠️ Esa factura ya se anotó o se descartó.")
+                elif accion != "ok":
+                    await query.message.edit_text("❌ <i>Factura no anotada. La foto quedó guardada.</i>", parse_mode="HTML")
+                else:
+                    from ..engine.factura_gasto import anotar_factura
+                    try:
+                        ids = anotar_factura(db, propuesta["res"], foto_ruta=propuesta["foto_ruta"], user_id=user_id)
+                    except ValueError as err:
+                        await query.message.edit_text(f"⚠️ {html.escape(str(err))} Anótala desde la app.")
+                    else:
+                        cuantos = "1 gasto" if len(ids) == 1 else f"{len(ids)} gastos"
+                        await query.message.edit_text(
+                            query.message.text_html.replace("¿La anoto como gasto en Finanzas?", "")
+                            + f"✅ <b>Anotado en Finanzas ({cuantos}).</b>",
+                            parse_mode="HTML",
+                        )
 
             elif data.startswith("factura_pajuela:") or data.startswith("cmd:confirmar_factura"):
                 await query.answer()
