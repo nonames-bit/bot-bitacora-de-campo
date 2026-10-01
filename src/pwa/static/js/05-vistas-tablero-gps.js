@@ -146,7 +146,7 @@
       actualizarClimaHeader();
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
-    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='font-size:12px; text-decoration:none; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
+    var pdfBtn = botonDescargar("general");
     // Sin botón "Buscar": la lupita flotante abre el mismo buscador
     // con arete Y potrero, para no duplicar controles en el celular.
     var h = "<div class='tablero-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"

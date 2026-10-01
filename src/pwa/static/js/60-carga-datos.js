@@ -18,7 +18,8 @@
     sistema:   { kpis: 4, graf: 0, tabla: 0 },
     mercado:   { kpis: 3, graf: 0, tabla: 8 },
     usuarios:  { kpis: 0, graf: 0, tabla: 5 },
-    revision:  { kpis: 0, graf: 0, tabla: 4 }
+    revision:  { kpis: 0, graf: 0, tabla: 4 },
+    reportes:  { kpis: 0, graf: 0, tabla: 8 }
   };
   function htmlSkeleton(v) {
     var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;

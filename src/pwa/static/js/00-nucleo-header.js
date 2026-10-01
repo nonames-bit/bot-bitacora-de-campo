@@ -27,22 +27,10 @@
   var icon = window.JA.icon;
   var dot = window.JA.dot;
 
-  function barraDescargaSeccion(seccion, nombre) {
-    var extraBtn = "";
-    if (seccion === "inventario") {
-      extraBtn = "<a href='/api/reporte.pdf?seccion=censo_ica' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; color:#1d4ed8; background:rgba(37,99,235,0.08); border:1px solid #3b82f6;' target='_blank' title='Descargar Censo Oficial ICA para movilización y vacunación'>"
-        + icon("filePdf", 12) + "Censo ICA (PDF)</a>";
-    } else if (seccion === "reproduccion") {
-      extraBtn = "<a href='/api/reporte.pdf?seccion=reproduccion&periodo=mensual' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700; color:#b45309; background:rgba(245,158,11,0.08); border:1px solid #f59e0b;' target='_blank' title='Descargar Informe Reproductivo Mensual (PDF)'>"
-        + icon("calendar", 12) + "Repro Mensual (PDF)</a>";
-    }
-    return "<div class='descarga-seccion-barra' style='display:inline-flex; align-items:center; gap:6px;'>"
-      + extraBtn
-      + "<a href='/api/reporte.pdf?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600;' target='_blank' title='Descargar reporte PDF de " + esc(nombre) + "'>"
-      + icon("download", 12) + "PDF</a>"
-      + "<a href='/api/reporte.xlsx?seccion=" + encodeURIComponent(seccion) + "' class='tema-btn' style='font-size:11.5px; padding:4px 9px; border-radius:6px; text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--verde-marca); border:1px solid var(--verde-marca);' target='_blank' title='Descargar datos en Excel de " + esc(nombre) + "'>"
-      + icon("table", 12) + "Excel</a>"
-      + "</div>";
+  // Un solo botón "Descargar" por pantalla: lleva a Reportes con el de
+  // esta sección resaltado (ver 47-reportes.js).
+  function barraDescargaSeccion(seccion) {
+    return botonDescargar(seccion);
   }
 
   var _pasturasGraficoActivo = "mapa_potreros";

@@ -446,8 +446,9 @@
     });
   }
   function renderAgenda(d) {
-    var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='float:right; font-size:12px; text-decoration:none; padding:4px 10px; margin-top:-4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
-    var h = "<h3>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días" + pdfBtn + "</h3>" + erroresHtml(d);
+    var pdfBtn = botonDescargar("general");
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;'>"
+      + "<h3 style='margin:0;'>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + pdfBtn + "</div>" + erroresHtml(d);
     // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
     // apilado, táctil grande, sin recargar la página.
     // Crear evento / tarea asignada de campo: formulario móvil táctil grande

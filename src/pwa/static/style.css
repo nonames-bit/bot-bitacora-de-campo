@@ -4458,3 +4458,25 @@ button.btn-peligro {
   border: 1px solid currentColor;
 }
 button.btn-peligro:hover { background: rgba(220, 38, 38, 0.08); }
+
+/* ---------- Reportes (Fase E) ---------- */
+.rep-periodo { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
+.rep-periodo .rep-per { font-size: 12.5px; padding: 6px 12px; }
+.rep-lista { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.rep-item { display: flex; flex-direction: column; gap: 10px; justify-content: space-between; margin: 0; }
+.rep-info { display: flex; gap: 10px; align-items: flex-start; }
+.rep-info b { display: block; font-size: 14px; }
+.rep-info small { display: block; color: var(--texto-suave); font-size: 12px; margin-top: 2px; }
+.rep-ico { color: var(--verde-marca); flex: 0 0 auto; margin-top: 1px; }
+.rep-acciones { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.rep-btn {
+  display: inline-flex; align-items: center; gap: 5px; min-height: 36px;
+  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  background: var(--verde-marca); color: #FFFFFF; border: 1px solid var(--verde-marca);
+  text-decoration: none; cursor: pointer;
+}
+.rep-btn:hover { background: var(--verde-marca-hover); }
+.rep-btn.rep-btn-sec { background: var(--superficie); color: var(--verde-marca); border-color: var(--borde-fuerte); }
+.rep-btn.rep-btn-sec:hover { background: var(--verde-marca-pastel); border-color: var(--verde-marca); }
+.rep-ficha input { flex: 1; min-width: 0; }
+@media (max-width: 420px) { .rep-lista { grid-template-columns: 1fr; } }
