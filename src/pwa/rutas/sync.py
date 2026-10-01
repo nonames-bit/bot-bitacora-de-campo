@@ -10,6 +10,7 @@ from typing import Any, Optional
 from flask import jsonify, request, session
 from ...engine import lactancia as _lactancia
 from ...engine import revision as _revision
+from ...engine.finanzas_categorias import normalizar_categoria
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
     _invalidar_tareas,
@@ -56,6 +57,29 @@ def registrar(app, ctx, h):
             return None
         fila = db_inst.query_one("SELECT 1 AS ok FROM fotos WHERE ruta = ? LIMIT 1", (ruta,))
         return ruta if fila else None
+
+    def _partes_desglose(desglose: Any) -> list[dict]:
+        """Valida el reparto por categoría que manda la PWA al guardar una
+        factura leída con IA. Devuelve [] si no sirve (y se guarda un solo
+        movimiento con los datos del formulario)."""
+        if not isinstance(desglose, list) or not 2 <= len(desglose) <= 15:
+            return []
+        partes = []
+        for g in desglose:
+            if not isinstance(g, dict):
+                return []
+            try:
+                monto = round(float(g.get("monto")), 2)
+            except (TypeError, ValueError):
+                return []
+            if monto <= 0:
+                return []
+            partes.append({
+                "categoria": normalizar_categoria(g.get("categoria"), "EGRESO"),
+                "concepto": (str(g.get("concepto") or "").strip()[:200] or None),
+                "monto": monto,
+            })
+        return partes
 
     def _procesar_eventos(db_sync, eventos, uid, rol_sync, nombre_usuario=None, revisar=True):
         """Registra una lista de eventos de /api/sync. Con ``revisar`` los
@@ -402,37 +426,46 @@ def registrar(app, ctx, h):
                     if tipo_fin == "INGRESO" and rol_sync not in ("OWNER", "ADMIN"):
                         errores.append(f"Permisos insuficientes para registrar INGRESO ({id_local or tipo})")
                         continue
-                    fid_finanza = db_sync.registrar_finanza(
-                        fecha=fecha,
-                        tipo=tipo_fin,
-                        categoria=payload.get("categoria"),
-                        concepto=payload.get("concepto"),
-                        monto=payload.get("monto"),
-                        litros=payload.get("litros"),
-                        animal_tag=payload.get("animal_tag") or None,
-                        potrero=payload.get("potrero") or None,
-                        contraparte=payload.get("contraparte") or None,
-                        notas=payload.get("notas"),
-                        registrado_por=uid,
-                    )
-                    foto_ruta_directa = _foto_media_existente(db_sync, payload.get("foto_ruta"))
-                    if foto_ruta_directa:
-                        # La foto ya se guardó al analizar la factura con IA
-                        # (ver /api/finanzas/analizar-factura) -- solo se
-                        # enlaza, no se vuelve a subir el mismo archivo.
-                        db_sync.execute(
-                            "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
-                            (foto_ruta_directa, fid_finanza),
+                    # Factura leída con IA que trae varias categorías (ej.
+                    # sal + droga): un movimiento por categoría, todos con
+                    # la misma foto, proveedor y fecha.
+                    partes = _partes_desglose(payload.get("desglose")) if tipo_fin == "EGRESO" else []
+                    if not partes:
+                        partes = [{"categoria": payload.get("categoria"), "concepto": payload.get("concepto"),
+                                   "monto": payload.get("monto")}]
+                    nota_reparto = (f"Factura repartida en {len(partes)} categorías." if len(partes) > 1 else None)
+                    notas_fin = " ".join(x for x in (payload.get("notas"), nota_reparto) if x) or None
+                    ids_finanza = [
+                        db_sync.registrar_finanza(
+                            fecha=fecha,
+                            tipo=tipo_fin,
+                            categoria=parte["categoria"],
+                            concepto=parte["concepto"],
+                            monto=parte["monto"],
+                            litros=payload.get("litros") if len(partes) == 1 else None,
+                            animal_tag=payload.get("animal_tag") or None,
+                            potrero=payload.get("potrero") or None,
+                            contraparte=payload.get("contraparte") or None,
+                            notas=notas_fin,
+                            registrado_por=uid,
                         )
-                    else:
+                        for parte in partes
+                    ]
+                    foto_ruta_fin = _foto_media_existente(db_sync, payload.get("foto_ruta"))
+                    if not foto_ruta_fin:
                         fid_foto = _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         if fid_foto:
                             foto_fila = db_sync.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
-                            if foto_fila and foto_fila["ruta"]:
-                                db_sync.execute(
-                                    "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
-                                    (foto_fila["ruta"], fid_finanza),
-                                )
+                            foto_ruta_fin = foto_fila["ruta"] if foto_fila and foto_fila["ruta"] else None
+                    if foto_ruta_fin:
+                        # Si la foto ya se guardó al analizar la factura con
+                        # IA (ver /api/finanzas/analizar-factura) solo se
+                        # enlaza, no se vuelve a subir el mismo archivo.
+                        for fid_finanza in ids_finanza:
+                            db_sync.execute(
+                                "UPDATE finanzas SET foto_ruta = ? WHERE id = ?",
+                                (foto_ruta_fin, fid_finanza),
+                            )
                     procesados += 1
                     if id_local:
                         ids_ok.append(id_local)

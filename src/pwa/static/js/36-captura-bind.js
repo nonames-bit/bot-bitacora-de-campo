@@ -2,6 +2,10 @@
     var cCampos = document.getElementById("captura-campos");
     var _fotoActual = null;
     var _facturaIaFotoRuta = null;
+    // Reparto de la factura leída con IA en una categoría por renglón (ej.
+    // sal + droga): si trae más de una, al guardar se anota un movimiento por
+    // categoría en vez de uno solo.
+    var _facturaIaDesglose = null;
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview)
     // + defaults inteligentes (último potrero / tag desde ficha).
@@ -764,6 +768,7 @@
         btnQuitar.addEventListener("click", function () {
           _fotoActual = null;
           _facturaIaFotoRuta = null;
+          _facturaIaDesglose = null;
           if (fileInp) fileInp.value = "";
           if (preWrap) preWrap.style.display = "none";
           if (preImg) preImg.src = "";
@@ -819,6 +824,7 @@
               if (preWrap) preWrap.style.display = "flex";
 
               _facturaIaFotoRuta = null;
+              _facturaIaDesglose = null;
               if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
                 boxIa.style.display = "block";
                 var txtAyudaIa = _tipoCapturaActual === "leche"
@@ -1117,6 +1123,7 @@
 
       function rellenarCamposFactura(res) {
         _facturaIaFotoRuta = res.foto_ruta || null;
+        _facturaIaDesglose = (res.tipo === "EGRESO" && res.desglose && res.desglose.length > 1) ? res.desglose : null;
         if (estadoIa) estadoIa.innerHTML = "";
         var selCat = document.getElementById("cap-fin-categoria");
         var fConcepto = document.getElementById("cap-fin-concepto");
@@ -1131,9 +1138,26 @@
         if (fFecha && res.fecha) fFecha.value = res.fecha;
         if (previewIa) {
           previewIa.style.display = "block";
+          var hDesglose = "";
+          if (_facturaIaDesglose) {
+            hDesglose = "<div style='margin-top:10px;'>"
+              + "<b>Esta factura trae varias cosas:</b>"
+              + "<ul style='margin:6px 0; padding-left:18px;'>"
+              + _facturaIaDesglose.map(function (g) {
+                return "<li><b>" + esc(etiquetaCategoriaFinanza(g.categoria)) + "</b>: " + esc(fmtMoneda(g.monto))
+                  + (g.concepto ? "<br><small style='color:var(--texto-suave);'>" + esc(g.concepto) + "</small>" : "") + "</li>";
+              }).join("")
+              + "</ul>"
+              + "<label style='display:flex; gap:8px; align-items:flex-start; font-weight:600;'>"
+              + "<input type='checkbox' id='cap-fin-separar' checked style='margin-top:3px; width:18px; height:18px;'>"
+              + "<span>Anotar separado por categoría (" + _facturaIaDesglose.length + " gastos)</span></label>"
+              + "<small style='color:var(--texto-suave); display:block; margin-top:4px;'>Si lo desmarcas se guarda un solo gasto con la categoría y el monto de arriba.</small>"
+              + "</div>";
+          }
           previewIa.innerHTML = "<div class='aviso' style='border-left:4px solid var(--verde-marca);'>"
             + icon("checkCircle", 14) + "<b>Factura leída.</b> Revisa los campos de arriba (categoría, concepto, monto, proveedor) antes de guardar."
             + (res.observaciones ? "<br><small>" + esc(res.observaciones) + "</small>" : "")
+            + hDesglose
             + "</div>";
         }
       }
@@ -1538,6 +1562,11 @@
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
           payload.potrero = (q("#cap-fin-potrero") && q("#cap-fin-potrero").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+          var chkSeparar = q("#cap-fin-separar");
+          if (_facturaIaDesglose && chkSeparar && chkSeparar.checked && payload.tipo_finanza === "EGRESO") {
+            payload.desglose = _facturaIaDesglose;
+            payload.monto = _facturaIaDesglose.reduce(function (t, g) { return t + (Number(g.monto) || 0); }, 0);
+          }
         } else if (_tipoCapturaActual === "tarea") {
           var objTipo = (q("#cap-tarea-obj") && q("#cap-tarea-obj").value) || "animal";
           payload.tipo_objetivo = objTipo.toUpperCase();
@@ -1649,6 +1678,8 @@
             if (tagG) localStorage.setItem("bitacora_ultimo_tag", tagG);
           } catch (eGuard) { /* almacenamiento no disponible */ }
           _fotoActual = null;
+          _facturaIaFotoRuta = null;
+          _facturaIaDesglose = null;
           form.reset();
           refrescarCamposCap();
           actualizarBadges();

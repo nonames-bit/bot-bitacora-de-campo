@@ -1,13 +1,29 @@
   /* ---------- Finanzas: Ingresos, Egresos y Utilidad ---------- */
   var _finanzasAno = new Date().getFullYear();
   var _finanzasMovsActuales = [];
+  // Mismo orden y nombres que src/engine/finanzas_categorias.py.
   var CATEGORIAS_FINANZAS_LABEL = {
     VENTA_LECHE: "Venta de leche", VENTA_ANIMAL: "Venta de animales",
-    COMPRA_ANIMAL: "Compra de animales", NOMINA: "Nómina / Jornales",
-    INSUMO: "Insumos (sal, alambre, etc.)", VETERINARIO: "Veterinario / Medicamentos",
-    INFRAESTRUCTURA: "Infraestructura / Mantenimiento", COMBUSTIBLE: "Combustible",
-    OTRO_INGRESO: "Otro ingreso", OTRO_EGRESO: "Otro gasto"
+    COMPRA_ANIMAL: "Compra de animales", OTRO_INGRESO: "Otro ingreso",
+    SAL_MINERALES: "Sal y minerales", MEDICAMENTOS: "Drogas / medicamentos",
+    ALIMENTO: "Concentrado / alimento", FERTILIZANTES: "Abonos, semillas y venenos de potrero",
+    REPRODUCCION: "Pajillas / nitrógeno", INSUMO: "Otros insumos (alambre, herramienta, etc.)",
+    NOMINA: "Nómina / jornales", VETERINARIO: "Veterinario (visita / servicio)",
+    INFRAESTRUCTURA: "Infraestructura / mantenimiento", COMBUSTIBLE: "Combustible",
+    OTRO_EGRESO: "Otro gasto"
   };
+  var CATEGORIAS_INGRESO_LISTA = ["VENTA_LECHE", "OTRO_INGRESO"];
+  var CATEGORIAS_EGRESO_LISTA = ["SAL_MINERALES", "MEDICAMENTOS", "ALIMENTO", "FERTILIZANTES", "REPRODUCCION",
+    "INSUMO", "NOMINA", "VETERINARIO", "INFRAESTRUCTURA", "COMBUSTIBLE", "OTRO_EGRESO"];
+  function opcionesCategoriaFinanza(seleccionada) {
+    function opts(lista) {
+      return lista.map(function (c) {
+        return "<option value='" + c + "'" + (c === seleccionada ? " selected" : "") + ">" + esc(CATEGORIAS_FINANZAS_LABEL[c]) + "</option>";
+      }).join("");
+    }
+    return "<optgroup label='Ingresos'>" + opts(CATEGORIAS_INGRESO_LISTA) + "</optgroup>"
+      + "<optgroup label='Gastos'>" + opts(CATEGORIAS_EGRESO_LISTA) + "</optgroup>";
+  }
   function etiquetaCategoriaFinanza(cat) { return CATEGORIAS_FINANZAS_LABEL[cat] || cat; }
 
   function renderFinanzas(d) {
@@ -236,19 +252,7 @@
     var overlay = document.getElementById("fin-editar-modal");
     if (overlay) overlay.remove();
 
-    var opcionesCategoria = ""
-      + "<optgroup label='Ingresos'>"
-      + "<option value='VENTA_LECHE'>Venta de leche</option>"
-      + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
-      + "</optgroup>"
-      + "<optgroup label='Egresos'>"
-      + "<option value='INSUMO'>Insumos (sal, alambre, herramienta, etc.)</option>"
-      + "<option value='NOMINA'>Nómina / Jornales</option>"
-      + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
-      + "<option value='INFRAESTRUCTURA'>Infraestructura / Mantenimiento</option>"
-      + "<option value='COMBUSTIBLE'>Combustible</option>"
-      + "<option value='OTRO_EGRESO'>Otro gasto</option>"
-      + "</optgroup>";
+    var opcionesCategoria = opcionesCategoriaFinanza(null);
 
     var cuerpoHtml = "<form id='form-editar-finanza' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label>Fecha: <input type='date' id='ef-fecha' value='" + esc(fechaCorta(fila.fecha)) + "' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"

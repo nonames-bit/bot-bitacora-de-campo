@@ -1840,6 +1840,60 @@ def test_api_sync_gasto_con_foto_ruta_no_duplica_foto(client, db_file):
         db.close()
 
 
+def test_api_sync_gasto_con_desglose_anota_un_movimiento_por_categoria(client, db_file):
+    """Factura leída con IA con sal y droga: se guarda un egreso por
+    categoría, todos con la misma foto y proveedor."""
+    from src.db.database import Database
+
+    db = Database(db_file)
+    db.registrar_foto(ruta="media/factura_sal_droga.jpg", caption="Factura/Recibo")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "id_local": "x2", "tipo": "gasto", "fecha": "2026-10-01",
+        "payload": {
+            "tipo_finanza": "EGRESO", "categoria": "SAL_MINERALES", "concepto": "Sal y droga",
+            "monto": 476000, "contraparte": "Agrotienda", "foto_ruta": "media/factura_sal_droga.jpg",
+            "desglose": [
+                {"categoria": "SAL_MINERALES", "concepto": "Sal x3", "monto": 357000},
+                {"categoria": "NO_EXISTE", "concepto": "Ivermectina", "monto": 119000},
+            ],
+        },
+    }]})
+    assert r.status_code == 200
+    assert r.get_json()["procesados"] == 1
+
+    db = Database(db_file)
+    try:
+        filas = db.query("SELECT categoria, concepto, monto, contraparte, foto_ruta, notas FROM finanzas ORDER BY id")
+        assert [(f["categoria"], f["monto"]) for f in filas] == [("SAL_MINERALES", 357000), ("OTRO_EGRESO", 119000)]
+        assert all(f["foto_ruta"] == "media/factura_sal_droga.jpg" for f in filas)
+        assert all(f["contraparte"] == "Agrotienda" for f in filas)
+        assert "repartida en 2" in filas[0]["notas"]
+    finally:
+        db.close()
+
+
+def test_api_sync_gasto_con_desglose_invalido_guarda_uno_solo(client, db_file):
+    from src.db.database import Database
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "id_local": "x3", "tipo": "gasto", "fecha": "2026-10-01",
+        "payload": {
+            "tipo_finanza": "EGRESO", "categoria": "MEDICAMENTOS", "concepto": "Droga",
+            "monto": 50000, "desglose": [{"categoria": "SAL_MINERALES", "monto": -1},
+                                         {"categoria": "MEDICAMENTOS", "monto": 10}],
+        },
+    }]})
+    assert r.status_code == 200
+    db = Database(db_file)
+    try:
+        filas = db.query("SELECT categoria, monto FROM finanzas")
+        assert [(f["categoria"], f["monto"]) for f in filas] == [("MEDICAMENTOS", 50000)]
+    finally:
+        db.close()
+
+
 def test_api_leche_guardar_quincena_con_monto_crea_ingreso_en_finanzas(client, db_file):
     """Guardar la quincena con el monto que pagaron debe crear el ingreso en
     Finanzas (categoría VENTA_LECHE) reusando la misma foto ya guardada al
