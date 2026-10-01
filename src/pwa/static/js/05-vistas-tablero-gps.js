@@ -73,116 +73,18 @@
       });
     }
   }
-  /* ---------- Modo Campo (mayordomo): 4 botones grandes + hoy ---------- */
-  function renderCampo() {
-    var nom = (window.__usuarioActual && window.__usuarioActual.nombre) || "Mayordomo";
-    var hoy = new Date();
-    var fechaLarga = hoy.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-    var h = "<div class='campo-head'>"
-      + "<div style='font-size:15px; color:var(--texto-suave); text-transform:capitalize;'>" + esc(fechaLarga) + "</div>"
-      + "<div style='font-size:22px; font-weight:800;'>🤠 Hola, " + esc(nom) + "</div>"
-      + "<div style='font-size:13.5px; color:var(--texto-suave);'>¿Qué vamos a hacer hoy en el corral?</div>"
-      + "</div>"
-      + "<div class='campo-grid'>"
-      + "<button type='button' class='campo-tile campo-tile-captura' data-ir='captura'>" + icon("plus", 30) + "<b>Registrar</b><small>Parto, celo, pesaje…</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='agenda'>" + icon("calendar", 30) + "<b>Hoy</b><small id='campo-hoy-sub'>Ver pendientes…</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='ficha'>" + icon("search", 30) + "<b>Ficha</b><small>Buscar por arete</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='mapa'>" + icon("pin", 30) + "<b>GPS</b><small>Dónde estoy</small></button>"
-      + "</div>"
-      + "<div class='card campo-hoy' id='campo-hoy-box'>"
-      + "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
-      + "<div style='font-size:13.5px; color:var(--texto-suave);'>⏳ Cargando pendientes…</div>"
-      + "</div>"
-      + "<div id='campo-gps-box'></div>";
-    var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
-    if (rol !== "TRABAJADOR") {
-      h += "<button type='button' id='btn-campo-salir' class='tema-btn' style='width:100%; padding:12px; font-size:14px;'>← Volver a la vista de oficina</button>";
-    }
-    return h;
-  }
-  function bindCampo() {
-    qa(".campo-tile").forEach(function (t) {
-      t.addEventListener("click", function () {
-        var v = t.getAttribute("data-ir");
-        if (!v) return;
-        try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib) {}
-        // GPS sin mapa: localiza y ofrece guardar la ronda aquí mismo.
-        // El mapa satelital es solo oficina (/api/mapa/datos da 403).
-        if (v === "mapa") {
-          localizarGPSCampo();
-          try { window.scrollTo(0, document.body.scrollHeight); } catch (eSc2) {}
-          return;
-        }
-        irAVista(v);
-        cargar(true);
-        try { window.scrollTo(0, 0); } catch (eSc) { window.scrollTo(0, 0); }
-      });
-    });
-    var salir = document.getElementById("btn-campo-salir");
-    if (salir) salir.addEventListener("click", function () {
-      irAVista("tablero");
-      cargar(true);
-    });
-    fetch("/api/agenda?dias=7").then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(function (d) {
-      pintarResumenCampo(d || {});
-    }).catch(function () {
-      var box = document.getElementById("campo-hoy-box");
-      if (box) box.innerHTML = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
-        + "<div style='font-size:13.5px; color:var(--texto-suave);'>⚠️ Sin conexión: abra la Agenda cuando vuelva la señal.</div>";
-    });
-  }
-  function pintarResumenCampo(d) {
-    var box = document.getElementById("campo-hoy-box");
-    if (!box) return;
-    var urg = [];
-    (d.eventos || []).forEach(function (e) {
-      if (e.faltan_dias == null || e.faltan_dias <= 0) urg.push({ txt: (e.etiqueta || e.tipo || "Alerta"), det: e.tag ? ("Arete " + e.tag) : (e.descripcion || ""), dias: e.faltan_dias });
-    });
-    (d.recordatorios || []).forEach(function (r) {
-      if (r.faltan_dias == null || r.faltan_dias <= 0) urg.push({ txt: r.mensaje || "Tarea", det: (r.hora ? ("Hora " + r.hora + " · ") : "") + (r.animal_tag || r.potrero_nombre || ""), dias: r.faltan_dias });
-    });
-    urg = urg.slice(0, 6);
-    var nRet = (d.retiros || []).length;
-    var sub = document.getElementById("campo-hoy-sub");
-    var total = urg.length + nRet;
-    if (sub) sub.textContent = total ? (total + " pendiente" + (total === 1 ? "" : "s")) : "Todo al día ✓";
-    var h = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>";
-    if (!urg.length && !nRet) {
-      h += "<div style='font-size:15px;'>✅ Todo al día. Buen trabajo en el corral.</div>";
-    } else {
-      h += "<div style='display:flex; flex-direction:column; gap:8px;'>"
-        + urg.map(function (u) {
-          var cuando = (u.dias == null) ? "Sin fecha" : (u.dias <= 0 ? (u.dias === 0 ? "Hoy" : ("Hace " + Math.abs(u.dias) + " d")) : ("En " + u.dias + " d"));
-          return "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
-            + "<div style='font-size:15px; font-weight:700;'>" + esc(u.txt) + "</div>"
-            + "<div style='font-size:13px; color:var(--texto-suave);'>" + esc(cuando) + (u.det ? (" · " + esc(u.det)) : "") + "</div></div>";
-        }).join("");
-      if (nRet) {
-        h += "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
-          + "<div style='font-size:15px; font-weight:700;'>💉 " + nRet + " en retiro sanitario</div>"
-          + "<div style='font-size:13px; color:var(--texto-suave);'>Revise leche y carne antes de entregar</div></div>";
-      }
-      h += "</div>";
-    }
-    h += "<button type='button' id='btn-campo-ver-agenda' class='tema-btn' style='width:100%; margin-top:10px; padding:12px; font-size:14px;'>Ver agenda completa →</button>";
-    box.innerHTML = h;
-    var btnA = document.getElementById("btn-campo-ver-agenda");
-    if (btnA) btnA.addEventListener("click", function () { irAVista("agenda"); cargar(true); });
-  }
-  // GPS del modo campo (equivale al /aqui del bot): detecta el potrero
-  // donde está parado y ofrece guardar la ronda. Sin mapa: funciona con
-  // cualquier rol y con guantes (botones grandes).
-  function localizarGPSCampo() {
-    var box = document.getElementById("campo-gps-box");
+  // GPS de ronda (equivale al /aqui del bot): detecta el potrero donde
+  // está parado y ofrece guardar la ronda. Sin mapa: funciona con
+  // cualquier rol y con guantes (botones grandes). Vive en Registrar
+  // desde que se quitó el Modo Campo.
+  function localizarGPSRonda() {
+    var box = document.getElementById("gps-ronda-box");
     if (!box) return;
     if (!navigator.geolocation) {
-      box.innerHTML = "<div class='card campo-hoy'>📍 Este equipo no da ubicación GPS.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>📍 Este equipo no da ubicación GPS.</div>";
       return;
     }
-    box.innerHTML = "<div class='card campo-hoy'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
+    box.innerHTML = "<div class='card gps-ronda'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
     try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib2) {}
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude;
@@ -193,17 +95,17 @@
         body: JSON.stringify({ lat: lat, lon: lon })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
-          box.innerHTML = "<div class='card campo-hoy'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          box.innerHTML = "<div class='card gps-ronda'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
           return;
         }
         var pot = d.potrero || {};
-        box.innerHTML = "<div class='card campo-hoy' style='border-left:5px solid var(--verde-marca);'>"
+        box.innerHTML = "<div class='card gps-ronda' style='border-left:5px solid var(--verde-marca);'>"
           + "<div style='font-size:15px; font-weight:800;'>📍 Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
           + "<div style='font-size:13.5px; color:var(--texto-suave); margin:2px 0 10px;'>"
           + esc(d.total_animales || 0) + " animales aquí · " + esc(Number(lat).toFixed(5)) + ", " + esc(Number(lon).toFixed(5)) + "</div>"
-          + "<button type='button' id='btn-campo-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
+          + "<button type='button' id='btn-gps-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
           + "</div>";
-        var btnG = document.getElementById("btn-campo-guardar-ronda");
+        var btnG = document.getElementById("btn-gps-guardar-ronda");
         if (btnG) btnG.addEventListener("click", function () {
           btnG.disabled = true;
           btnG.textContent = "Guardando…";
@@ -227,10 +129,10 @@
           });
         });
       }).catch(function () {
-        box.innerHTML = "<div class='card campo-hoy'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
+        box.innerHTML = "<div class='card gps-ronda'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
       });
     }, function () {
-      box.innerHTML = "<div class='card campo-hoy'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
     }, { enableHighAccuracy: true, timeout: 15000 });
   }
 

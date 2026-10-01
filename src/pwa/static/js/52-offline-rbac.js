@@ -220,9 +220,7 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        // El botón Campo de la barra es exclusivo del mayordomo
-        // (oficina entra por el sheet "Modo Campo").
-        if (v === "gps" || v === "campo") b.style.display = "none";
+        if (v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -242,7 +240,7 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "sistema" || v === "gps" || v === "campo") b.style.display = "none";
+        if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -261,14 +259,12 @@
       if (sheetMapa) sheetMapa.style.display = "none";
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "none";
-      // Modo Campo: el mayordomo entra a 4 botones grandes (Captura,
-      // Agenda-hoy, Ficha, GPS) en vez del tablero de oficina. La Agenda
-      // es lectura/consulta que ya necesita en el corral. El mapa
-      // satelital sigue exclusivo de oficina (ver /api/mapa/datos): el
-      // botón GPS del modo campo localiza y guarda la ronda sin mapa.
-      var permitidas = ["captura", "manga", "ficha", "campo", "agenda"];
-      var btnCampo = document.getElementById("btn-nav-campo");
-      if (btnCampo) btnCampo.style.display = "";
+      // El mayordomo entra directo a Registrar (antes era el Modo Campo,
+      // que se quitó). La Agenda es lectura/consulta que ya necesita en el
+      // corral. El mapa satelital sigue exclusivo de oficina (ver
+      // /api/mapa/datos): el botón GPS de Registrar localiza y guarda la
+      // ronda sin mapa.
+      var permitidas = ["captura", "manga", "ficha", "agenda"];
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
@@ -278,6 +274,9 @@
         }
         if (permitidas.indexOf(v) !== -1) {
           b.style.display = "";
+          // Con solo 4 vistas, todas caben en la barra inferior del celular.
+          b.classList.remove("nav-secundario");
+          b.classList.add("nav-primario");
         } else {
           b.style.display = "none";
         }
@@ -295,7 +294,7 @@
         }
       });
       if (permitidas.indexOf(actual) === -1 && actual !== "ayuda") {
-        irAVista("campo");
+        irAVista("captura");
         cargar();
       }
     }

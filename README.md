@@ -755,10 +755,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Cuotas por usuario+IP en endpoints costosos (429 + `Retry-After`): voz 12/min, identificar 30/min, satélite 6/5min, gráficos 40/min, sync 40/min, mensajes 90/min. Sin esto, una sesión saturaba waitress y tumbaba la PWA.
   - `/exportar` (comando y botón) solo OWNER + aviso a los demás OWNER por Telegram; botón oculto para ADMIN y manual actualizado.
   - Pruebas: `tests/test_seguridad_rate_limit.py` (5 en verde: progresión/tope/persistencia del castigo, escalado y limpieza en login, 429 en API) + regresión (37 + 14 + 60).
-- [x] **Modo Campo del mayordomo (2026-09-24)**:
+- [x] **Modo Campo del mayordomo (2026-09-24)** (retirado el 2026-10-01, ver abajo):
   - Vista `campo` (`?v=campo`): saludo con fecha, 4 mosaicos grandes (Registrar, Hoy, Ficha, GPS) y resumen "Hoy en la finca" (vencidos + hoy, retiros, enlace a agenda). Botón Campo en la barra solo para TRABAJADOR y mosaico "Modo Campo" en el sheet para todos.
   - El TRABAJADOR cae en campo al entrar (antes caía en captura); puede abrir agenda y ficha; el GPS localiza y guarda la ronda sin mapa (el satelital sigue solo oficina, 403 intacto).
-  - Pruebas: `tests/test_modo_campo.py` (3 en verde) + 10/10 checks visuales con login PIN real de trabajador (cae en campo, GPS detecta ORDENIO SANTA MARTHA con 62 animales y la ronda queda persistida).
+  - Pruebas: `tests/test_modo_campo.py` (hoy `tests/test_trabajador_registrar.py`) (3 en verde) + 10/10 checks visuales con login PIN real de trabajador (cae en campo, GPS detecta ORDENIO SANTA MARTHA con 62 animales y la ronda queda persistida).
 - [x] **Buscador unificado y cielo detrás de la vaquita (2026-09-24)**:
   - Se quitó el botón "Buscar" del Tablero (duplicaba la lupita 🔍): la lupita ahora trae campo de arete/tag Y de potrero, con botones "Abrir Ficha" y "Ver en Tablero" (aplica el filtro y muestra la barra con contexto). Enter sin arete filtra el Tablero.
   - La vaquita de la cabecera quedó delante del cielo (z-index sobre sol/luna/nubes); la lluvia sigue cayendo encima, como debe ser.
@@ -795,6 +795,12 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - **Paleta Multicolor Zootécnica Contrastante**: Expansión de `COLORES_RAZA` y soporte de índice alternativo `idx` para diferenciar nítidamente cada componente racial en la barra apilada.
   - **Selector de Toros Limpio y Compacto**: En `/api/toros` y `cap-toro-padre`, se extrae la raza principal y se limpian dobles espacios, evitando que fórmulas multi-raza complejas de 70 caracteres desborden los menús desplegables del celular.
   - **Normalización y Desduplicación de Razas en BD**: Unificación de `Holstein Negro` -> `Holstein`, preservando `Holstein Rojo`. Consolidación de múltiples variantes de Cebú en `Cebú Comercial`. Normalización de 889 animales en `data/bitacora.db` mediante `scripts/normalizar_razas_existentes.py`.
+
+- [x] **Navegación de la PWA y botón atrás del celular (2026-10-01)**:
+  - La flecha atrás de Android ya no cierra la app: cada cambio de vista queda en el historial (`pushState`/`popstate` en `70-badges-nav.js`). Atrás primero cierra lo que esté abierto encima (modal, menú Más, visor de fotos, chat) o retrocede un paso de Registrar; luego vuelve a la vista anterior; desde el inicio avisa "Toca atrás otra vez para salir".
+  - Menú lateral y hoja "Más" en 4 grupos: Inicio (Tablero, Agenda), Registrar (Registrar, Manga Corral), Hato y Gestión. Manga Corral ya no queda encima del Tablero. "Captura" se llama "Registrar".
+  - Se quitó el Modo Campo: el TRABAJADOR entra a Registrar y su barra inferior muestra Agenda, Registrar, Manga Corral y Ficha. El GPS de ronda ("Estoy en el potrero") pasó a Registrar.
+  - Pruebas: `tests/test_trabajador_registrar.py` + verificación en Chromium 390×844 (atrás cierra Más, vuelve Repro → Inventario → Tablero, avisa al salir; trabajador cae en Registrar).
 
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.

@@ -1,5 +1,6 @@
-"""Modo Campo (mayordomo): el TRABAJADOR abre Captura, Agenda-hoy,
-Ficha y GPS desde 4 botones grandes; las APIs que usa responden 200."""
+"""El TRABAJADOR (mayordomo) entra a Registrar: Captura, Manga, Agenda,
+Ficha y el GPS de ronda. El Modo Campo se quitó (2026-10-01); las APIs que
+usaba siguen respondiendo 200."""
 import json
 
 import pytest
@@ -50,8 +51,23 @@ def test_trabajador_gps_sin_mapa(tmp_path):
     assert r2.get_json()["ok"] is True
 
 
-def test_index_trae_vista_campo(tmp_path):
+def test_index_sin_modo_campo(tmp_path):
     _, c = _app_trabajador(tmp_path)
     html = c.get("/").get_data(as_text=True)
-    assert 'data-v="campo"' in html
-    assert "Modo Campo" in html
+    assert 'data-v="campo"' not in html
+    assert "Modo Campo" not in html
+    # Manga queda junto a Registrar, no encima del Tablero.
+    assert html.index('data-v="tablero"') < html.index('data-v="captura"') < html.index('data-v="manga"')
+
+
+def test_app_js_historial_y_gps_en_registrar():
+    from pathlib import Path
+
+    js = (Path(__file__).resolve().parent.parent / "src" / "pwa" / "static" / "app.js").read_text(encoding="utf-8")
+    # El botón atrás del celular vuelve a la vista anterior.
+    assert 'addEventListener("popstate"' in js
+    assert "function iniciarHistorial" in js
+    # El GPS de ronda vive en Registrar y el trabajador ya no cae en "campo".
+    assert "btn-cap-gps-ronda" in js
+    assert "renderCampo" not in js
+    assert 'irAVista("campo")' not in js

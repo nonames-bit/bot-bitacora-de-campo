@@ -524,116 +524,18 @@
       });
     }
   }
-  /* ---------- Modo Campo (mayordomo): 4 botones grandes + hoy ---------- */
-  function renderCampo() {
-    var nom = (window.__usuarioActual && window.__usuarioActual.nombre) || "Mayordomo";
-    var hoy = new Date();
-    var fechaLarga = hoy.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
-    var h = "<div class='campo-head'>"
-      + "<div style='font-size:15px; color:var(--texto-suave); text-transform:capitalize;'>" + esc(fechaLarga) + "</div>"
-      + "<div style='font-size:22px; font-weight:800;'>🤠 Hola, " + esc(nom) + "</div>"
-      + "<div style='font-size:13.5px; color:var(--texto-suave);'>¿Qué vamos a hacer hoy en el corral?</div>"
-      + "</div>"
-      + "<div class='campo-grid'>"
-      + "<button type='button' class='campo-tile campo-tile-captura' data-ir='captura'>" + icon("plus", 30) + "<b>Registrar</b><small>Parto, celo, pesaje…</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='agenda'>" + icon("calendar", 30) + "<b>Hoy</b><small id='campo-hoy-sub'>Ver pendientes…</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='ficha'>" + icon("search", 30) + "<b>Ficha</b><small>Buscar por arete</small></button>"
-      + "<button type='button' class='campo-tile' data-ir='mapa'>" + icon("pin", 30) + "<b>GPS</b><small>Dónde estoy</small></button>"
-      + "</div>"
-      + "<div class='card campo-hoy' id='campo-hoy-box'>"
-      + "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
-      + "<div style='font-size:13.5px; color:var(--texto-suave);'>⏳ Cargando pendientes…</div>"
-      + "</div>"
-      + "<div id='campo-gps-box'></div>";
-    var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
-    if (rol !== "TRABAJADOR") {
-      h += "<button type='button' id='btn-campo-salir' class='tema-btn' style='width:100%; padding:12px; font-size:14px;'>← Volver a la vista de oficina</button>";
-    }
-    return h;
-  }
-  function bindCampo() {
-    qa(".campo-tile").forEach(function (t) {
-      t.addEventListener("click", function () {
-        var v = t.getAttribute("data-ir");
-        if (!v) return;
-        try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib) {}
-        // GPS sin mapa: localiza y ofrece guardar la ronda aquí mismo.
-        // El mapa satelital es solo oficina (/api/mapa/datos da 403).
-        if (v === "mapa") {
-          localizarGPSCampo();
-          try { window.scrollTo(0, document.body.scrollHeight); } catch (eSc2) {}
-          return;
-        }
-        irAVista(v);
-        cargar(true);
-        try { window.scrollTo(0, 0); } catch (eSc) { window.scrollTo(0, 0); }
-      });
-    });
-    var salir = document.getElementById("btn-campo-salir");
-    if (salir) salir.addEventListener("click", function () {
-      irAVista("tablero");
-      cargar(true);
-    });
-    fetch("/api/agenda?dias=7").then(function (r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
-    }).then(function (d) {
-      pintarResumenCampo(d || {});
-    }).catch(function () {
-      var box = document.getElementById("campo-hoy-box");
-      if (box) box.innerHTML = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>"
-        + "<div style='font-size:13.5px; color:var(--texto-suave);'>⚠️ Sin conexión: abra la Agenda cuando vuelva la señal.</div>";
-    });
-  }
-  function pintarResumenCampo(d) {
-    var box = document.getElementById("campo-hoy-box");
-    if (!box) return;
-    var urg = [];
-    (d.eventos || []).forEach(function (e) {
-      if (e.faltan_dias == null || e.faltan_dias <= 0) urg.push({ txt: (e.etiqueta || e.tipo || "Alerta"), det: e.tag ? ("Arete " + e.tag) : (e.descripcion || ""), dias: e.faltan_dias });
-    });
-    (d.recordatorios || []).forEach(function (r) {
-      if (r.faltan_dias == null || r.faltan_dias <= 0) urg.push({ txt: r.mensaje || "Tarea", det: (r.hora ? ("Hora " + r.hora + " · ") : "") + (r.animal_tag || r.potrero_nombre || ""), dias: r.faltan_dias });
-    });
-    urg = urg.slice(0, 6);
-    var nRet = (d.retiros || []).length;
-    var sub = document.getElementById("campo-hoy-sub");
-    var total = urg.length + nRet;
-    if (sub) sub.textContent = total ? (total + " pendiente" + (total === 1 ? "" : "s")) : "Todo al día ✓";
-    var h = "<div style='font-size:15px; font-weight:800; margin-bottom:6px;'>📅 Hoy en la finca</div>";
-    if (!urg.length && !nRet) {
-      h += "<div style='font-size:15px;'>✅ Todo al día. Buen trabajo en el corral.</div>";
-    } else {
-      h += "<div style='display:flex; flex-direction:column; gap:8px;'>"
-        + urg.map(function (u) {
-          var cuando = (u.dias == null) ? "Sin fecha" : (u.dias <= 0 ? (u.dias === 0 ? "Hoy" : ("Hace " + Math.abs(u.dias) + " d")) : ("En " + u.dias + " d"));
-          return "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
-            + "<div style='font-size:15px; font-weight:700;'>" + esc(u.txt) + "</div>"
-            + "<div style='font-size:13px; color:var(--texto-suave);'>" + esc(cuando) + (u.det ? (" · " + esc(u.det)) : "") + "</div></div>";
-        }).join("");
-      if (nRet) {
-        h += "<div style='background:var(--fondo); border-radius:8px; padding:10px 12px; border:1px solid var(--borde);'>"
-          + "<div style='font-size:15px; font-weight:700;'>💉 " + nRet + " en retiro sanitario</div>"
-          + "<div style='font-size:13px; color:var(--texto-suave);'>Revise leche y carne antes de entregar</div></div>";
-      }
-      h += "</div>";
-    }
-    h += "<button type='button' id='btn-campo-ver-agenda' class='tema-btn' style='width:100%; margin-top:10px; padding:12px; font-size:14px;'>Ver agenda completa →</button>";
-    box.innerHTML = h;
-    var btnA = document.getElementById("btn-campo-ver-agenda");
-    if (btnA) btnA.addEventListener("click", function () { irAVista("agenda"); cargar(true); });
-  }
-  // GPS del modo campo (equivale al /aqui del bot): detecta el potrero
-  // donde está parado y ofrece guardar la ronda. Sin mapa: funciona con
-  // cualquier rol y con guantes (botones grandes).
-  function localizarGPSCampo() {
-    var box = document.getElementById("campo-gps-box");
+  // GPS de ronda (equivale al /aqui del bot): detecta el potrero donde
+  // está parado y ofrece guardar la ronda. Sin mapa: funciona con
+  // cualquier rol y con guantes (botones grandes). Vive en Registrar
+  // desde que se quitó el Modo Campo.
+  function localizarGPSRonda() {
+    var box = document.getElementById("gps-ronda-box");
     if (!box) return;
     if (!navigator.geolocation) {
-      box.innerHTML = "<div class='card campo-hoy'>📍 Este equipo no da ubicación GPS.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>📍 Este equipo no da ubicación GPS.</div>";
       return;
     }
-    box.innerHTML = "<div class='card campo-hoy'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
+    box.innerHTML = "<div class='card gps-ronda'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
     try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib2) {}
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude;
@@ -644,17 +546,17 @@
         body: JSON.stringify({ lat: lat, lon: lon })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
-          box.innerHTML = "<div class='card campo-hoy'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          box.innerHTML = "<div class='card gps-ronda'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
           return;
         }
         var pot = d.potrero || {};
-        box.innerHTML = "<div class='card campo-hoy' style='border-left:5px solid var(--verde-marca);'>"
+        box.innerHTML = "<div class='card gps-ronda' style='border-left:5px solid var(--verde-marca);'>"
           + "<div style='font-size:15px; font-weight:800;'>📍 Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
           + "<div style='font-size:13.5px; color:var(--texto-suave); margin:2px 0 10px;'>"
           + esc(d.total_animales || 0) + " animales aquí · " + esc(Number(lat).toFixed(5)) + ", " + esc(Number(lon).toFixed(5)) + "</div>"
-          + "<button type='button' id='btn-campo-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
+          + "<button type='button' id='btn-gps-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
           + "</div>";
-        var btnG = document.getElementById("btn-campo-guardar-ronda");
+        var btnG = document.getElementById("btn-gps-guardar-ronda");
         if (btnG) btnG.addEventListener("click", function () {
           btnG.disabled = true;
           btnG.textContent = "Guardando…";
@@ -678,10 +580,10 @@
           });
         });
       }).catch(function () {
-        box.innerHTML = "<div class='card campo-hoy'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
+        box.innerHTML = "<div class='card gps-ronda'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
       });
     }, function () {
-      box.innerHTML = "<div class='card campo-hoy'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
     }, { enableHighAccuracy: true, timeout: 15000 });
   }
 
@@ -6588,11 +6490,17 @@
     ];
 
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
-      + "<h3 style='margin:0;'>" + icon("clipboard") + "Captura Rápida de Campo (Online / Offline)</h3>"
+      + "<h3 style='margin:0;'>" + icon("clipboard") + "Registrar evento</h3>"
+      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+      + "<button type='button' id='btn-cap-gps-ronda' class='tema-btn' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+      + icon("pin", 16) + "Estoy en el potrero (GPS)"
+      + "</button>"
       + "<button type='button' id='btn-cap-ir-manga' class='btn-guardar-manga' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
       + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
       + "</button>"
-      + "</div>";
+      + "</div>"
+      + "</div>"
+      + "<div id='gps-ronda-box'></div>";
     h += "<p class='aviso' style='margin:4px 0 10px; font-size:12.5px;'>Para procesar o pesar varios animales seguidos en lote, usa <b>Manga Corral</b>.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
@@ -7660,6 +7568,8 @@
     }
 
     function wireStepperCap() {
+      var bGps = document.getElementById("btn-cap-gps-ronda");
+      if (bGps) bGps.addEventListener("click", localizarGPSRonda);
       var bManga = document.getElementById("btn-cap-ir-manga");
       if (bManga) {
         bManga.addEventListener("click", function () {
@@ -11371,9 +11281,7 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        // El botón Campo de la barra es exclusivo del mayordomo
-        // (oficina entra por el sheet "Modo Campo").
-        if (v === "gps" || v === "campo") b.style.display = "none";
+        if (v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -11393,7 +11301,7 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "sistema" || v === "gps" || v === "campo") b.style.display = "none";
+        if (v === "sistema" || v === "gps") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
@@ -11412,14 +11320,12 @@
       if (sheetMapa) sheetMapa.style.display = "none";
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       if (sheetMapa) sheetMapa.style.display = "none";
-      // Modo Campo: el mayordomo entra a 4 botones grandes (Captura,
-      // Agenda-hoy, Ficha, GPS) en vez del tablero de oficina. La Agenda
-      // es lectura/consulta que ya necesita en el corral. El mapa
-      // satelital sigue exclusivo de oficina (ver /api/mapa/datos): el
-      // botón GPS del modo campo localiza y guarda la ronda sin mapa.
-      var permitidas = ["captura", "manga", "ficha", "campo", "agenda"];
-      var btnCampo = document.getElementById("btn-nav-campo");
-      if (btnCampo) btnCampo.style.display = "";
+      // El mayordomo entra directo a Registrar (antes era el Modo Campo,
+      // que se quitó). La Agenda es lectura/consulta que ya necesita en el
+      // corral. El mapa satelital sigue exclusivo de oficina (ver
+      // /api/mapa/datos): el botón GPS de Registrar localiza y guarda la
+      // ronda sin mapa.
+      var permitidas = ["captura", "manga", "ficha", "agenda"];
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
@@ -11429,6 +11335,9 @@
         }
         if (permitidas.indexOf(v) !== -1) {
           b.style.display = "";
+          // Con solo 4 vistas, todas caben en la barra inferior del celular.
+          b.classList.remove("nav-secundario");
+          b.classList.add("nav-primario");
         } else {
           b.style.display = "none";
         }
@@ -11446,7 +11355,7 @@
         }
       });
       if (permitidas.indexOf(actual) === -1 && actual !== "ayuda") {
-        irAVista("campo");
+        irAVista("captura");
         cargar();
       }
     }
@@ -14229,7 +14138,6 @@
   function cargar(animar) {
     if (animar === undefined) animar = true;
     actualizarFabGlobal();
-    try { document.body.classList.toggle("modo-campo", actual === "campo"); } catch (eBody) {}
 
     var barraFiltros = document.getElementById("barra-filtros");
     if (barraFiltros) {
@@ -14275,15 +14183,6 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
-      }
-      return;
-    }
-
-    if (actual === "campo") {
-      if (!animar) return; // En polling silencioso no resetear el resumen
-      if (vista) {
-        montarVista(vista, renderCampo(), animar);
-        bindCampo();
       }
       return;
     }
@@ -14574,11 +14473,10 @@
   var VISTAS_PRIMARIAS = ["tablero", "captura", "inventario", "finanzas"];
   var NOMBRES_VISTA = {
     tablero: "Tablero",
-    captura: "Captura",
+    captura: "Registrar",
     inventario: "Inventario",
     finanzas: "Finanzas",
     mapa: "Mapa & GPS",
-    campo: "Campo",
     manga: "Manga",
     agenda: "Agenda",
     repro: "Repro",
@@ -14850,6 +14748,7 @@
 
   // Cambia de pestaña activa sin recargar
   function irAVista(v) {
+    var vistaPrevia = actual;
     if (actual === "mapa" && v !== "mapa") {
       if (_mapaTimerRefresh) {
         clearInterval(_mapaTimerRefresh);
@@ -14868,6 +14767,9 @@
       }
     }
     actual = v;
+    if (_historialListo && !_navegandoHistorial && v !== vistaPrevia) {
+      try { window.history.pushState({ ja: "vista", v: v }, ""); } catch (eHist) {}
+    }
     actualizarFabGlobal();
     var navEl = document.getElementById("nav-principal");
     if (navEl) navEl.classList.remove("nav-hidden");
@@ -14900,6 +14802,101 @@
       else { it.classList.remove("act"); it.removeAttribute("aria-current"); }
     });
   }
+  /* ---------- Botón atrás del celular (historial de pantallas) ----------
+     Cada cambio de vista deja una entrada en el historial del navegador, así
+     la flecha atrás de Android vuelve a la vista anterior en vez de cerrar
+     la app. Antes de cambiar de vista, atrás cierra lo que esté abierto
+     encima (modal, menú "Más", visor de fotos, chat) o retrocede un paso de
+     Registrar. Desde la vista de inicio avisa y el siguiente atrás sale.
+     Pila: [raiz, vista inicial, vista 2, ...]; "raiz" es la entrada de
+     guarda que recibe el último atrás. */
+  var _historialListo = false;
+  var _navegandoHistorial = false;
+
+  function vistaInicio() {
+    var rol = (window.__usuarioActual && window.__usuarioActual.rol || "").toUpperCase();
+    return rol === "TRABAJADOR" ? "captura" : "tablero";
+  }
+
+  function iniciarHistorial() {
+    if (_historialListo || !window.history || !window.history.pushState) return;
+    if (!document.getElementById("nav-principal")) return;
+    try {
+      window.history.replaceState({ ja: "raiz" }, "");
+      window.history.pushState({ ja: "vista", v: actual }, "");
+      _historialListo = true;
+    } catch (eIni) {}
+  }
+
+  function capaVisible(el) {
+    if (!el || !el.isConnected) return false;
+    try { return window.getComputedStyle(el).display !== "none"; } catch (eCs) { return false; }
+  }
+
+  // Cierra la capa abierta más arriba. Devuelve true si cerró algo.
+  function cerrarCapaAbierta() {
+    var lb = document.getElementById("lightbox-visor");
+    if (lb && lb.isConnected) {
+      var lbCerrar = lb.querySelector("#lb-btn-cerrar");
+      if (lbCerrar) lbCerrar.click();
+      if (lb.isConnected) { lb.remove(); document.body.style.overflow = ""; }
+      return true;
+    }
+    var abiertos = qa(".modal-overlay").filter(function (m) { return m.id !== "chat-dock" && capaVisible(m); });
+    if (abiertos.length) {
+      var m = abiertos[abiertos.length - 1];
+      var cerrar = m.querySelector(".modal-cerrar, [id^='btn-cerrar'], .btn-cerrar, [data-cerrar], [aria-label='Cerrar']");
+      if (cerrar) cerrar.click();
+      if (capaVisible(m)) m.style.display = "none";
+      return true;
+    }
+    var dock = document.getElementById("chat-dock");
+    if (dock && dock.classList.contains("expandido")) {
+      var btnCol = document.getElementById("btn-colapsar-chat");
+      if (btnCol) btnCol.click();
+      else { dock.classList.remove("expandido"); dock.classList.add("colapsado"); }
+      return true;
+    }
+    if (actual === "captura") {
+      var paso3 = q(".cap-paso-3.act");
+      var paso2 = q(".cap-paso-2.act");
+      var btnAtras = paso3 ? document.getElementById("btn-cap-atras3") : (paso2 ? document.getElementById("btn-cap-atras2") : null);
+      if (btnAtras) { btnAtras.click(); return true; }
+    }
+    return false;
+  }
+
+  window.addEventListener("popstate", function (e) {
+    if (!_historialListo) return;
+    var st = e.state || {};
+    if (cerrarCapaAbierta()) {
+      // El atrás se gastó cerrando la capa: se repone la entrada de la vista actual.
+      try { window.history.pushState({ ja: "vista", v: actual }, ""); } catch (eP) {}
+      return;
+    }
+    if (st.ja === "vista" && st.v) {
+      if (st.v !== actual) {
+        _navegandoHistorial = true;
+        try { irAVista(st.v); } finally { _navegandoHistorial = false; }
+        cargar();
+        try { window.scrollTo(0, 0); } catch (eSc) {}
+      }
+      return;
+    }
+    // Entrada de guarda: si no está en el inicio, va al inicio; si ya está,
+    // avisa y deja que el siguiente atrás cierre la app.
+    var inicio = vistaInicio();
+    if (actual !== inicio) {
+      _navegandoHistorial = true;
+      try { irAVista(inicio); } finally { _navegandoHistorial = false; }
+      cargar();
+      try { window.history.pushState({ ja: "vista", v: inicio }, ""); } catch (eP2) {}
+      try { window.scrollTo(0, 0); } catch (eSc2) {}
+      return;
+    }
+    mostrarToast("Toca atrás otra vez para salir", "verde");
+  });
+
   // Cargar manual (botón o Enter): el tag manda a Ficha y el potrero manda a
   // Tablero (únicas vistas que usan esos campos), sin importar qué pestaña
   // estaba activa antes.
@@ -15995,6 +15992,7 @@
     });
     cargarUsuario().finally(function () {
       arrancarDesdeUrl();
+      iniciarHistorial();
       if (window.__cargarMensajesEquipo) window.__cargarMensajesEquipo();
     });
   }

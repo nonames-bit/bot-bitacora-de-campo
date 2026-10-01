@@ -547,6 +547,7 @@
     });
     cargarUsuario().finally(function () {
       arrancarDesdeUrl();
+      iniciarHistorial();
       if (window.__cargarMensajesEquipo) window.__cargarMensajesEquipo();
     });
   }
