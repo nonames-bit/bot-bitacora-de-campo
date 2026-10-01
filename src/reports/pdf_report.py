@@ -501,7 +501,7 @@ def generar_pdf(
                 fontSize=6.8, leading=8.5, textColor=colors.HexColor(COLOR_GRIS), alignment=1
             )
             txt_glosario = (
-                "<b>Glosario SG:</b> "
+                "<b>Glosario:</b> "
                 "<b>CH:</b> Cría Hembra · <b>HL:</b> Hembra Levante · <b>NV:</b> Novilla Vientre · "
                 "<b>VP:</b> Vaca Parida · <b>VS:</b> Vaca Seca · <b>CM:</b> Cría Macho · "
                 "<b>ML:</b> Macho Levante · <b>MC:</b> Macho Ceba · <b>Rep:</b> Reproductor"
@@ -652,7 +652,7 @@ def generar_pdf(
     # Pie institucional de cierre
     story.append(Spacer(1, 8))
     story.append(tabla_pie(
-        "Bitácora de Campo Ganadería JA — Generado automáticamente para control zootécnico y conciliación contable/SG",
+        "Bitácora de Campo Ganadería JA — Generado automáticamente para control zootécnico y conciliación contable",
         ancho=ANCHO_UTIL,
     ))
 

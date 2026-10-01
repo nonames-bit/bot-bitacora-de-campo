@@ -1229,7 +1229,7 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas de Software Ganadero están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
+      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
     }
 
     if (pajuelasInactivas.length) {
@@ -1237,7 +1237,7 @@
         + "<summary style='cursor:pointer; font-weight:700; font-size:12px; color:var(--texto-suave);'>"
         + "📁 Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
         + "</summary>"
-        + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico importado de Software Ganadero (2013–2018) archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
+        + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico 2013–2018 archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
         + "<div class='tabla-scroll' style='max-height:240px; overflow-y:auto;'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Saldo Ant.</th><th>Procedencia</th><th style='text-align:center;'>Acción</th></tr>"
         + pajuelasInactivas.map(function (p) {
           return "<tr>"
@@ -1407,7 +1407,7 @@
       h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid " + semColor + "; background:var(--superficie); box-shadow:0 2px 6px var(--sombra);'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;'>"
         + "<div>"
-        + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad Oficial (Software Ganadero)</div>"
+        + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad</div>"
         + "<div style='font-size:28px; font-weight:800; color:" + semColor + "; line-height:1.2; margin:4px 0;'>"
         + (ifInfo.semaforo || "🟢") + " " + ifInfo.indice_pct + "%"
         + "</div>"
@@ -1470,7 +1470,7 @@
         + "<div style='font-size:14px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;'>"
         + icon("chartBar", 16) + "Distribución de Frecuencias [Días Abiertos]"
         + "</div>"
-        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Desglose de vacas abiertas según tramos de días postparto (referencia SG)</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Desglose de vacas abiertas según tramos de días postparto</div>"
         + "<div style='display:flex; flex-direction:column; gap:6px;'>";
       d.distribucion_dias_abiertos.forEach(function (tr) {
         var barColor = (tr.tramo === "0-90" || tr.tramo === "91-120") ? "var(--verde-marca)" : (tr.tramo === "121-150" || tr.tramo === "151-180" ? "#D97706" : "#DC2626");
@@ -3042,9 +3042,9 @@
     if (d.total_historico_sg && d.total_historico_sg > 0) {
       h += "<details style='margin-top:20px; opacity:0.85;'>"
         + "<summary style='cursor:pointer; font-size:12px; color:var(--texto-suave); padding:6px 0;'>"
-        + icon("archive", 14) + " Archivo histórico de controles individuales (" + d.total_historico_sg + " registros SG 2016-2018)"
+        + icon("archive", 14) + " Archivo histórico de controles individuales (" + d.total_historico_sg + " registros 2016-2018)"
         + "</summary>"
-        + "<p class='aviso' style='font-size:11.5px; margin:6px 0;'>Estos registros corresponden a pesajes individuales antiguos por vaca importados de Software Ganadero (2016-2018). Se mantienen preservados en la base de datos histórica sin alterar los totales ni gráficos de la producción actual de la finca.</p>"
+        + "<p class='aviso' style='font-size:11.5px; margin:6px 0;'>Estos registros corresponden a pesajes individuales antiguos por vaca importados del sistema anterior (2016-2018). Se mantienen preservados en la base de datos histórica sin alterar los totales ni gráficos de la producción actual de la finca.</p>"
         + "</details>";
     }
 
@@ -5284,7 +5284,7 @@
     h += "<div class='kpis'>"
       + kpiIr(kpi(totalAct, "Hato activo"), { sec: "Grados de sangre" })
       + kpiIr(kpi(tip, "Con desglose racial (" + pctTip + "%)", "ok"), { sec: "Pool genético" })
-      + kpiIr(kpi(d.indeterminados || 0, "Sin desglose (base SG)"), { sec: "Familias de cruce" })
+      + kpiIr(kpi(d.indeterminados || 0, "Sin desglose de raza"), { sec: "Familias de cruce" })
       + "</div>";
 
     // 2. Grados de sangre: barra apilada + leyenda (clic = filtra familias)
@@ -5390,7 +5390,7 @@
     if (pjinact.length) {
       h += "<details style='margin-top:10px; font-size:12px; background:var(--superficie-2); border:1px solid var(--borde-suave); border-radius:8px; padding:8px 12px;'>"
         + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>📦 Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
-        + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico importado de Software Ganadero archivados para no generar falsas alertas en el termo actual.</p>"
+        + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico archivados para no generar falsas alertas en el termo actual.</p>"
         + "<div class='tabla-scroll' style='max-height:200px; overflow-y:auto; margin-top:6px;'>"
         + tabla(pjinact, [
           ["codigo_toro", "Código"],
@@ -8208,7 +8208,7 @@
         var sug = calcularSugerencia();
         if (!sug) return;
         if (hint) {
-          hint.innerHTML = "💡 Sugerencia SG: <span style='text-decoration:underline;'>" + esc(sug) + "</span> <small style='color:var(--texto-suave); font-weight:normal;'>(opcional, clic para aplicar)</small>";
+          hint.innerHTML = "Sugerencia de arete: <span style='text-decoration:underline;'>" + esc(sug) + "</span> <small style='color:var(--texto-suave); font-weight:normal;'>(opcional, clic para aplicar)</small>";
         }
         if (forzar || !_tagModificadoManualmente || !fCria.value.trim()) {
           fCria.value = sug;
@@ -9687,62 +9687,13 @@
     var diskSub = (vps.disk_total_gb) ? "Disco (" + (vps.disk_used_gb || 0) + "/" + vps.disk_total_gb + " GB)" : "Disco VPS";
     var diskClase = vps.disk_pct >= 85 ? "alerta" : (vps.disk_pct > 0 ? "ok" : "");
 
-    var syncUlt = (d.sync_sg && d.sync_sg.ultimo) ? d.sync_sg.ultimo : null;
-    var kpiSyncTxt = syncUlt ? esc(syncUlt.tiempo_relativo || "Reciente") : "Sin Sync";
-    var kpiSyncSub = syncUlt ? esc(syncUlt.archivo || "Software Ganadero") : "Backup SG";
-    var kpiSyncCls = (syncUlt && syncUlt.al_dia) ? "ok" : (syncUlt ? "alerta" : "");
-
     h += "<div class='kpis'>"
-      + kpi(kpiSyncTxt, kpiSyncSub, kpiSyncCls)
       + kpi(ramTxt, ramSub, ramClase)
       + kpi(diskTxt, diskSub, diskClase)
       + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
       + kpiIr(kpi((db.activos != null ? String(db.activos) : "—"), "Hato Activo", "ok"), { vista: "inventario" })
       + (d.en_linea_count !== undefined ? kpiIr(kpi(String(d.en_linea_count), "Usuarios en Línea", d.en_linea_count > 0 ? "ok" : ""), { vista: "usuarios" }) : "")
       + "</div>";
-
-    // 1. Sincronización Software Ganadero (SG)
-    var syncHist = (d.sync_sg && d.sync_sg.historial) ? d.sync_sg.historial : [];
-    h += "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:10px; padding:16px; margin:20px 0;'>";
-    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>";
-    h += "<h4 style='margin:0; display:flex; align-items:center; gap:6px;'>" + icon("refresh", 16) + "Sincronización con Software Ganadero (SG)</h4>";
-    if (syncUlt) {
-      var badgeCls = syncUlt.al_dia ? "chip verde" : "chip ambar";
-      var badgeTxt = syncUlt.al_dia ? "✅ Al día (" + esc(syncUlt.tiempo_relativo) + ")" : "⚠️ Requiere actualización (" + esc(syncUlt.tiempo_relativo) + ")";
-      h += "<span class='" + badgeCls + "'>" + badgeTxt + "</span>";
-    } else {
-      h += "<span class='chip gris'>Sin sincronizaciones registradas</span>";
-    }
-    h += "</div>";
-
-    if (syncUlt) {
-      h += "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:14px; background:var(--tarjeta-bg); padding:12px; border-radius:8px; border:1px solid var(--borde);'>";
-      h += "<div><span style='color:var(--texto-suave); font-size:11px; display:block;'>📦 Último Backup Procesado</span><b style='font-family:var(--font-mono); font-size:13px;'>" + esc(syncUlt.archivo || "backup.zip") + "</b></div>";
-      h += "<div><span style='color:var(--texto-suave); font-size:11px; display:block;'>📅 Fecha de Importación</span><b style='font-size:13px;'>" + esc(syncUlt.fecha_iso ? syncUlt.fecha_iso.replace("T", " ") : "—") + "</b></div>";
-      h += "<div><span style='color:var(--texto-suave); font-size:11px; display:block;'>✨ Registros Nuevos</span><b style='color:var(--color-verde-txt); font-size:13px;'>+" + esc(String(syncUlt.nuevos || 0)) + " incorporados</b></div>";
-      h += "<div><span style='color:var(--texto-suave); font-size:11px; display:block;'>🔄 Registros Existentes</span><b style='color:var(--texto); font-size:13px;'>" + esc(String(syncUlt.duplicados || 0)) + " verificados (idempotentes)</b></div>";
-      h += "</div>";
-
-      if (syncHist.length > 1) {
-        h += "<div style='margin-top:10px;'><span style='font-size:12px; font-weight:600; color:var(--texto-suave); display:block; margin-bottom:6px;'>📜 Historial Reciente de Backups SG:</span>";
-        h += "<div class='tabla-scroll'><table style='width:100%; font-size:11.5px; border-collapse:collapse;'>";
-        h += "<tr style='border-bottom:1px solid var(--borde); text-align:left; color:var(--texto-suave);'><th style='padding:5px 8px;'>Fecha</th><th style='padding:5px 8px;'>Archivo</th><th style='padding:5px 8px; text-align:center;'>Nuevos</th><th style='padding:5px 8px; text-align:center;'>Existentes</th><th style='padding:5px 8px; text-align:center;'>Estado</th></tr>";
-        syncHist.slice(0, 5).forEach(function (sh) {
-          h += "<tr style='border-bottom:1px solid var(--borde);'>";
-          h += "<td style='padding:5px 8px;'>" + esc(sh.fecha_iso ? sh.fecha_iso.replace("T", " ") : "—") + "</td>";
-          h += "<td style='padding:5px 8px;'><code style='font-size:11px;'>" + esc(sh.archivo || "—") + "</code></td>";
-          h += "<td style='padding:5px 8px; text-align:center; color:var(--color-verde-txt); font-weight:600;'>+" + esc(String(sh.nuevos || 0)) + "</td>";
-          h += "<td style='padding:5px 8px; text-align:center; color:var(--texto-suave);'>" + esc(String(sh.duplicados || 0)) + "</td>";
-          h += "<td style='padding:5px 8px; text-align:center;'><span class='chip verde' style='font-size:10px; padding:2px 6px;'>Exitoso</span></td>";
-          h += "</tr>";
-        });
-        h += "</table></div></div>";
-      }
-    } else {
-      h += "<p style='color:var(--texto-suave); font-size:12px; margin:6px 0;'>Aún no se registran importaciones de Software Ganadero en la base de datos.</p>";
-    }
-    h += "<p style='font-size:11px; color:var(--texto-suave); margin:8px 0 0 0;'>💡 <i>Los backups se sincronizan en segundo plano vía carpeta COPIAS o en Telegram enviando el .Zip con /confirmar_importar. Las notas de campo capturadas por los trabajadores nunca se borran.</i></p>";
-    h += "</div>";
 
     // 2. Bitácora de Actividad Reciente de los Demás Usuarios
     var actList = d.actividad_reciente || [];
@@ -9754,7 +9705,6 @@
     h += "<button type='button' class='btn-filtro-act act tema-btn' data-f='todos' style='font-size:11px; padding:3px 8px;'>🌐 Todos</button>";
     h += "<button type='button' class='btn-filtro-act tema-btn' data-f='campo' style='font-size:11px; padding:3px 8px;'>🤠 Campo / Mayordomos</button>";
     h += "<button type='button' class='btn-filtro-act tema-btn' data-f='admin' style='font-size:11px; padding:3px 8px;'>🛡️ Administradores</button>";
-    h += "<button type='button' class='btn-filtro-act tema-btn' data-f='sg' style='font-size:11px; padding:3px 8px;'>📁 Software Ganadero</button>";
     h += "</div></div>";
 
     if (actList.length) {
@@ -9770,15 +9720,14 @@
       actList.forEach(function (ev) {
         var rolCat = (ev.usuario_rol || "TRABAJADOR").toUpperCase();
         var fGrupo = "campo";
-        if (rolCat === "OWNER" || rolCat === "ADMIN") fGrupo = "admin";
-        else if (rolCat === "SISTEMA") fGrupo = "sg";
+        if (rolCat === "OWNER" || rolCat === "ADMIN" || rolCat === "SISTEMA") fGrupo = "admin";
 
         var badgeRol = rolCat === "OWNER" ? "<span class='chip ambar' style='font-size:9.5px; padding:1px 5px;'>OWNER</span>"
                      : rolCat === "ADMIN" ? "<span class='chip azul' style='font-size:9.5px; padding:1px 5px;'>ADMIN</span>"
                      : rolCat === "SISTEMA" ? "<span class='chip gris' style='font-size:9.5px; padding:1px 5px;'>SISTEMA</span>"
                      : "<span class='chip verde' style='font-size:9.5px; padding:1px 5px;'>CAMPO</span>";
 
-        var icCanal = ev.canal === "Telegram" ? "🤖 Telegram" : (ev.canal === "PWA" ? "📱 PWA" : "📁 SG");
+        var icCanal = ev.canal === "Telegram" ? "Telegram" : (ev.canal === "PWA" ? "App" : "Sistema");
 
         h += "<tr class='fila-act-usr' data-grupo='" + fGrupo + "' style='border-bottom:1px solid var(--borde);'>";
         h += "<td style='padding:7px 8px;'>";
@@ -9834,14 +9783,13 @@
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
-    // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA, Copias)
+    // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>🌐 Todos</button>"
       + "<button type='button' class='btn-canal-log tema-btn' data-canal='telegram' style='font-size:11.5px; padding:4px 9px;'>🤖 Telegram</button>"
       + "<button type='button' class='btn-canal-log tema-btn' data-canal='pwa' style='font-size:11.5px; padding:4px 9px;'>🐮 PWA Web</button>"
-      + "<button type='button' class='btn-canal-log tema-btn' data-canal='copias' style='font-size:11.5px; padding:4px 9px;'>📁 Copias de Seguridad</button>"
       + "<button type='button' id='btn-refrescar-logs' class='tema-btn' style='font-size:11.5px; padding:4px 10px; margin-left:6px;'>" + icon("refresh", 13) + "Refrescar</button>"
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";

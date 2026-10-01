@@ -253,7 +253,7 @@
     h += "<div class='kpis'>"
       + kpiIr(kpi(totalAct, "Hato activo"), { sec: "Grados de sangre" })
       + kpiIr(kpi(tip, "Con desglose racial (" + pctTip + "%)", "ok"), { sec: "Pool genético" })
-      + kpiIr(kpi(d.indeterminados || 0, "Sin desglose (base SG)"), { sec: "Familias de cruce" })
+      + kpiIr(kpi(d.indeterminados || 0, "Sin desglose de raza"), { sec: "Familias de cruce" })
       + "</div>";
 
     // 2. Grados de sangre: barra apilada + leyenda (clic = filtra familias)
@@ -359,7 +359,7 @@
     if (pjinact.length) {
       h += "<details style='margin-top:10px; font-size:12px; background:var(--superficie-2); border:1px solid var(--borde-suave); border-radius:8px; padding:8px 12px;'>"
         + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>📦 Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
-        + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico importado de Software Ganadero archivados para no generar falsas alertas en el termo actual.</p>"
+        + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico archivados para no generar falsas alertas en el termo actual.</p>"
         + "<div class='tabla-scroll' style='max-height:200px; overflow-y:auto; margin-top:6px;'>"
         + tabla(pjinact, [
           ["codigo_toro", "Código"],

@@ -1328,7 +1328,7 @@
         var sug = calcularSugerencia();
         if (!sug) return;
         if (hint) {
-          hint.innerHTML = "💡 Sugerencia SG: <span style='text-decoration:underline;'>" + esc(sug) + "</span> <small style='color:var(--texto-suave); font-weight:normal;'>(opcional, clic para aplicar)</small>";
+          hint.innerHTML = "Sugerencia de arete: <span style='text-decoration:underline;'>" + esc(sug) + "</span> <small style='color:var(--texto-suave); font-weight:normal;'>(opcional, clic para aplicar)</small>";
         }
         if (forzar || !_tagModificadoManualmente || !fCria.value.trim()) {
           fCria.value = sug;

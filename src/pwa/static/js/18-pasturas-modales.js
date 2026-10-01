@@ -1132,9 +1132,9 @@
     if (d.total_historico_sg && d.total_historico_sg > 0) {
       h += "<details style='margin-top:20px; opacity:0.85;'>"
         + "<summary style='cursor:pointer; font-size:12px; color:var(--texto-suave); padding:6px 0;'>"
-        + icon("archive", 14) + " Archivo histórico de controles individuales (" + d.total_historico_sg + " registros SG 2016-2018)"
+        + icon("archive", 14) + " Archivo histórico de controles individuales (" + d.total_historico_sg + " registros 2016-2018)"
         + "</summary>"
-        + "<p class='aviso' style='font-size:11.5px; margin:6px 0;'>Estos registros corresponden a pesajes individuales antiguos por vaca importados de Software Ganadero (2016-2018). Se mantienen preservados en la base de datos histórica sin alterar los totales ni gráficos de la producción actual de la finca.</p>"
+        + "<p class='aviso' style='font-size:11.5px; margin:6px 0;'>Estos registros corresponden a pesajes individuales antiguos por vaca importados del sistema anterior (2016-2018). Se mantienen preservados en la base de datos histórica sin alterar los totales ni gráficos de la producción actual de la finca.</p>"
         + "</details>";
     }
 
