@@ -127,14 +127,19 @@
 
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var btnCrear = "";
     var rolInv = window.__usuarioActual && window.__usuarioActual.rol;
     if (rolInv === "OWNER" || rolInv === "ADMIN") {
-      expBtn = "<button type='button' class='tema-btn' data-accion='crear-animal' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 14) + "Crear Animal</button>" + expBtn;
+      btnCrear = "<button type='button' class='tema-btn' data-accion='crear-animal' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 14) + "Crear Animal</button>";
     }
-    var h = "<div class='inv-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("cow") + "Inventario y Población</h3>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + barraDescargaSeccion("inventario", "Inventario") + expBtn + "</div>"
+    var h = "<div class='seccion-head-barra inv-head-barra'>"
+      + "<h3>" + icon("cow") + "Inventario y Población</h3>"
+      + "<div class='head-acciones-fila'>"
+      + btnCrear
+      + barraDescargaSeccion("inventario", "Inventario")
+      + expBtn
+      + "</div>"
       + "</div>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpiIr(kpi(d.total_activos, "Activos totales"), { sec: "Estructura del hato" })
       + kpiIr(kpi(d.total_hembras, "Hembras"), { sec: "Pirámide de edades" }) + kpiIr(kpi(d.total_machos, "Machos"), { sec: "Pirámide de edades" })

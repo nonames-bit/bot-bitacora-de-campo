@@ -4527,3 +4527,87 @@ button.cap-atajo .svg-icon { margin: 0; }
 /* Al pasar el mouse el botón de tipo quedaba verde oscuro con letra oscura. */
 .btn-punto:hover { background: var(--verde-marca-pastel); border-color: var(--verde-marca); color: var(--texto); }
 .btn-punto.act:hover { background: var(--verde-marca-hover); color: #fff; }
+
+/* ---------- Barras de encabezado y acciones superiores compactas (1 sola línea) ---------- */
+.seccion-head-barra {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+.seccion-head-barra h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+.head-acciones-fila {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  max-width: 100%;
+  padding: 1px 0;
+}
+.head-acciones-fila::-webkit-scrollbar {
+  display: none;
+}
+.head-acciones-fila .tema-btn,
+.head-acciones-fila button,
+.head-acciones-fila .btn-accion-head {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+.head-acciones-fila select {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--superficie);
+  color: var(--texto);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.head-acciones-fila label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin: 0;
+}
+@media (max-width: 640px) {
+  .seccion-head-barra {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .seccion-head-barra .head-acciones-fila {
+    width: 100%;
+  }
+}

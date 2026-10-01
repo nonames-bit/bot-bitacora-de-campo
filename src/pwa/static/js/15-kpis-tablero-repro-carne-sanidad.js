@@ -103,9 +103,11 @@
   }
 
   function renderRepro(d) {
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
+    var h = "<div class='seccion-head-barra repro-head-barra'>"
+      + "<h3>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("reproduccion", "Reproducción")
+      + "</div>"
       + "</div>" + erroresHtml(d);
     window.__listaTrabajo = d.lista_trabajo || null;
     window.__responsablesSugeridos = d.responsables_sugeridos || window.__responsablesSugeridos || [];
@@ -754,9 +756,11 @@
   }
 
   function renderSanidad(d) {
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("shieldPlus") + "Sanidad</h3>"
+    var h = "<div class='seccion-head-barra sanidad-head-barra'>"
+      + "<h3>" + icon("shieldPlus") + "Sanidad</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("sanidad", "Sanidad")
+      + "</div>"
       + "</div>" + erroresHtml(d);
     // Alta operativa directa (misma tabla que Telegram/Captura vía POST /api/sanidad/tratamiento).
     var hoySan = new Date().toISOString().slice(0, 10);

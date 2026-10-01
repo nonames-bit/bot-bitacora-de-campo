@@ -1231,9 +1231,11 @@
   }
 
   function renderRepro(d) {
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
+    var h = "<div class='seccion-head-barra repro-head-barra'>"
+      + "<h3>" + icon("sperm", 22) + "Reproducción y Genética</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("reproduccion", "Reproducción")
+      + "</div>"
       + "</div>" + erroresHtml(d);
     window.__listaTrabajo = d.lista_trabajo || null;
     window.__responsablesSugeridos = d.responsables_sugeridos || window.__responsablesSugeridos || [];
@@ -1882,9 +1884,11 @@
   }
 
   function renderSanidad(d) {
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("shieldPlus") + "Sanidad</h3>"
+    var h = "<div class='seccion-head-barra sanidad-head-barra'>"
+      + "<h3>" + icon("shieldPlus") + "Sanidad</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("sanidad", "Sanidad")
+      + "</div>"
       + "</div>" + erroresHtml(d);
     // Alta operativa directa (misma tabla que Telegram/Captura vía POST /api/sanidad/tratamiento).
     var hoySan = new Date().toISOString().slice(0, 10);
@@ -1995,11 +1999,14 @@
       actualizarClimaHeader();
     }
     var simple = modoPasturasEsSimple();
-    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px; margin-left:8px;'>"
+    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px;'>"
       + (simple ? icon("stethoscope", 14) + "Ver técnico" : "Ver simple") + "</button>";
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("grass", 22) + "Pasturas (Voisin & Aforos)" + btnModo + "</h3>"
+    var h = "<div class='seccion-head-barra pasturas-head-barra'>"
+      + "<h3>" + icon("grass", 22) + "Pasturas (Voisin &amp; Aforos)</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("pasturas", "Pasturas")
+      + btnModo
+      + "</div>"
       + "</div>" + erroresHtml(d);
 
     var pron = d.pronostico;
@@ -2968,12 +2975,12 @@
     var ord = d.resumen_ordeno || {};
     var litrosPorVaca = res.litros_por_vaca_dia;
 
-    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:6px 14px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; cursor:pointer;'>"
       + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
 
-    var h = "<div class='leche-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
-      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
+    var h = "<div class='seccion-head-barra leche-head-barra'>"
+      + "<h3>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("leche", "Leche")
       + btnIa
       + "</div>"
@@ -3156,22 +3163,22 @@
 
   function renderFinanzas(d) {
     var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
-    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
-    var h = "<div class='finanzas-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
-      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + barraDescargaSeccion("finanzas", "Finanzas")
-      + btnGasto
-      + "</div>"
-      + "</div>" + erroresHtml(d);
-
     var anoActual = new Date().getFullYear();
     var opcionesAno = "";
     for (var y = anoActual; y >= anoActual - 4; y--) {
       opcionesAno += "<option value='" + y + "'" + (y === _finanzasAno ? " selected" : "") + ">" + y + "</option>";
     }
-    h += "<div style='margin-bottom:12px;'><label style='font-size:13px; font-weight:600;'>Año: "
-      + "<select id='fin-ano' style='padding:6px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); margin-left:6px;'>" + opcionesAno + "</select></label></div>";
+    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; cursor:pointer;'>" + icon("receipt", 14) + "+ Ingreso / Gasto</button>";
+    var selectAno = "<label style='margin-left:auto;'>Año: <select id='fin-ano'>" + opcionesAno + "</select></label>";
+
+    var h = "<div class='seccion-head-barra finanzas-head-barra'>"
+      + "<h3>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
+      + "<div class='head-acciones-fila'>"
+      + barraDescargaSeccion("finanzas", "Finanzas")
+      + btnGasto
+      + selectAno
+      + "</div>"
+      + "</div>" + erroresHtml(d);
 
     // Acceso directo al módulo de subastas y precios de mercado
     h += "<div style='margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); padding:10px 14px; border-radius:8px; border:1px solid var(--borde);'>"
@@ -5234,14 +5241,19 @@
 
   function renderInventario(d) {
     // Vista única Inventario + Población: tabla SG + pirámide + GMD + gráficos.
-    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var expBtn = "<button type='button' class='tema-btn' data-accion='exportar-inventario' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("download", 14) + "Exportar CSV</button>";
+    var btnCrear = "";
     var rolInv = window.__usuarioActual && window.__usuarioActual.rol;
     if (rolInv === "OWNER" || rolInv === "ADMIN") {
-      expBtn = "<button type='button' class='tema-btn' data-accion='crear-animal' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 14) + "Crear Animal</button>" + expBtn;
+      btnCrear = "<button type='button' class='tema-btn' data-accion='crear-animal' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 14) + "Crear Animal</button>";
     }
-    var h = "<div class='inv-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("cow") + "Inventario y Población</h3>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>" + barraDescargaSeccion("inventario", "Inventario") + expBtn + "</div>"
+    var h = "<div class='seccion-head-barra inv-head-barra'>"
+      + "<h3>" + icon("cow") + "Inventario y Población</h3>"
+      + "<div class='head-acciones-fila'>"
+      + btnCrear
+      + barraDescargaSeccion("inventario", "Inventario")
+      + expBtn
+      + "</div>"
       + "</div>" + erroresHtml(d);
     h += "<div class='kpis'>" + kpiIr(kpi(d.total_activos, "Activos totales"), { sec: "Estructura del hato" })
       + kpiIr(kpi(d.total_hembras, "Hembras"), { sec: "Pirámide de edades" }) + kpiIr(kpi(d.total_machos, "Machos"), { sec: "Pirámide de edades" })

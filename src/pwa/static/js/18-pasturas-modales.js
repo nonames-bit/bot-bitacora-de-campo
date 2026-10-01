@@ -15,11 +15,14 @@
       actualizarClimaHeader();
     }
     var simple = modoPasturasEsSimple();
-    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px; margin-left:8px;'>"
+    var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px;'>"
       + (simple ? icon("stethoscope", 14) + "Ver técnico" : "Ver simple") + "</button>";
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("grass", 22) + "Pasturas (Voisin & Aforos)" + btnModo + "</h3>"
+    var h = "<div class='seccion-head-barra pasturas-head-barra'>"
+      + "<h3>" + icon("grass", 22) + "Pasturas (Voisin &amp; Aforos)</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("pasturas", "Pasturas")
+      + btnModo
+      + "</div>"
       + "</div>" + erroresHtml(d);
 
     var pron = d.pronostico;
@@ -988,12 +991,12 @@
     var ord = d.resumen_ordeno || {};
     var litrosPorVaca = res.litros_por_vaca_dia;
 
-    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='float:right; font-size:12px; padding:6px 14px; margin-top:-4px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;'>"
+    var btnIa = "<button type='button' class='tema-btn' id='btn-ir-captura-leche' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; cursor:pointer;'>"
       + icon("sparkles", 14) + "Digitalizar Recibo con IA</button>";
 
-    var h = "<div class='leche-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
-      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
+    var h = "<div class='seccion-head-barra leche-head-barra'>"
+      + "<h3>" + icon("milk", 22) + "Producción de Leche (Total Diario · Finca)</h3>"
+      + "<div class='head-acciones-fila'>"
       + barraDescargaSeccion("leche", "Leche")
       + btnIa
       + "</div>"

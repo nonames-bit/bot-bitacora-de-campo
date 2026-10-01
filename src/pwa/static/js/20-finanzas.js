@@ -12,22 +12,22 @@
 
   function renderFinanzas(d) {
     var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
-    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("receipt", 14) + "Registrar Ingreso / Gasto</button>";
-    var h = "<div class='finanzas-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;'>"
-      + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
-      + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + barraDescargaSeccion("finanzas", "Finanzas")
-      + btnGasto
-      + "</div>"
-      + "</div>" + erroresHtml(d);
-
     var anoActual = new Date().getFullYear();
     var opcionesAno = "";
     for (var y = anoActual; y >= anoActual - 4; y--) {
       opcionesAno += "<option value='" + y + "'" + (y === _finanzasAno ? " selected" : "") + ">" + y + "</option>";
     }
-    h += "<div style='margin-bottom:12px;'><label style='font-size:13px; font-weight:600;'>Año: "
-      + "<select id='fin-ano' style='padding:6px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); margin-left:6px;'>" + opcionesAno + "</select></label></div>";
+    var btnGasto = "<button type='button' class='tema-btn' id='btn-ir-captura-gasto' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; cursor:pointer;'>" + icon("receipt", 14) + "+ Ingreso / Gasto</button>";
+    var selectAno = "<label style='margin-left:auto;'>Año: <select id='fin-ano'>" + opcionesAno + "</select></label>";
+
+    var h = "<div class='seccion-head-barra finanzas-head-barra'>"
+      + "<h3>" + icon("banknote") + "Finanzas: Ingresos, Egresos y Utilidad</h3>"
+      + "<div class='head-acciones-fila'>"
+      + barraDescargaSeccion("finanzas", "Finanzas")
+      + btnGasto
+      + selectAno
+      + "</div>"
+      + "</div>" + erroresHtml(d);
 
     // Acceso directo al módulo de subastas y precios de mercado
     h += "<div style='margin-bottom:14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--superficie); padding:10px 14px; border-radius:8px; border:1px solid var(--borde);'>"
