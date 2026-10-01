@@ -1575,6 +1575,13 @@ def texto_ejemplo_evento(tipo: str) -> str:
             "<code>se murio el novillo 105 causa mordedura de culebra</code>\n\n"
             "💡 <i>Inventario:</i> El animal pasa a estado inactivo y se registra la causa."
         ),
+        "venta": (
+            "💰 <b>Ejemplo de Venta de Animal:</b>\n"
+            "<code>vaca 47 vendida a Carnes del Norte por 3500000</code>\n"
+            "<code>se vendio el toro JA-01 a Frigorifico por 4200000</code>\n"
+            "<code>salieron 8 toros vendidos para ceba</code>\n\n"
+            "💡 <i>Inventario & Finanzas:</i> El animal pasa a estado VENDIDO (sale del inventario activo) y el valor se refleja en los ingresos de Finanzas."
+        ),
         "movimiento": (
             "📥 <b>Ejemplo de Entrada / Salida:</b>\n"
             "<code>entraron 15 novillas compradas en subasta</code>\n"

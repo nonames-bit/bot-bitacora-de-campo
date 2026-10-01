@@ -2356,6 +2356,66 @@ def test_api_rectificar_tag_conflicto_y_fusion(client, db_file):
         db.close()
 
 
+def test_sync_venta_animal_actualiza_estado_y_movimientos(db_file, client):
+    """Verifica que el evento 'venta' recibido en /api/sync crea el movimiento
+    de VENTA, actualiza el animal a estado VENDIDO (lo saca del inventario activo)
+    y registra el pesaje de salida si se incluyó peso."""
+    db = Database(db_file)
+    db.registrar_animal("JA99", sexo="Macho", estado="ACTIVO")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [{
+        "tipo": "venta",
+        "id_local": "loc_venta_ja99",
+        "fecha": "2026-09-30",
+        "payload": {
+            "animal_tag": "JA99",
+            "comprador": "Frigorífico del Llano",
+            "precio": 3850000,
+            "peso_kg": 475.5,
+            "motivo": "Ceba / Sacrificio",
+            "notas": "Guía ICA 12345",
+        },
+    }]})
+    assert r.status_code == 200
+    res = r.get_json()
+    assert res["procesados"] == 1
+    assert "loc_venta_ja99" in res["ids_ok"]
+
+    # Validar que en base de datos el animal ya no es ACTIVO sino VENDIDO
+    db2 = Database(db_file)
+    try:
+        a = db2.query_one("SELECT * FROM animales WHERE tag = ?", ("JA99",))
+        assert a is not None
+        assert a["estado"] == "VENDIDO"
+
+        # Validar movimiento
+        movs = db2.query("SELECT * FROM movimientos WHERE animal_id = ?", (a["id_animal"],))
+        assert len(movs) == 1
+        assert movs[0]["tipo_movimiento"] == "VENTA"
+        assert movs[0]["procedencia_destino"] == "Frigorífico del Llano"
+        assert movs[0]["precio"] == 3850000
+        assert "Peso: 475.5 kg" in movs[0]["notas"]
+
+        # Validar pesaje de salida
+        pesos = db2.ultimos_pesajes("JA99", 5)
+        assert len(pesos) == 1
+        assert pesos[0]["peso_kg"] == 475.5
+        assert pesos[0]["evento"] == "PESAJE_VENTA"
+    finally:
+        db2.close()
+
+    # Validar que la ficha del animal refleja la venta
+    r_f = client.get("/api/ficha/JA99")
+    assert r_f.status_code == 200
+    f_data = r_f.get_json()
+    assert f_data["estado"] == "VENDIDO"
+    assert f_data["venta"] is not None
+    assert f_data["venta"]["precio"] == 3850000
+    assert f_data["venta"]["procedencia_destino"] == "Frigorífico del Llano"
+
+
+
 
 
 

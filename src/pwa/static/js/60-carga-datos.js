@@ -391,6 +391,39 @@
       else if (acc === "ir-mapa-satelital") { e.preventDefault(); irAVista("mapa"); cargar(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
       else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }
+      else if (acc === "capturar-evento" || acc === "vender-animal") {
+        e.preventDefault();
+        var tipoCap = elAcc.getAttribute("data-tipo") || (acc === "vender-animal" ? "venta" : "pesaje");
+        var tagC = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
+        var potC = elAcc.getAttribute("data-potrero") || "";
+        var farmC = elAcc.getAttribute("data-farmaco") || "";
+        var toroC = elAcc.getAttribute("data-toro") || "";
+
+        if (tagC) {
+          try { localStorage.setItem("bitacora_ultimo_tag", tagC); } catch (eVTag) {}
+          window.__capTagPendiente = tagC;
+        }
+        if (potC) {
+          try { localStorage.setItem("bitacora_ultimo_potrero", potC); } catch (eVPot) {}
+          window.__capPotreroPendiente = potC;
+        }
+        if (farmC) {
+          window.__capFarmacoPendiente = farmC;
+        }
+        if (toroC) {
+          window.__capToroPendiente = toroC;
+        }
+
+        window.__capPasoInicial = 2;
+        _tipoCapturaActual = tipoCap;
+
+        var mAbierto = document.getElementById("modal-animales-lista") || document.getElementById("modal-animales-potrero");
+        if (mAbierto) mAbierto.remove();
+
+        irAVista("captura");
+        cargar(true);
+        try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (eScroll) { window.scrollTo(0, 0); }
+      }
       else if (acc === "rectificar-tag") {
         var tTag = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
         mostrarModalRectificarTag(tTag);
@@ -481,15 +514,17 @@
         if (target) target.innerHTML = "❌ No se pudo cargar (" + esc(e && e.message || e) + "). <button data-accion='reload'>Reintentar</button>";
       });
   }
-  function mostrarFormularioAnimal(f, tagPrellenado) {
+  function mostrarFormularioAnimal(f, tagPrellenado, defaults) {
     var esEdicion = !!(f && f.tag);
     var overlay = document.getElementById("animal-form-modal");
     if (overlay) overlay.remove();
 
     function val(v) { return v == null ? "" : esc(v); }
-    var madreTag = (f && f.madre && f.madre.tag) || "";
-    var padreTag = (f && f.padre && f.padre.tag) || "";
-    var nacimiento = (f && f.fecha_nacimiento) ? String(f.fecha_nacimiento).slice(0, 10) : "";
+    var madreTag = (defaults && defaults.madre_tag) || (f && f.madre && f.madre.tag) || "";
+    var padreTag = (defaults && defaults.padre_tag) || (f && f.padre && f.padre.tag) || "";
+    var nacimiento = (defaults && defaults.fecha_nacimiento) || ((f && f.fecha_nacimiento) ? String(f.fecha_nacimiento).slice(0, 10) : "");
+    var sexoDef = (defaults && defaults.sexo) || (f && f.sexo) || "";
+    var potreroDef = (defaults && defaults.potrero) || (f && f.potrero && f.potrero !== "Sin potrero asignado" ? f.potrero : "");
 
     function campo(id, etiqueta, valorAttr, extra) {
       return "<label style='display:block; font-size:12.5px; font-weight:600; margin-bottom:2px;'>" + etiqueta
@@ -514,10 +549,10 @@
       + campo("an-nombre", "Nombre", val(f && f.nombre), " placeholder='ej. Carranga'")
       + "<label style='display:block; font-size:12.5px; font-weight:600;'>Sexo<select id='an-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); font-weight:400; margin-top:2px;'>"
       + "<option value=''>—</option>"
-      + "<option value='Hembra'" + ((f && f.sexo) === "Hembra" ? " selected" : "") + ">Hembra</option>"
-      + "<option value='Macho'" + ((f && f.sexo) === "Macho" ? " selected" : "") + ">Macho</option>"
+      + "<option value='Hembra'" + (sexoDef === "Hembra" ? " selected" : "") + ">Hembra</option>"
+      + "<option value='Macho'" + (sexoDef === "Macho" ? " selected" : "") + ">Macho</option>"
       + "</select></label>"
-      + "<div id='an-toro-wrap' style='display:" + ((f && f.sexo) === "Macho" ? "block" : "none") + "; margin:2px 0 4px; padding:8px 12px; background:rgba(34,197,94,0.08); border-radius:6px; border:1px solid rgba(34,197,94,0.25);'>"
+      + "<div id='an-toro-wrap' style='display:" + (sexoDef === "Macho" ? "block" : "none") + "; margin:2px 0 4px; padding:8px 12px; background:rgba(34,197,94,0.08); border-radius:6px; border:1px solid rgba(34,197,94,0.25);'>"
       + "<label style='display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:600; cursor:pointer; margin:0;'>"
       + "<input type='checkbox' id='an-es-toro'" + (esToro ? " checked" : "") + " style='width:16px; height:16px;'> "
       + "🐂 ¿Es Reproductor / Toro activo de la finca?"
@@ -527,7 +562,7 @@
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
       + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
-      + campo("an-potrero", "Potrero", val(f && f.potrero && f.potrero !== "Sin potrero asignado" ? f.potrero : ""), " list='dl-potreros' placeholder='ej. Guayabal'")
+      + campo("an-potrero", "Potrero", val(potreroDef), " list='dl-potreros' placeholder='ej. Guayabal'")
       + campo("an-hierro", "Hierro / Marca a fuego", val(f && f.hierro), " placeholder='ej. JA'")
       + campo("an-chip", "Chip / RFID", val(f && f.chip), " placeholder='ej. 985...'")
       + campo("an-color", "Color / Pelo", val(f && f.color), " placeholder='ej. Negro'")

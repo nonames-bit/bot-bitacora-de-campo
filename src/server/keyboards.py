@@ -264,9 +264,10 @@ def crear_teclado_ejemplos() -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("💀 Muerte / Baja", callback_data="ejemplo:muerte"),
-            InlineKeyboardButton("📥 Entrada / Salida", callback_data="ejemplo:movimiento"),
+            InlineKeyboardButton("💰 Venta Animal", callback_data="ejemplo:venta"),
         ],
         [
+            InlineKeyboardButton("📥 Entrada / Salida", callback_data="ejemplo:movimiento"),
             InlineKeyboardButton("🏠 Menú Principal", callback_data="menu:principal"),
         ],
     ]

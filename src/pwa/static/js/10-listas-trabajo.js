@@ -72,6 +72,20 @@
         + "<button type='button' class='chip btn-lt-hecho' data-tipo='ENTERO'>Queda entero</button>";
     } else if (clave === "secar") {
       acciones = "<button type='button' class='chip btn-lt-secado'>🍼 Secada / ya está seca</button>";
+    } else if (clave === "palpar") {
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(a.tag) + "'>🩺 Diagnosticar Tacto</button>";
+    } else if (clave === "partos") {
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(a.tag) + "'>🍼 Registrar Parto</button>";
+    } else if (clave === "servir" || clave === "celos") {
+      acciones = "<button type='button' class='chip verde' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(a.tag) + "'>🐂 Inseminar / Servir</button>";
+    } else if (clave === "destetar") {
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='destete' data-tag='" + esc(a.madre || a.tag) + "'>🐮 Destetar</button>";
+    } else if (clave === "tratamientos") {
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(a.tag) + "'>💉 Aplicar Dosis</button>";
+    } else if (clave === "bajo_peso") {
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "'>⚖️ Pesar Báscula</button>";
+    } else if (clave === "venta") {
+      acciones = "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(a.tag) + "' style='background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;'>💰 Vender Animal</button>";
     } else if (info.manejo) {
       acciones = "<button type='button' class='chip btn-lt-hecho' data-tipo='" + info.manejo + "'>✓ Hecho</button>";
     }

@@ -15,7 +15,8 @@
       { id: "celo", nom: "Celo", ico: "flame" },
       { id: "servicio", nom: "Servicio / IA", ico: "sperm" },
       { id: "leche", nom: "Leche", ico: "milk" },
-      { id: "muerte", nom: "Muerte / Descarte", ico: "cowSkull" },
+      { id: "venta", nom: "Venta Animal", ico: "receipt" },
+      { id: "muerte", nom: "Muerte / Baja", ico: "cowSkull" },
       { id: "gasto", nom: "Ingreso / Gasto", ico: "banknote" },
       { id: "tarea", nom: "Asignar Tarea", ico: "calendar" }
     ];
@@ -185,6 +186,18 @@
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>💡 Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
         + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Ordeño del día, control tanque, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
+    } else if (tipo === "venta") {
+      h += "<div class='aviso' style='margin:2px 0 8px; font-size:12px;'>💰 <b>Venta de Animal:</b> El semoviente pasa automáticamente a estado <b>VENDIDO</b> (sale del inventario activo) y el monto se registra como ingreso en Finanzas.</div>"
+        + "<label>Arete / Tag del animal vendido: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Comprador / Destino: <input id='cap-venta-comprador' placeholder='ej. Frigorífico del Llano, Finca San José, Subasta' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Precio / Valor Total de Venta ($): <input type='number' step='1000' min='0' id='cap-venta-precio' placeholder='ej. 3500000' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "</div>"
+        + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
+        + "<div style='flex:1;'><label>Peso de Salida en Báscula (kg, opcional): <input type='number' step='0.5' id='cap-venta-peso' placeholder='ej. 460' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div style='flex:1;'><label>Motivo / Destino zootécnico: <select id='cap-venta-motivo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Ceba / Sacrificio'>Ceba / Sacrificio</option><option value='Cría / Reproducción'>Cría / Reproductor</option><option value='Descarte por edad'>Descarte por vejez</option><option value='Descarte productivo'>Descarte productivo / baja leche</option><option value='Comercial / Subasta'>Comercial / Subasta</option><option value='Otro'>Otro motivo</option></select></label></div>"
+        + "</div>"
+        + "<label>Observaciones / Guía de movilización: <input id='cap-notas' placeholder='ej. Guía ICA 1234, camión de Don Pedro' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "muerte") {
       h += "<label>Arete / Tag: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Causa Presunta: <input id='cap-causa' placeholder='ej. Mordedura de serpiente, timpanismo, descarte vejez' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"

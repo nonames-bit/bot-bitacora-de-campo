@@ -409,8 +409,12 @@
           catsHtml += "<span class='chip' style='font-size:11px; padding:2px 7px; margin-right:4px;'><b>" + esc(cat) + "</b>: " + esc(categorias[cat]) + "</span>";
         });
 
+        var btnMoverLote = cfg.esPotrero && cfg.nombrePotrero
+          ? "<button type='button' class='tema-btn' data-accion='capturar-evento' data-tipo='traslado' data-potrero='" + esc(cfg.nombrePotrero) + "' style='font-size:11px; padding:3px 8px; font-weight:700; background:rgba(30,60,114,0.1); color:var(--azul-marca); border:1px solid var(--azul-marca); border-radius:5px; cursor:pointer; display:inline-flex; align-items:center; gap:4px;'>" + icon("truck", 12) + "Trasladar Lote</button>"
+          : "";
+
         var content = "<div class='modal-potrero-kpis' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding:8px 12px; background:var(--tarjeta-fondo); border-radius:6px; border:1px solid var(--borde);'>"
-          + "<div><b>Total: " + esc(total) + "</b> " + (total === 1 ? "animal activo" : "animales activos") + "</div>"
+          + "<div style='display:flex; align-items:center; gap:8px; flex-wrap:wrap;'><b>Total: " + esc(total) + "</b> " + (total === 1 ? "animal activo" : "animales activos") + btnMoverLote + "</div>"
           + "<div style='display:flex; gap:4px; flex-wrap:wrap;'>" + catsHtml + "</div>"
           + "</div>";
 
@@ -429,11 +433,12 @@
 
         content += "<div class='tabla-scroll' style='max-height:50vh; overflow-y:auto; overflow-x:hidden;'><table id='tabla-modal-lista' style='width:100%; font-size:12px; border-collapse:collapse; table-layout:fixed;'>"
           + "<thead><tr>"
-          + "<th style='width:24%; text-align:left; padding:6px 4px;'>Número</th>"
-          + "<th style='width:28%; text-align:left; padding:6px 4px;'>Nombre</th>"
-          + "<th style='width:15%; text-align:center; padding:6px 2px;'>Edad</th>"
+          + "<th style='width:22%; text-align:left; padding:6px 4px;'>Número</th>"
+          + "<th style='width:24%; text-align:left; padding:6px 4px;'>Nombre</th>"
+          + "<th style='width:13%; text-align:center; padding:6px 2px;'>Edad</th>"
           + "<th style='width:13%; text-align:center; padding:6px 2px;'>Estado</th>"
-          + "<th style='width:20%; text-align:" + (cfg.esPotrero ? "right" : "left") + "; padding:6px 4px;'>" + col5Tit + "</th>"
+          + "<th style='width:14%; text-align:" + (cfg.esPotrero ? "right" : "left") + "; padding:6px 4px;'>" + col5Tit + "</th>"
+          + "<th style='width:14%; text-align:center; padding:6px 2px;'>Acción</th>"
           + "</tr></thead>"
           + "<tbody>";
 
@@ -453,6 +458,12 @@
             col5Val = a.potrero_nombre || "Sin potrero";
           }
 
+          var potFila = a.potrero_nombre || cfg.nombrePotrero || "";
+          var accionHtml = "<div style='display:flex; justify-content:center; gap:4px;'>"
+            + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(a.tag) + "' data-potrero='" + esc(potFila) + "' style='padding:2px 5px; cursor:pointer;' title='Pesar'>" + icon("scale", 11) + "</button>"
+            + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='traslado' data-tag='" + esc(a.tag) + "' data-potrero='" + esc(potFila) + "' style='padding:2px 5px; cursor:pointer;' title='Mover'>" + icon("truck", 11) + "</button>"
+            + "</div>";
+
           var bStr = (a.tag + " " + (a.nombre || "") + " " + (a.categoria_sg || "") + " " + (a.categoria_desc || "") + " " + (a.potrero_nombre || "") + " " + (a.estado_reprod || "")).toLowerCase();
 
           content += "<tr data-busqueda='" + esc(bStr) + "'>"
@@ -461,6 +472,7 @@
             + "<td style='padding:6px 2px; text-align:center; white-space:nowrap; font-size:11px;'>" + esc(edadTxt) + "</td>"
             + "<td style='padding:6px 2px; text-align:center; white-space:nowrap;'>" + chipCat + "</td>"
             + "<td style='padding:6px 4px; text-align:" + (cfg.esPotrero ? "right" : "left") + "; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11.5px;' title='" + esc(col5Val) + "'>" + esc(col5Val) + "</td>"
+            + "<td style='padding:6px 2px; text-align:center; white-space:nowrap;'>" + accionHtml + "</td>"
             + "</tr>";
         });
 
@@ -504,7 +516,8 @@
       titulo: "Potrero: " + nomPotrero,
       url: "/api/potrero/" + encodeURIComponent(nomPotrero) + "/animales",
       icono: "grass",
-      esPotrero: true
+      esPotrero: true,
+      nombrePotrero: nomPotrero
     });
   }
   window.abrirModalAnimalesPotrero = abrirModalAnimalesPotrero;

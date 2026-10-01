@@ -1760,11 +1760,49 @@ class Database:
         })
         if existente:
             return existente
-        return self.insert("movimientos", dict(
+        mid = self.insert("movimientos", dict(
             animal_id=animal_id, fecha=f, tipo_movimiento=tipo_movimiento,
             procedencia_destino=procedencia_destino, precio=precio, notas=notas,
             creado_en=self._ahora(), registrado_por=registrado_por,
         ))
+        if animal_id:
+            tipo_u = str(tipo_movimiento or "").strip().upper()
+            if tipo_u == "VENTA":
+                self.execute("UPDATE animales SET estado = 'VENDIDO' WHERE id_animal = ?", (animal_id,))
+            elif tipo_u == "DESCARTE":
+                self.execute("UPDATE animales SET estado = 'DESCARTE' WHERE id_animal = ?", (animal_id,))
+        return mid
+
+    def registrar_venta(self, animal_tag, fecha=None, comprador=None, precio=None,
+                        peso_kg=None, motivo=None, notas=None, registrado_por=None) -> int:
+        """Registra la venta de un semoviente: crea el movimiento de VENTA, actualiza
+        el estado del animal a 'VENDIDO' (sale del inventario activo) y, si se especifica
+        peso_kg, registra el pesaje de salida correspondiente."""
+        notas_partes = []
+        if peso_kg:
+            notas_partes.append(f"Peso: {peso_kg} kg")
+        if motivo:
+            notas_partes.append(str(motivo).strip())
+        if notas:
+            notas_partes.append(str(notas).strip())
+        notas_full = " · ".join(notas_partes) if notas_partes else None
+
+        mid = self.registrar_movimiento(
+            animal_tag=animal_tag, fecha=fecha, tipo_movimiento="VENTA",
+            procedencia_destino=comprador, precio=precio, notas=notas_full,
+            registrado_por=registrado_por,
+        )
+        if peso_kg:
+            try:
+                p_num = float(peso_kg)
+                if p_num > 0:
+                    self.registrar_pesaje(
+                        animal_tag=animal_tag, fecha=fecha, peso_kg=p_num,
+                        evento="PESAJE_VENTA", registrado_por=registrado_por,
+                    )
+            except Exception:
+                pass
+        return mid
 
     def registrar_finanza(self, fecha=None, tipo=None, categoria=None, concepto=None,
                           monto=0.0, litros=None, animal_tag=None, potrero=None,

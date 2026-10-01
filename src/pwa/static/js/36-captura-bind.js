@@ -39,13 +39,45 @@
       }
       if (tagIni) {
         var fTagDef = document.getElementById("cap-tag");
-        if (fTagDef && !fTagDef.value) {
+        if (fTagDef) {
           fTagDef.value = tagIni;
+          fTagDef.dispatchEvent(new Event("input"));
           fTagDef.dispatchEvent(new Event("change"));
         }
         var chipTag = document.getElementById("cap-tag-chip");
         if (chipTag) chipTag.innerHTML = "<span class='chip azul'>📋 Animal: " + esc(tagIni) + "</span>";
         window.__capTagPendiente = null;
+      }
+      var potIni = window.__capPotreroPendiente || null;
+      if (potIni) {
+        var idsPotIni = ["cap-pot-orig", "cap-fin-potrero", "cap-pot-madre"];
+        for (var iOrig = 0; iOrig < idsPotIni.length; iOrig++) {
+          var elPotI = document.getElementById(idsPotIni[iOrig]);
+          if (elPotI) {
+            elPotI.value = potIni;
+            elPotI.dispatchEvent(new Event("change"));
+            break;
+          }
+        }
+        window.__capPotreroPendiente = null;
+      }
+      var farmIni = window.__capFarmacoPendiente || null;
+      if (farmIni) {
+        var elTratP = document.getElementById("cap-trat-producto");
+        if (elTratP) {
+          elTratP.value = farmIni;
+          elTratP.dispatchEvent(new Event("change"));
+        }
+        window.__capFarmacoPendiente = null;
+      }
+      var toroIni = window.__capToroPendiente || null;
+      if (toroIni) {
+        var elToroS = document.getElementById("cap-toro") || document.getElementById("cap-palp-toro");
+        if (elToroS) {
+          elToroS.value = toroIni;
+          elToroS.dispatchEvent(new Event("change"));
+        }
+        window.__capToroPendiente = null;
       }
       var ultPot = null;
       try { ultPot = localStorage.getItem("bitacora_ultimo_potrero"); } catch (ePot0) { ultPot = null; }
@@ -111,7 +143,7 @@
         parto: "Parto", pesaje: "Pesaje", palpacion: "Tacto / Palpación", pajuela: "Stock Pajillas",
         nitrogeno: "Recarga Nitrógeno", tratamiento: "Tratamiento", traslado: "Traslado",
         destete: "Destete", secado: "Secado", celo: "Celo", servicio: "Servicio / IA",
-        leche: "Leche", muerte: "Muerte / Descarte", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea"
+        leche: "Leche", venta: "Venta Animal", muerte: "Muerte / Baja", gasto: "Ingreso / Gasto", tarea: "Asignar Tarea"
       };
       return noms[id] || id;
     }
@@ -511,6 +543,23 @@
           + (d["cap-nitr-prox"] ? (" · Próxima recarga: <b>" + esc(fechaCorta(d["cap-nitr-prox"])) + "</b>") : "") + "</div>"
           + (d["cap-nitr-proveedor"] ? ("<div style='font-size:12.5px; margin-top:3px;'>Proveedor: <b>" + esc(d["cap-nitr-proveedor"]) + "</b></div>") : "")
           + (d["cap-nitr-costo"] ? ("<div style='font-size:12.5px; margin-top:2px;'>Costo: <b>" + fmtMoneda(Number(d["cap-nitr-costo"])) + "</b></div>") : "")
+          + "</div>";
+        if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
+        return h;
+      }
+
+      if (_capTipo === "venta") {
+        var vTag = d["cap-tag"] || "—";
+        var vComp = d["cap-venta-comprador"] || "(sin comprador)";
+        var vPrecio = d["cap-venta-precio"] ? fmtMoneda(Number(d["cap-venta-precio"])) : "Sin precio";
+        var vPeso = d["cap-venta-peso"] ? (d["cap-venta-peso"] + " kg") : null;
+        var vMot = d["cap-venta-motivo"] || "Venta";
+        h = "<div style='font-size:14px; font-weight:700; color:var(--texto); margin-bottom:8px;'>💰 Venta de Semoviente</div>"
+          + "<div style='background:rgba(217,119,6,0.08); border-left:4px solid #D97706; padding:10px 12px; border-radius:6px; margin-bottom:8px;'>"
+          + "<div style='font-size:14px;'>Animal / Tag: <b style='font-family:var(--font-mono); font-size:16px; color:#D97706;'>" + esc(vTag) + "</b> · Fecha: <b>" + esc(fechaCorta(fechaR)) + "</b></div>"
+          + "<div style='font-size:13px; margin-top:4px;'>Comprador / Destino: <b>" + esc(vComp) + "</b></div>"
+          + "<div style='font-size:13px; margin-top:2px;'>Monto Venta: <b style='color:#16a34a; font-size:15px;'>" + esc(vPrecio) + "</b>" + (vPeso ? (" · Peso báscula: <b>" + esc(vPeso) + "</b>") : "") + "</div>"
+          + "<div style='font-size:12px; color:var(--texto-suave); margin-top:2px;'>Motivo: <b>" + esc(vMot) + "</b> · <i>El animal cambiará a estado VENDIDO.</i></div>"
           + "</div>";
         if (d["cap-notas"]) h += "<div style='margin-top:4px; font-size:12px; font-style:italic;'>💬 " + esc(d["cap-notas"]) + "</div>";
         return h;
@@ -1346,7 +1395,12 @@
 
     refrescarCamposCap();
     wireStepperCap();
-    mostrarPasoCap(1);
+    if (window.__capPasoInicial) {
+      mostrarPasoCap(window.__capPasoInicial);
+      window.__capPasoInicial = null;
+    } else {
+      mostrarPasoCap(1);
+    }
 
     qa("button[data-cap-tipo]").forEach(function (b) {
       b.addEventListener("click", function () {
@@ -1454,6 +1508,13 @@
         } else if (_tipoCapturaActual === "leche") {
           payload.litros = parseFloat(q("#cap-litros") && q("#cap-litros").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
+        } else if (_tipoCapturaActual === "venta") {
+          payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
+          payload.comprador = (q("#cap-venta-comprador") && q("#cap-venta-comprador").value || "").trim();
+          payload.precio = parseFloat(q("#cap-venta-precio") && q("#cap-venta-precio").value) || null;
+          payload.peso_kg = parseFloat(q("#cap-venta-peso") && q("#cap-venta-peso").value) || null;
+          payload.motivo = (q("#cap-venta-motivo") && q("#cap-venta-motivo").value) || null;
+          payload.notas = (q("#cap-notas") && q("#cap-notas").value) || null;
         } else if (_tipoCapturaActual === "muerte") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.causa_presunta = (q("#cap-causa") && q("#cap-causa").value) || null;
@@ -1540,6 +1601,32 @@
           if (feed) {
             feed.innerHTML = "<div class='chip " + (online ? "verde" : "ambar") + "' style='font-size:14px; padding:8px 12px;'>"
               + (online ? "✅ Evento" + fotoTxt + " registrado en el servidor." : "💾 Evento" + fotoTxt + " guardado en cola local offline (se enviará al volver la señal).") + "</div>";
+            if (_tipoCapturaActual === "parto" && (!payload.tipo_evento || payload.tipo_evento === "PARTO" || payload.tipo_evento === "GEMELAR")) {
+              var vMadre = payload.vaca_tag || "";
+              var fParto = fecha || new Date().toISOString().slice(0, 10);
+              var potMadre = payload.potrero_madre || "";
+              var crSexo = payload.sexo_cria || "";
+              feed.innerHTML += "<div style='margin-top:10px; padding:10px; background:var(--superficie); border-radius:8px; border:1px solid var(--borde); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;'>"
+                + "<span>🐣 <b>¿Deseas registrar la cría en el inventario ahora?</b></span>"
+                + "<button type='button' class='tema-btn' id='btn-crear-cria-parto' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px; display:inline-flex; align-items:center; gap:5px;'>"
+                + icon("cowCalf", 14) + "Registrar Arete de la Cría</button>"
+                + "</div>";
+              setTimeout(function () {
+                var bCr = document.getElementById("btn-crear-cria-parto");
+                if (bCr) {
+                  bCr.addEventListener("click", function () {
+                    if (typeof mostrarFormularioAnimal === "function") {
+                      mostrarFormularioAnimal(null, "", {
+                        madre_tag: vMadre,
+                        fecha_nacimiento: fParto,
+                        potrero: potMadre,
+                        sexo: crSexo === "HEMBRA" ? "Hembra" : (crSexo === "MACHO" ? "Macho" : "")
+                      });
+                    }
+                  });
+                }
+              }, 50);
+            }
           }
           mostrarToast(online ? "Guardado ✓" : "Guardado offline, se enviará al volver la señal", online ? "verde" : "ambar");
           vibrarConfirmacion();

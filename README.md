@@ -871,6 +871,46 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - **Estandarización Terminológica a Pajillas**: Reemplazo de "pajuelas" por "pajillas" en toda la interfaz de usuario de la PWA, Bot de Telegram (`formatters.py`, `keyboards.py`, `telegram_bot.py`), Captura Rápida de Campo y enrutador de lenguaje natural de `QueryEngine`, manteniendo retrocompatibilidad total con comandos anteriores (`/pajilla_stock`, `/pajillas`, `/pajilla_add`).
         - **Endpoints API**: Nuevas rutas `/api/pajillas` y `/api/pajillas/estado` con compatibilidad de esquemas.
         - **Pruebas y Verificación**: Suite de pruebas `tests/test_pajillas_estado.py` en verde (44/44 tests pasando), `node --check` y `ruff` limpios.
+- [x] **Flujo Unificado y Explícito de Venta de Animales en PWA y Bot (2026-09-30)** 💰🏷️:
+    - **Registro de Venta en Captura Rápida de Campo (`35-captura.js`, `36-captura-bind.js`)**:
+        - Nueva tarjeta dedicada **"Venta Animal"** en el selector de tipos de evento de Captura Rápida con ícono de recibo/venta.
+        - Formulario estructurado para campo: Tag con autocompletado en tiempo real, Comprador/Destino, Precio o Valor total ($), Peso de salida en báscula (kg opcional), Motivo/Destino zootécnico (Ceba, Cría, Descarte vejez, Descarte productivo, Subasta, etc.) y Observaciones.
+        - Banner informativo visual destacando que el animal cambiará automáticamente a estado `VENDIDO` y saldrá del hato activo.
+    - **Botón de Venta Directa en Ficha del Animal (`55-ficha.js`, `60-carga-datos.js`)**:
+        - Acción rápida `💰 Vender Animal` en la cabecera zootécnica de cualquier animal con estado `ACTIVO`.
+        - Al hacer clic, abre Captura Rápida prellenando de inmediato el arete del animal, reduciendo errores de digitación en campo.
+    - **Sincronización y Actualización de Estado en Base de Datos (`src/db/database.py`, `src/pwa/rutas/sync.py`)**:
+        - Corrección en `Database.registrar_movimiento`: cuando `tipo_movimiento == 'VENTA'`, actualiza automáticamente `animales.estado = 'VENDIDO'` (y `DESCARTE` si aplica), garantizando el cumplimiento de la Regla Fundamental de Inventario (Hato Activo vs Histórico).
+        - Implementado método de alto nivel `Database.registrar_venta(...)` que registra el movimiento de venta, actualiza el estado del animal a `VENDIDO`, registra el pesaje de salida (`PESAJE_VENTA`) si se especificó el peso, y sincroniza automáticamente los ingresos con Finanzas.
+        - Manejo offline/online en el endpoint `/api/sync` para eventos de tipo `venta` y `movimiento`.
+    - **Soporte y Ejemplos en Bot de Telegram (`src/server/keyboards.py`, `src/server/formatters.py`)**:
+        - Agregado botón `💰 Venta Animal` en el teclado interactivo de ejemplos (`/ejemplos`).
+        - Plantilla de texto explicativa con formato: `"Venta de 1234 a Frigorífico por 2500000, peso 450kg"`.
+    - **Verificación y Pruebas**:
+        - Prueba unitaria `test_sync_venta_animal_actualiza_estado_y_movimientos` en `tests/test_pwa_api.py`.
+        - Suite de pruebas de base de datos, API y mapa de rutas en verde.
+- [x] **Ecosistema de Prellenado Inteligente y Acciones Rápidas de Campo en PWA (2026-09-30)** ⚡🐄:
+    - **Barra de Acciones Rápidas en Ficha del Animal (`55-ficha.js`, `60-carga-datos.js`)**:
+        - Para cualquier animal con estado `ACTIVO`, se despliega una barra táctil dedicada: *Acciones Rápidas en Manga / Corral (Prellenado Automático)*.
+        - Accesos a 1 toque adaptados al sexo: `[⚖️ Pesar]`, `[🩺 Palpar]` (hembras), `[💉 Tratar]`, `[🚚 Mover]`, `[🐂 Servicio/IA]` (hembras), `[🍼 Parto]` (hembras), `[💰 Vender]` y `[⚰️ Baja]`.
+        - Al tocar cualquiera, redirige a Captura Rápida saltando directo al **Paso 2 (Datos del evento)** con el arete (y potrero de origen si aplica) precargado.
+    - **Acciones Directas en Listas de Trabajo (`10-listas-trabajo.js`)**:
+        - Cada fila de las listas de trabajo ahora incluye botones de acción de 1 toque:
+            - Palpar: `[🩺 Diagnosticar Tacto]`
+            - Partos: `[🍼 Registrar Parto]`
+            - Servir / Celos: `[🐂 Inseminar / Servir]`
+            - Destete: `[🐮 Destetar]`
+            - Tratamientos: `[💉 Aplicar Dosis]`
+            - Bajo peso: `[⚖️ Pesar Báscula]`
+            - Venta: `[💰 Vender Animal]`
+        - Tocar el botón abre directamente la captura del evento con el arete seleccionado.
+    - **Módulo de Potreros y Listas de Animales (`18-pasturas-modales.js`)**:
+        - En el modal de animales por potrero: botón en cabecera `[🚚 Trasladar Lote]` con el potrero origen prellenado.
+        - En la tabla de animales del potrero: nueva columna `Acción` con botones táctiles `[⚖️]` (pesar) y `[🚚]` (trasladar) que abren la captura con el arete y potrero precargados.
+    - **Flujo de Parto hacia la Cría (`36-captura-bind.js`, `60-carga-datos.js`)**:
+        - Al guardar un parto con cría viva, la notificación de éxito ofrece el botón `[🏷️ Registrar Arete de la Cría]`, abriendo el formulario de alta de nuevo animal con Madre, Fecha de nacimiento, Potrero y Sexo de la cría prellenados automáticamente.
+    - **Verificación Visual y Suite de Pruebas**:
+        - Validado con `browser_subagent` en emulación móvil (390×844) verificando Ficha, Listas de Trabajo, Potrero y redirección con prellenado a Captura Paso 2. Tests de JavaScript construido y suite general en verde.
 
 
 ---

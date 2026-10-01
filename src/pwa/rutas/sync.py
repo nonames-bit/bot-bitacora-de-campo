@@ -293,6 +293,31 @@ def registrar(app, ctx, h):
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                    elif tipo in ("venta", "movimiento"):
+                        p_tag = payload.get("animal_tag") or payload.get("tag")
+                        p_comprador = payload.get("comprador") or payload.get("procedencia_destino") or payload.get("destino")
+                        p_precio = payload.get("precio") or payload.get("monto") or payload.get("valor")
+                        try:
+                            precio_num = float(p_precio) if p_precio is not None and str(p_precio).strip() != "" else None
+                        except (ValueError, TypeError):
+                            precio_num = None
+                        p_peso = payload.get("peso_kg") or payload.get("peso")
+                        p_motivo = payload.get("motivo")
+                        p_notas = payload.get("notas")
+                        db_sync.registrar_venta(
+                            animal_tag=p_tag,
+                            fecha=fecha,
+                            comprador=p_comprador,
+                            precio=precio_num,
+                            peso_kg=p_peso,
+                            motivo=p_motivo,
+                            notas=p_notas,
+                            registrado_por=uid,
+                        )
+                        _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
                     elif tipo == "leche":
                         db_sync.registrar_produccion_leche(
                             fecha=fecha,

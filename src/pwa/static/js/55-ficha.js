@@ -191,6 +191,26 @@
     var btnRectificar = (rolEd === "OWNER")
       ? "<button type='button' class='tema-btn btn-rectificar-tag' data-accion='rectificar-tag' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); font-weight:600;' title='Proceso especial: rectificar chapeta mal leída en campo'>" + icon("tag", 14) + "Rectificar Chapeta</button>"
       : "";
+    var barraAccionesCampo = "";
+    if (stUpper === "ACTIVO") {
+      var esHembra = (f.sexo || "").toLowerCase().indexOf("h") === 0;
+      var potreroAnim = (f.potrero && f.potrero !== "Sin potrero asignado") ? f.potrero : "";
+
+      barraAccionesCampo = "<div class='ficha-acciones-campo' style='margin:10px 0 12px; padding:10px 12px; background:var(--tarjeta-fondo); border:1px solid var(--borde); border-radius:8px;'>"
+        + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px;'>"
+        + icon("clipboard", 13) + "Acciones Rápidas en Manga / Corral (Prellenado Automático)</div>"
+        + "<div style='display:flex; gap:6px; flex-wrap:wrap; align-items:center;'>"
+        + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='pesaje' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Registrar peso en báscula'>" + icon("scale", 14) + "Pesar</button>"
+        + (esHembra ? "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='palpacion' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Diagnóstico de preñez / tacto'>" + icon("stethoscope", 14) + "Palpar</button>" : "")
+        + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='tratamiento' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Aplicar fármaco / tratamiento'>" + icon("syringe", 14) + "Tratar</button>"
+        + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='traslado' data-tag='" + esc(f.tag) + "' data-potrero='" + esc(potreroAnim) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Trasladar a otro potrero'>" + icon("truck", 14) + "Mover</button>"
+        + (esHembra ? "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='servicio' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Inseminar o registrar monta'>" + icon("sperm", 14) + "Servicio / IA</button>" : "")
+        + (esHembra ? "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='parto' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px;' title='Registrar nuevo parto'>" + icon("cowCalf", 14) + "Parto</button>" : "")
+        + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='venta' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px; background:rgba(217,119,6,0.12); color:#D97706; border-color:#D97706;' title='Registrar venta del animal'>" + icon("receipt", 14) + "Vender</button>"
+        + "<button type='button' class='chip' data-accion='capturar-evento' data-tipo='muerte' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:6px 10px; display:inline-flex; align-items:center; gap:5px; background:rgba(220,38,38,0.08); color:var(--color-rojo-txt); border-color:var(--color-rojo-txt);' title='Registrar baja o muerte'>" + icon("cowSkull", 14) + "Baja</button>"
+        + "</div></div>";
+    }
+
     head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Buscar otra ficha de animal (Ctrl+K)'>"
       + icon("search", 14) + "Buscar otro</button>"
@@ -202,7 +222,7 @@
 
     head += "</div>";
 
-    var html = head + erroresHtml(f) + (showIdent ? identPanelHtml(true) : "");
+    var html = head + barraAccionesCampo + erroresHtml(f) + (showIdent ? identPanelHtml(true) : "");
     html += "<div id='ficha-tabs' role='tablist'><div class='mini'>"
       + TABS.map(function (t, i) { return "<button role='tab' aria-selected='" + (i === 0 ? "true" : "false") + "' data-tab='" + t.id + "' class='" + (i === 0 ? "act" : "") + "'>" + t.label + "</button>"; }).join("")
       + "</div></div><div id='ficha-panel'>" + fichaTab("general", f) + "</div>";
