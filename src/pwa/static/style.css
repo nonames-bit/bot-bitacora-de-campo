@@ -4418,3 +4418,43 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .dot-rojo { background: var(--rojo-alerta); }
 .dot-naranja { background: #E8710A; }
 .dot-gris { background: var(--color-gris-txt); }
+
+/* ---------- Pestañas dentro de una vista (Fase D) ---------- */
+.pestanas { display: flex; gap: 6px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
+  margin: 4px 0 16px; padding: 4px; background: var(--superficie); border: 1px solid var(--borde); border-radius: 12px;
+  position: sticky; top: 0; z-index: 5; }
+.pestanas::-webkit-scrollbar { display: none; }
+.pestanas .pestana { flex: 1 0 auto; min-height: 40px; padding: 8px 14px; border-radius: 9px; white-space: nowrap;
+  background: transparent; color: var(--texto-suave); font-weight: 700; font-size: 13.5px; box-shadow: none; }
+.pestanas .pestana:hover { background: var(--verde-marca-pastel); color: var(--texto); }
+.pestanas .pestana.activa { background: var(--verde-marca); color: #fff; }
+.pestana-panel[hidden] { display: none; }
+
+/* ---------- Botones: un solo estilo (Fase D) ----------
+   `button` a secas es el principal (verde). Los secundarios (filtros,
+   refrescar, descargas) usan .tema-btn o .btn-sec: contorno, y verde lleno
+   cuando están activos (.act). Lo que borra o da de baja usa .btn-peligro.
+   El encabezado conserva su propio .tema-btn. */
+button.tema-btn:not(header .tema-btn),
+button.btn-sec {
+  background: var(--superficie);
+  color: var(--verde-marca);
+  border: 1px solid var(--borde-fuerte);
+}
+button.tema-btn:not(header .tema-btn):hover,
+button.btn-sec:hover {
+  background: var(--verde-marca-pastel);
+  border-color: var(--verde-marca);
+}
+button.tema-btn.act:not(header .tema-btn),
+button.btn-sec.act {
+  background: var(--verde-marca);
+  color: #FFFFFF;
+  border-color: var(--verde-marca);
+}
+button.btn-peligro {
+  background: var(--superficie);
+  color: var(--color-rojo-txt, #B91C1C);
+  border: 1px solid currentColor;
+}
+button.btn-peligro:hover { background: rgba(220, 38, 38, 0.08); }

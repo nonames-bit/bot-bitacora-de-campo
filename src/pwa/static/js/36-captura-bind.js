@@ -342,7 +342,7 @@
                 + badgeMetodo
                 + "<b style='color:var(--texto); font-size:12px;'>" + esc(tagToro + nomToro) + "</b>"
                 + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(s.explicacion) + ")</small>"
-                + "<button type='button' class='btn-aplicar-toro-sug' style='background:var(--ambar, #d97706); color:#fff; border:none; border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer;'>Aplicar</button>"
+                + "<button type='button' class='btn-aplicar-toro-sug' style='background:var(--ambar, #d97706); border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer;'>Aplicar</button>"
                 + "</div>";
 
               hintToro.innerHTML = html;
@@ -898,7 +898,7 @@
               + "<td><input type='date' class='inp-ia-fecha' value='" + esc(ultimaFecha) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='0' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='text' class='inp-ia-notas' value='' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
+              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila btn-peligro' style='padding:2px 6px; font-size:11px; cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
             tbody.appendChild(tr);
             var nuevoInpL = tr.querySelector(".inp-ia-litros");
             if (nuevoInpL) nuevoInpL.addEventListener("input", recalcularSuma);
@@ -1081,7 +1081,7 @@
             + "<td><input type='date' class='inp-ia-fecha' value='" + esc(fIso) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='" + esc(lts) + "' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='text' class='inp-ia-notas' value='" + esc(not) + "' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila btn-peligro' style='padding:2px 6px; font-size:11px; cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
             + "</tr>";
         });
 

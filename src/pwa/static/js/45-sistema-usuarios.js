@@ -14,7 +14,7 @@
     var diskSub = (vps.disk_total_gb) ? "Disco (" + (vps.disk_used_gb || 0) + "/" + vps.disk_total_gb + " GB)" : "Disco VPS";
     var diskClase = vps.disk_pct >= 85 ? "alerta" : (vps.disk_pct > 0 ? "ok" : "");
 
-    h += "<div class='kpis'>"
+    h += marcaPestana("estado") + "<div class='kpis'>"
       + kpi(ramTxt, ramSub, ramClase)
       + kpi(diskTxt, diskSub, diskClase)
       + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
@@ -23,6 +23,7 @@
       + "</div>";
 
     // 2. Bitácora de Actividad Reciente de los Demás Usuarios
+    h += marcaPestana("actividad");
     var actList = d.actividad_reciente || [];
     h += "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:10px; padding:16px; margin:20px 0;'>";
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>";
@@ -81,6 +82,7 @@
     h += "</div>";
 
     // 3. Usuarios & Presencia en Tiempo Real
+    h += marcaPestana("usuarios");
     var presList = d.presencias || [];
     if (presList.length) {
       h += "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:10px; padding:16px; margin:20px 0;'>";
@@ -106,12 +108,12 @@
     // Telegram con parse_mode HTML): trae <b>/<i> intencionales y sus valores
     // dinámicos ya vienen escapados del lado del servidor -- no re-escapar aquí
     // o los tags salen literales en vez de renderizarse.
-    h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
+    h += marcaPestana("estado") + "<h4>" + icon("grid") + "Diagnóstico General</h4>"
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
-    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
+    h += marcaPestana("logs") + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>" + icon("globe", 12) + "Todos</button>"
@@ -121,7 +123,12 @@
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
 
-    return h;
+    return armarPestanas("sistema", h, [
+      { k: "estado", t: "Estado", icono: "grid" },
+      { k: "actividad", t: "Actividad", icono: "clipboard" },
+      { k: "usuarios", t: "Sesiones", icono: "users" },
+      { k: "logs", t: "Logs", icono: "notes" }
+    ]);
   }
 
   function bindSistema() {
@@ -282,7 +289,7 @@
       + "<div style='flex:1; min-width:200px;'>"
       + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>PIN de 4 Dígitos (Acceso Celular/PC):</label>"
       + "<div style='display:flex; gap:6px;'>"
-      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:17px; font-weight:bold; letter-spacing:2px; text-align:center;'>"
+      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; min-width:0; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:17px; font-weight:bold; letter-spacing:2px; text-align:center;'>"
       + "<button type='button' id='btn-gen-pin' class='tema-btn' style='font-size:12px; padding:0 12px; white-space:nowrap;'>" + icon("refresh", 13) + " Generar PIN</button>"
       + "</div></div>"
       + "</div>"
@@ -399,7 +406,7 @@
           var numOwners = usuarios.filter(function (x) { return String(x.rol || "").toUpperCase() === "OWNER"; }).length;
           var bloquearBorrar = esOwnerTarget && numOwners <= 1;
           if (!bloquearBorrar && (miRol === "OWNER" || rolU === "TRABAJADOR")) {
-            h += "<button type='button' class='btn-borrar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:4px 9px; color:var(--color-rojo-txt);'>" + icon("xmark", 12) + " Eliminar</button>";
+            h += "<button type='button' class='btn-borrar-usr btn-peligro' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:4px 9px;'>" + icon("xmark", 12) + " Eliminar</button>";
           }
         } else {
           h += "<span style='color:var(--texto-suave); font-size:11px;'>Protegido</span>";

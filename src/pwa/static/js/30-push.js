@@ -101,7 +101,7 @@
                   if (real) {
                     mostrarToast("Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
                   } else {
-                    mostrarToast("Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
+                    mostrarToast("Por ahora solo habrá avisos con la app abierta.", "ambar");
                   }
                 });
             }
@@ -138,7 +138,12 @@
   function textoEstadoAvisos(est) {
     if (!est.soporta) return "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
     if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
-    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
+    if (!est.servidor_listo) {
+      // El detalle técnico (llaves VAPID) solo le sirve al propietario.
+      var esOwner = window.__usuarioActual && window.__usuarioActual.rol === "OWNER";
+      return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Los avisos con la app cerrada aún no están activos.</span> "
+        + (esOwner ? "Al servidor le faltan las llaves VAPID." : "Por ahora solo se ven con la app abierta.");
+    }
     if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
     return "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
   }
@@ -496,7 +501,7 @@
           } else if (res && res.motivo === "sin_suscripcion") {
             mostrarToast("Este celular no está suscrito: toque «Activar».", "ambar");
           } else if (res && res.motivo === "servidor_sin_llaves") {
-            mostrarToast("El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
+            mostrarToast("Los avisos con la app cerrada aún no están activos en el servidor.", "ambar");
           } else {
             mostrarToast("No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
           }

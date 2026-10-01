@@ -187,7 +187,7 @@
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
         + "<label>Código Toro / Pajilla: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
+        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>" + icon("lightbulb", 14) + "Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
@@ -342,7 +342,7 @@
       + "<div id='cap-foto-nombre' style='font-size:12px; font-weight:700; word-break:break-all;'>foto.jpg</div>"
       + "<div id='cap-foto-tam' style='font-size:11px; color:var(--texto-suave);'>Optimizada</div>"
       + "</div>"
-      + "<button type='button' id='btn-quitar-foto' class='tema-btn' style='color:var(--color-rojo-txt); font-size:11.5px; padding:4px 9px; cursor:pointer;'>" + icon("xmark", 12) + " Quitar</button>"
+      + "<button type='button' id='btn-quitar-foto' class='btn-peligro' style='font-size:11.5px; padding:4px 9px; cursor:pointer;'>" + icon("xmark", 12) + " Quitar</button>"
       + "</div>"
       + "</div>";
 

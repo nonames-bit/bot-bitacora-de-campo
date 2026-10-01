@@ -734,6 +734,72 @@
     var chip = (opts && opts.chip) ? (" chip " + opts.chip) : "";
     return "<a href='#' class='ficha-link" + chip + "' data-ir-ficha='" + t + "' style='font-weight:700; text-decoration:none;'>" + t + "</a>";
   }
+  /* ---------- Pestañas dentro de una vista (Fase D) ----------
+     Las vistas largas (Reproducción, Leche, Sistema) marcan sus bloques con
+     marcaPestana("clave") mientras arman el HTML; armarPestanas() los agrupa
+     en paneles y pone la barra de pestañas debajo del encabezado. Lo que va
+     antes de la primera marca (título, botones de descarga) queda siempre
+     visible. La pestaña elegida se recuerda por vista en este navegador. */
+  function marcaPestana(clave) { return "<!--pestana:" + clave + "-->"; }
+
+  function pestanaGuardada(vistaId, claves) {
+    try {
+      var v = localStorage.getItem("ja_pestana_" + vistaId);
+      if (v && claves.indexOf(v) !== -1) return v;
+    } catch (e) { /* almacenamiento no disponible */ }
+    return claves[0];
+  }
+
+  function armarPestanas(vistaId, html, lista) {
+    var partes = String(html).split(/<!--pestana:([a-z0-9_]+)-->/);
+    var cabecera = partes[0];
+    var paneles = {};
+    for (var i = 1; i < partes.length; i += 2) paneles[partes[i]] = (paneles[partes[i]] || "") + (partes[i + 1] || "");
+    var visibles = lista.filter(function (p) { return paneles[p.k]; });
+    if (visibles.length < 2) return cabecera + visibles.map(function (p) { return paneles[p.k]; }).join("");
+    var activa = pestanaGuardada(vistaId, visibles.map(function (p) { return p.k; }));
+    var barra = "<div class='pestanas' role='tablist' data-vista-pestanas='" + esc(vistaId) + "'>"
+      + visibles.map(function (p) {
+        var on = p.k === activa;
+        return "<button type='button' class='pestana" + (on ? " activa" : "") + "' role='tab' aria-selected='" + on
+          + "' data-pestana='" + esc(p.k) + "'>" + (p.icono ? icon(p.icono, 15) : "") + esc(p.t) + "</button>";
+      }).join("") + "</div>";
+    var cuerpo = visibles.map(function (p) {
+      return "<section class='pestana-panel' role='tabpanel' data-panel='" + esc(p.k) + "'"
+        + (p.k === activa ? "" : " hidden") + ">" + paneles[p.k] + "</section>";
+    }).join("");
+    return cabecera + barra + cuerpo;
+  }
+
+  // Abre la pestaña que contiene a `el` (los atajos de los KPI saltan a
+  // secciones que pueden estar en una pestaña oculta).
+  function mostrarPestanaDe(el) {
+    var panel = el && el.closest ? el.closest(".pestana-panel[hidden]") : null;
+    if (!panel) return;
+    var barra = panel.parentNode.querySelector(".pestanas");
+    var b = barra && barra.querySelector(".pestana[data-pestana='" + panel.getAttribute("data-panel") + "']");
+    if (b) b.click();
+  }
+
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest(".pestanas .pestana") : null;
+    if (!b) return;
+    var barra = b.parentNode;
+    var clave = b.getAttribute("data-pestana");
+    Array.prototype.forEach.call(barra.children, function (x) {
+      var on = x === b;
+      x.classList.toggle("activa", on);
+      x.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    Array.prototype.forEach.call(barra.parentNode.children, function (sec) {
+      if (sec.classList && sec.classList.contains("pestana-panel")) sec.hidden = sec.getAttribute("data-panel") !== clave;
+    });
+    try { localStorage.setItem("ja_pestana_" + barra.getAttribute("data-vista-pestanas"), clave); } catch (e2) { /* sin almacenamiento */ }
+    // Los gráficos que se dibujaron ocultos recalculan su ancho.
+    try { window.dispatchEvent(new Event("resize")); } catch (e3) { /* navegador viejo */ }
+    if (barra.getBoundingClientRect().top < 0) barra.scrollIntoView({ block: "start" });
+  });
+
   // ---------- Listas de trabajo (todas las vistas) + chequeo del hato ----------
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
@@ -1097,6 +1163,8 @@
         if (el.childNodes[n].nodeType === 3) propio += el.childNodes[n].nodeValue;
       }
       if (propio.toLowerCase().indexOf(t) === -1) continue;
+      // Si la sección está en otra pestaña, abrir esa pestaña primero.
+      mostrarPestanaDe(el);
       // Resaltar la tarjeta de la sección, salvo que sea la de toda la vista.
       var card = el.closest(".card, details");
       var marco = (card && !card.querySelector(".kpis")) ? card : el;
@@ -1110,11 +1178,11 @@
   function aplicarDestinoLocal(lt, filtro, sec) {
     if (lt) {
       var bl = q(".lt-card .btn-lt[data-lt='" + lt + "']");
-      if (bl) { bl.click(); if (!sec) { var card = bl.closest(".lt-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); } }
+      if (bl) { mostrarPestanaDe(bl); bl.click(); if (!sec) { var card = bl.closest(".lt-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); } }
     }
     if (filtro) {
       var bf = q(".btn-filtro-pes[data-filtro='est'][data-valor='" + filtro + "']");
-      if (bf) bf.click();
+      if (bf) { mostrarPestanaDe(bf); bf.click(); }
     }
     if (sec) irASeccion(sec);
   }
@@ -1178,8 +1246,10 @@
       + "</div>" + erroresHtml(d);
     window.__listaTrabajo = d.lista_trabajo || null;
     window.__responsablesSugeridos = d.responsables_sugeridos || window.__responsablesSugeridos || [];
-    h += renderListaTrabajo(d.lista_trabajo, ltClaves("repro")) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    h += marcaPestana("hoy") + renderListaTrabajo(d.lista_trabajo, ltClaves("repro"))
+      + marcaPestana("indicadores") + grafico("reproductivo_hato", "Estado reproductivo del hato");
 
+    h += marcaPestana("termo");
     // Banco de Semen & Termo Criogénico (Software Ganadero)
     var termo = d.termo;
     var pajuelas = d.pajuelas || d.pajillas || [];
@@ -1351,6 +1421,7 @@
     }
     h += "</div>";
 
+    h += marcaPestana("indicadores");
     // Evaluación de palpadores: palpaciones del último año por responsable.
     h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid #0ea5e9;'>"
       + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>" + icon("stethoscope", 16) + " Evaluación de palpadores (último año)</div>"
@@ -1506,6 +1577,7 @@
       h += "</div></div>";
     }
 
+    h += marcaPestana("hoy");
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -1570,6 +1642,7 @@
         ["en_dias", "En", "text", function (v) { return esc(v) + " d"; }]
       ], "Sin celos proyectados en los próximos 30 días.");
 
+    h += marcaPestana("servicios");
     var rangoServ = d.servicios_rango || {};
     var servs = d.servicios_realizados || [];
     h += "<div class='card' style='padding:14px 16px; margin:12px 0; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
@@ -1610,7 +1683,12 @@
         ["motivo", "Motivo"],
         ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
-    return h;
+    return armarPestanas("repro", h, [
+      { k: "hoy", t: "Hoy", icono: "calendar" },
+      { k: "indicadores", t: "Indicadores", icono: "chartBar" },
+      { k: "termo", t: "Termo e IATF", icono: "snowflake" },
+      { k: "servicios", t: "Servicios y toros", icono: "sperm" }
+    ]);
   }
   // Rangos de fecha de la prueba de comportamiento (Carne) y de servicios
   // realizados (Repro). null = usar el default del servidor.
@@ -2277,7 +2355,7 @@
       + icon(icName, 18)
       + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(tituloModal) + "</span>"
       + "</div>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<div id='modal-lista-anim-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
@@ -2909,13 +2987,14 @@
       + btnIa
       + "</div>"
       + "</div>" + erroresHtml(d);
-    h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
+    h += marcaPestana("hoy") + renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
     h += renderLotesOrdeno(d.lotes_ordeno);
     h += renderControlLechero(d.control_lechero);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
       h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
 
+    h += marcaPestana("produccion");
     // 1. KPIs Ejecutivos de Producción
     h += "<div class='kpis'>"
       + kpiIr(kpi(totalLitros.toLocaleString("es-CO") + " L", "Total período (" + diasCount + " días)", "ok"), { sec: "Detalle de Entregas Diarias" })
@@ -2987,6 +3066,7 @@
       + "<div class='grafico-wrap' style='margin-top:8px;'><img src='/api/grafico/leche_total?t=" + tNow + "' alt='Gráfico Producción Total de Leche' loading='lazy'></div>"
       + "</details>";
 
+    h += marcaPestana("entregas");
     // 4. Tabla Detallada Día a Día
     h += "<h4>" + icon("calendar", 16) + "Detalle de Entregas Diarias al Acopiador</h4>";
     if (serie.length > 0) {
@@ -3049,7 +3129,11 @@
         + "</details>";
     }
 
-    return h;
+    return armarPestanas("leche", h, [
+      { k: "hoy", t: "Hoy", icono: "calendar" },
+      { k: "produccion", t: "Producción", icono: "chartLine" },
+      { k: "entregas", t: "Entregas y recibos", icono: "receipt" }
+    ]);
   }
 
   function bindLeche() {
@@ -4339,7 +4423,7 @@
       + "<div id='ins-lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
       + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
       + "<button type='button' class='tema-btn' id='btn-cancel-ins-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
-      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0; background:var(--verde-marca); border-color:var(--verde-marca);'>Confirmar Inseminación (" + nHembras + " vacas)</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0; border-color:var(--verde-marca);'>Confirmar Inseminación (" + nHembras + " vacas)</button>"
       + "</div>"
       + "</form>"
       + "</div></div></div>";
@@ -5754,7 +5838,7 @@
                   if (real) {
                     mostrarToast("Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
                   } else {
-                    mostrarToast("Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
+                    mostrarToast("Por ahora solo habrá avisos con la app abierta.", "ambar");
                   }
                 });
             }
@@ -5791,7 +5875,12 @@
   function textoEstadoAvisos(est) {
     if (!est.soporta) return "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
     if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
-    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
+    if (!est.servidor_listo) {
+      // El detalle técnico (llaves VAPID) solo le sirve al propietario.
+      var esOwner = window.__usuarioActual && window.__usuarioActual.rol === "OWNER";
+      return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Los avisos con la app cerrada aún no están activos.</span> "
+        + (esOwner ? "Al servidor le faltan las llaves VAPID." : "Por ahora solo se ven con la app abierta.");
+    }
     if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
     return "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
   }
@@ -6149,7 +6238,7 @@
           } else if (res && res.motivo === "sin_suscripcion") {
             mostrarToast("Este celular no está suscrito: toque «Activar».", "ambar");
           } else if (res && res.motivo === "servidor_sin_llaves") {
-            mostrarToast("El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
+            mostrarToast("Los avisos con la app cerrada aún no están activos en el servidor.", "ambar");
           } else {
             mostrarToast("No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
           }
@@ -6656,7 +6745,7 @@
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
         + "<label>Código Toro / Pajilla: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
+        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>" + icon("lightbulb", 14) + "Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
@@ -6811,7 +6900,7 @@
       + "<div id='cap-foto-nombre' style='font-size:12px; font-weight:700; word-break:break-all;'>foto.jpg</div>"
       + "<div id='cap-foto-tam' style='font-size:11px; color:var(--texto-suave);'>Optimizada</div>"
       + "</div>"
-      + "<button type='button' id='btn-quitar-foto' class='tema-btn' style='color:var(--color-rojo-txt); font-size:11.5px; padding:4px 9px; cursor:pointer;'>" + icon("xmark", 12) + " Quitar</button>"
+      + "<button type='button' id='btn-quitar-foto' class='btn-peligro' style='font-size:11.5px; padding:4px 9px; cursor:pointer;'>" + icon("xmark", 12) + " Quitar</button>"
       + "</div>"
       + "</div>";
 
@@ -7223,7 +7312,7 @@
                 + badgeMetodo
                 + "<b style='color:var(--texto); font-size:12px;'>" + esc(tagToro + nomToro) + "</b>"
                 + "<small style='color:var(--texto-suave); font-size:11px;'>(" + esc(s.explicacion) + ")</small>"
-                + "<button type='button' class='btn-aplicar-toro-sug' style='background:var(--ambar, #d97706); color:#fff; border:none; border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer;'>Aplicar</button>"
+                + "<button type='button' class='btn-aplicar-toro-sug' style='background:var(--ambar, #d97706); border-radius:4px; padding:2px 7px; font-size:11px; font-weight:700; cursor:pointer;'>Aplicar</button>"
                 + "</div>";
 
               hintToro.innerHTML = html;
@@ -7779,7 +7868,7 @@
               + "<td><input type='date' class='inp-ia-fecha' value='" + esc(ultimaFecha) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='0' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
               + "<td><input type='text' class='inp-ia-notas' value='' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
+              + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila btn-peligro' style='padding:2px 6px; font-size:11px; cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>";
             tbody.appendChild(tr);
             var nuevoInpL = tr.querySelector(".inp-ia-litros");
             if (nuevoInpL) nuevoInpL.addEventListener("input", recalcularSuma);
@@ -7962,7 +8051,7 @@
             + "<td><input type='date' class='inp-ia-fecha' value='" + esc(fIso) + "' style='width:100%; padding:4px 6px; font-size:12px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='number' step='0.1' min='0' class='inp-ia-litros' value='" + esc(lts) + "' style='width:100%; padding:4px 6px; font-size:12.5px; font-weight:bold; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
             + "<td><input type='text' class='inp-ia-notas' value='" + esc(not) + "' placeholder='Opcional' style='width:100%; padding:4px 6px; font-size:11.5px; border-radius:4px; border:1px solid var(--borde-fuerte);'></td>"
-            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila tema-btn' style='padding:2px 6px; font-size:11px; color:var(--color-rojo-txt); cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
+            + "<td style='text-align:center;'><button type='button' class='btn-ia-quitar-fila btn-peligro' style='padding:2px 6px; font-size:11px; cursor:pointer;' title='Eliminar fila' aria-label='Eliminar fila'>" + icon("xmark", 16) + "</button></td>"
             + "</tr>";
         });
 
@@ -9694,7 +9783,7 @@
     var diskSub = (vps.disk_total_gb) ? "Disco (" + (vps.disk_used_gb || 0) + "/" + vps.disk_total_gb + " GB)" : "Disco VPS";
     var diskClase = vps.disk_pct >= 85 ? "alerta" : (vps.disk_pct > 0 ? "ok" : "");
 
-    h += "<div class='kpis'>"
+    h += marcaPestana("estado") + "<div class='kpis'>"
       + kpi(ramTxt, ramSub, ramClase)
       + kpi(diskTxt, diskSub, diskClase)
       + kpi((db.tam_mb != null ? db.tam_mb + " MB" : "—"), "Base SQLite")
@@ -9703,6 +9792,7 @@
       + "</div>";
 
     // 2. Bitácora de Actividad Reciente de los Demás Usuarios
+    h += marcaPestana("actividad");
     var actList = d.actividad_reciente || [];
     h += "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:10px; padding:16px; margin:20px 0;'>";
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>";
@@ -9761,6 +9851,7 @@
     h += "</div>";
 
     // 3. Usuarios & Presencia en Tiempo Real
+    h += marcaPestana("usuarios");
     var presList = d.presencias || [];
     if (presList.length) {
       h += "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:10px; padding:16px; margin:20px 0;'>";
@@ -9786,12 +9877,12 @@
     // Telegram con parse_mode HTML): trae <b>/<i> intencionales y sus valores
     // dinámicos ya vienen escapados del lado del servidor -- no re-escapar aquí
     // o los tags salen literales en vez de renderizarse.
-    h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
+    h += marcaPestana("estado") + "<h4>" + icon("grid") + "Diagnóstico General</h4>"
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
-    h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
+    h += marcaPestana("logs") + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
       + "<div style='display:flex; gap:6px; align-items:center; flex-wrap:wrap;'>"
       + "<button type='button' class='btn-canal-log act tema-btn' data-canal='todos' style='font-size:11.5px; padding:4px 9px;'>" + icon("globe", 12) + "Todos</button>"
@@ -9801,7 +9892,12 @@
       + "</div></div>"
       + "<pre id='visor-logs' style='background:#121212; color:#39FF14; padding:14px; border-radius:8px; font-family:var(--font-mono); font-size:11.5px; max-height:380px; overflow-y:auto; line-height:1.45; white-space:pre-wrap; word-break:break-all; border:1px solid rgba(255,255,255,0.1);'>Cargando logs del servidor...</pre>";
 
-    return h;
+    return armarPestanas("sistema", h, [
+      { k: "estado", t: "Estado", icono: "grid" },
+      { k: "actividad", t: "Actividad", icono: "clipboard" },
+      { k: "usuarios", t: "Sesiones", icono: "users" },
+      { k: "logs", t: "Logs", icono: "notes" }
+    ]);
   }
 
   function bindSistema() {
@@ -9962,7 +10058,7 @@
       + "<div style='flex:1; min-width:200px;'>"
       + "<label style='font-size:12px; font-weight:700; display:block; margin-bottom:4px;'>PIN de 4 Dígitos (Acceso Celular/PC):</label>"
       + "<div style='display:flex; gap:6px;'>"
-      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:17px; font-weight:bold; letter-spacing:2px; text-align:center;'>"
+      + "<input id='usr-pin' type='text' maxlength='4' pattern='\\d{4}' placeholder='ej. 4521' required style='flex:1; min-width:0; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-family:var(--font-mono); font-size:17px; font-weight:bold; letter-spacing:2px; text-align:center;'>"
       + "<button type='button' id='btn-gen-pin' class='tema-btn' style='font-size:12px; padding:0 12px; white-space:nowrap;'>" + icon("refresh", 13) + " Generar PIN</button>"
       + "</div></div>"
       + "</div>"
@@ -10079,7 +10175,7 @@
           var numOwners = usuarios.filter(function (x) { return String(x.rol || "").toUpperCase() === "OWNER"; }).length;
           var bloquearBorrar = esOwnerTarget && numOwners <= 1;
           if (!bloquearBorrar && (miRol === "OWNER" || rolU === "TRABAJADOR")) {
-            h += "<button type='button' class='btn-borrar-usr tema-btn' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:4px 9px; color:var(--color-rojo-txt);'>" + icon("xmark", 12) + " Eliminar</button>";
+            h += "<button type='button' class='btn-borrar-usr btn-peligro' data-uid='" + esc(u.user_id) + "' data-nom='" + esc(u.nombre) + "' style='font-size:11px; padding:4px 9px;'>" + icon("xmark", 12) + " Eliminar</button>";
           }
         } else {
           h += "<span style='color:var(--texto-suave); font-size:11px;'>Protegido</span>";
@@ -12278,7 +12374,7 @@
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
       + "<div style='font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; color:var(--texto);'>"
       + icon("dna", 16) + "Composición Genética Multi-Raza</div>"
-      + (esAdminOwer ? ("<button type='button' id='btn-editar-composicion-raza' data-tag='" + esc(f.tag) + "' class='chip ambar' style='cursor:pointer; font-weight:600; padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:5px; border:none;'>" + icon("pencil", 12) + "Editar Razas</button>") : "")
+      + (esAdminOwer ? ("<button type='button' id='btn-editar-composicion-raza' data-tag='" + esc(f.tag) + "' class='chip ambar' style='cursor:pointer; font-weight:600; padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("pencil", 12) + "Editar Razas</button>") : "")
       + "</div>";
 
     if (compRacial.length > 0) {
@@ -12313,7 +12409,7 @@
       var rzTxt = f.raza || "Sin clasificar";
       h += "<div style='display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12.5px; color:var(--texto-suave);'>"
         + "<span>Raza registrada: <b>" + esc(rzTxt) + "</b> (sin desglose de porcentajes).</span>"
-        + (esAdminOwer ? ("<button type='button' class='chip verde' data-accion='editar-composicion-raza' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("plus", 11) + "Definir Multi-Raza</button>") : "")
+        + (esAdminOwer ? ("<button type='button' class='chip verde' data-accion='editar-composicion-raza' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 11) + "Definir Multi-Raza</button>") : "")
         + "</div>";
     }
     h += "</div>";
@@ -12764,7 +12860,7 @@
             + "</div>";
 
           if (d.puede_deshacer) {
-            html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
+            html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
               + icon("trash", 14) + "Deshacer</button>";
           }
           html += "</div>";
@@ -13067,7 +13163,7 @@
       + icon("cow", 14) + "¿Es Reproductor / Toro activo de la finca?"
       + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
-      + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
+      + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
       + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
@@ -13237,7 +13333,7 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%; max-height:92vh; overflow-y:auto;'>"
       + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde);'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px; font-size:15px;'>" + icon("camera", 17) + "Foto de Perfil · Animal " + esc(tag) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-subir-foto-animal' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div style='text-align:center; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:10px;'>"
@@ -13734,7 +13830,7 @@
         + "<span class='comp-frac-badge chip gris' style='font-size:11px; padding:3px 6px; display:inline-block;'>—</span>"
         + "</div>"
         + "<div>"
-        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
+        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
         + "</div>";
 
       var inPct = row.querySelector(".comp-pct-input");

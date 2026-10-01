@@ -263,7 +263,7 @@
             + "</div>";
 
           if (d.puede_deshacer) {
-            html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
+            html += "<button type='button' class='btn-deshacer-accion' data-tipo='" + esc(ev.tabla) + "' data-id='" + ev.id + "' data-desc='" + resumenTxt + " (" + tagTxt + ", " + fechaTxt + ")' style='background:rgba(220,38,38,0.08); color:#DC2626; border:1px solid rgba(220,38,38,0.3); padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;'>"
               + icon("trash", 14) + "Deshacer</button>";
           }
           html += "</div>";
@@ -566,7 +566,7 @@
       + icon("cow", 14) + "¿Es Reproductor / Toro activo de la finca?"
       + "</label></div>"
       + campo("an-raza", "Raza (código o nombre)", val(f && f.raza), " placeholder='ej. I, T, C, M'")
-      + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
+      + (esEdicion ? "<div style='margin-top:-4px; margin-bottom:4px;'><button type='button' id='btn-ir-comp-desde-form' class='chip ambar' style='font-size:11.5px; cursor:pointer; font-weight:600; padding:3px 8px; display:inline-flex; align-items:center; gap:4px;'>" + icon("dna", 12) + " Configurar Multi-Raza en Porcentajes (%)</button></div>" : "")
       + campo("an-nacimiento", "Fecha de nacimiento", nacimiento, " type='date'")
       + campo("an-madre", "Madre (tag)", val(madreTag), " list='dl-tags' placeholder='ej. 47'")
       + campo("an-padre", "Padre (tag)", val(padreTag), " list='dl-tags' placeholder='ej. T1'")
