@@ -376,6 +376,15 @@ def registrar(app, ctx, h):
         except (TypeError, ValueError):
             dias = 7
         out = datos_badges(db_path, dias=max(1, min(dias, 60)))
+        # Bandeja "Por revisar": solo OWNER/ADMIN ven el contador.
+        if _rol_actual() in ("OWNER", "ADMIN"):
+            db_b = _db(db_path)
+            try:
+                out["revision"] = db_b.contar_pendientes()
+            except Exception:
+                logger.exception("No se pudo contar los registros por revisar")
+            finally:
+                db_b.close()
         return jsonify(out)
 
     @app.post("/api/identificar")

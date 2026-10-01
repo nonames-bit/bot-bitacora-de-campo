@@ -8,9 +8,9 @@ auxiliares (_rol_actual, _usuario_actual, _limite_api...).
 """
 from __future__ import annotations
 
-from . import _comun, auth, paginas, vistas_campo, leche_finanzas, animales, agenda_equipo, sync, manga_ia, insumos_repro, sistema, push_graficos
+from . import _comun, auth, paginas, vistas_campo, leche_finanzas, animales, agenda_equipo, sync, manga_ia, insumos_repro, sistema, push_graficos, revision
 
-MODULOS = (auth, paginas, vistas_campo, leche_finanzas, animales, agenda_equipo, sync, manga_ia, insumos_repro, sistema, push_graficos,)
+MODULOS = (auth, paginas, vistas_campo, leche_finanzas, animales, agenda_equipo, sync, manga_ia, insumos_repro, sistema, push_graficos, revision,)
 
 
 def registrar_todas(app, ctx, h) -> None:

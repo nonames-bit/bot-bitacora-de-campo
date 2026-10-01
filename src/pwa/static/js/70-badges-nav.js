@@ -1,5 +1,5 @@
   /* ---------- Badges de contadores en la navegación ---------- */
-  var VISTAS_BADGE = ["agenda", "repro", "sanidad"];
+  var VISTAS_BADGE = ["agenda", "repro", "sanidad", "revision"];
   var badgesCache = {};
   function crearBadgesNav() {
     VISTAS_BADGE.forEach(function (v) {
@@ -186,6 +186,7 @@
     gps: "Mapa & GPS",
     usuarios: "Usuarios",
     sistema: "Sistema",
+    revision: "Por revisar",
     mercado: "Subastas",
     ayuda: "Ayuda"
   };

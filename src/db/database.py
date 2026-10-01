@@ -4611,6 +4611,85 @@ class Database:
         return True
 
     # ------------------------------------------------------------------ #
+    # Bandeja "Por revisar" (eventos delicados de trabajadores)
+    # ------------------------------------------------------------------ #
+    def crear_pendiente(self, *, origen: str, tipo: str, datos: dict, fecha: Optional[str] = None,
+                        animal_tag: Optional[str] = None, resumen: Optional[str] = None,
+                        registrado_por: Optional[int] = None, registrado_por_nombre: Optional[str] = None,
+                        canal: Optional[str] = None) -> int:
+        """Guarda un evento en pausa hasta que un OWNER/ADMIN lo revise."""
+        return self.insert("registros_pendientes", dict(
+            origen=origen, tipo=tipo, datos_json=json.dumps(datos or {}, ensure_ascii=False, default=str),
+            fecha=fecha, animal_tag=(str(animal_tag).strip() or None) if animal_tag else None,
+            resumen=resumen, registrado_por=registrado_por,
+            registrado_por_nombre=registrado_por_nombre, canal=canal,
+            creado_en=self._ahora(), estado="PENDIENTE",
+        ))
+
+    def _fila_pendiente(self, fila: sqlite3.Row) -> dict:
+        d = dict(fila)
+        try:
+            d["datos"] = json.loads(d.pop("datos_json") or "{}")
+        except (TypeError, ValueError):
+            d["datos"] = {}
+        return d
+
+    def listar_pendientes(self, estado: str = "PENDIENTE", limite: int = 100) -> list[dict]:
+        """Pendientes en orden de llegada; con estado='REVISADOS' los últimos
+        aprobados/rechazados (más reciente primero)."""
+        limite = max(1, min(int(limite or 100), 500))
+        if estado == "REVISADOS":
+            filas = self.query(
+                "SELECT * FROM registros_pendientes WHERE estado IN ('APROBADO', 'RECHAZADO') "
+                "ORDER BY revisado_en DESC, id DESC LIMIT ?", (limite,))
+        else:
+            filas = self.query(
+                "SELECT * FROM registros_pendientes WHERE estado = ? ORDER BY creado_en, id LIMIT ?",
+                (estado, limite))
+        return [self._fila_pendiente(f) for f in filas]
+
+    def contar_pendientes(self) -> int:
+        fila = self.query_one("SELECT COUNT(*) AS n FROM registros_pendientes WHERE estado = 'PENDIENTE'")
+        return int(fila["n"]) if fila else 0
+
+    def obtener_pendiente(self, pid: int) -> Optional[dict]:
+        fila = self.query_one("SELECT * FROM registros_pendientes WHERE id = ?", (pid,))
+        return self._fila_pendiente(fila) if fila else None
+
+    def tomar_pendiente(self, pid: int) -> bool:
+        """Marca el pendiente como APLICANDO solo si sigue PENDIENTE, para que
+        dos revisores a la vez no lo apliquen dos veces."""
+        cur = self.execute(
+            "UPDATE registros_pendientes SET estado = 'APLICANDO' WHERE id = ? AND estado = 'PENDIENTE'", (pid,))
+        return cur.rowcount == 1
+
+    def soltar_pendiente(self, pid: int) -> None:
+        """Devuelve a PENDIENTE un registro que no se pudo aplicar."""
+        self.execute(
+            "UPDATE registros_pendientes SET estado = 'PENDIENTE' WHERE id = ? AND estado = 'APLICANDO'", (pid,))
+
+    def cerrar_pendiente(self, pid: int, estado: str, revisado_por: Optional[int] = None,
+                         revisado_por_nombre: Optional[str] = None, nota: Optional[str] = None,
+                         datos: Optional[dict] = None, resumen: Optional[str] = None) -> bool:
+        """Cierra un pendiente como APROBADO o RECHAZADO. ``datos`` guarda la
+        versión corregida, si el revisor cambió algo antes de aprobar."""
+        if estado not in ("APROBADO", "RECHAZADO"):
+            raise ValueError(f"Estado de revisión inválido: {estado}")
+        sets = "estado = ?, revisado_por = ?, revisado_por_nombre = ?, revisado_en = ?, nota_revision = ?"
+        params: list[Any] = [estado, revisado_por, revisado_por_nombre, self._ahora(), nota]
+        if datos is not None:
+            sets += ", datos_json = ?"
+            params.append(json.dumps(datos, ensure_ascii=False, default=str))
+        if resumen:
+            sets += ", resumen = ?"
+            params.append(resumen)
+        params.append(pid)
+        cur = self.execute(
+            f"UPDATE registros_pendientes SET {sets} WHERE id = ? AND estado IN ('PENDIENTE', 'APLICANDO')",
+            tuple(params))
+        return cur.rowcount == 1
+
+    # ------------------------------------------------------------------ #
     # WebAuthn — login con huella / Face ID en la PWA
     # ------------------------------------------------------------------ #
     def _ensure_webauthn_table(self) -> None:

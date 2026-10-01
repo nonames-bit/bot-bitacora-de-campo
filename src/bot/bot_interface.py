@@ -8,6 +8,8 @@ from ..db.database import Database
 from ..engine.growth_engine import gmd
 from ..engine.health_engine import fecha_fin_retiro
 from ..engine.query_engine import QueryEngine
+from ..engine.revision import poner_en_revision, requiere_revision
+from ..engine.revision import resumen as resumen_revision
 from ..engine.reproductive_engine import (fecha_ecografia, fecha_estimada_parto,
                                           fecha_palpacion, fecha_secado,
                                           programar_inseminacion)
@@ -29,7 +31,12 @@ class Bot:
     # ------------------------------------------------------------------ #
     # Entradas
     # ------------------------------------------------------------------ #
-    def procesar_texto(self, texto: str, user_id: Optional[int] = None) -> str:
+    def procesar_texto(self, texto: str, user_id: Optional[int] = None, rol: Optional[str] = None,
+                       nombre: Optional[str] = None, canal: str = "Telegram",
+                       users_file: Optional[str] = None) -> str:
+        """``rol``: con TRABAJADOR, los eventos delicados (parto, muerte,
+        traslado, venta/movimiento) no se registran: quedan en la bandeja
+        "Por revisar" hasta que un OWNER/ADMIN los apruebe."""
         resultado = self.parser.parse(texto)
         eventos = resultado if isinstance(resultado, list) else [resultado]
 
@@ -56,6 +63,17 @@ class Bot:
                     f"⚠️ No registré el diagnóstico de {tag_d}: indique el resultado, "
                     f"por ejemplo 'palpé la {ev.animal_tag or '47'}, preñada' o '..., vacía'."
                 )
+            elif requiere_revision(rol, ev.tipo):
+                datos_rev = {"tipo": ev.tipo, "texto": ev.texto, "animal_tag": ev.animal_tag,
+                             "fecha": ev.fecha, "datos": dict(ev.datos or {})}
+                poner_en_revision(
+                    self.db, origen="bot", tipo=ev.tipo, datos=datos_rev, fecha=ev.fecha,
+                    registrado_por=user_id, registrado_por_nombre=nombre, canal=canal,
+                    users_file=users_file,
+                )
+                respuestas.append(
+                    f"📝 {resumen_revision('bot', ev.tipo, datos_rev)}: quedó por revisar. "
+                    "Se registra cuando el administrador lo apruebe.")
             else:
                 self._registrar(ev, user_id, grupo_gemelar)
                 self._generar_alertas(ev)
@@ -66,12 +84,25 @@ class Bot:
                    "'pario la 47, ternero macho' o una pregunta."
         return "\n".join(respuestas)
 
-    def procesar_audio(self, audio_path: str, user_id: Optional[int] = None) -> str:
+    def procesar_audio(self, audio_path: str, user_id: Optional[int] = None, rol: Optional[str] = None,
+                       nombre: Optional[str] = None) -> str:
         try:
             transcript = transcribe_audio(audio_path)
         except MediaError as e:
             return f"No se pudo transcribir el audio: {e}"
-        return self.procesar_texto(transcript.texto, user_id=user_id)
+        return self.procesar_texto(transcript.texto, user_id=user_id, rol=rol, nombre=nombre)
+
+    def aplicar_evento_revisado(self, datos: dict, user_id: Optional[int] = None) -> None:
+        """Registra un evento del bot que estaba "Por revisar" y fue aprobado
+        (``datos`` es lo que guardó procesar_texto). Queda a nombre de quien
+        lo reportó."""
+        ev = ParsedEvent(
+            tipo=str(datos.get("tipo") or ""), texto=str(datos.get("texto") or ""),
+            animal_tag=datos.get("animal_tag"), fecha=datos.get("fecha") or iso(self.hoy),
+            datos=dict(datos.get("datos") or {}),
+        )
+        self._registrar(ev, user_id, {})
+        self._generar_alertas(ev)
 
     def procesar_imagen(self, image_path: str, caption: Optional[str] = None,
                         animal_tag: Optional[str] = None, user_id: Optional[int] = None) -> str:

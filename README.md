@@ -806,6 +806,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Sistema ya no muestra la tarjeta "Backup SG", la sección "Sincronización con Software Ganadero", el filtro "Software Ganadero" ni el botón de logs "Copias de Seguridad"; el diagnóstico muestra el **último respaldo diario** de `backups/` (fecha, tamaño y cuántas copias hay) en vez de la última importación SG.
   - Textos limpios en Reproducción (Índice de Fertilidad, días abiertos), Leche (archivo histórico 2016-2018), Genética/Inventario ("Indeterminados", "Sin desglose de raza"), Registrar ("Sugerencia de arete") y en los reportes PDF/Excel. Los datos históricos no cambian; la importación por Telegram (`/confirmar_importar`) sigue disponible.
 
+- [x] **Bandeja "Por revisar" para trabajadores (2026-10-01)**:
+  - Los partos, muertes, ventas (y demás entradas/salidas de animales) y traslados que registra un **TRABAJADOR** desde la app, la cola offline, el traslado de potrero completo, la voz o Telegram **no se aplican de una**: quedan en `registros_pendientes` y avisan a OWNER/ADMIN (canal del equipo + push). Pesajes, leche, celos, tratamientos y lo demás entran como siempre.
+  - Pantalla **Por revisar** (menú Gestión, solo OWNER/ADMIN, con contador): cada registro muestra quién lo envió, por dónde y cuándo, con **Aprobar**, **Corregir** (editar los campos y aprobar) y **Rechazar** (con motivo). Al aprobar se registra a nombre del trabajador; el canal del equipo avisa la aprobación o el rechazo.
+  - Pruebas: `tests/test_revision_trabajador.py` + verificación en Chromium 390×844 y 1366×860.
+
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [x] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada (2026-09-24)**: Simulador de cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, distocias y pérdidas gestacionales, catálogo y evaluación de técnicos inseminadores, y módulo de sincronizaciones hormonales IATF.

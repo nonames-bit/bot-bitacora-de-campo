@@ -4375,3 +4375,37 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .kpi-link .kpi::after { content: "›"; position: absolute; right: 10px; top: 8px; color: var(--texto-suave); font-size: 16px; opacity: .6; }
 .kpi-link .kpi { position: relative; }
 .kpi-destacado { outline: 3px solid var(--verde-marca); outline-offset: 2px; transition: outline-color .4s; }
+
+/* ---------- Por revisar (eventos delicados de trabajadores) ---------- */
+.rev-lista { display: flex; flex-direction: column; gap: 12px; margin: 14px 0 20px; }
+.rev-tarjeta { background: var(--superficie); border: 1px solid var(--borde-fuerte); border-radius: 12px; padding: 14px 16px;
+  box-shadow: var(--sombra); transition: opacity .25s, transform .25s; }
+.rev-tarjeta.rev-saliendo { opacity: 0; transform: translateX(16px); }
+.rev-cab { display: flex; gap: 12px; align-items: flex-start; }
+.rev-ico { flex: none; width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--verde-marca-pastel); color: var(--verde-marca); }
+.rev-ico .svg-icon { margin: 0; top: 0; }
+.rev-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.rev-txt b { font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.rev-txt small { color: var(--texto-suave); font-size: 12.5px; line-height: 1.35; }
+.rev-campos, .rev-rechazo { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 12px; }
+.rev-campos[hidden], .rev-rechazo[hidden], .rev-error[hidden] { display: none; }
+.rev-campo { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--texto-suave); }
+.rev-campo input { font: inherit; font-size: 15px; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde-fuerte);
+  border-radius: 8px; padding: 9px 10px; min-height: 42px; }
+.rev-error { margin-top: 10px; color: var(--color-rojo-txt); background: var(--color-rojo-bg); border-radius: 8px; padding: 8px 10px; font-size: 13px; }
+.rev-acciones { display: flex; gap: 8px; margin-top: 14px; }
+.rev-btn { flex: 1; min-height: 44px; border-radius: 10px; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+  border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--texto); }
+.rev-btn:disabled { opacity: .55; cursor: default; }
+.rev-aprobar { background: var(--verde-marca); border-color: var(--verde-marca); color: #fff; }
+.rev-aprobar:hover:not(:disabled) { background: var(--verde-marca-hover); }
+.rev-corregir.activo { border-color: var(--verde-marca); color: var(--verde-marca); }
+.rev-rechazar { color: var(--color-rojo-txt); border-color: var(--color-rojo-bg); }
+.rev-vacio { display: flex; gap: 10px; align-items: center; padding: 18px 16px; margin: 14px 0 20px; border-radius: 12px;
+  border: 1px dashed var(--borde-fuerte); color: var(--texto-suave); }
+.rev-subtitulo { margin: 8px 0 10px; font-size: 14px; color: var(--texto-suave); }
+.rev-historial { display: flex; flex-direction: column; border: 1px solid var(--borde); border-radius: 12px; overflow: hidden; }
+.rev-hist-fila { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--borde); }
+.rev-hist-fila:last-child { border-bottom: none; }
+.rev-hist-fila .chip { flex: none; font-size: 11px; }
