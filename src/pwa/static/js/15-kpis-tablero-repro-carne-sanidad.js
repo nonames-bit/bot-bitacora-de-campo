@@ -26,6 +26,8 @@
         if (el.childNodes[n].nodeType === 3) propio += el.childNodes[n].nodeValue;
       }
       if (propio.toLowerCase().indexOf(t) === -1) continue;
+      // Si la sección está en otra pestaña, abrir esa pestaña primero.
+      mostrarPestanaDe(el);
       // Resaltar la tarjeta de la sección, salvo que sea la de toda la vista.
       var card = el.closest(".card, details");
       var marco = (card && !card.querySelector(".kpis")) ? card : el;
@@ -39,11 +41,11 @@
   function aplicarDestinoLocal(lt, filtro, sec) {
     if (lt) {
       var bl = q(".lt-card .btn-lt[data-lt='" + lt + "']");
-      if (bl) { bl.click(); if (!sec) { var card = bl.closest(".lt-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); } }
+      if (bl) { mostrarPestanaDe(bl); bl.click(); if (!sec) { var card = bl.closest(".lt-card"); if (card) card.scrollIntoView({ behavior: "smooth", block: "start" }); } }
     }
     if (filtro) {
       var bf = q(".btn-filtro-pes[data-filtro='est'][data-valor='" + filtro + "']");
-      if (bf) bf.click();
+      if (bf) { mostrarPestanaDe(bf); bf.click(); }
     }
     if (sec) irASeccion(sec);
   }
@@ -107,8 +109,10 @@
       + "</div>" + erroresHtml(d);
     window.__listaTrabajo = d.lista_trabajo || null;
     window.__responsablesSugeridos = d.responsables_sugeridos || window.__responsablesSugeridos || [];
-    h += renderListaTrabajo(d.lista_trabajo, ltClaves("repro")) + grafico("reproductivo_hato", "Estado reproductivo del hato");
+    h += marcaPestana("hoy") + renderListaTrabajo(d.lista_trabajo, ltClaves("repro"))
+      + marcaPestana("indicadores") + grafico("reproductivo_hato", "Estado reproductivo del hato");
 
+    h += marcaPestana("termo");
     // Banco de Semen & Termo Criogénico (Software Ganadero)
     var termo = d.termo;
     var pajuelas = d.pajuelas || d.pajillas || [];
@@ -280,6 +284,7 @@
     }
     h += "</div>";
 
+    h += marcaPestana("indicadores");
     // Evaluación de palpadores: palpaciones del último año por responsable.
     h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid #0ea5e9;'>"
       + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>" + icon("stethoscope", 16) + " Evaluación de palpadores (último año)</div>"
@@ -435,6 +440,7 @@
       h += "</div></div>";
     }
 
+    h += marcaPestana("hoy");
     h += "<h4>" + icon("calendar") + "FEP ≤30d (próximos partos)</h4>"
       + tabla(d.fep_30d, [
         ["tag", "Vaca"], ["fecha", "Servicio"], ["toro_pajilla", "Toro"],
@@ -499,6 +505,7 @@
         ["en_dias", "En", "text", function (v) { return esc(v) + " d"; }]
       ], "Sin celos proyectados en los próximos 30 días.");
 
+    h += marcaPestana("servicios");
     var rangoServ = d.servicios_rango || {};
     var servs = d.servicios_realizados || [];
     h += "<div class='card' style='padding:14px 16px; margin:12px 0; background:var(--superficie); border-left:5px solid var(--azul-marca);'>"
@@ -539,7 +546,12 @@
         ["motivo", "Motivo"],
         ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
-    return h;
+    return armarPestanas("repro", h, [
+      { k: "hoy", t: "Hoy", icono: "calendar" },
+      { k: "indicadores", t: "Indicadores", icono: "chartBar" },
+      { k: "termo", t: "Termo e IATF", icono: "snowflake" },
+      { k: "servicios", t: "Servicios y toros", icono: "sperm" }
+    ]);
   }
   // Rangos de fecha de la prueba de comportamiento (Carne) y de servicios
   // realizados (Repro). null = usar el default del servidor.

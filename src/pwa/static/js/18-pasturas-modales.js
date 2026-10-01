@@ -366,7 +366,7 @@
       + icon(icName, 18)
       + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(tituloModal) + "</span>"
       + "</div>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<div id='modal-lista-anim-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
@@ -998,13 +998,14 @@
       + btnIa
       + "</div>"
       + "</div>" + erroresHtml(d);
-    h += renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
+    h += marcaPestana("hoy") + renderListaTrabajo(d.tareas, ltClaves("leche"), "Lista de trabajo · Leche");
     h += renderLotesOrdeno(d.lotes_ordeno);
     h += renderControlLechero(d.control_lechero);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
       h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
 
+    h += marcaPestana("produccion");
     // 1. KPIs Ejecutivos de Producción
     h += "<div class='kpis'>"
       + kpiIr(kpi(totalLitros.toLocaleString("es-CO") + " L", "Total período (" + diasCount + " días)", "ok"), { sec: "Detalle de Entregas Diarias" })
@@ -1076,6 +1077,7 @@
       + "<div class='grafico-wrap' style='margin-top:8px;'><img src='/api/grafico/leche_total?t=" + tNow + "' alt='Gráfico Producción Total de Leche' loading='lazy'></div>"
       + "</details>";
 
+    h += marcaPestana("entregas");
     // 4. Tabla Detallada Día a Día
     h += "<h4>" + icon("calendar", 16) + "Detalle de Entregas Diarias al Acopiador</h4>";
     if (serie.length > 0) {
@@ -1138,7 +1140,11 @@
         + "</details>";
     }
 
-    return h;
+    return armarPestanas("leche", h, [
+      { k: "hoy", t: "Hoy", icono: "calendar" },
+      { k: "produccion", t: "Producción", icono: "chartLine" },
+      { k: "entregas", t: "Entregas y recibos", icono: "receipt" }
+    ]);
   }
 
   function bindLeche() {

@@ -311,7 +311,7 @@
       + "<div id='ins-lote-form-error' style='display:none; color:var(--color-rojo-txt, #dc2626); font-size:12px; font-weight:600;'></div>"
       + "<div style='display:flex; justify-content:flex-end; gap:8px; margin-top:6px;'>"
       + "<button type='button' class='tema-btn' id='btn-cancel-ins-lote-modal' style='padding:8px 14px; border-radius:6px;'>Cancelar</button>"
-      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0; background:var(--verde-marca); border-color:var(--verde-marca);'>Confirmar Inseminación (" + nHembras + " vacas)</button>"
+      + "<button type='submit' class='btn-guardar-manga' style='padding:8px 16px; margin:0; border-color:var(--verde-marca);'>Confirmar Inseminación (" + nHembras + " vacas)</button>"
       + "</div>"
       + "</form>"
       + "</div></div></div>";

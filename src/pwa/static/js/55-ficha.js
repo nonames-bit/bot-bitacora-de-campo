@@ -819,7 +819,7 @@
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
       + "<div style='font-size:13px; font-weight:700; display:flex; align-items:center; gap:6px; color:var(--texto);'>"
       + icon("dna", 16) + "Composición Genética Multi-Raza</div>"
-      + (esAdminOwer ? ("<button type='button' id='btn-editar-composicion-raza' data-tag='" + esc(f.tag) + "' class='chip ambar' style='cursor:pointer; font-weight:600; padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:5px; border:none;'>" + icon("pencil", 12) + "Editar Razas</button>") : "")
+      + (esAdminOwer ? ("<button type='button' id='btn-editar-composicion-raza' data-tag='" + esc(f.tag) + "' class='chip ambar' style='cursor:pointer; font-weight:600; padding:4px 10px; font-size:12px; display:inline-flex; align-items:center; gap:5px;'>" + icon("pencil", 12) + "Editar Razas</button>") : "")
       + "</div>";
 
     if (compRacial.length > 0) {
@@ -854,7 +854,7 @@
       var rzTxt = f.raza || "Sin clasificar";
       h += "<div style='display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12.5px; color:var(--texto-suave);'>"
         + "<span>Raza registrada: <b>" + esc(rzTxt) + "</b> (sin desglose de porcentajes).</span>"
-        + (esAdminOwer ? ("<button type='button' class='chip verde' data-accion='editar-composicion-raza' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px; border:none;'>" + icon("plus", 11) + "Definir Multi-Raza</button>") : "")
+        + (esAdminOwer ? ("<button type='button' class='chip verde' data-accion='editar-composicion-raza' data-tag='" + esc(f.tag) + "' style='cursor:pointer; font-weight:600; padding:3px 8px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;'>" + icon("plus", 11) + "Definir Multi-Raza</button>") : "")
         + "</div>";
     }
     h += "</div>";

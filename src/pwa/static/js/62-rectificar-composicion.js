@@ -77,7 +77,7 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%; max-height:92vh; overflow-y:auto;'>"
       + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde);'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px; font-size:15px;'>" + icon("camera", 17) + "Foto de Perfil · Animal " + esc(tag) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-subir-foto-animal' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div style='text-align:center; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:10px;'>"
@@ -574,7 +574,7 @@
         + "<span class='comp-frac-badge chip gris' style='font-size:11px; padding:3px 6px; display:inline-block;'>—</span>"
         + "</div>"
         + "<div>"
-        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
+        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
         + "</div>";
 
       var inPct = row.querySelector(".comp-pct-input");
