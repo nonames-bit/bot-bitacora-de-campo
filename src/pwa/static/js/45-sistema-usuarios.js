@@ -112,6 +112,9 @@
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
+    // Copias de seguridad: se llenan al abrir (ver 48-respaldos.js).
+    h += marcaPestana("copias") + "<div id='respaldos-panel' class='card'><p style='color:var(--texto-suave);'>Cargando copias…</p></div>";
+
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
     h += marcaPestana("logs") + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
@@ -125,6 +128,7 @@
 
     return armarPestanas("sistema", h, [
       { k: "estado", t: "Estado", icono: "grid" },
+      { k: "copias", t: "Copias", icono: "archive" },
       { k: "actividad", t: "Actividad", icono: "clipboard" },
       { k: "usuarios", t: "Sesiones", icono: "users" },
       { k: "logs", t: "Logs", icono: "notes" }
@@ -177,6 +181,7 @@
     }
 
     cargarLogs(_canalLogsActual);
+    cargarRespaldos();
 
     var btnRef = document.getElementById("btn-refrescar-logs");
     if (btnRef) btnRef.addEventListener("click", function () { cargarLogs(_canalLogsActual); });

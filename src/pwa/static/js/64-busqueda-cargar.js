@@ -388,6 +388,8 @@
       if (animar) skeleton(vista, "sistema");
       fetchJSON("/api/sistema", function (d) {
         if (!vista) return;
+        // El refresco silencioso no borra una restauración a medio confirmar.
+        if (!animar && vista.querySelector(".resp-confirmar:not([hidden])")) return;
         montarVista(vista, renderSistema(d), animar);
         bindSistema();
       }, animar ? vista : null);
