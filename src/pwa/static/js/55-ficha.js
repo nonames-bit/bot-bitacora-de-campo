@@ -127,9 +127,6 @@
         + "<img src='" + defaultAnim + "' alt='Ilustración' style='width:60px; height:32px; object-fit:contain; display:block;'>"
         + "</div>";
     }
-    head += "<button type='button' class='btn-cambiar-foto-badge' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' title='Cambiar o tomar foto de perfil con la cámara' style='position:absolute; bottom:-3px; right:-3px; background:var(--verde-marca); color:#fff; border:2px solid var(--superficie); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25); z-index:2;'>"
-      + icon("camera", 12)
-      + "</button>";
     head += "</div>";
     var estadoChip = "";
     var stUpper = String(f.estado || "").toUpperCase();

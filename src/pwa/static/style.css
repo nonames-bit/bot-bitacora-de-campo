@@ -2092,17 +2092,6 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .ficha-avatar-placeholder:hover {
   filter: brightness(0.96);
 }
-.btn-cambiar-foto-badge {
-  transition: transform .18s cubic-bezier(0.2, 0.8, 0.2, 1), background .15s ease, box-shadow .15s ease;
-}
-.btn-cambiar-foto-badge:hover {
-  transform: scale(1.15);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
-  background: var(--verde-marca-oscuro, #213c24) !important;
-}
-.btn-cambiar-foto-badge:active {
-  transform: scale(0.92);
-}
 
 /* Captura Rápida: Foto Opcional de Campo */
 .cap-foto-box {

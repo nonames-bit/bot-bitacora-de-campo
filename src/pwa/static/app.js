@@ -11588,9 +11588,6 @@
         + "<img src='" + defaultAnim + "' alt='Ilustración' style='width:60px; height:32px; object-fit:contain; display:block;'>"
         + "</div>";
     }
-    head += "<button type='button' class='btn-cambiar-foto-badge' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' title='Cambiar o tomar foto de perfil con la cámara' style='position:absolute; bottom:-3px; right:-3px; background:var(--verde-marca); color:#fff; border:2px solid var(--superficie); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25); z-index:2;'>"
-      + icon("camera", 12)
-      + "</button>";
     head += "</div>";
     var estadoChip = "";
     var stUpper = String(f.estado || "").toUpperCase();
@@ -13337,10 +13334,7 @@
             avatarWrap.innerHTML = "<div class='foto-card-mini' title='Toca para agrandar' style='cursor:zoom-in; position:relative; border-radius:8px; overflow:hidden;'>"
               + "<img class='avatar zoomable-img' src='" + esc(nuevaUrl) + "' alt='Foto principal " + esc(tag) + "' style='width:64px; height:64px; border-radius:8px; object-fit:cover; display:block;' data-onerror-hide='parent'>"
               + "<div style='position:absolute; bottom:2px; right:2px; background:rgba(0,0,0,0.65); border-radius:3px; padding:2px 3px; color:#fff; display:flex; align-items:center; pointer-events:none;'>" + icon("search", 10) + "</div>"
-              + "</div>"
-              + "<button type='button' class='btn-cambiar-foto-badge' data-accion='cambiar-foto-animal' data-tag='" + esc(tag) + "' title='Cambiar o tomar foto de perfil con la cámara' style='position:absolute; bottom:-3px; right:-3px; background:var(--verde-marca); color:#fff; border:2px solid var(--superficie); border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 5px rgba(0,0,0,0.25); z-index:2;'>"
-              + icon("camera", 12)
-              + "</button>";
+              + "</div>";
           }
 
           // Actualizar galería de fotos en pestaña General si está visible
