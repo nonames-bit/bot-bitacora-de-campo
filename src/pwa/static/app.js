@@ -536,6 +536,9 @@
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
           box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "" + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          // El aviso se quita solo para no dejar ocupado el espacio de arriba.
+          var aviso = box.firstChild;
+          setTimeout(function () { if (aviso && aviso.parentNode === box) box.innerHTML = ""; }, 6000);
           return;
         }
         var pot = d.potrero || {};
@@ -6572,19 +6575,18 @@
       { id: "tarea", nom: "Asignar Tarea", ico: "calendar" }
     ];
 
-    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:10px;'>"
+    // GPS y Manga van como dos botones chicos (ícono arriba, texto abajo,
+    // igual que la barra inferior) para no gastar media pantalla del celular.
+    var h = "<div class='cap-cabecera'>"
       + "<h3 style='margin:0;'>" + icon("clipboard") + "Registrar evento</h3>"
-      + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
-      + "<button type='button' id='btn-cap-gps-ronda' class='tema-btn' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-      + icon("pin", 16) + "Estoy en el potrero (GPS)"
-      + "</button>"
-      + "<button type='button' id='btn-cap-ir-manga' class='btn-guardar-manga' style='padding:8px 14px; font-size:13px; font-weight:600; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-      + icon("manga", 16) + "Manga Corral (Trabajo en Lote) →"
-      + "</button>"
+      + "<div class='cap-atajos'>"
+      + "<button type='button' id='btn-cap-gps-ronda' class='cap-atajo' title='Guardar dónde estoy (ronda GPS)'>"
+      + icon("pin", 20) + "<span>Estoy en el potrero</span></button>"
+      + "<button type='button' id='btn-cap-ir-manga' class='cap-atajo' title='Procesar o pesar varios animales seguidos en lote'>"
+      + icon("manga", 20) + "<span>Manga corral</span></button>"
       + "</div>"
       + "</div>"
       + "<div id='gps-ronda-box'></div>";
-    h += "<p class='aviso' style='margin:4px 0 10px; font-size:12.5px;'>Para procesar o pesar varios animales seguidos en lote, usa <b>Manga Corral</b>.</p>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
@@ -9894,6 +9896,9 @@
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 
+    // Copias de seguridad: se llenan al abrir (ver 48-respaldos.js).
+    h += marcaPestana("copias") + "<div id='respaldos-panel' class='card'><p style='color:var(--texto-suave);'>Cargando copias…</p></div>";
+
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
     h += marcaPestana("logs") + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
@@ -9907,6 +9912,7 @@
 
     return armarPestanas("sistema", h, [
       { k: "estado", t: "Estado", icono: "grid" },
+      { k: "copias", t: "Copias", icono: "archive" },
       { k: "actividad", t: "Actividad", icono: "clipboard" },
       { k: "usuarios", t: "Sesiones", icono: "users" },
       { k: "logs", t: "Logs", icono: "notes" }
@@ -9959,6 +9965,7 @@
     }
 
     cargarLogs(_canalLogsActual);
+    cargarRespaldos();
 
     var btnRef = document.getElementById("btn-refrescar-logs");
     if (btnRef) btnRef.addEventListener("click", function () { cargarLogs(_canalLogsActual); });
@@ -10710,6 +10717,98 @@
     cargar(true);
     try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e2) { window.scrollTo(0, 0); }
   });
+  /* ---------- Copias de seguridad (Fase F): Sistema → Copias, solo OWNER ----------
+     Lista las copias de backups/ (diarias de las 3 a. m., manuales y las que
+     se guardan antes de restaurar), permite hacer una ahora, descargarla y
+     restaurarla escribiendo RESTAURAR. Rutas en src/pwa/rutas/sistema.py. */
+  var NOMBRE_TIPO_COPIA = { diaria: "Automática", manual: "Hecha a mano", antes_de_restaurar: "Antes de restaurar" };
+
+  function fechaCopia(c) {
+    var m = /^(\d{4}-\d{2}-\d{2})\.db$/.exec(c.nombre);
+    var f = (c.fecha || "").replace("T", " ");
+    return m ? m[1] + " · 3:00 a. m." : f;
+  }
+
+  function htmlRespaldos(d) {
+    var copias = (d && d.copias) || [];
+    var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;'>"
+      + "<h4 style='margin:0;'>" + icon("archive", 16) + "Copias de seguridad</h4>"
+      + "<button type='button' id='btn-copia-ahora'>" + icon("plus", 14) + "Hacer copia ahora</button></div>"
+      + "<p class='aviso' style='margin:10px 0;'>Todos los días a las 3:00 a. m. se guarda una copia de la base y se conservan "
+      + esc((d && d.dias_guardadas) || 30) + " días. Restaurar devuelve la finca a como estaba en esa copia: "
+      + "se pierde lo registrado después, pero antes se guarda la base actual por si hay que volver.</p>";
+    if (!copias.length) return h + "<p style='color:var(--texto-suave);'>Todavía no hay copias en el servidor.</p>";
+    h += "<div class='resp-lista'>";
+    copias.forEach(function (c) {
+      var n = esc(c.nombre);
+      h += "<div class='resp-item' data-nombre='" + n + "'>"
+        + "<div class='resp-info'><b>" + esc(fechaCopia(c)) + "</b>"
+        + "<small>" + esc(NOMBRE_TIPO_COPIA[c.tipo] || c.tipo) + " · " + esc(c.tam_mb) + " MB</small></div>"
+        + "<div class='resp-acciones'>"
+        + "<a class='rep-btn rep-btn-sec' href='/api/respaldos/" + encodeURIComponent(c.nombre) + "/descargar'>" + icon("download", 14) + "Descargar</a>"
+        + "<button type='button' class='btn-peligro btn-resp-restaurar'>" + icon("refresh", 14) + "Restaurar</button></div>"
+        + "<form class='resp-confirmar' hidden>"
+        + "<label>Escribe <b>RESTAURAR</b> para volver a la copia de " + esc(fechaCopia(c)) + ":</label>"
+        + "<div class='resp-confirmar-fila'><input autocomplete='off' autocapitalize='characters' aria-label='Confirmación'>"
+        + "<button type='submit' class='btn-peligro'>Confirmar</button>"
+        + "<button type='button' class='btn-sec btn-resp-cancelar'>Cancelar</button></div></form>"
+        + "</div>";
+    });
+    return h + "</div>";
+  }
+
+  function cargarRespaldos() {
+    var panel = document.getElementById("respaldos-panel");
+    if (!panel) return;
+    fetch("/api/respaldos").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok) throw new Error((d && d.error) || "Sin acceso");
+      panel.innerHTML = htmlRespaldos(d);
+      bindRespaldos(panel);
+    }).catch(function (e) {
+      panel.innerHTML = "<p class='aviso'>No se pudieron cargar las copias: " + esc(e.message) + "</p>";
+    });
+  }
+
+  function bindRespaldos(panel) {
+    var bCopia = document.getElementById("btn-copia-ahora");
+    if (bCopia) bCopia.addEventListener("click", function () {
+      bCopia.disabled = true;
+      fetch("/api/respaldos/crear", { method: "POST" }).then(function (r) { return r.json(); }).then(function (d) {
+        if (!d.ok) throw new Error(d.error || "No se pudo hacer la copia.");
+        mostrarToast("Copia guardada", "verde");
+        cargarRespaldos();
+      }).catch(function (e) { mostrarToast(e.message, "rojo"); bCopia.disabled = false; });
+    });
+    panel.querySelectorAll(".resp-item").forEach(function (it) {
+      var form = it.querySelector(".resp-confirmar");
+      it.querySelector(".btn-resp-restaurar").addEventListener("click", function () {
+        panel.querySelectorAll(".resp-confirmar").forEach(function (f) { f.hidden = f !== form; });
+        form.hidden = false;
+        form.querySelector("input").focus();
+      });
+      it.querySelector(".btn-resp-cancelar").addEventListener("click", function () { form.hidden = true; });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var txt = (form.querySelector("input").value || "").trim().toUpperCase();
+        if (txt !== "RESTAURAR") { mostrarToast("Escribe RESTAURAR para confirmar.", "ambar"); return; }
+        var bOk = form.querySelector("button[type=submit]");
+        bOk.disabled = true;
+        bOk.textContent = "Restaurando…";
+        fetch("/api/respaldos/" + encodeURIComponent(it.getAttribute("data-nombre")) + "/restaurar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ confirmacion: txt })
+        }).then(function (r) { return r.json(); }).then(function (d) {
+          if (!d.ok) throw new Error(d.error || "No se pudo restaurar.");
+          mostrarToast("Base restaurada. Lo de antes quedó guardado como otra copia.", "verde");
+          cargar(true);
+        }).catch(function (e2) {
+          mostrarToast(e2.message, "rojo");
+          bOk.disabled = false;
+          bOk.textContent = "Confirmar";
+        });
+      });
+    });
+  }
   /* ---------- Asistente IA (Chat Natural) ---------- */
   function formatearMensajeChat(raw) {
     if (!raw) return "";
@@ -14530,6 +14629,8 @@
       if (animar) skeleton(vista, "sistema");
       fetchJSON("/api/sistema", function (d) {
         if (!vista) return;
+        // El refresco silencioso no borra una restauración a medio confirmar.
+        if (!animar && vista.querySelector(".resp-confirmar:not([hidden])")) return;
         montarVista(vista, renderSistema(d), animar);
         bindSistema();
       }, animar ? vista : null);

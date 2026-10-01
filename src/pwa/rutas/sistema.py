@@ -9,12 +9,15 @@ import shutil
 import sys
 from datetime import date
 import logging
-from flask import jsonify, request, session
+from flask import jsonify, request, send_file, session
 from .. import app as _base
+from ...engine import respaldos as _respaldos
+from ...engine import revision as _revision
 from ...engine.dashboard_data import _filas_dict
 from ...utils import to_date
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
+    _invalidar_tareas,
 )
 
 # Mismo logger que src/pwa/app.py: los mensajes salen igual que antes.
@@ -404,3 +407,66 @@ def registrar(app, ctx, h):
             return jsonify(res)
         finally:
             db_map.close()
+
+    # ---------- Copias de seguridad (Sistema → Copias, solo OWNER) ----------
+    def _ruta_db_real() -> str:
+        return _base._resolver_db_existente(db_path) or db_path
+
+    def _solo_owner():
+        return jsonify({"ok": False, "error": "Solo el propietario maneja las copias de seguridad."}), 403
+
+    @app.get("/api/respaldos")
+    def api_respaldos():
+        if _rol_actual() != "OWNER":
+            return _solo_owner()
+        copias = _respaldos.listar()
+        return jsonify({"ok": True, "copias": copias, "dias_guardadas": int(os.getenv("BACKUPS_DIAS", "30"))})
+
+    @app.post("/api/respaldos/crear")
+    def api_respaldos_crear():
+        if _rol_actual() != "OWNER":
+            return _solo_owner()
+        try:
+            nombre = _respaldos.crear_copia(_ruta_db_real())
+        except Exception:
+            logger.exception("No se pudo crear la copia de seguridad")
+            return jsonify({"ok": False, "error": "No se pudo hacer la copia. Revisa el espacio en disco."}), 500
+        return jsonify({"ok": True, "nombre": nombre})
+
+    @app.get("/api/respaldos/<nombre>/descargar")
+    def api_respaldos_descargar(nombre):
+        if _rol_actual() != "OWNER":
+            return _solo_owner()
+        try:
+            ruta = _respaldos.ruta_copia(nombre)
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 404
+        return send_file(str(ruta.resolve()), mimetype="application/vnd.sqlite3",
+                         as_attachment=True, download_name=f"bitacora_{nombre}")
+
+    @app.post("/api/respaldos/<nombre>/restaurar")
+    def api_respaldos_restaurar(nombre):
+        if _rol_actual() != "OWNER":
+            return _solo_owner()
+        cuerpo = request.get_json(silent=True) or {}
+        if str(cuerpo.get("confirmacion") or "").strip().upper() != "RESTAURAR":
+            return jsonify({"ok": False, "error": "Escribe RESTAURAR para confirmar."}), 400
+        try:
+            seguridad = _respaldos.restaurar(nombre, _ruta_db_real())
+        except ValueError as e:
+            return jsonify({"ok": False, "error": str(e)}), 422
+        except Exception:
+            logger.exception("Error al restaurar la copia %s", nombre)
+            return jsonify({"ok": False, "error": "No se pudo restaurar. La base quedó como estaba."}), 500
+        _invalidar_tareas()
+        quien = session.get("nombre") or "El propietario"
+        logger.warning("%s restauró la base desde %s (copia previa: %s)", quien, nombre, seguridad)
+        db_av = _db(db_path)
+        try:
+            _revision.avisar_equipo(
+                db_av, f"{quien} restauró la base a la copia {nombre}. "
+                       "Lo registrado después de esa copia ya no aparece; si falta algo, avísenle.",
+                user_id=session.get("user_id"), nombre=quien, rol="OWNER")
+        finally:
+            db_av.close()
+        return jsonify({"ok": True, "copia_previa": seguridad})
