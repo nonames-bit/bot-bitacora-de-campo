@@ -44,9 +44,9 @@
 
       var badgePlaza = "";
       if (esGranada) {
-        badgePlaza = " <span class='chip verde' style='font-size:10px; font-weight:700;'>📍 Plaza Local Finca</span>";
+        badgePlaza = " <span class='chip verde' style='font-size:10px; font-weight:700;'>" + icon("pin", 12) + "Plaza Local Finca</span>";
       } else if (esTop) {
-        badgePlaza = " <span class='chip ambar' style='font-size:10px; font-weight:700;'>👑 Mayor Precio</span>";
+        badgePlaza = " <span class='chip ambar' style='font-size:10px; font-weight:700;'>" + icon("crown", 12) + "Mayor Precio</span>";
       } else if (esNal) {
         badgePlaza = " <span class='chip gris' style='font-size:10px; font-weight:600;'>🇨🇴 Consolidado</span>";
       }
@@ -229,10 +229,10 @@
     var resTend = d.resumen_tendencias && d.resumen_tendencias[cat];
     var insightHtml = "";
     if (resTend) {
-      var flechaTend = resTend.tendencia === "SUBIENDO" ? "📈" : (resTend.tendencia === "BAJANDO" ? "📉" : "📊");
+      var flechaTend = resTend.tendencia === "SUBIENDO" ? icon("trendUp", 14) : (resTend.tendencia === "BAJANDO" ? icon("trendDown", 14) : icon("chartBar", 14));
       var dirTxt = resTend.tendencia === "SUBIENDO" ? "ALCISTA" : (resTend.tendencia === "BAJANDO" ? "BAJISTA" : "ESTABLE");
       insightHtml = "<div class='mercado-insight-box'>"
-        + "<div><b>" + flechaTend + " Interpretación de Mercado (" + esc(etiquetaMercado(cat)) + "):</b></div>"
+        + "<div><b>" + flechaTend + "Interpretación de Mercado (" + esc(etiquetaMercado(cat)) + "):</b></div>"
         + "<div style='margin-top:4px;'>Tendencia semanal <b>" + dirTxt + "</b> con variación promedio del <b>" + (resTend.variacion_pct > 0 ? "+" : "") + resTend.variacion_pct + "%</b> (" + fmtMoneda(resTend.variacion_pesos) + "/kg). En <b>Granada</b> cotiza a <b>" + fmtMoneda(resTend.precio_granada) + "/kg</b> (" + (resTend.variacion_granada_pct > 0 ? "+" : "") + resTend.variacion_granada_pct + "%). La plaza más alta es <b>" + esc(resTend.plaza_top) + "</b> (" + fmtMoneda(resTend.precio_top) + "/kg).</div>"
         + "</div>";
     }
@@ -378,7 +378,7 @@
     }
 
     var avisoReferencia = (d && d.es_datos_referencia)
-      ? "<div class='chip ambar' style='margin-bottom:10px;'>⚠️ Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
+      ? "<div class='chip ambar' style='margin-bottom:10px;'>" + icon("alertTriangle", 12) + "Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
       : "";
 
     return headerHtml + avisoReferencia + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";

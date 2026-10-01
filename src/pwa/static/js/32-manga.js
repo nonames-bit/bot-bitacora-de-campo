@@ -78,7 +78,7 @@
       var chipGmd = f.gmd != null && !isNaN(f.gmd)
         ? "<span class='chip " + (Number(f.gmd) >= 600 ? "verde" : Number(f.gmd) > 0 ? "ambar" : "rojo") + "'>" + (Number(f.gmd) > 0 ? "+" : "") + Number(f.gmd).toFixed(0) + " g/d</span>"
         : (f.gmd || "—");
-      h += "<tr><td>" + esc(f.hora) + "</td><td><b>" + esc(f.tag) + "</b></td><td><b>" + esc(f.peso) + " kg</b></td><td>" + chipGmd + "</td><td>" + esc(f.estado) + "</td></tr>";
+      h += "<tr><td>" + esc(f.hora) + "</td><td><b>" + esc(f.tag) + "</b></td><td><b>" + esc(f.peso) + " kg</b></td><td>" + chipGmd + "</td><td>" + (f.estado === "Guardado" ? dot("verde") : f.estado === "Offline" ? icon("save", 12) : "") + esc(f.estado) + "</td></tr>";
     });
     h += "</table></div>";
     return h;
@@ -158,7 +158,7 @@
 
           if (resBox) {
             resBox.style.display = "block";
-            resBox.innerHTML = "<b>✅ Pesaje Registrado:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b><br>"
+            resBox.innerHTML = "<b>" + icon("checkCircle", 14) + "Pesaje Registrado:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b><br>"
               + (data.peso_anterior != null
                 ? "Anterior: <b>" + esc(data.peso_anterior) + " kg</b> (hace " + esc(data.dias_entre_pesajes) + " días) · GMD: " + chipGmd
                 : "Primer pesaje registrado para este animal.");
@@ -169,7 +169,7 @@
             tag: tag,
             peso: peso,
             gmd: gmd,
-            estado: "🟢 Guardado"
+            estado: "Guardado"
           });
           var wrap = document.getElementById("manga-historial-wrap");
           if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -183,14 +183,14 @@
             if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
-              resBox.innerHTML = "<b>💾 Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
+              resBox.innerHTML = "<b>" + icon("save", 14) + "Pesaje Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> — <b>" + peso + " kg</b> (en cola para sincronizar al volver la señal)";
             }
             _sesionManga.unshift({
               hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
               tag: tag,
               peso: peso,
               gmd: "—",
-              estado: "💾 Offline"
+              estado: "Offline"
             });
             var wrap = document.getElementById("manga-historial-wrap");
             if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -215,14 +215,14 @@
             if (navigator.vibrate) { try { navigator.vibrate([80, 40, 80]); } catch (eVibOff2) { /* noop */ } }
             if (resBox) {
               resBox.style.display = "block";
-              resBox.innerHTML = "<b>💾 Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
+              resBox.innerHTML = "<b>" + icon("save", 14) + "Guardado Offline:</b> Animal <b>" + esc(tag) + "</b> (" + esc(err.message) + " — en cola local)";
             }
             _sesionManga.unshift({
               hora: new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }),
               tag: tag,
               peso: peso,
               gmd: "—",
-              estado: "💾 Offline"
+              estado: "Offline"
             });
             var wrap = document.getElementById("manga-historial-wrap");
             if (wrap) wrap.innerHTML = renderTablaSesionManga();
@@ -274,7 +274,7 @@
         }).then(function (r) { return r.json(); })
           .then(function (res) {
             if (res.ok) {
-              alert("✅ Tratamiento aplicado a " + res.procesados + " animales con éxito.");
+              alert("Tratamiento aplicado a " + res.procesados + " animales con éxito.");
               if (q("#manga-lote-producto")) q("#manga-lote-producto").value = "";
               if (q("#manga-lote-tags")) q("#manga-lote-tags").value = "";
               actualizarBadges();
@@ -290,15 +290,15 @@
       btnBle.addEventListener("click", function () {
         var estado = document.getElementById("manga-ble-estado");
         if (!navigator.bluetooth) {
-          if (estado) estado.innerHTML = "❌ Tu navegador no soporta Web Bluetooth.<br><small>Recomendado: Chrome o Edge en Android o PC con Bluetooth activo.</small>";
+          if (estado) estado.innerHTML = icon("xCircle", 14) + "Tu navegador no soporta Web Bluetooth.<br><small>Recomendado: Chrome o Edge en Android o PC con Bluetooth activo.</small>";
           return;
         }
-        if (estado) estado.textContent = "🔍 Buscando báscula o bastón RFID Bluetooth...";
+        if (estado) estado.textContent = "Buscando báscula o bastón RFID Bluetooth...";
         navigator.bluetooth.requestDevice({
           acceptAllDevices: true,
           optionalServices: ["0000181d-0000-1000-8000-00805f9b34fb", "battery_service"]
         }).then(function (device) {
-          if (estado) estado.innerHTML = "🟢 Conectado a <b>" + esc(device.name || "Dispositivo BLE") + "</b>.<br>Listo para recibir lecturas.";
+          if (estado) estado.innerHTML = dot("verde") + "Conectado a <b>" + esc(device.name || "Dispositivo BLE") + "</b>.<br>Listo para recibir lecturas.";
         }).catch(function (err) {
           if (estado) estado.textContent = "Conexión BLE cancelada o no disponible (" + err.message + ").";
         });

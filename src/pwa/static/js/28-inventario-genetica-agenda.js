@@ -58,7 +58,7 @@
       var n = Number(f.total) || 0;
       if (n === 0) {
         h += "<tr><td class='col-cat' title='" + esc(f.ayuda) + "'>" + esc(f.etiqueta) + "</td>"
-          + "<td class='col-cab' style='text-align:center;'><span class='chip verde' style='padding:2px 6px; font-size:11px;'>✓ 0</span></td>"
+          + "<td class='col-cab' style='text-align:center;'><span class='chip verde' style='padding:2px 6px; font-size:11px;'>" + icon("check", 12) + "0</span></td>"
           + "<td class='col-pct' style='text-align:right; color:var(--texto-suave, #64748b);'>0%</td></tr>";
         return;
       }
@@ -75,11 +75,11 @@
 
   // Registros imposibles o sospechosos (engine/calidad_datos.py). Se
   // corrigen desde la ficha de cada animal.
-  var GRAVEDAD_ICONO = { alta: "🔴", media: "🟠", baja: "⚪" };
+  var GRAVEDAD_ICONO = { alta: dot("rojo"), media: dot("naranja"), baja: dot("gris") };
   var DR_MAX_FILAS = 30;
   function renderDatosRevisar(lista) {
     if (!lista) return "";
-    var h = "<div class='card lt-card'><h4 style='margin:0 0 6px;'>🧹 Datos a revisar (" + lista.length + ")</h4>";
+    var h = "<div class='card lt-card'><h4 style='margin:0 0 6px;'>" + icon("eraser", 16) + "Datos a revisar (" + lista.length + ")</h4>";
     if (!lista.length) return h + vacio("No se encontraron registros imposibles en el hato activo.") + "</div>";
     h += "<p class='aviso' style='margin:0 0 8px;'>Registros que no pueden ser ciertos (casi siempre errores de digitación "
       + "o de la importación). Abra la ficha y corríjalos: mientras tanto pueden descuadrar listas y conteos.</p>";
@@ -92,7 +92,7 @@
     tipos.forEach(function (t, i) {
       var p0 = por[t][0];
       h += "<button type='button' class='chip btn-dr" + (i === 0 ? " act" : "") + "' data-dr='" + esc(t) + "'>"
-        + (GRAVEDAD_ICONO[p0.gravedad] || "") + " " + esc(p0.titulo) + " <b>" + por[t].length + "</b></button>";
+        + (GRAVEDAD_ICONO[p0.gravedad] || "") + esc(p0.titulo) + " <b>" + por[t].length + "</b></button>";
     });
     h += "</div>";
     tipos.forEach(function (t, i) {
@@ -219,9 +219,9 @@
     cyan: "#1f9aa6", lima: "#8fa82a", naranja: "#e0782a", gris: "#9aa19b"
   };
   var GEN_ICONO_GRADO = {
-    PURO: "🌟", F1_1_2: "🧬", "3_4": "📐", "5_8": "⚖️", "7_8": "🎯", "15_16": "🏅",
-    "13_16": "📐", "11_16": "📐", "9_16": "📐", "1_2": "🌿", MULTI: "🔄",
-    PARCIAL: "🧩", CEBU: "🐂", TAURINO: "🐄", INDET: "❓", SIN_CLASIFICAR: "❔"
+    PURO: icon("sparkles", 12), F1_1_2: icon("dna", 12), "3_4": icon("ruler", 12), "5_8": icon("scale", 12), "7_8": icon("target", 12), "15_16": icon("award", 12),
+    "13_16": icon("ruler", 12), "11_16": icon("ruler", 12), "9_16": icon("ruler", 12), "1_2": icon("leaf", 12), MULTI: icon("refresh", 12),
+    PARCIAL: icon("grid", 12), CEBU: icon("cow", 12), TAURINO: icon("cow", 12), INDET: icon("help", 12), SIN_CLASIFICAR: icon("help", 12)
   };
   // Grados sin raza confiable: al final, en gris y cerrados por defecto.
   var GEN_SIN_DESGLOSE = { PARCIAL: 1, CEBU: 1, TAURINO: 1, INDET: 1, SIN_CLASIFICAR: 1 };
@@ -289,7 +289,7 @@
       });
       h += "</div>";
       if (Number(d.pool_sin_dato_pct) > 0) {
-        h += "<p class='aviso'>🧩 Además, el " + esc(d.pool_sin_dato_pct) + "% de la sangre de estos animales no tiene dato (padre o madre sin raza registrada); no se cuenta como raza.</p>";
+        h += "<p class='aviso'>" + icon("grid", 14) + "Además, el " + esc(d.pool_sin_dato_pct) + "% de la sangre de estos animales no tiene dato (padre o madre sin raza registrada); no se cuenta como raza.</p>";
       }
     }
 
@@ -299,10 +299,10 @@
       h += "<h4>" + icon("dna") + "Familias de cruce</h4>"
         + "<div class='gen-filtros'><button type='button' class='chip btn-filtro-gen act' data-grado='TODOS'>Todos</button>";
       grados.forEach(function (g) {
-        h += "<button type='button' class='chip btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>" + (GEN_ICONO_GRADO[g.codigo] || "") + " " + esc(g.chip) + "</button>";
+        h += "<button type='button' class='chip btn-filtro-gen' data-grado='" + esc(g.codigo) + "'>" + (GEN_ICONO_GRADO[g.codigo] || "") + esc(g.chip) + "</button>";
       });
       h += "</div>"
-        + "<input id='buscar-genetica-input' class='gen-buscar' type='search' placeholder='🔍 Buscar cruce, raza o arete (ej: Gyr, 3/4, JA45)'>";
+        + "<input id='buscar-genetica-input' class='gen-buscar' type='search' placeholder='Buscar cruce, raza o arete (ej: Gyr, 3/4, JA45)'>";
 
       var grupos = [], porGrado = {};
       patrones.forEach(function (p) {
@@ -320,7 +320,7 @@
         var abierto = !GEN_SIN_DESGLOSE[gr.codigo];
         h += "<details class='gen-grupo' data-grado='" + esc(gr.codigo) + "'" + (abierto ? " open" : "") + ">"
           + "<summary><i style='background:" + (GEN_COLOR_GRADO[gr.color] || GEN_COLOR_GRADO.gris) + ";'></i>"
-          + "<span>" + (GEN_ICONO_GRADO[gr.codigo] || "") + " " + esc(res.nombre || gr.nombre) + "</span>"
+          + "<span>" + (GEN_ICONO_GRADO[gr.codigo] || "") + esc(res.nombre || gr.nombre) + "</span>"
           + "<b>" + esc(gr.cabezas) + "</b><small>" + esc(res.pct_hato != null ? res.pct_hato + "%" : "") + "</small></summary>";
         gr.items.forEach(function (p) {
           var tags = p.animales || [];
@@ -358,7 +358,7 @@
     var pjinact = d.pajillas_inactivas || d.pajuelas_inactivas || [];
     if (pjinact.length) {
       h += "<details style='margin-top:10px; font-size:12px; background:var(--superficie-2); border:1px solid var(--borde-suave); border-radius:8px; padding:8px 12px;'>"
-        + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>📦 Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
+        + "<summary style='cursor:pointer; font-weight:600; color:var(--texto-suave);'>" + icon("package", 14) + "Catálogo histórico / pajillas inactivas (" + pjinact.length + " toros antiguos)</summary>"
         + "<p style='margin:6px 0; color:var(--texto-suave); font-size:11px;'>Toros del histórico archivados para no generar falsas alertas en el termo actual.</p>"
         + "<div class='tabla-scroll' style='max-height:200px; overflow-y:auto; margin-top:6px;'>"
         + tabla(pjinact, [
@@ -375,7 +375,7 @@
     if (te && te.vencido) {
       var dv = Number(te.dias_vencido) || 0;
       var hace = dv >= 730 ? Math.floor(dv / 365) + " años" : dv >= 60 ? Math.floor(dv / 30) + " meses" : dv + " días";
-      h += "<p><span class='chip rojo'>⚠️ Recarga vencida hace " + esc(hace) + "</span> <small class='aviso'>Registra la última recarga para retomar el control.</small></p>";
+      h += "<p><span class='chip rojo'>" + icon("alertTriangle", 12) + "Recarga vencida hace " + esc(hace) + "</span> <small class='aviso'>Registra la última recarga para retomar el control.</small></p>";
     }
     h += tabla(d.termo_nitrogeno, [
       ["fecha_recarga", "Última recarga", "text", function (v) { return esc(fechaCorta(v)); }],
@@ -457,9 +457,9 @@
       + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
       + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div style='display:flex; gap:8px;'>"
-      + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
-      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
-      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>" + icon("leaf", 14) + "Potrero</button>"
+      + "<button type='button' class='tema-btn ag-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>" + icon("clipboard", 14) + "General</button>"
       + "</div>"
       + "<input type='hidden' id='ag-obj-tipo' value='animal'>"
       + "<div id='ag-wrap-animal'>"
@@ -475,13 +475,13 @@
       + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
       + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Tipo de Tarea:<br>"
       + "<select id='ag-tipo-tarea' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
-      + "<option value='MEDICAMENTO'>💉 Aplicar medicamento</option>"
-      + "<option value='FUMIGAR'>🌿 Fumigar</option>"
-      + "<option value='REVISION'>🔍 Revisión / Chequeo</option>"
-      + "<option value='TRASLADO'>🚚 Traslado</option>"
-      + "<option value='CERCA'>⚡ Arreglo de cerca</option>"
-      + "<option value='PESAJE'>⚖️ Pesaje</option>"
-      + "<option value='GENERAL'>📋 General</option>"
+      + "<option value='MEDICAMENTO'>Aplicar medicamento</option>"
+      + "<option value='FUMIGAR'>Fumigar</option>"
+      + "<option value='REVISION'>Revisión / Chequeo</option>"
+      + "<option value='TRASLADO'>Traslado</option>"
+      + "<option value='CERCA'>Arreglo de cerca</option>"
+      + "<option value='PESAJE'>Pesaje</option>"
+      + "<option value='GENERAL'>General</option>"
       + "</select></label>"
       + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Adjudicar / Asignar a:<br>"
       + "<input id='ag-asignado' list='dl-equipo-agenda' placeholder='ej. Encargado o Administrador' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
@@ -498,7 +498,7 @@
       + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
       + "<label style='flex:1; min-width:130px; font-size:13px; font-weight:600;'>Fecha límite<br><input id='ag-fecha' type='date' value='" + hoyIso + "' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
       + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Hora (opcional)<br><input id='ag-hora' type='time' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'></label>"
-      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Prioridad<br><select id='ag-prioridad' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label>"
+      + "<label style='flex:1; min-width:110px; font-size:13px; font-weight:600;'>Prioridad<br><select id='ag-prioridad' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'><option value='NORMAL'>Normal</option><option value='URGENTE'>Urgente</option></select></label>"
       + "</div>"
       + "<button type='submit' id='btn-ag-guardar' class='btn-guardar-manga' style='margin-top:4px; font-size:14px;'>" + icon("plus", 14) + "Asignar Tarea / Programar Evento</button>"
       + "<div id='ag-form-feedback' role='status' aria-live='polite' style='font-size:13px;'></div>"
@@ -521,16 +521,16 @@
       recs.forEach(function (rc) {
         var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
         var objChip = "";
-        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
-        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
 
-        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>👤 " + esc(rc.asignado_a) + "</span> ") : "";
-        var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>🚨 URGENTE</span> " : "";
+        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + esc(rc.asignado_a) + "</span> ") : "";
+        var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>" + icon("alertTriangle", 12) + "URGENTE</span> " : "";
 
         h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "'>"
           + "<div class='tarea-card-header'>"
           + "<div>" + objChip + asigChip + prioChip + chipUrg(rc) + "</div>"
-          + "<small style='color:var(--texto-suave); font-weight:600;'>📅 " + fh + "</small>"
+          + "<small style='color:var(--texto-suave); font-weight:600;'>" + icon("calendar", 14) + fh + "</small>"
           + "</div>"
           + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
@@ -543,7 +543,7 @@
       });
       h += "</div>";
     } else {
-      h += "<p class='aviso'>🎉 Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+      h += "<p class='aviso'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
     }
 
     if (recsComp.length) {
@@ -552,8 +552,8 @@
       recsComp.forEach(function (rc) {
         var fechaComp = esc(rc.completado_en || rc.fecha || "—");
         var objChip = "";
-        if (rc.animal_tag) objChip = "<span class='chip azul'>🐄 " + esc(rc.animal_tag) + "</span> ";
-        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>🌿 " + esc(rc.potrero_nombre) + "</span> ";
+        if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
+        else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
         var quien = esc(rc.completado_por || rc.asignado_a || "Equipo");
 
         var fotoHtml = "";
@@ -565,12 +565,12 @@
 
         h += "<div style='padding:10px 14px; border:1px solid var(--borde); border-radius:8px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
           + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;'>"
-          + "<div>" + objChip + "<span class='chip verde' style='font-size:11px;'>✓ REALIZADO</span></div>"
-          + "<small style='color:var(--texto-suave);'>🕒 " + fechaComp + "</small>"
+          + "<div>" + objChip + "<span class='chip verde' style='font-size:11px;'>" + icon("check", 12) + "REALIZADO</span></div>"
+          + "<small style='color:var(--texto-suave);'>" + icon("clock", 14) + fechaComp + "</small>"
           + "</div>"
           + "<div style='font-weight:600; font-size:13.5px; margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
-          + "<div style='font-size:12.5px; color:var(--texto-suave);'>👤 Ejecutado por: <b>" + quien + "</b></div>"
-          + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>💬 " + esc(rc.notas_completado) + "</div>") : "")
+          + "<div style='font-size:12.5px; color:var(--texto-suave);'>" + icon("user", 14) + "Ejecutado por: <b>" + quien + "</b></div>"
+          + (rc.notas_completado ? ("<div style='font-size:12px; margin-top:4px; padding:6px 10px; background:var(--fondo); border-radius:6px; font-style:italic;'>" + icon("chat", 14) + esc(rc.notas_completado) + "</div>") : "")
           + fotoHtml
           + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<div style='display:flex; justify-content:flex-end; margin-top:6px;'><button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea realizada: " + esc(rc.mensaje || "") + "' title='Eliminar registro de tarea' style='font-size:11.5px; color:var(--color-rojo-txt);'>" + icon("trash", 12) + " Eliminar del historial</button></div>") : "")
           + "</div>";

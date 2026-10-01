@@ -15,7 +15,7 @@
       var seguro = esc(dec.trim());
       pres.push(
         "<div class='chat-pre-wrap'>" +
-          "<button class='btn-pre-copy' type='button' title='Copiar tabla'>📋 Copiar</button>" +
+          "<button class='btn-pre-copy' type='button' title='Copiar tabla'>" + icon("clipboard", 12) + "Copiar</button>" +
           "<pre>" + seguro + "</pre>" +
         "</div>"
       );
@@ -146,7 +146,7 @@
     }
 
     /* ---------- Chat de Equipo (canal de avisos entre usuarios conectados) ---------- */
-    var ROL_ICONO_EQUIPO = { OWNER: "👑", ADMIN: "🛡️", TRABAJADOR: "👷" };
+    var ROL_ICONO_EQUIPO = { OWNER: icon("crown", 12), ADMIN: icon("shieldPlus", 12), TRABAJADOR: icon("cowboy", 12) };
     var LS_EQUIPO_VISTO = "ja_chat_equipo_visto_id";
     var equipoTabActiva = false;
     var equipoUltimoId = 0;
@@ -214,12 +214,12 @@
       div.setAttribute("data-id", m.id);
       var html = "";
       if (!esMio) {
-        var ic = ROL_ICONO_EQUIPO[m.rol] || "👤";
-        html += "<div class='chat-msg-cabecera'>" + ic + " " + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
+        var ic = ROL_ICONO_EQUIPO[m.rol] || icon("user", 12);
+        html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
-      if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje'>🗑</span>";
+      if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje' aria-label='Borrar mensaje'>" + icon("trash", 12) + "</span>";
       html += "</div>";
       div.innerHTML = html;
       histEquipo.appendChild(div);
@@ -271,7 +271,7 @@
       if (hist) hist.style.display = cual === "ia" ? "" : "none";
       if (histEquipo) histEquipo.style.display = cual === "equipo" ? "" : "none";
       if (btnMic) btnMic.style.display = cual === "ia" ? "" : "none";
-      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa 🎙️..." : "Escribe un aviso para el equipo...";
+      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa el micrófono..." : "Escribe un aviso para el equipo...";
       if (cual === "equipo") {
         equipoMarcarVisto(equipoUltimoId);
         if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
@@ -329,7 +329,7 @@
 
     if (btnLimpiar && hist) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz 🎙️.</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
       });
     }
 
@@ -341,9 +341,9 @@
         var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
         if (pre && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
-            var old = btn.textContent;
-            btn.textContent = "✓ Copiado";
-            setTimeout(function () { btn.textContent = old; }, 1800);
+            var old = btn.innerHTML;
+            btn.textContent = "Copiado";
+            setTimeout(function () { btn.innerHTML = old; }, 1800);
           });
         }
       });
@@ -398,7 +398,7 @@
             if (hist) hist.scrollTop = hist.scrollHeight;
           }).catch(function (err) {
             var hErr = horaCortaActual();
-            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
+            if (botPlaceholder) botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + hErr + "</div>";
           });
       });
     }
@@ -495,7 +495,7 @@
         var hAudio = horaCortaActual();
         var userMsgPlaceholder = document.createElement("div");
         userMsgPlaceholder.className = "chat-msg user";
-        userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio enviado (procesando nota de voz)...</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+        userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Audio enviado (procesando nota de voz)...</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
         if (hist) {
           hist.appendChild(userMsgPlaceholder);
           hist.scrollTop = hist.scrollHeight;
@@ -511,8 +511,8 @@
 
         _chatMediaRecorder.addEventListener("stop", function () {
           if (!_chatAudioChunks.length) {
-            userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Audio vacío.</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-            botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ No se detectó sonido.</div><div class='chat-msg-hora'>" + esc(horaCortaActual()) + "</div>";
+            userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Audio vacío.</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+            botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("alertTriangle", 14) + "No se detectó sonido.</div><div class='chat-msg-hora'>" + esc(horaCortaActual()) + "</div>";
             detenerAudioGrabacion(true);
             return;
           }
@@ -528,18 +528,18 @@
             .then(function (data) {
               var hBot = horaCortaActual();
               if (data.ok) {
-                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<b>\"" + esc(data.transcripcion || "Nota de voz") + "\"</b></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
                 botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + formatearMensajeChat(data.respuesta || "Registrado correctamente.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
                 actualizarBadges();
               } else {
-                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>⚠️ " + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
+                userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+                botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("alertTriangle", 14) + esc(data.error || "No se pudo procesar el audio.") + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               }
               if (hist) hist.scrollTop = hist.scrollHeight;
             }).catch(function (err) {
               var hBot = horaCortaActual();
-              userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>🎙️ <i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
-              botPlaceholder.innerHTML = "<div class='chat-msg-texto'>❌ Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
+              userMsgPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("mic", 14) + "<i>Nota de voz</i></div><div class='chat-msg-hora'>" + esc(hAudio) + "</div>";
+              botPlaceholder.innerHTML = "<div class='chat-msg-texto'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message) + "</div><div class='chat-msg-hora'>" + esc(hBot) + "</div>";
               if (hist) hist.scrollTop = hist.scrollHeight;
             });
         }, { once: true });
@@ -574,7 +574,7 @@
       modal.style.display = "flex";
       if (resBox) { resBox.style.display = "none"; resBox.innerHTML = ""; }
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        if (estado) estado.textContent = "❌ Tu navegador no soporta grabación de micrófono.";
+        if (estado) estado.textContent = "Tu navegador no soporta grabación de micrófono.";
         if (btnAccion) btnAccion.style.display = "none";
         return;
       }
@@ -612,18 +612,18 @@
                 if (btnAccion) btnAccion.innerHTML = icon("mic", 14) + "Grabar Otra Nota";
                 actualizarBadges();
               } else {
-                if (estado) estado.textContent = "⚠️ " + esc(data.error || "No se pudo procesar");
+                if (estado) estado.textContent = esc(data.error || "No se pudo procesar");
                 if (btnAccion) btnAccion.textContent = "Reintentar";
               }
             }).catch(function (err) {
-              if (estado) estado.textContent = "❌ Error de conexión: " + esc(err.message);
+              if (estado) estado.textContent = "Error de conexión: " + esc(err.message);
               if (btnAccion) btnAccion.textContent = "Reintentar";
             });
         };
         _mediaRecorder.start();
-        if (estado) estado.textContent = "🔴 Grabando... hable ahora con claridad.";
+        if (estado) estado.textContent = "Grabando... hable ahora con claridad.";
       }).catch(function (err) {
-        if (estado) estado.textContent = "❌ No se pudo acceder al micrófono: " + err.message;
+        if (estado) estado.textContent = "No se pudo acceder al micrófono: " + err.message;
         if (btnAccion) btnAccion.style.display = "none";
       });
     });
@@ -659,9 +659,9 @@
         var pre = btn.parentElement ? btn.parentElement.querySelector("pre") : null;
         if (pre && navigator.clipboard && navigator.clipboard.writeText) {
           navigator.clipboard.writeText(pre.innerText || pre.textContent).then(function () {
-            var old = btn.textContent;
-            btn.textContent = "✓ Copiado";
-            setTimeout(function () { btn.textContent = old; }, 1800);
+            var old = btn.innerHTML;
+            btn.textContent = "Copiado";
+            setTimeout(function () { btn.innerHTML = old; }, 1800);
           });
         }
       });

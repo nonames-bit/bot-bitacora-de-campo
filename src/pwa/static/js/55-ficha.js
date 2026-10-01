@@ -18,7 +18,7 @@
     if (colapsable) {
       return "<details class='card ident-box' style='margin-top:10px; margin-bottom:12px; padding:10px 14px;'>"
         + "<summary style='cursor:pointer; font-weight:600; font-size:13px; color:var(--texto-suave); user-select:none; display:flex; align-items:center; justify-content:space-between; outline:none;'>"
-        + "<span>" + icon("camera", 15) + " 📷 Identificar otro animal por foto o QR</span>"
+        + "<span>" + icon("camera", 15) + "Identificar otro animal por foto o QR</span>"
         + "<span style='font-size:11px; opacity:0.75;'>▼ desplegar</span>"
         + "</summary>"
         + "<div style='margin-top:10px;'>"
@@ -268,7 +268,7 @@
       function nodoAnimal(an, label, icono) {
         if (!an || !an.tag) {
           return "<div style='background:var(--superficie); border:1px dashed var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12px; color:var(--texto-suave);'>"
-            + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:2px;'>" + icono + " " + esc(label) + "</div>"
+            + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:2px;'>" + icono + esc(label) + "</div>"
             + "<div>Desconocido / Sin Registro</div>"
             + "</div>";
         }
@@ -276,7 +276,7 @@
         var rz = an.raza ? " [" + esc(an.raza) + "]" : "";
         var hie = an.hierro ? (" <span class='chip ambar' style='font-size:10px; padding:1px 4px;' title='Hierro'>" + esc(an.hierro) + "</span>") : "";
         return "<div style='background:var(--superficie); border:1px solid var(--borde-fuerte); border-radius:8px; padding:10px; font-size:12.5px; box-shadow:0 1px 3px var(--sombra);'>"
-          + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + " " + esc(label) + "</div>"
+          + "<div style='font-weight:600; font-size:11px; text-transform:uppercase; color:var(--texto-suave); margin-bottom:4px;'>" + icono + esc(label) + "</div>"
           + "<div><a href='#' class='ficha-link' data-ir-ficha=\"" + esc(an.tag) + "\" style='font-weight:bold; font-size:14px; text-decoration:none;'><b>" + esc(an.tag) + "</b></a>" + nom + " <span class='chip gris' style='font-size:11px; padding:1px 5px;'>" + esc(an.raza || "S/D") + "</span>" + hie + "</div>"
           + "</div>";
       }
@@ -288,25 +288,25 @@
 
         // Línea Paterna
         + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
-        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐂 LÍNEA PATERNA</div>"
-        + nodoAnimal(f.padre, "Padre", "🐂")
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>" + icon("cow", 16) + "LÍNEA PATERNA</div>"
+        + nodoAnimal(f.padre, "Padre", icon("cow", 12))
         + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
-        + nodoAnimal(f.abuelo_pat || g.abuelo_pat, "Abuelo Paterno", "🐂")
-        + (g.bisabuelos && g.bisabuelos.pat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_pat_p, "Bisabuelo (PP)", "🧬") + "</div>" : "")
-        + nodoAnimal(f.abuela_pat || g.abuela_pat, "Abuela Paterna", "🐄")
-        + (g.bisabuelos && g.bisabuelos.pat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_mat_m, "Bisabuela (PM)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuelo_pat || g.abuelo_pat, "Abuelo Paterno", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.pat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_pat_p, "Bisabuelo (PP)", icon("dna", 12)) + "</div>" : "")
+        + nodoAnimal(f.abuela_pat || g.abuela_pat, "Abuela Paterna", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.pat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.pat_mat_m, "Bisabuela (PM)", icon("dna", 12)) + "</div>" : "")
         + "</div>"
         + "</div>"
 
         // Línea Materna
         + "<div style='background:rgba(47,82,51,0.03); border:1px solid var(--borde); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:10px;'>"
-        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>🐄 LÍNEA MATERNA</div>"
-        + nodoAnimal(f.madre, "Madre", "🐄")
+        + "<div style='font-weight:bold; color:var(--verde-marca); border-bottom:1px solid var(--borde); padding-bottom:6px; font-size:13px; display:flex; align-items:center; gap:6px;'>" + icon("cow", 16) + "LÍNEA MATERNA</div>"
+        + nodoAnimal(f.madre, "Madre", icon("cow", 12))
         + "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte); display:flex; flex-direction:column; gap:8px;'>"
-        + nodoAnimal(f.abuelo_mat || g.abuelo_mat, "Abuelo Materno", "🐂")
-        + (g.bisabuelos && g.bisabuelos.mat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_pat_p, "Bisabuelo (MP)", "🧬") + "</div>" : "")
-        + nodoAnimal(f.abuela_mat || g.abuela_mat, "Abuela Materna", "🐄")
-        + (g.bisabuelos && g.bisabuelos.mat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_mat_m, "Bisabuela (MM)", "🧬") + "</div>" : "")
+        + nodoAnimal(f.abuelo_mat || g.abuelo_mat, "Abuelo Materno", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.mat_pat_p ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_pat_p, "Bisabuelo (MP)", icon("dna", 12)) + "</div>" : "")
+        + nodoAnimal(f.abuela_mat || g.abuela_mat, "Abuela Materna", icon("cow", 12))
+        + (g.bisabuelos && g.bisabuelos.mat_mat_m ? "<div style='padding-left:10px; border-left:2px solid var(--borde-fuerte);'>" + nodoAnimal(g.bisabuelos.mat_mat_m, "Bisabuela (MM)", icon("dna", 12)) + "</div>" : "")
         + "</div>"
         + "</div>"
 
@@ -368,7 +368,7 @@
         h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px; background:var(--superficie); padding:10px 12px; border-radius:8px; border:1px solid var(--borde);'>"
           + "<div style='font-size:13px; font-weight:700; color:var(--texto); display:flex; align-items:center; gap:6px;'>" + icon("stethoscope", 16) + "Control Reproductivo & Tactos</div>"
           + "<button type='button' class='tema-btn btn-palpar-ficha-directo' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-          + icon("stethoscope", 13) + "🖐️ Palpación / Eco</button>"
+          + icon("stethoscope", 13) + "Palpación / Eco</button>"
           + "</div>";
       }
       var colsPartos = [
@@ -408,7 +408,7 @@
       var colsDiag = [
         ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipResultado(v); }],
-        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>📟 Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>🖐️ Tacto</span>"; }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFO" ? "<span class='chip azul' style='font-size:11px;'>" + icon("phone", 12) + "Ecógrafo</span>" : "<span class='chip gris' style='font-size:11px;'>" + icon("hand", 12) + "Tacto</span>"; }],
         ["dias_gestacion", "Días", "text", function (v) { return v ? (esc(v) + " d") : "—"; }],
         ["toro_pajuela", "Toro / Pajilla", "text", function (v) { return v ? esc(v) : "—"; }],
         ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
@@ -453,15 +453,15 @@
         if (lac.estado === "En ordeño") {
           if (lac.en_pausa) {
             h3 += "<div class='card' style='padding:10px 14px; margin:8px 0; border-left:3px solid var(--color-ambar-txt, #D97706);'>"
-              + "<p style='margin:0 0 8px; font-size:13px;'>⏸ <b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
+              + "<p style='margin:0 0 8px; font-size:13px;'>" + icon("pause", 14) + "<b>Ordeño en pausa" + (lac.pausa_motivo ? " · " + esc(lac.pausa_motivo) : "") + "</b>"
               + (lac.pausa_fecha_inicio ? " (desde " + esc(fechaCorta(lac.pausa_fecha_inicio)) + ")" : "")
               + " — no se cuenta en el promedio litros/vaca/día.</p>"
               + "<button type='button' class='tema-btn' data-accion='reanudar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>▶ Reanudar ordeño</button>"
               + "</div>";
           } else {
             h3 += "<div style='margin:8px 0; display:flex; gap:8px; flex-wrap:wrap;'>"
-              + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>⏸ Pausar ordeño (no se está ordeñando)</button>"
-              + "<button type='button' class='tema-btn' data-accion='registrar-secado' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>🍼 Ya está seca</button>"
+              + "<button type='button' class='tema-btn' data-accion='pausar-ordeno' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>" + icon("pause", 14) + "Pausar ordeño (no se está ordeñando)</button>"
+              + "<button type='button' class='tema-btn' data-accion='registrar-secado' data-tag='" + esc(f.tag) + "' style='padding:8px 14px; cursor:pointer;'>" + icon("milk", 14) + "Ya está seca</button>"
               + "</div>";
           }
         }
@@ -655,7 +655,7 @@
     var avisosDatos = (f.aviso_datos ? [f.aviso_datos] : []).concat(f.avisos_datos || []);
     if (avisosDatos.length) {
       h += "<div class='card' style='border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;'>"
-        + "<b>⚠️ " + (avisosDatos.length > 1 ? avisosDatos.length + " datos a revisar" : "Dato a revisar") + "</b>"
+        + "<b>" + icon("alertTriangle", 14) + (avisosDatos.length > 1 ? avisosDatos.length + " datos a revisar" : "Dato a revisar") + "</b>"
         + avisosDatos.map(function (t) { return "<p style='margin:6px 0 0; font-size:13px;'>" + esc(t) + "</p>"; }).join("")
         + "</div>";
     }

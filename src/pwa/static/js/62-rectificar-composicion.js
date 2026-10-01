@@ -77,13 +77,13 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%; max-height:92vh; overflow-y:auto;'>"
       + "<div class='modal-header' style='display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid var(--borde);'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px; font-size:15px;'>" + icon("camera", 17) + "Foto de Perfil · Animal " + esc(tag) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-foto-modal' style='background:none; border:none; font-size:18px; cursor:pointer;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-subir-foto-animal' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div style='text-align:center; background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:10px;'>"
       + "<img src='" + fotoData.base64 + "' alt='Vista previa foto " + esc(tag) + "' style='max-height:220px; max-width:100%; border-radius:6px; object-fit:cover; display:block; margin:0 auto; box-shadow:0 2px 8px rgba(0,0,0,0.15);'>"
       + "<div style='font-size:11.5px; color:var(--texto-suave); margin-top:8px; display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + "<span class='chip verde' style='font-size:10.5px;'>✓ Optimizada (" + fotoData.tam_kb + " KB)</span>"
+      + "<span class='chip verde' style='font-size:10.5px;'>" + icon("check", 12) + "Optimizada (" + fotoData.tam_kb + " KB)</span>"
       + "<span>" + fotoData.ancho + " × " + fotoData.alto + " px</span>"
       + "</div>"
       + "</div>"
@@ -150,7 +150,7 @@
         if (res.status === 200 && res.body.ok) {
           cerrar();
           if (typeof mostrarToast === "function") {
-            mostrarToast("✓ " + (res.body.mensaje || "Foto de perfil actualizada con éxito."), "verde");
+            mostrarToast((res.body.mensaje || "Foto de perfil actualizada con éxito."), "verde");
           }
           try {
             if (navigator && navigator.vibrate) navigator.vibrate([35]);
@@ -189,7 +189,7 @@
           if (btnSubmit) btnSubmit.disabled = false;
           if (btnTxt) btnTxt.textContent = "Guardar Foto";
           if (errEl) {
-            errEl.textContent = "❌ " + (res.body.error || "No se pudo guardar la foto.");
+            errEl.textContent = (res.body.error || "No se pudo guardar la foto.");
             errEl.style.display = "block";
           }
         }
@@ -197,7 +197,7 @@
         if (btnSubmit) btnSubmit.disabled = false;
         if (btnTxt) btnTxt.textContent = "Guardar Foto";
         if (errEl) {
-          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.textContent = "Error de conexión: " + (err.message || err);
           errEl.style.display = "block";
         }
       });
@@ -217,11 +217,11 @@
       + "<div class='modal-contenido' style='max-width:440px; width:92%;'>"
       + "<div class='modal-header'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("tag", 16) + "Rectificar Chapeta / Número</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-rect-modal'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-rect-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-rectificar-tag' style='padding:16px; display:flex; flex-direction:column; gap:12px;'>"
       + "<div class='aviso' style='background:var(--color-ambar-bg); color:var(--color-ambar-txt); border:1px solid var(--color-ambar-txt); border-radius:8px; padding:10px 12px; font-size:12px; line-height:1.4;'>"
-      + "👑 <b>Exclusivo Propietario (OWNER)</b><br>"
+      + icon("crown", 14) + "<b>Exclusivo Propietario (OWNER)</b><br>"
       + "Utilice este proceso si en campo leyeron o anotaron mal la chapeta (ej. se registró como <b>" + esc(tagActual) + "</b> pero la chapeta real era otra). Todo el historial de eventos se conservará."
       + "</div>"
       + "<label style='display:block; font-size:12.5px; font-weight:600;'>Chapeta / Arete Actual"
@@ -275,7 +275,7 @@
 
       if (!tagNv) return;
       if (tagAct.toUpperCase() === tagNv.toUpperCase()) {
-        if (errEl) { errEl.textContent = "❌ El nuevo número es idéntico al actual."; errEl.style.display = "block"; }
+        if (errEl) { errEl.textContent = "El nuevo número es idéntico al actual."; errEl.style.display = "block"; }
         return;
       }
 
@@ -299,18 +299,18 @@
         } else if (res.status === 409 && res.body.requiere_confirmacion_fusion) {
           if (boxFusion && msgFusion) {
             boxFusion.style.display = "block";
-            msgFusion.innerHTML = "⚠️ " + esc(res.body.mensaje);
+            msgFusion.innerHTML = icon("alertTriangle", 14) + esc(res.body.mensaje);
             if (btnTxt) btnTxt.textContent = "Confirmar Fusión y Rectificar";
           }
         } else {
           if (errEl) {
-            errEl.textContent = "❌ " + (res.body.error || "No se pudo rectificar el arete.");
+            errEl.textContent = (res.body.error || "No se pudo rectificar el arete.");
             errEl.style.display = "block";
           }
         }
       }).catch(function (err) {
         if (errEl) {
-          errEl.textContent = "❌ Error de conexión: " + (err.message || err);
+          errEl.textContent = "Error de conexión: " + (err.message || err);
           errEl.style.display = "block";
         }
       });
@@ -443,11 +443,11 @@
       + "<div class='modal-contenido' style='max-width:480px; width:94%; max-height:85vh; display:flex; flex-direction:column;'>"
       + "<div class='modal-header'>"
       + "<b style='display:inline-flex; align-items:center; gap:6px;'>" + icon("dna", 16) + "Composición Genética · Arete " + esc(tagActual) + "</b>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-comp-modal'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-comp-modal' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<form id='form-comp-racial' style='padding:16px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex:1;'>"
       + "<div class='aviso' style='font-size:12.5px; line-height:1.4; margin:0;'>"
-      + "🧬 <b>Ingreso multi-raza & cruces zootécnicos</b><br>"
+      + icon("dna", 14) + "<b>Ingreso multi-raza & cruces zootécnicos</b><br>"
       + "Seleccione las razas del animal e ingrese los porcentajes. El sistema traducirá automáticamente a fracciones estándar (1/2, 3/4, 7/8, PC). La suma total debe ser <b>100%</b>."
       + "</div>"
       + "<datalist id='dl-catalogo-razas'></datalist>"
@@ -532,10 +532,10 @@
 
       suma = Math.round(suma * 100) / 100;
       if (Math.abs(suma - 100) <= 0.2) {
-        sumaBadge.innerHTML = "<span class='chip verde' style='font-size:12.5px; font-weight:700;'>Suma: 100% ✅</span>";
+        sumaBadge.innerHTML = "<span class='chip verde' style='font-size:12.5px; font-weight:700;'>" + icon("checkCircle", 12) + "Suma: 100%</span>";
       } else if (suma < 100) {
         var falta = Math.round((100 - suma) * 100) / 100;
-        sumaBadge.innerHTML = "<span class='chip ambar' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Faltan " + falta + "%) ⚠️</span> "
+        sumaBadge.innerHTML = "<span class='chip ambar' style='font-size:12.5px; font-weight:700;'>" + icon("alertTriangle", 12) + "Suma: " + suma + "% (Faltan " + falta + "%)</span> "
           + "<button type='button' id='btn-autocompletar-comp' class='chip' style='cursor:pointer; font-size:11px; padding:2px 6px; font-weight:600;'>Completar 100%</button>";
         var btnAuto = document.getElementById("btn-autocompletar-comp");
         if (btnAuto) {
@@ -550,7 +550,7 @@
         }
       } else {
         var exceso = Math.round((suma - 100) * 100) / 100;
-        sumaBadge.innerHTML = "<span class='chip rojo' style='font-size:12.5px; font-weight:700;'>Suma: " + suma + "% (Excede por " + exceso + "%) ❌</span>";
+        sumaBadge.innerHTML = "<span class='chip rojo' style='font-size:12.5px; font-weight:700;'>" + icon("xCircle", 12) + "Suma: " + suma + "% (Excede por " + exceso + "%)</span>";
       }
 
       if (resumenPrev) {
@@ -574,7 +574,7 @@
         + "<span class='comp-frac-badge chip gris' style='font-size:11px; padding:3px 6px; display:inline-block;'>—</span>"
         + "</div>"
         + "<div>"
-        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza'>🗑️</button>"
+        + "<button type='button' class='btn-del-raza-fila' style='background:transparent; border:none; color:var(--color-rojo-txt); font-size:16px; cursor:pointer; padding:4px 6px;' title='Eliminar raza' aria-label='Eliminar raza'>" + icon("trash", 16) + "</button>"
         + "</div>";
 
       var inPct = row.querySelector(".comp-pct-input");
@@ -683,7 +683,7 @@
             if (target) abrirFicha(tagActual, target, false, false);
           }
           if (typeof window.mostrarAviso === "function") {
-            window.mostrarAviso("🧬 Composición genética actualizada: " + (res.body.resumen || ""));
+            window.mostrarAviso("Composición genética actualizada: " + (res.body.resumen || ""));
           } else {
             alert("Composición genética guardada: " + (res.body.resumen || ""));
           }
@@ -710,8 +710,8 @@
           ? "<button type='button' class='tema-btn' data-accion='crear-animal' data-tag-nuevo='" + esc(tag) + "' style='padding:8px 14px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("plus", 15) + "Crear animal " + esc(tag) + "</button>"
           : "";
         var btnBuscarOtro = "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='padding:8px 14px; font-weight:600; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>" + icon("search", 14) + "Buscar otro animal</button>";
-        if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>❌ Sin registro para <b>" + esc(tag) + "</b>.</p>"
-          + "<p class='aviso'>💡 Si viene de escanear un arete, puede que el tag aún no esté en la base. "
+        if (target) montarVista(target, "<h3>" + icon("cow") + "Ficha animal</h3><p>" + icon("xCircle", 14) + "Sin registro para <b>" + esc(tag) + "</b>.</p>"
+          + "<p class='aviso'>" + icon("lightbulb", 14) + "Si viene de escanear un arete, puede que el tag aún no esté en la base. "
           + "Pruebe escribiendo el número sin guiones (ej. " + esc(String(tag).replace(/\D/g, "") || tag) + ").</p>"
           + "<div style='display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-top:12px;'>"
           + btnCrearNf

@@ -54,7 +54,7 @@
       + "<img class='lightbox-img' id='lb-img' src='" + esc(src) + "' alt='" + esc(tit) + "' draggable='false'>"
       + "</div>"
       + "<div style='color:rgba(255,255,255,0.75); font-size:11.5px; margin-top:8px; text-align:center; pointer-events:none; user-select:none;'>"
-      + "✋ Arrastra con la mano para mover · 🔍 Rueda o doble toque para zoom · Esc para salir</div>";
+      + icon("hand", 12) + "Arrastra con la mano para mover · " + icon("search", 12) + "Rueda o doble toque para zoom · Esc para salir</div>";
 
     lb.innerHTML = h;
     document.body.appendChild(lb);
@@ -399,7 +399,7 @@
                 "</div>" +
                 "<div class='paso-item'>" +
                   "<div class='paso-num'>2</div>" +
-                  "<div class='paso-txt'>Desliza la lista de opciones y toca <b>'Agregar a la pantalla de inicio'</b> ➕.</div>" +
+                  "<div class='paso-txt'>Desliza la lista de opciones y toca " + icon("plus", 14) + "<b>'Agregar a la pantalla de inicio'</b>.</div>" +
                 "</div>" +
                 "<div class='paso-item'>" +
                   "<div class='paso-num'>3</div>" +
@@ -503,7 +503,7 @@
           "padding:6px 10px; box-shadow:0 -1px 4px rgba(0,0,0,0.25);";
         document.body.appendChild(el);
       }
-      el.textContent = "⚠️ Sin conexión: " + texto + ". Algunos datos pueden estar desactualizados.";
+      el.textContent = "Sin conexión: " + texto + ". Algunos datos pueden estar desactualizados.";
       el.style.display = "";
     }
     instalarAvisoDatosRancios();

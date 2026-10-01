@@ -95,8 +95,8 @@
       var n = v.claves.reduce(function (s, k) { return s + (c[k] || 0); }, 0);
       h += "<button type='button' class='chip btn-ir-tareas' data-vista='" + v.vista + "'>" + esc(v.nombre) + " <b>" + n + "</b></button>";
     });
-    if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>⚠️ Chequeo <b>" + esc(c.chequeo) + "</b></button>";
-    if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>🧹 Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
+    if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>" + icon("alertTriangle", 14) + "Chequeo <b>" + esc(c.chequeo) + "</b></button>";
+    if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>" + icon("eraser", 14) + "Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
     return h + "</div></div>";
   }
 
@@ -128,9 +128,9 @@
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='palpacion' style='font-size:11.5px; padding:5px 10px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
       + icon("stethoscope", 13) + "Tacto / Palpación</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='pajuela' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("sperm", 13) + "➕ Entrada Pajillas</button>"
+      + icon("sperm", 13) + "Entrada Pajillas</button>"
       + "<button type='button' class='tema-btn btn-ir-cap-directo' data-tipo='nitrogeno' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("snowflake", 13) + "❄️ Recarga Nitrógeno</button>"
+      + icon("snowflake", 13) + "Recarga Nitrógeno</button>"
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
@@ -159,13 +159,13 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
+      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «Entrada Pajillas» para registrar compras nuevas.");
     }
 
     if (pajuelasInactivas.length) {
       h += "<details style='margin-top:14px; background:var(--superficie-2); border-radius:8px; padding:10px 14px; border:1px solid var(--borde-suave);'>"
         + "<summary style='cursor:pointer; font-weight:700; font-size:12px; color:var(--texto-suave);'>"
-        + "📁 Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
+        + icon("folder", 14) + "Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
         + "</summary>"
         + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico 2013–2018 archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
         + "<div class='tabla-scroll' style='max-height:240px; overflow-y:auto;'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Saldo Ant.</th><th>Procedencia</th><th style='text-align:center;'>Acción</th></tr>"
@@ -188,7 +188,7 @@
     window.__lotesIatf = (d.iatf && d.iatf.lotes) || [];
     window.__evaluacionInseminadores = d.evaluacion_inseminadores || [];
 
-    // 🧬 Sincronizaciones IATF (Inseminación Artificial a Tiempo Fijo)
+    // Sincronizaciones IATF (Inseminación Artificial a Tiempo Fijo)
     var iatf = d.iatf || {};
     var lotesIatf = iatf.lotes || [];
     var metricasIatf = iatf.metricas || {};
@@ -200,9 +200,9 @@
       + "</div>"
       + "<div style='display:flex; gap:6px; flex-wrap:wrap;'>"
       + "<button type='button' class='tema-btn' id='btn-ver-protocolos-iatf' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; border:1px solid var(--borde-fuerte); background:var(--superficie-elevada); color:var(--texto);'>"
-      + icon("clipboard", 13) + "📖 Protocolos & Marcas</button>"
+      + icon("clipboard", 13) + "Protocolos & Marcas</button>"
       + "<button type='button' class='tema-btn' id='btn-nuevo-lote-iatf' style='font-size:11.5px; padding:5px 10px; background:#0284c7; color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px;'>"
-      + icon("plus", 13) + "➕ Iniciar Lote IATF</button>"
+      + icon("plus", 13) + "Iniciar Lote IATF</button>"
       + "</div>"
       + "</div>"
       + "<div class='kpis' style='margin-bottom:12px;'>"
@@ -232,7 +232,7 @@
           var esActual = idx === lote.paso_actual && lote.estado === "EN_CURSO";
           var bdrColor = yaPaso ? "var(--verde-marca, #16a34a)" : (esActual ? "#0284c7" : "var(--borde)");
           var bgStep = yaPaso ? "rgba(22,163,74,0.08)" : (esActual ? "rgba(2,132,199,0.1)" : "var(--superficie)");
-          var iconStep = yaPaso ? "✅" : (esActual ? "👉" : "⏳");
+          var iconStep = yaPaso ? icon("checkCircle", 12) : (esActual ? icon("arrowRight", 12) : icon("hourglass", 12));
 
           stepperHtml += "<div style='flex:1; min-width:130px; border:1px solid " + bdrColor + "; background:" + bgStep + "; border-radius:6px; padding:6px 8px; font-size:11px;'>"
             + "<div style='font-weight:700; color:var(--texto); display:flex; justify-content:space-between;'>"
@@ -247,15 +247,15 @@
         if (lote.estado === "EN_CURSO") {
           if (lote.paso_actual < 2) {
             btnsAccion += "<button type='button' class='tema-btn btn-paso-iatf' data-lote-id='" + lote.id + "' data-paso-idx='" + lote.paso_actual + "' style='font-size:11.5px; padding:4px 9px; background:#0284c7; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:600;'>"
-              + "💊 Registrar Dosis / Fármaco</button>";
+              + icon("pill", 14) + "Registrar Dosis / Fármaco</button>";
           }
           if (lote.paso_actual === 2 || lote.paso_actual === 1) {
             btnsAccion += "<button type='button' class='tema-btn btn-inseminar-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; background:var(--verde-marca); color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:700;'>"
-              + "🧬 Inseminar Lote Completo (1-Toque)</button>";
+              + icon("dna", 14) + "Inseminar Lote Completo (1-Toque)</button>";
           }
         }
         btnsAccion += "<button type='button' class='tema-btn btn-detalle-lote-iatf' data-lote-id='" + lote.id + "' style='font-size:11.5px; padding:4px 9px; border:1px solid var(--borde-fuerte); border-radius:5px; cursor:pointer; background:var(--superficie); color:var(--texto);'>"
-          + "📋 Ver Hembras (" + (lote.animales_activos || lote.total_animales) + ")</button>";
+          + icon("clipboard", 14) + "Ver Hembras (" + (lote.animales_activos || lote.total_animales) + ")</button>";
         btnsAccion += "</div>";
 
         h += "<div style='border:1px solid var(--borde); background:var(--superficie-elevada, rgba(0,0,0,0.02)); border-radius:8px; padding:12px 14px;'>"
@@ -276,7 +276,7 @@
       });
       h += "</div>";
     } else {
-      h += vacio("No hay lotes IATF en curso. Use «➕ Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
+      h += vacio("No hay lotes IATF en curso. Use «Iniciar Lote IATF» para programar sincronizaciones hormonales en novillas o vacas.");
     }
     h += "</div>";
 
@@ -292,7 +292,7 @@
       ], "Sin palpaciones registradas en el último año.")
       + "</div>";
 
-    // 🏆 Evaluación y Efectividad de Inseminadores
+    // Evaluación y Efectividad de Inseminadores
     var insems = d.evaluacion_inseminadores || [];
 
     h += "<div class='card' style='padding:16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid #8b5cf6;'>"
@@ -301,7 +301,7 @@
       + icon("chartBar", 16) + "Evaluación & Efectividad de Inseminadores"
       + "</div>"
       + "<button type='button' class='tema-btn' id='btn-nuevo-inseminador' style='font-size:11.5px; padding:5px 10px; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; background:var(--superficie-elevada, #f3f4f6); color:var(--texto); border:1px solid var(--borde-fuerte);'>"
-      + icon("userPlus", 13) + "➕ Nuevo Inseminador</button>"
+      + icon("userPlus", 13) + "Nuevo Inseminador</button>"
       + "</div>"
       + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>"
       + "Monitoreo zootécnico del desempeño por técnico: tasa de concepción y servicios requeridos por preñez."
@@ -326,7 +326,7 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay inseminadores registrados. Use el botón «➕ Nuevo Inseminador» para darlos de alta o registre servicios por IA.");
+      h += vacio("No hay inseminadores registrados. Use el botón «Nuevo Inseminador» para darlos de alta o registre servicios por IA.");
     }
     h += "</div>";
 
@@ -339,7 +339,7 @@
         + "<div>"
         + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad</div>"
         + "<div style='font-size:28px; font-weight:800; color:" + semColor + "; line-height:1.2; margin:4px 0;'>"
-        + (ifInfo.semaforo || "🟢") + " " + ifInfo.indice_pct + "%"
+        + (ifInfo.semaforo || dot("verde")) + " " + ifInfo.indice_pct + "%"
         + "</div>"
         + "<div style='font-size:13px; font-weight:600; color:var(--texto);'>" + esc(ifInfo.diagnostico || "Eficiencia reproductiva") + "</div>"
         + "</div>"
@@ -372,13 +372,13 @@
     // pérdidas y vacas reincidentes que el mayordomo debe vigilar.
     if (pm && (pm.perdidas || pm.distocias)) {
       h += "<div class='card' style='padding:14px 16px; margin-bottom:14px; background:var(--superficie); border-left:5px solid var(--color-rojo-txt, #dc2626);'>"
-        + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>⚠️ Pérdidas gestacionales y partos difíciles</div>"
+        + "<div style='font-size:14px; font-weight:700; margin-bottom:6px;'>" + icon("alertTriangle", 16) + "Pérdidas gestacionales y partos difíciles</div>"
         + "<div style='font-size:12.5px; color:var(--texto-suave); margin-bottom:8px;'>"
         + esc(pm.partos || 0) + " partos · " + esc(pm.perdidas || 0) + " pérdidas (" + esc(pm.tasa_perdida_pct || 0) + "%) · "
         + esc(pm.distocias || 0) + " difíciles (" + esc(pm.tasa_distocia_pct || 0) + "%) · "
         + esc(pm.crias_muertas_parto || 0) + " crías muertas al nacer</div>";
       if (pm.reincidentes && pm.reincidentes.length) {
-        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>🔁 Vacas reincidentes (≥2 pérdidas):</div>"
+        h += "<div style='font-size:12.5px; font-weight:700; margin-bottom:4px;'>" + icon("refresh", 14) + "Vacas reincidentes (≥2 pérdidas):</div>"
           + "<div style='display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;'>"
           + pm.reincidentes.map(function (r) {
             return "<a href='#' class='ficha-link chip rojo' data-ir-ficha='" + esc(r.vaca) + "' style='font-size:12px; padding:3px 8px; font-weight:bold; text-decoration:none;'>" + esc(r.vaca) + " ×" + esc(r.perdidas) + "</a>";
@@ -446,7 +446,7 @@
         ["fecha", "Fecha"],
         ["resultado", "Resultado", "text", function (v) { return chipEstado(v); }],
         ["dias_gestacion", "Días gest.", "text", function (v) { return v ? (v + " d") : "—"; }],
-        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFIA" ? "<span class='chip azul' style='font-size:11px;'>📡 Ecografía</span>" : "<span class='chip gris' style='font-size:11px;'>✋ Tacto</span>"; }],
+        ["metodo", "Método", "text", function (v) { return v === "ECOGRAFIA" ? "<span class='chip azul' style='font-size:11px;'>" + icon("satellite", 12) + "Ecografía</span>" : "<span class='chip gris' style='font-size:11px;'>" + icon("hand", 12) + "Tacto</span>"; }],
         ["hallazgo", "Hallazgo / Notas", "text", function (v, r) {
           var hTxt = v || (r && r.detalle) || "—";
           var toro = (r && r.toro_pajuela) ? ("<br><small style='color:var(--verde-marca); font-weight:600;'>Toro: " + esc(r.toro_pajuela) + "</small>") : "";
@@ -467,7 +467,7 @@
         ["tag", "Animal"], ["fecha", "Fecha"],
         ["valor", "Condición CC", "text", function (v) { return "<span class='chip rojo'>" + esc(v) + "</span>"; }],
         ["notas", "Observaciones"]
-      ], "Ningún animal con condición corporal crítica registrada. 🎉");
+      ], "Ningún animal con condición corporal crítica registrada.");
 
     // --- Gaps estilo Software Ganadero (menú Reproducción) ---
     var debieron = d.debieron_parir || [];
@@ -478,7 +478,7 @@
         ["toro_pajilla", "Toro / Pajilla"],
         ["fep_calculada", "FEP", "text", function (v) { return "<b>" + esc(fechaCorta(v)) + "</b>"; }],
         ["dias_atraso", "Atraso", "text", function (v) { return "<span class='chip rojo'><b>" + esc(v) + " d</b></span>"; }]
-      ], "Ninguna vaca con FEP vencida sin parto registrado. 🎉");
+      ], "Ninguna vaca con FEP vencida sin parto registrado.");
 
     var sinProg = d.sin_programar || [];
     h += "<h4>" + icon("calendar") + "Hembras sin programar (abiertas &gt; 60 días)</h4>"
@@ -487,7 +487,7 @@
         ["nombre", "Nombre"],
         ["ultimo_parto", "Último parto", "text", function (v) { return esc(fechaCorta(v)); }],
         ["dias_abiertos", "Días abiertos", "text", function (v) { return "<span class='chip " + (v > 150 ? "rojo" : "ambar") + "'><b>" + esc(v) + " d</b></span>"; }]
-      ], "Todas las vacas abiertas están programadas o dentro del periodo voluntario. 🎉");
+      ], "Todas las vacas abiertas están programadas o dentro del periodo voluntario.");
 
     var celosProx = d.proyeccion_celos || [];
     h += "<h4>" + icon("flame") + "Proyección de celos (próximos 30 días)</h4>"
@@ -570,10 +570,10 @@
       + "<div style='font-size:14px; font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:6px;'>" + icon("scale", 16) + "Agenda de pesaje</div>"
       + "<p class='aviso' style='margin:0 0 8px;'>Frecuencia: crías &lt;8 m cada 30 d · levantes 8-18 m cada 60 d · adultos &gt;18 m cada 90 d.</p>";
     if (!aPesar.length) {
-      h += vacio("Ningún animal activo tiene su pesaje vencido. 🎉");
+      h += vacio("Ningún animal activo tiene su pesaje vencido.");
     } else {
       if (nActivos && aPesar.length >= nActivos * 0.9) {
-        h += "<p class='aviso' style='margin:0 0 10px;'>⚠️ Casi todo el hato (" + esc(aPesar.length) + " de " + esc(nActivos)
+        h += "<p class='aviso' style='margin:0 0 10px;'>" + icon("alertTriangle", 14) + "Casi todo el hato (" + esc(aPesar.length) + " de " + esc(nActivos)
           + ") está sin pesaje reciente. Conviene empezar por las crías y los levantes, que son los que más cambian de peso.</p>";
       }
       var cont = { cat: {}, est: { NUNCA: 0, VENCIDO: 0 } };
@@ -771,7 +771,7 @@
       + "</form></div>";
     h += renderListaTrabajo(d.tareas, ltClaves("sanidad"), "Lista de trabajo · Sanidad");
     h += "<h4>" + icon("alert") + "Retiros activos (leche / carne)</h4>";
-    if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro. 🎉"); }
+    if (!d.retiros || !d.retiros.length) { h += vacio("Ningún animal en retiro."); }
     else {
       h += "<div class='tabla-scroll'><table><tr><th>Animal</th><th>Producto</th><th>Fin leche</th><th>Fin carne</th></tr>";
       h += d.retiros.map(function (r) {
@@ -811,11 +811,11 @@
         var via = ((document.getElementById("san-via") || {}).value || "").trim() || null;
         var rLeche = parseInt((document.getElementById("san-ret-leche") || {}).value || 0, 10) || 0;
         var rCarne = parseInt((document.getElementById("san-ret-carne") || {}).value || 0, 10) || 0;
-        if (!tag) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el arete del animal.</span>"; return; }
-        if (!producto) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba el producto aplicado.</span>"; return; }
-        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha.</span>"; return; }
+        if (!tag) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba el arete del animal.</span>"; return; }
+        if (!producto) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba el producto aplicado.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Elija la fecha.</span>"; return; }
         if (btn) btn.disabled = true;
-        if (fb) fb.textContent = "⏳ Guardando...";
+        if (fb) fb.textContent = "Guardando...";
         fetch("/api/sanidad/tratamiento", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -824,7 +824,7 @@
           .then(function (out) {
             if (btn) btn.disabled = false;
             if (!out.ok || !out.j.ok) {
-              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
               return;
             }
             mostrarToast("Tratamiento guardado", "verde");
@@ -833,7 +833,7 @@
             actualizarBadges();
           }).catch(function (err) {
             if (btn) btn.disabled = false;
-            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }

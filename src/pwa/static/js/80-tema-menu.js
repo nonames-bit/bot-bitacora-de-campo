@@ -220,7 +220,7 @@
           if (res.ok && res.d && res.d.ok) {
             try { localStorage.setItem("ja_huella_preferida", "1"); } catch (e) {}
             actualizarHuellaMenu();
-            alert("✅ Huella activada. La próxima vez puede entrar tocando 'Ingresar con huella'.");
+            alert("Huella activada. La próxima vez puede entrar tocando 'Ingresar con huella'.");
           } else {
             alert((res.d && res.d.error) || "No se pudo activar la huella.");
           }

@@ -99,9 +99,9 @@
                   // Solo se confirma "activadas" si quedó una suscripción real:
                   // antes salía el aviso aunque el servidor no pudiera enviar nada.
                   if (real) {
-                    mostrarToast("✓ Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
+                    mostrarToast("Avisos activados en este celular. Toque «Probar» para confirmar con la app cerrada.", "verde");
                   } else {
-                    mostrarToast("⚠️ Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
+                    mostrarToast("Solo habrá avisos con la app abierta: el servidor no tiene llaves de notificación (VAPID).", "ambar");
                   }
                 });
             }
@@ -136,11 +136,11 @@
   }
 
   function textoEstadoAvisos(est) {
-    if (!est.soporta) return "<span style='color:var(--texto-suave);'>❌ Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
-    if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
-    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
-    if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
-    return "<span style='color:var(--verde-marca); font-weight:600;'>✅ Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
+    if (!est.soporta) return "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Este navegador no permite avisos. En Android use Chrome con la app instalada.</span>";
+    if (est.permiso === "denied") return "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Bloqueados en este celular.</span> Toque el candado junto a la dirección → Permisos → Notificaciones → Permitir.";
+    if (!est.servidor_listo) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "El servidor no puede enviar avisos</span> (faltan las llaves VAPID). Solo se verán con la app abierta.";
+    if (est.permiso !== "granted" || !est.suscrito) return "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Este celular no está suscrito.</span> Toque «Activar» para recibir partos, retiros y alertas con la app cerrada.";
+    return "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Activos en este celular.</span> Llegan con la app cerrada: resumen a las 6:30 a. m. y avisos urgentes (partos, retiros, servidor).";
   }
 
   // Tablero: si este celular no recibe avisos con la app cerrada, lo dice
@@ -159,7 +159,7 @@
       div.className = "card";
       div.style.cssText = "border-left:4px solid var(--color-ambar-txt, #D97706); padding:12px 14px;";
       var puedeActivar = est.permiso !== "denied" && est.servidor_listo;
-      div.innerHTML = "<b>🔔 Avisos al celular</b><p style='margin:6px 0 8px; font-size:13px;'>" + textoEstadoAvisos(est) + "</p>"
+      div.innerHTML = "<b>" + icon("bell", 16) + "Avisos al celular</b><p style='margin:6px 0 8px; font-size:13px;'>" + textoEstadoAvisos(est) + "</p>"
         + "<div style='display:flex; gap:8px; flex-wrap:wrap;'>"
         + (puedeActivar ? "<button type='button' class='tema-btn' id='btn-banner-activar-avisos'>Activar avisos</button>" : "")
         + "<button type='button' class='tema-btn' id='btn-banner-ocultar-avisos' style='background:var(--bg-suave); color:var(--texto-base);'>Ahora no</button></div>";
@@ -258,14 +258,14 @@
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
         var prioridad = (document.getElementById("ag-prioridad") || {}).value || "NORMAL";
 
-        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Escriba qué hay que hacer.</span>"; return; }
-        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>⚠️ Elija la fecha de la tarea.</span>"; return; }
+        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("alertTriangle", 14) + "Elija la fecha de la tarea.</span>"; return; }
 
         var prefix = (objTipo === "animal" && tag.trim()) ? (tag.trim() + ": ") : ((objTipo === "potrero" && pot.trim()) ? (pot.trim() + ": ") : "");
         var mensajeFinal = prefix + desc;
 
         if (btn) btn.disabled = true;
-        if (fb) fb.textContent = "⏳ Guardando tarea...";
+        if (fb) fb.textContent = "Guardando tarea...";
         fetch("/api/agenda/recordatorio", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -284,16 +284,16 @@
           .then(function (out) {
             if (btn) btn.disabled = false;
             if (!out.ok || !out.j.ok) {
-              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo guardar.") + "</span>";
               return;
             }
-            mostrarToast("Tarea asignada y agendada ✓", "verde");
+            mostrarToast("Tarea asignada y agendada", "verde");
             vibrarConfirmacion();
             cargar(true);
             actualizarBadges();
           }).catch(function (err) {
             if (btn) btn.disabled = false;
-            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Sin conexión: " + esc(err.message || err) + "</span>";
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -383,7 +383,7 @@
         if (inpAckId) inpAckId.value = rid;
         if (txtAckInfo) {
           var asigInfo = asig ? ("<br><small style='color:var(--texto-suave);'>Asignado a: <b>" + esc(asig) + "</b></small>") : "";
-          txtAckInfo.innerHTML = "<b>📌 " + esc(msg) + "</b>" + asigInfo;
+          txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
@@ -400,7 +400,7 @@
         var btnConf = document.getElementById("btn-confirmar-ack");
         var fbAck = document.getElementById("ack-feedback");
         if (btnConf) btnConf.disabled = true;
-        if (fbAck) fbAck.textContent = "⏳ Registrando cumplimiento...";
+        if (fbAck) fbAck.textContent = "Registrando cumplimiento...";
         var payloadAck = {
           notas: (inpAckNotas && inpAckNotas.value || "").trim(),
           completado_por: (inpAckPor && inpAckPor.value || "").trim(),
@@ -415,16 +415,16 @@
             if (btnConf) btnConf.disabled = false;
             if (res && res.ok) {
               cerrarModalAck();
-              mostrarToast("¡Tarea marcada como realizada ✓!", "verde");
+              mostrarToast("¡Tarea marcada como realizada!", "verde");
               vibrarConfirmacion();
               cargar(true);
               actualizarBadges();
             } else {
-              if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ " + esc((res && res.error) || "Error al completar.") + "</span>";
+              if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + esc((res && res.error) || "Error al completar.") + "</span>";
             }
           }).catch(function (err) {
             if (btnConf) btnConf.disabled = false;
-            if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>❌ Error de conexión: " + esc(err.message || err) + "</span>";
+            if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Error de conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -443,19 +443,19 @@
       });
       return;
       if (!("Notification" in window)) {
-        estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>❌ Tu navegador no soporta notificaciones nativas.</span>";
+        estadoEl.innerHTML = "<span style='color:var(--texto-suave);'>" + icon("xCircle", 14) + "Tu navegador no soporta notificaciones nativas.</span>";
         if (btnActivar) btnActivar.style.display = "none";
         if (btnProbar) btnProbar.style.display = "none";
         return;
       }
       if (Notification.permission === "granted") {
-        estadoEl.innerHTML = "<span style='color:var(--verde-marca); font-weight:600;'>✅ Notificaciones activas en este dispositivo.</span> Recibirás alertas de retiros de carne/leche, celos AM-PM, termo criogénico y Voisin.";
+        estadoEl.innerHTML = "<span style='color:var(--verde-marca); font-weight:600;'>" + icon("checkCircle", 14) + "Notificaciones activas en este dispositivo.</span> Recibirás alertas de retiros de carne/leche, celos AM-PM, termo criogénico y Voisin.";
         if (btnActivar) btnActivar.textContent = "Re-sincronizar";
       } else if (Notification.permission === "denied") {
-        estadoEl.innerHTML = "<span style='color:var(--rojo-alerta); font-weight:600;'>🚫 Notificaciones bloqueadas.</span> Habilita los permisos en la barra de direcciones o ajustes del navegador.";
+        estadoEl.innerHTML = "<span style='color:var(--rojo-alerta); font-weight:600;'>" + icon("ban", 14) + "Notificaciones bloqueadas.</span> Habilita los permisos en la barra de direcciones o ajustes del navegador.";
         if (btnActivar) btnActivar.disabled = true;
       } else {
-        estadoEl.innerHTML = "<span style='color:var(--ambar-alerta); font-weight:600;'>⚠️ Desactivadas.</span> Actívalas para recibir alertas de retiros sanitarios, celos e inventario crítico.";
+        estadoEl.innerHTML = "<span style='color:var(--ambar-alerta); font-weight:600;'>" + icon("alertTriangle", 14) + "Desactivadas.</span> Actívalas para recibir alertas de retiros sanitarios, celos e inventario crítico.";
         if (btnActivar) btnActivar.disabled = false;
       }
     }
@@ -492,13 +492,13 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           if (res && res.ok) {
-            mostrarToast("✓ Enviada a " + res.enviados + " dispositivo(s). Debe llegar en segundos; cierre la app para comprobarlo.", "verde");
+            mostrarToast("Enviada a " + res.enviados + " dispositivo(s). Debe llegar en segundos; cierre la app para comprobarlo.", "verde");
           } else if (res && res.motivo === "sin_suscripcion") {
-            mostrarToast("⚠️ Este celular no está suscrito: toque «Activar».", "ambar");
+            mostrarToast("Este celular no está suscrito: toque «Activar».", "ambar");
           } else if (res && res.motivo === "servidor_sin_llaves") {
-            mostrarToast("⚠️ El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
+            mostrarToast("El servidor no tiene llaves VAPID: no puede enviar avisos.", "ambar");
           } else {
-            mostrarToast("❌ No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
+            mostrarToast("No se pudo enviar (" + ((res && res.fallidos) || 0) + " fallidos). Toque «Re-sincronizar» y pruebe de nuevo.", "rojo");
           }
           actualizarTextoEstado();
         })

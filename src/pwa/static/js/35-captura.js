@@ -187,13 +187,13 @@
       h += "<label>Arete / Vaca: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Tipo de Servicio: <select id='cap-tipo-serv' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='IA'>Inseminación Artificial (I.A.)</option><option value='MN'>Monta Natural</option><option value='IATF'>IATF Protocolo</option></select></label>"
         + "<label>Código Toro / Pajilla: <input id='cap-toro' placeholder='ej. GUZ-01' list='dl-toros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;'>➕</button></div><datalist id='dl-inseminadores'></datalist></label>";
+        + "<label>Inseminador / Técnico: <div style='display:flex; gap:6px; align-items:center;'><input id='cap-inseminador' placeholder='Nombre del técnico' list='dl-inseminadores' style='flex:1; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><button type='button' id='btn-nuevo-inseminador-cap' title='Registrar nuevo inseminador' style='padding:8px 10px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto); cursor:pointer;' aria-label='Registrar nuevo inseminador'>" + icon("plus", 14) + "</button></div><datalist id='dl-inseminadores'></datalist></label>";
     } else if (tipo === "leche") {
       h += "<label>Litros del Día (Entregados al Tanque / Acopiador): <input type='number' step='0.5' id='cap-litros' placeholder='ej. 320' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>💡 Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
+        + "<p class='aviso' style='margin:2px 0 6px 0; font-size:11.5px;'>" + icon("lightbulb", 14) + "Si tienes la foto del recibo o planilla de quincena, sube la foto abajo y presiona <b>Leer Recibo con IA</b> para digitalizar y guardar cada día automáticamente.</p>"
         + "<label>Observaciones / Detalle: <input id='cap-notas' placeholder='ej. Ordeño del día, control tanque, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "venta") {
-      h += "<div class='aviso' style='margin:2px 0 8px; font-size:12px;'>💰 <b>Venta de Animal:</b> El semoviente pasa automáticamente a estado <b>VENDIDO</b> (sale del inventario activo) y el monto se registra como ingreso en Finanzas.</div>"
+      h += "<div class='aviso' style='margin:2px 0 8px; font-size:12px;'>" + icon("banknote", 14) + "<b>Venta de Animal:</b> El semoviente pasa automáticamente a estado <b>VENDIDO</b> (sale del inventario activo) y el monto se registra como ingreso en Finanzas.</div>"
         + "<label>Arete / Tag del animal vendido: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Comprador / Destino: <input id='cap-venta-comprador' placeholder='ej. Frigorífico del Llano, Finca San José, Subasta' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
@@ -210,11 +210,11 @@
         + "<label>Observaciones: <input id='cap-notas' placeholder='Detalles o destino' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "gasto") {
       h += "<label>Categoría: <select id='cap-fin-categoria' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<optgroup label='💰 Ingresos'>"
+        + "<optgroup label='Ingresos'>"
         + "<option value='VENTA_LECHE'>Venta de leche</option>"
         + "<option value='OTRO_INGRESO'>Otro ingreso</option>"
         + "</optgroup>"
-        + "<optgroup label='💸 Egresos'>"
+        + "<optgroup label='Egresos'>"
         + "<option value='INSUMO' selected>Insumos (sal, alambre, herramienta, etc.)</option>"
         + "<option value='NOMINA'>Nómina / Jornales</option>"
         + "<option value='VETERINARIO'>Veterinario / Medicamentos</option>"
@@ -263,7 +263,7 @@
         + "<label>Procedencia / Casa Genética: <input id='cap-paj-procedencia' placeholder='ej. Ciale, Semex, Ganadería El Oasis' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Notas adicionales: <input id='cap-notas' placeholder='ej. Registro Asocebú 89123' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "nitrogeno") {
-      h += "<div class='aviso' style='margin:2px 0 8px;'>❄️ Registro de recarga de nitrógeno líquido en termo criogénico para mantener la viabilidad del semen.</div>"
+      h += "<div class='aviso' style='margin:2px 0 8px;'>" + icon("snowflake", 14) + "Registro de recarga de nitrógeno líquido en termo criogénico para mantener la viabilidad del semen.</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Intervalo de autonomía (días estimados): <input type='number' min='1' max='90' id='cap-nitr-intervalo' value='21' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Próxima recarga calculada: <input type='date' id='cap-nitr-prox' readonly style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--fondo-card); font-weight:700;'></label></div>"
@@ -371,9 +371,9 @@
 
     if (tipo === "tarea") {
       h += "<div style='display:flex; gap:8px; margin-bottom:10px;'>"
-        + "<button type='button' class='tema-btn cap-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>🐄 Animal</button>"
-        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>🌿 Potrero</button>"
-        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>📋 General</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='potrero' style='flex:1; padding:8px; font-size:13px;'>" + icon("leaf", 14) + "Potrero</button>"
+        + "<button type='button' class='tema-btn cap-obj-btn' data-obj='general' style='flex:1; padding:8px; font-size:13px;'>" + icon("clipboard", 14) + "General</button>"
         + "</div>"
         + "<input type='hidden' id='cap-tarea-obj' value='animal'>"
         + "<div id='cap-wrap-obj-animal'>"
@@ -384,13 +384,13 @@
         + "</div>"
         + "<label style='margin-top:6px;'>Tipo de Acción / Tarea: "
         + "<select id='cap-tarea-tipo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'>"
-        + "<option value='MEDICAMENTO'>💉 Aplicar medicamento / Tratamiento</option>"
-        + "<option value='FUMIGAR'>🌿 Fumigar maleza / Potrero</option>"
-        + "<option value='REVISION'>🔍 Revisión veterinaria / Chequeo</option>"
-        + "<option value='TRASLADO'>🚚 Traslado de potrero</option>"
-        + "<option value='CERCA'>⚡ Arreglar cerca / Mantenimiento</option>"
-        + "<option value='PESAJE'>⚖️ Pesaje de control</option>"
-        + "<option value='OTRO'>📋 Otra tarea / General</option>"
+        + "<option value='MEDICAMENTO'>Aplicar medicamento / Tratamiento</option>"
+        + "<option value='FUMIGAR'>Fumigar maleza / Potrero</option>"
+        + "<option value='REVISION'>Revisión veterinaria / Chequeo</option>"
+        + "<option value='TRASLADO'>Traslado de potrero</option>"
+        + "<option value='CERCA'>Arreglar cerca / Mantenimiento</option>"
+        + "<option value='PESAJE'>Pesaje de control</option>"
+        + "<option value='OTRO'>Otra tarea / General</option>"
         + "</select></label>"
         + "<label style='margin-top:6px;'>Indicación / Descripción de la tarea: <input id='cap-tarea-desc' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar borde cerca' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label style='margin-top:6px;'>Adjudicar / Asignar a: "
@@ -402,7 +402,7 @@
         + "<option value='Trabajador'></option>"
         + "</datalist></label>"
         + "<div style='display:flex; gap:10px; margin-top:6px;'>"
-        + "<div style='flex:1;'><label>Prioridad: <select id='cap-tarea-prioridad' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NORMAL'>Normal</option><option value='URGENTE'>🚨 Urgente</option></select></label></div>"
+        + "<div style='flex:1;'><label>Prioridad: <select id='cap-tarea-prioridad' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='NORMAL'>Normal</option><option value='URGENTE'>Urgente</option></select></label></div>"
         + "<div style='flex:1;'><label>Hora límite (opc): <input type='time' id='cap-tarea-hora' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>";
     }

@@ -16,7 +16,7 @@
     }
     var simple = modoPasturasEsSimple();
     var btnModo = "<button type='button' id='btn-toggle-modo-pasturas' class='tema-btn' style='font-size:12px; padding:5px 12px; margin-left:8px;'>"
-      + (simple ? "🔬 Ver técnico" : "😊 Ver simple") + "</button>";
+      + (simple ? icon("stethoscope", 14) + "Ver técnico" : "Ver simple") + "</button>";
     var h = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px;'>" + icon("grass", 22) + "Pasturas (Voisin & Aforos)" + btnModo + "</h3>"
       + barraDescargaSeccion("pasturas", "Pasturas")
@@ -46,7 +46,7 @@
           + "</div>";
       }
       if (pron.desactualizado_horas != null) {
-        h += "<p class='aviso'>⚠️ Datos del pronóstico de hace " + Math.round(pron.desactualizado_horas) + " h (sin conexión a Open-Meteo en la última actualización).</p>";
+        h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Datos del pronóstico de hace " + Math.round(pron.desactualizado_horas) + " h (sin conexión a Open-Meteo en la última actualización).</p>";
       }
     }
 
@@ -85,9 +85,9 @@
     var tieneSat = sat.total_potreros > 0;
 
     var btnSyncSar = "<button type='button' class='tema-btn btn-satelite-sar' id='btn-sync-satelite-sar'>"
-      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (con nubes)" : "📡 Radar SAR (Todo Clima)") + "</button>";
+      + icon("sparkles", 13) + (simple ? "Actualizar (con nubes)" : "Radar SAR (Todo Clima)") + "</button>";
     var btnSyncAuto = "<button type='button' class='tema-btn' id='btn-sync-satelite-auto' style='font-size:12px; padding:6px 12px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; box-shadow:0 2px 4px rgba(0,0,0,0.15);'>"
-      + icon("sparkles", 13) + (simple ? "🔄 Actualizar (rápido)" : "⚡ Auto (S2 + S1)") + "</button>";
+      + icon("sparkles", 13) + (simple ? "Actualizar (rápido)" : "Auto (S2 + S1)") + "</button>";
 
     h += "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin:18px 0 10px;'>"
       + "<h4 style='margin:0;'>" + icon("chartLine") + (simple ? "Estado del Pasto (satélite)" : "Monitoreo Satelital (Radar SAR Sentinel-1 & Óptico S2)") + "</h4>"
@@ -118,7 +118,7 @@
     if (!simple) {
       h += "<div class='card' style='padding:10px 14px; margin-bottom:14px; background:rgba(30, 60, 114, 0.05); border-left:4px solid #2a5298;'>"
         + "<div style='font-size:12.5px; line-height:1.45; color:var(--texto-color);'>"
-        + "<b>📡 Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
+        + "<b>" + icon("satellite", 14) + "Monitoreo Radar SAR Sentinel-1 (C-band 10m):</b> En época de lluvias, la nubosidad bloquea el sensor óptico Sentinel-2. "
         + "El radar SAR emite microondas que penetran nubes, lluvia y neblina, calculando el índice dual de vegetación (RVI) y biomasa estimada sin perder continuidad temporal."
         + "</div></div>";
     }
@@ -137,9 +137,9 @@
 
     // 1. Selector de Pestañas de Gráficos (evita apilar 3 gráficos verticales gigantes)
     var graficosPasturas = [
-      { id: "mapa_potreros", nom: "🗺️ Mapa Potreros (Voisin)", desc: "Distribución satelital y rotación" },
-      { id: "ocupacion", nom: "📊 Ocupación y Carga", desc: "Carga animal por potrero" },
-      { id: "aforo", nom: "🌾 Aforos y Forraje", desc: "Disponibilidad de forraje verde" }
+      { id: "mapa_potreros", nom: icon("map", 12) + "Mapa Potreros (Voisin)", desc: "Distribución satelital y rotación" },
+      { id: "ocupacion", nom: icon("chartBar", 12) + "Ocupación y Carga", desc: "Carga animal por potrero" },
+      { id: "aforo", nom: icon("grass", 12) + "Aforos y Forraje", desc: "Disponibilidad de forraje verde" }
     ];
     h += "<div class='card' style='padding:12px; margin:14px 0 10px; background:var(--superficie); border-left:4px solid var(--verde-marca);'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;'>"
@@ -172,12 +172,12 @@
       h += vacio("Sin potreros con geometría registrada.");
     } else {
       function iconoPastoVoisin(dias) {
-        if (dias == null) return "⚪ ";
+        if (dias == null) return dot("gris") + " ";
         var num = Number(dias);
-        if (num < 12) return "<span title='Rebrote tierno (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌱</span>";
-        if (num <= 24) return "<span title='En desarrollo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌿</span>";
-        if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>🌾</span>";
-        return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>🍂</span>";
+        if (num < 12) return "<span title='Rebrote tierno (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("sprout", 14) + "</span>";
+        if (num <= 24) return "<span title='En desarrollo (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("leaf", 14) + "</span>";
+        if (num <= 45) return "<span title='Punto óptimo Voisin (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("grass", 14) + "</span>";
+        return "<span title='Pasado de reposo (" + num + " d)' style='font-size:14px; margin-right:4px;'>" + icon("leaf", 14) + "</span>";
       }
 
       h += "<div class='tabla-scroll'><table>"
@@ -199,7 +199,7 @@
         var haTxt = p.area_has != null ? (!isNaN(Number(p.area_has)) ? Number(p.area_has).toFixed(1) : p.area_has) + " ha" : "";
 
         var tiempoTxt = nAnim > 0
-          ? "<span style='font-weight:700; color:var(--verde-marca);'>⏳ Ocupado " + (p.dias_ocupacion != null ? p.dias_ocupacion + "d" : "activo") + "</span>"
+          ? "<span style='font-weight:700; color:var(--verde-marca);'>" + icon("hourglass", 14) + "Ocupado " + (p.dias_ocupacion != null ? p.dias_ocupacion + "d" : "activo") + "</span>"
           : (iconoPastoVoisin(p.dias_reposo) + "<span style='color:var(--texto);'>Reposo " + (p.dias_reposo != null ? p.dias_reposo + "d" : "—") + "</span>");
 
         var animCol = nAnim > 0
@@ -260,7 +260,7 @@
     });
     h += "<div class='card' style='padding:12px 14px; margin-top:14px; border-left:4px solid var(--verde-marca);'>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;'>"
-      + "<div><b>🌱 Checklist de Ronda Voisin</b><div style='font-size:12px; color:var(--texto-suave);'>10-15 puntos de aforo por potrero → días de forraje + semáforo</div></div>"
+      + "<div><b>" + icon("sprout", 16) + "Checklist de Ronda Voisin</b><div style='font-size:12px; color:var(--texto-suave);'>10-15 puntos de aforo por potrero → días de forraje + semáforo</div></div>"
       + "<button type='button' class='tema-btn' id='btn-nueva-ronda' style='background:var(--verde-marca); color:#fff; font-weight:700; border:none; border-radius:6px; padding:8px 14px; cursor:pointer;'>+ Nueva Ronda Voisin</button>"
       + "</div><div id='rondas-recientes' style='margin-top:8px; font-size:12.5px;'></div></div>";
     return h;
@@ -274,7 +274,7 @@
     }).join("");
     var html = "<div id='ronda-voisin-modal' class='modal-overlay'>"
       + "<div class='modal-contenido' style='max-width:520px;'>"
-      + "<div class='modal-header'><b>🌱 Nueva Ronda Voisin</b><button type='button' class='modal-cerrar' id='btn-cerrar-ronda'>✕</button></div>"
+      + "<div class='modal-header'><b>" + icon("sprout", 16) + "Nueva Ronda Voisin</b><button type='button' class='modal-cerrar' id='btn-cerrar-ronda' aria-label='Cerrar'>" + icon("xmark", 16) + "</button></div>"
       + "<div style='padding:14px 16px; display:flex; flex-direction:column; gap:10px; overflow-y:auto;'>"
       + "<label style='font-size:13px;'><b>1. Potrero</b><br><select id='rv-potrero' class='ronda-campo' style='width:100%; margin-top:4px;'>" + opts + "</select></label>"
       + "<label style='font-size:13px;'><b>2. Nº de animales en pastoreo</b><br><input id='rv-num-animales' class='ronda-campo' type='number' min='1' value='1' style='width:100%; margin-top:4px;'></label>"
@@ -317,10 +317,10 @@
       var vals = txt.split(/[,;\s]+/).map(function (x) { return parseFloat(x); }).filter(isFinite);
       // El trabajador anota en gramos (ej. 450); la API espera kg MV/m².
       vals = vals.map(function (v) { return v > 10 ? v / 1000 : v; });
-      if (!vals.length) { res.innerHTML = "<p class='aviso'>⚠️ Ingresa al menos una medición válida.</p>"; return; }
+      if (!vals.length) { res.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + "Ingresa al menos una medición válida.</p>"; return; }
       var nAnim = parseInt((document.getElementById("rv-num-animales").value || "1"), 10) || 1;
       btn.disabled = true;
-      res.innerHTML = "⏳ Evaluando...";
+      res.innerHTML = icon("hourglass", 14) + "Evaluando...";
       fetch("/api/pasturas/ronda", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -330,7 +330,7 @@
         .then(function (out) {
           btn.disabled = false;
           if (!out.ok || !out.j.ok) {
-            res.innerHTML = "<p class='aviso'>❌ " + esc((out.j && out.j.error) || "No se pudo evaluar (¿potrero sin área?).") + "</p>";
+            res.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + esc((out.j && out.j.error) || "No se pudo evaluar (¿potrero sin área?).") + "</p>";
             return;
           }
           var ronda = out.j.ronda || {};
@@ -345,7 +345,7 @@
         })
         .catch(function (err) {
           btn.disabled = false;
-          res.innerHTML = "<p class='aviso'>❌ Error de red: " + esc(err.message || err) + "</p>";
+          res.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + "Error de red: " + esc(err.message || err) + "</p>";
         });
     });
   }
@@ -366,11 +366,11 @@
       + icon(icName, 18)
       + "<span style='overflow:hidden; text-overflow:ellipsis;'>" + esc(tituloModal) + "</span>"
       + "</div>"
-      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;'>✕</button>"
+      + "<button type='button' class='modal-cerrar' id='btn-cerrar-modal-lista-anim' style='color:#fff; font-size:20px; padding:4px 8px;' aria-label='Cerrar'>" + icon("xmark", 16) + "</button>"
       + "</div>"
       + "<div id='modal-lista-anim-body' style='padding:14px 16px; overflow-y:auto; flex:1; -webkit-overflow-scrolling:touch;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave);'>"
-      + "<div style='font-size:24px; margin-bottom:8px;'>⏳</div>"
+      + "<div style='font-size:24px; margin-bottom:8px;'>" + icon("hourglass", 24) + "</div>"
       + "Consultando animales activos..."
       + "</div>"
       + "</div>"
@@ -397,7 +397,7 @@
         var body = document.getElementById("modal-lista-anim-body");
         if (!body) return;
         if (!data || !data.ok) {
-          body.innerHTML = "<p class='aviso'>⚠️ " + esc((data && data.error) || "No se pudo cargar la información de los animales.") + "</p>";
+          body.innerHTML = "<p class='aviso'>" + icon("alertTriangle", 14) + esc((data && data.error) || "No se pudo cargar la información de los animales.") + "</p>";
           return;
         }
         var animales = data.animales || [];
@@ -420,14 +420,14 @@
 
         if (!animales.length) {
           content += "<div style='text-align:center; padding:30px 10px; color:var(--texto-suave);'>"
-            + "<div style='font-size:28px; margin-bottom:8px;'>🌾</div>"
+            + "<div style='font-size:28px; margin-bottom:8px;'>" + icon("grass", 28) + "</div>"
             + "No hay animales activos registrados en este grupo actualmente."
             + "</div>";
           body.innerHTML = content;
           return;
         }
 
-        content += "<input type='search' id='filtro-animal-lista' class='modal-potrero-busqueda' placeholder='🔍 Filtrar por número, nombre, potrero o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
+        content += "<input type='search' id='filtro-animal-lista' class='modal-potrero-busqueda' placeholder='Filtrar por número, nombre, potrero o categoría...' autocomplete='off' style='width:100%; box-sizing:border-box; margin-bottom:10px; padding:8px 10px; font-size:13px; border-radius:6px; border:1px solid var(--borde-fuerte); background:var(--superficie); color:var(--texto);'>";
 
         var col5Tit = cfg.esPotrero ? "Días" : "Potrero";
 
@@ -505,7 +505,7 @@
       .catch(function (err) {
         var body = document.getElementById("modal-lista-anim-body");
         if (body) {
-          body.innerHTML = "<p class='aviso'>❌ Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
+          body.innerHTML = "<p class='aviso'>" + icon("xCircle", 14) + "Error de conexión al consultar animales: " + esc(err.message || err) + "</p>";
         }
       });
   }
@@ -584,7 +584,7 @@
         box.style.border = "1px solid #2a5298";
         box.style.color = "#1e3c72";
         box.innerHTML = "<div style='display:flex; align-items:center; gap:10px;'>"
-          + "<span style='font-size:22px;'>🛰️</span>"
+          + "<span style='font-size:22px;'>" + icon("satellite", 22) + "</span>"
           + "<div><b>Consultando Google Earth Engine en tiempo real...</b><br>"
           + "<span style='font-size:12px;'>Procesando reflectancia " + esc(textoModo) + " para los 20 potreros de la finca. Esto toma ~10-15 segundos.</span></div>"
           + "</div>";
@@ -609,7 +609,7 @@
             box.style.background = "rgba(46, 125, 50, 0.1)";
             box.style.border = "1px solid #2e7d32";
             box.style.color = "#1b5e20";
-            box.innerHTML = "<b>✅ " + esc(data.mensaje || "Sincronización satelital exitosa.") + "</b>"
+            box.innerHTML = "<b>" + icon("checkCircle", 14) + esc(data.mensaje || "Sincronización satelital exitosa.") + "</b>"
               + "<div style='font-size:12px; margin-top:4px;'>Refrescando mapa de vigor satelital y tablas...</div>";
           }
           setTimeout(function () {
@@ -620,7 +620,7 @@
             box.style.background = "rgba(211, 47, 47, 0.1)";
             box.style.border = "1px solid #d32f2f";
             box.style.color = "#c62828";
-            box.innerHTML = "<b>⚠️ Error:</b> " + esc(data.error || "No se pudo sincronizar");
+            box.innerHTML = "<b>" + icon("alertTriangle", 14) + "Error:</b> " + esc(data.error || "No se pudo sincronizar");
           }
         }
       })
@@ -631,7 +631,7 @@
           box.style.background = "rgba(211, 47, 47, 0.1)";
           box.style.border = "1px solid #d32f2f";
           box.style.color = "#c62828";
-          box.innerHTML = "<b>❌ Error de sincronización satelital:</b> " + esc(err.message || err);
+          box.innerHTML = "<b>" + icon("xCircle", 14) + "Error de sincronización satelital:</b> " + esc(err.message || err);
         }
       });
     }
@@ -863,17 +863,17 @@
   var LOTE_MODO = { manual: "fijado a mano", nombre: "por el nombre", auto: "hay recién paridas", no: "" };
   function renderLotesOrdeno(lotes) {
     if (!lotes || !lotes.length) return "";
-    var h = "<div class='card'><h4 style='margin:0 0 6px;'>🥛 Lote de ordeño</h4>"
+    var h = "<div class='card'><h4 style='margin:0 0 6px;'>" + icon("milk", 16) + "Lote de ordeño</h4>"
       + "<p class='aviso' style='margin:0 0 8px;'>Solo las vacas de los potreros marcados cuentan como <b>en ordeño</b> "
       + "(lista Secar, ficha y litros/vaca). Las demás paridas se toman como secas. Toque un potrero para corregirlo.</p>"
       + "<div class='gen-filtros'>";
     lotes.forEach(function (p) {
       h += "<button type='button' class='chip btn-lote-ordeno" + (p.ordeno ? " act" : "") + "' data-pid='" + esc(p.id)
         + "' data-modo='" + esc(p.modo) + "' data-ordeno='" + (p.ordeno ? 1 : 0) + "' title='" + esc(LOTE_MODO[p.modo] || "") + "'>"
-        + (p.ordeno ? "🥛 " : "") + esc(p.nombre) + " · " + esc(p.vacas_paridas) + " paridas"
-        + (p.modo === "manual" ? " 📌" : "") + "</button>";
+        + (p.ordeno ? icon("milk", 12) : "") + esc(p.nombre) + " · " + esc(p.vacas_paridas) + " paridas"
+        + (p.modo === "manual" ? " " + icon("pin", 12) : "") + "</button>";
     });
-    return h + "</div><small>📌 = fijado a mano. Toque: automático → sí es ordeño → no es ordeño.</small></div>";
+    return h + "</div><small>" + icon("pin", 12) + "= fijado a mano. Toque: automático → sí es ordeño → no es ordeño.</small></div>";
   }
   function bindLotesOrdeno() {
     qa(".btn-lote-ordeno").forEach(function (b) {
@@ -897,7 +897,7 @@
   function renderControlLechero(cl) {
     if (!cl) return "";
     var vacas = cl.vacas || [], r = cl.resumen || {}, u = r.ultimo;
-    var h = "<div class='card' id='card-control-lechero'><h4 style='margin:0 0 6px;'>🥛 Control lechero</h4>";
+    var h = "<div class='card' id='card-control-lechero'><h4 style='margin:0 0 6px;'>" + icon("milk", 16) + "Control lechero</h4>";
     if (u) {
       h += "<p style='margin:0 0 8px; font-size:13px;'>Último control <b>" + esc(fechaCorta(u.fecha)) + "</b>: "
         + esc(u.vacas) + " vacas · <b>" + esc(u.promedio) + " L/vaca</b> · total " + esc(u.total_litros) + " L"
@@ -925,9 +925,9 @@
     });
     h += "<p id='control-total' style='font-weight:700; margin:10px 0;'>Total: 0 L · 0 vacas</p>"
       + "<button type='button' class='tema-btn' id='btn-guardar-control'>Guardar control</button></div>";
-    var listas = [["caida", "📉 Caída fuerte (posible mastitis)"], ["baja_produccion", "🔻 Baja producción"], ["sin_control", "⏰ Sin control"]];
+    var listas = [["caida", icon("trendDown", 14) + "Caída fuerte (posible mastitis)"], ["baja_produccion", icon("trendDown", 14) + "Baja producción"], ["sin_control", icon("clock", 14) + "Sin control"]];
     if (r.top && r.top.length) {
-      h += "<div style='margin-top:10px;'><b>🏆 Mejores</b> " + r.top.map(function (t) { return enlaceFicha(t.tag) + " " + esc(t.litros) + " L"; }).join(" · ") + "</div>";
+      h += "<div style='margin-top:10px;'><b>" + icon("award", 14) + "Mejores</b> " + r.top.map(function (t) { return enlaceFicha(t.tag) + " " + esc(t.litros) + " L"; }).join(" · ") + "</div>";
     }
     listas.forEach(function (par) {
       var filas = r[par[0]] || [];
@@ -970,7 +970,7 @@
           .then(function (res) { if (!(res.ok && res.procesados > 0)) return encolarOffline(ev.tipo, ev.payload, fecha); })
           .catch(function () { return encolarOffline(ev.tipo, ev.payload, fecha); });
       Promise.resolve(envio).then(function () {
-        mostrarToast("✓ Control guardado: " + regs.length + " vacas.", "verde");
+        mostrarToast("Control guardado: " + regs.length + " vacas.", "verde");
         vibrarConfirmacion();
         cargar(true);
       });
@@ -1002,7 +1002,7 @@
     h += renderLotesOrdeno(d.lotes_ordeno);
     h += renderControlLechero(d.control_lechero);
     if (d.tareas && d.tareas.conteos && !d.tareas.conteos.secar && d.tareas.conteos.chequeo) {
-      h += "<p class='aviso'>⚠️ Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
+      h += "<p class='aviso'>" + icon("alertTriangle", 14) + "Las preñeces no están al día (" + esc(d.tareas.conteos.chequeo) + " vacas sin dato reciente): haz el <b>chequeo del hato</b> en Reproducción para que aparezcan las vacas a secar.</p>";
     }
 
     // 1. KPIs Ejecutivos de Producción

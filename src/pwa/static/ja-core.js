@@ -49,12 +49,12 @@
       var emoji = colores[i][0];
       if (t.indexOf(emoji) === 0) {
         var resto = t.slice(emoji.length).replace(/^\s+/, "");
-        return "<span class='chip " + colores[i][1] + "'>" + emoji + (resto ? " " + esc(resto) : "") + "</span>";
+        return "<span class='chip " + colores[i][1] + "'>" + dot(colores[i][1]) + (resto ? esc(resto) : "") + "</span>";
       }
     }
     return "<span class='chip gris'>" + esc(t) + "</span>";
   }
-  function vacio(msg) { return "<p class='aviso'><span aria-hidden='true'>🌾</span> " + esc(msg || "Sin datos.") + "</p>"; }
+  function vacio(msg) { return "<p class='aviso'>" + icon("grass", 14) + esc(msg || "Sin datos.") + "</p>"; }
   // cols: [clave, etiqueta, 'num'?, render?(valor,fila)]
   function tabla(filas, cols, vacioMsg) {
     if (!filas || !filas.length) return vacio(vacioMsg || "Sin datos.");
@@ -74,7 +74,7 @@
   function erroresHtml(d) {
     if (!d || !d.errores) return "";
     var msgs = Object.keys(d.errores).map(function (k) { return esc(k) + ": " + esc(d.errores[k]); });
-    return "<p class='aviso'>⚠️ Sección con error: " + msgs.join(" · ") + "</p>";
+    return "<p class='aviso'>" + icon("alertTriangle", 14) + "Sección con error: " + msgs.join(" · ") + "</p>";
   }
   function fechaCorta(v) { return v ? String(v).slice(0, 10) : ""; }
   function fmtMoneda(n) {
@@ -106,7 +106,7 @@
     // Contenedor interactivo (SVG nativo responsivo)
     h += "<div class='grafico-svg-target' style='width:100%; min-height:160px;'>"
       + "<div style='text-align:center; padding:28px 10px; color:var(--texto-suave); font-size:12px;'>"
-      + "<div style='font-size:20px; margin-bottom:6px;'>⏳</div>Cargando visualización..."
+      + "<div style='font-size:20px; margin-bottom:6px;'>" + icon("hourglass", 20) + "</div>Cargando visualización..."
       + "</div>"
       + "</div>";
 
@@ -267,7 +267,7 @@
         + "<a href='#' class='link-potrero-animales' data-potrero='" + esc(p.nombre) + "' style='font-size:13px; font-weight:700; color:var(--verde-marca); text-decoration:none; display:inline-flex; align-items:center; gap:4px;'>"
         + icon("grass", 13) + esc(p.nombre) + "</a>"
         + "<div style='display:flex; align-items:center; gap:8px; font-size:12px;'>"
-        + "<span style='font-weight:700; color:" + col + ";'>" + sem + " " + p.dias + " d</span>"
+        + "<span style='font-weight:700; color:" + col + ";'>" + semaforoHtml(sem) + p.dias + " d</span>"
         + "<button type='button' class='tema-btn btn-listar-animales-pot' data-potrero='" + esc(p.nombre) + "' style='font-size:11px; padding:2px 7px; border-radius:4px;'>"
         + icon("cow", 11) + p.animales + " cab.</button>"
         + "</div>"
@@ -552,7 +552,7 @@
 
     var colorEstado = { "🟢": "var(--verde-marca)", "🟡": "#e0a400", "🔴": "#d64545", "🌱": "var(--texto-suave)" };
     var h = "<div style='font-size:11px; color:var(--texto-suave); margin-bottom:8px;'>"
-      + "🟢 óptimo / listo · 🟡 rotar pronto · 🔴 sobreocupado · 🌱 en reposo · ordenado por urgencia de rotación</div>";
+      + dot("verde") + "óptimo / listo · " + dot("ambar") + "rotar pronto · " + dot("rojo") + "sobreocupado · " + icon("sprout", 12) + "en reposo · ordenado por urgencia de rotación</div>";
     h += "<div style='display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px; margin-bottom:12px;'>";
     potreros.forEach(function (p) {
       var nAnim = Number(p.animales) || 0;
@@ -572,7 +572,7 @@
       var titulo = p.estado_rotacion ? " title='" + esc(p.estado_rotacion) + "'" : "";
       h += "<div style='background:var(--tarjeta-fondo, var(--superficie)); border:1px solid var(--borde); border-left:3px solid " + borde + "; border-radius:8px; padding:8px 10px;'" + titulo + ">"
         + "<div style='display:flex; justify-content:space-between; align-items:center;'>"
-        + "<span style='font-size:14px;'>" + sem + "</span>"
+        + "<span style='font-size:14px;'>" + semaforoHtml(sem) + "</span>"
         + "<span style='font-size:11px; color:var(--texto-suave);'>" + haTxt + "</span>"
         + "</div>"
         + "<div style='font-size:12px; font-weight:700; color:var(--texto); margin:4px 0 2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;'>" + esc(p.nombre) + "</div>"
@@ -664,7 +664,7 @@
         })
         .catch(function () {
           target.innerHTML = "<div style='text-align:center; padding:18px 10px; color:var(--texto-suave); font-size:12px;'>"
-            + "<span style='font-size:16px;'>📊</span> Visualización vectorial no disponible en este momento. "
+            + icon("chartBar", 16) + "Visualización vectorial no disponible en este momento. "
             + "<br><small>Puedes consultar el gráfico del servidor en el desplegable de abajo.</small></div>";
         });
     });
@@ -685,7 +685,7 @@
     var s = size || 18;
     // "cow" usa un dibujo de cuerpo completo con relleno (viewBox/estilo propio);
     // el resto de íconos de vaca (cría, combinado de parto) sigue con trazo Lucide.
-    if (name === "cow") {
+    if (name === "cow" || name === "bull") {
       return '<svg class="svg-icon" viewBox="0 0 256 256" width="' + s + '" height="' + s + '" fill="currentColor" aria-hidden="true" focusable="false" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + COW_BODY_FILL + '</svg>';
     }
     var paths = {
@@ -773,13 +773,74 @@
       table: '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/>',
       pencil: '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
       trash: '<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>',
+      // --- Fase C (2026-10-01): íconos Lucide (ISC) que reemplazan emojis ---
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      checkCircle: '<circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/>',
+      alertTriangle: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      xCircle: '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      lightbulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+      ruler: '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
+      zap: '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+      map: '<path d="M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z"/><path d="M15 5.764v15"/><path d="M9 3.236v15"/>',
+      hand: '<path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/>',
+      ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+      user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+      satellite: '<path d="M4 10a7.31 7.31 0 0 0 10 10Z"/><path d="m9 15 3-3"/><path d="M17 13a6 6 0 0 0-6-6"/><path d="M21 13A10 10 0 0 0 11 3"/>',
+      info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+      trendDown: '<polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>',
+      trendUp: '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+      bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+      sprout: '<path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/>',
+      leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
+      award: '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>',
+      wifi: '<path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>',
+      phone: '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+      pause: '<rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/>',
+      moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+      sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>',
+      scissors: '<circle cx="6" cy="6" r="3"/><path d="M8.12 8.12 12 12"/><path d="M20 4 8.12 15.88"/><circle cx="6" cy="18" r="3"/><path d="M14.8 14.8 20 20"/>',
+      book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+      folder: '<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/>',
+      package: '<path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.29 7 12 12 20.71 7"/><line x1="12" y1="22" x2="12" y2="12"/>',
+      arrowRight: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+      bot: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>',
+      eraser: '<path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/>',
+      globe: '<circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/>',
+      // Nombres que el código ya usaba y no tenían dibujo (salían vacíos).
+      archive: '<rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/>',
+      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+      gitBranch: '<line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
+      image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+      mapPin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+      notes: '<path d="M15.5 3H5a2 2 0 0 0-2 2v14c0 1.1.9 2 2 2h14a2 2 0 0 0 2-2V8.5L15.5 3Z"/><path d="M15 3v6h6"/>',
+      send: '<path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"/><path d="m21.854 2.147-10.94 10.939"/>',
+      shield: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+      shieldCheck: '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1 1 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/>',
+      tag: '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5"/>',
+      userPlus: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
       newspaper: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/>'
     };
     return '<svg class="svg-icon" viewBox="0 0 24 24" width="' + s + '" height="' + s + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none" aria-hidden="true" focusable="false" style="display:inline-block; vertical-align:middle; margin-right:6px; position:relative; top:-1px;">' + (paths[name] || '') + '</svg>';
   }
 
+  // Punto de color del tema (reemplaza 🟢🟡🔴⚪🟠 en textos HTML).
+  // color: verde | ambar | rojo | gris | naranja.
+  function dot(color) {
+    return '<span class="dot-estado dot-' + (color || "gris") + '" aria-hidden="true"></span>';
+  }
+
+  // Convierte el emoji semáforo que llega del servidor (p.semaforo) en punto/ícono SVG.
+  function semaforoHtml(e) {
+    var m = { "🟢": "verde", "🟡": "ambar", "🔴": "rojo", "⚪": "gris", "🟠": "naranja" };
+    if (m[e]) return dot(m[e]);
+    if (e === "🌱") return icon("sprout", 14);
+    return e;
+  }
+
   window.JA = {
     esc: esc,
+    dot: dot,
     mostrarToast: mostrarToast,
     vibrarConfirmacion: vibrarConfirmacion,
     chipEstado: chipEstado,

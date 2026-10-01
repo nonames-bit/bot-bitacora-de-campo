@@ -81,10 +81,10 @@
     var box = document.getElementById("gps-ronda-box");
     if (!box) return;
     if (!navigator.geolocation) {
-      box.innerHTML = "<div class='card gps-ronda'>📍 Este equipo no da ubicación GPS.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Este equipo no da ubicación GPS.</div>";
       return;
     }
-    box.innerHTML = "<div class='card gps-ronda'>📍 Localizando… acepte el permiso de ubicación del navegador.</div>";
+    box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Localizando… acepte el permiso de ubicación del navegador.</div>";
     try { if (navigator.vibrate) navigator.vibrate(15); } catch (eVib2) {}
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude;
@@ -95,12 +95,12 @@
         body: JSON.stringify({ lat: lat, lon: lon })
       }).then(function (r) { return r.json(); }).then(function (d) {
         if (!d || !d.detectado) {
-          box.innerHTML = "<div class='card gps-ronda'>📍 " + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
+          box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "" + esc((d && d.mensaje) || "Ubicación fuera de los potreros.") + "</div>";
           return;
         }
         var pot = d.potrero || {};
         box.innerHTML = "<div class='card gps-ronda' style='border-left:5px solid var(--verde-marca);'>"
-          + "<div style='font-size:15px; font-weight:800;'>📍 Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
+          + "<div style='font-size:15px; font-weight:800;'>" + icon("pin", 16) + "Estás en " + esc(pot.nombre || pot.codigo || "potrero") + "</div>"
           + "<div style='font-size:13.5px; color:var(--texto-suave); margin:2px 0 10px;'>"
           + esc(d.total_animales || 0) + " animales aquí · " + esc(Number(lat).toFixed(5)) + ", " + esc(Number(lon).toFixed(5)) + "</div>"
           + "<button type='button' id='btn-gps-guardar-ronda' class='tema-btn' style='width:100%; padding:14px; font-size:15px; background:var(--verde-marca); color:#fff; font-weight:700; border:none;'>Guardar ronda aquí</button>"
@@ -115,24 +115,24 @@
             body: JSON.stringify({ lat: lat, lon: lon, potrero_id: pot.id || null, potrero_nombre: pot.nombre || null, punto_control: "recorrido" })
           }).then(function (r2) { return r2.json(); }).then(function (ok) {
             if (ok && ok.ok) {
-              mostrarToast("✅ Ronda guardada en " + (pot.nombre || "campo"), "verde");
+              mostrarToast("Ronda guardada en " + (pot.nombre || "campo"), "verde");
               try { if (navigator.vibrate) navigator.vibrate([30, 50, 30]); } catch (eVib3) {}
             } else {
-              mostrarToast("❌ " + ((ok && ok.error) || "No se pudo guardar"), "rojo");
+              mostrarToast(((ok && ok.error) || "No se pudo guardar"), "rojo");
               btnG.disabled = false;
               btnG.textContent = "Guardar ronda aquí";
             }
           }).catch(function (err) {
-            mostrarToast("❌ Sin conexión: " + (err && err.message || err), "rojo");
+            mostrarToast("Sin conexión: " + (err && err.message || err), "rojo");
             btnG.disabled = false;
             btnG.textContent = "Guardar ronda aquí";
           });
         });
       }).catch(function () {
-        box.innerHTML = "<div class='card gps-ronda'>📍 Sin conexión: no se pudo detectar el potrero.</div>";
+        box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "Sin conexión: no se pudo detectar el potrero.</div>";
       });
     }, function () {
-      box.innerHTML = "<div class='card gps-ronda'>📍 No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
+      box.innerHTML = "<div class='card gps-ronda'>" + icon("pin", 14) + "No se pudo obtener la ubicación. Revise el permiso de GPS del navegador.</div>";
     }, { enableHighAccuracy: true, timeout: 15000 });
   }
 
@@ -147,7 +147,7 @@
     }
     var pot = d.potrero_filtro ? " — potrero: <b>" + esc(d.potrero_filtro) + "</b>" : "";
     var pdfBtn = "<a href='/api/reporte.pdf' class='tema-btn' download style='font-size:12px; text-decoration:none; padding:5px 12px; display:inline-flex; align-items:center; gap:4px;'>" + icon("filePdf", 14) + "Reporte PDF</a>";
-    // Sin botón "Buscar": la lupita flotante (🔍) abre el mismo buscador
+    // Sin botón "Buscar": la lupita flotante abre el mismo buscador
     // con arete Y potrero, para no duplicar controles en el celular.
     var h = "<div class='tablero-head-barra' style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;'>"
       + "<h3 style='margin:0; display:flex; align-items:center; gap:8px; font-size:18px;'>" + icon("grid") + "Tablero finca" + pot + "</h3>"

@@ -4409,3 +4409,12 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .rev-hist-fila { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-bottom: 1px solid var(--borde); }
 .rev-hist-fila:last-child { border-bottom: none; }
 .rev-hist-fila .chip { flex: none; font-size: 11px; }
+
+/* Puntos de estado del tema (reemplazan los emojis 🟢🟡🔴) */
+.dot-estado { display: inline-block; width: .62em; height: .62em; border-radius: 50%; vertical-align: middle;
+  margin-right: 6px; position: relative; top: -1px; flex: none; }
+.dot-verde { background: var(--color-verde-txt); }
+.dot-ambar { background: var(--color-ambar); }
+.dot-rojo { background: var(--rojo-alerta); }
+.dot-naranja { background: #E8710A; }
+.dot-gris { background: var(--color-gris-txt); }
