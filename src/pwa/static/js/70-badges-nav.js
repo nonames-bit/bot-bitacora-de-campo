@@ -187,6 +187,7 @@
     usuarios: "Usuarios",
     sistema: "Sistema",
     revision: "Por revisar",
+    reportes: "Reportes",
     mercado: "Subastas",
     ayuda: "Ayuda"
   };

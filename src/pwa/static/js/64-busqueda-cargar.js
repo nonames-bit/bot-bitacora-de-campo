@@ -394,6 +394,14 @@
       return;
     }
 
+    if (actual === "reportes") {
+      // No pide datos: la lista es fija y los archivos se arman al descargar.
+      if (!animar) return;
+      montarVista(vista, renderReportes(), animar);
+      bindReportes();
+      return;
+    }
+
     if (actual === "revision") {
       if (animar) skeleton(vista, "revision");
       fetchJSON("/api/revision/pendientes", function (d) {
