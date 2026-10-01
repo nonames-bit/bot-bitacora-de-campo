@@ -1,5 +1,11 @@
   /* ---------- Captura Rápida de Campo (Offline Real) ---------- */
   var _tipoCapturaActual = "parto";
+  var GRUPOS_CAPTURA = [
+    { t: "Reproducción", ids: ["celo", "servicio", "palpacion", "parto", "secado"] },
+    { t: "Salud y manejo", ids: ["pesaje", "tratamiento", "manejo", "destete", "traslado"] },
+    { t: "Leche y termo", ids: ["leche", "pajuela", "nitrogeno"] },
+    { t: "Salidas, dinero y tareas", ids: ["venta", "muerte", "gasto", "tarea"] }
+  ];
   function renderCaptura() {
     var tipos = [
       { id: "parto", nom: "Parto", ico: "cowCalf" },
@@ -47,9 +53,24 @@
       + "<div class='cap-paso cap-paso-1 act'>"
       + "<div class='cap-paso-num'>1/3: ¿Qué evento desea registrar?</div>"
       + "<div class='cap-tipos-grid'>";
-    tipos.forEach(function (t) {
-      var act = t.id === _tipoCapturaActual ? "act" : "";
-      h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "'>" + icon(t.ico, 16) + "<span>" + t.nom + "</span></button>";
+    // Los 17 tipos van agrupados por tema para encontrarlos sin leer toda
+    // la lista. Un tipo que no esté en ningún grupo sale al final en "Otros".
+    var porId = {};
+    tipos.forEach(function (t) { porId[t.id] = t; });
+    var usados = {};
+    var grupos = GRUPOS_CAPTURA.map(function (g) {
+      var items = g.ids.filter(function (id) { return porId[id]; }).map(function (id) { usados[id] = 1; return porId[id]; });
+      return { t: g.t, items: items };
+    });
+    var otros = tipos.filter(function (t) { return !usados[t.id]; });
+    if (otros.length) grupos.push({ t: "Otros", items: otros });
+    grupos.forEach(function (g) {
+      if (!g.items.length) return;
+      h += "<div class='cap-grupo-titulo'>" + esc(g.t) + "</div>";
+      g.items.forEach(function (t) {
+        var act = t.id === _tipoCapturaActual ? "act" : "";
+        h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "'>" + icon(t.ico, 16) + "<span>" + t.nom + "</span></button>";
+      });
     });
     h += "</div>"
       + "<button type='button' id='btn-cap-sig1' class='btn-guardar-manga'>Siguiente →</button>"
