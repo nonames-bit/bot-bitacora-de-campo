@@ -2415,11 +2415,90 @@ def test_sync_venta_animal_actualiza_estado_y_movimientos(db_file, client):
     assert f_data["venta"]["procedencia_destino"] == "Frigorífico del Llano"
 
 
+def test_sync_venta_rechaza_animal_inexistente_o_inactivo(db_file, client):
+    """Un arete mal escrito no crea un animal "vendido" y un animal muerto no se
+    vuelve a vender; ambos salen de la cola con el motivo en errores."""
+    db = Database(db_file)
+    db.registrar_animal("JA77", sexo="Hembra", estado="MUERTO")
+    db.close()
+
+    r = client.post("/api/sync", json={"eventos": [
+        {"tipo": "venta", "id_local": "v_fantasma", "fecha": "2026-09-30",
+         "payload": {"animal_tag": "NOEXISTE1", "precio": 1000}},
+        {"tipo": "venta", "id_local": "v_muerta", "fecha": "2026-09-30",
+         "payload": {"animal_tag": "JA77", "precio": 1000}},
+    ]})
+    res = r.get_json()
+    assert res["procesados"] == 0
+    assert set(res["ids_ok"]) == {"v_fantasma", "v_muerta"}
+    assert any("NOEXISTE1" in e for e in res["errores"])
+    assert any("JA77" in e and "MUERTO" in e for e in res["errores"])
+
+    db2 = Database(db_file)
+    try:
+        assert db2.get_animal("NOEXISTE1") is None
+        assert db2.get_animal("JA77")["estado"] == "MUERTO"
+        assert db2.query("SELECT * FROM movimientos") == []
+    finally:
+        db2.close()
 
 
+def test_sync_venta_reenviada_no_duplica(db_file, client):
+    """La misma venta enviada otra vez (sin id_local) devuelve la existente en
+    vez de fallar porque el animal ya quedó VENDIDO."""
+    db = Database(db_file)
+    db.registrar_animal("JA88", sexo="Macho", estado="ACTIVO")
+    db.close()
+    ev = {"tipo": "venta", "fecha": "2026-09-30", "payload": {"animal_tag": "JA88", "precio": 2000}}
+    assert client.post("/api/sync", json={"eventos": [ev]}).get_json()["procesados"] == 1
+    res = client.post("/api/sync", json={"eventos": [ev]}).get_json()
+    assert res["procesados"] == 1 and res["errores"] == []
+    db2 = Database(db_file)
+    try:
+        assert len(db2.query("SELECT * FROM movimientos WHERE tipo_movimiento = 'VENTA'")) == 1
+    finally:
+        db2.close()
 
 
+def test_sync_venta_con_peso_invalido_guarda_la_venta_sin_pesaje(db_file, client):
+    db = Database(db_file)
+    db.registrar_animal("JA55", sexo="Macho", estado="ACTIVO")
+    db.close()
+    res = client.post("/api/sync", json={"eventos": [
+        {"tipo": "venta", "fecha": "2026-09-30", "payload": {"animal_tag": "JA55", "peso_kg": "abc"}},
+    ]}).get_json()
+    assert res["procesados"] == 1
+    db2 = Database(db_file)
+    try:
+        assert db2.get_animal("JA55")["estado"] == "VENDIDO"
+        assert db2.ultimos_pesajes("JA55", 5) == []
+        mov = db2.query_one("SELECT notas FROM movimientos")
+        assert mov["notas"] is None
+    finally:
+        db2.close()
 
 
+def test_sync_movimiento_generico_no_vende_el_animal(db_file, client):
+    """Un 'movimiento' de entrada se guarda con su tipo y deja al animal ACTIVO;
+    uno sin tipo no se adivina como venta."""
+    db = Database(db_file)
+    db.registrar_animal("JA66", sexo="Hembra", estado="ACTIVO")
+    db.close()
 
+    res = client.post("/api/sync", json={"eventos": [
+        {"tipo": "movimiento", "id_local": "m_entrada", "fecha": "2026-09-30",
+         "payload": {"animal_tag": "JA66", "tipo_movimiento": "ENTRADA", "procedencia_destino": "Subasta"}},
+        {"tipo": "movimiento", "id_local": "m_sin_tipo", "fecha": "2026-09-30",
+         "payload": {"animal_tag": "JA66"}},
+    ]}).get_json()
+    assert res["procesados"] == 1
+    assert set(res["ids_ok"]) == {"m_entrada", "m_sin_tipo"}
+    assert any("falta el tipo" in e for e in res["errores"])
 
+    db2 = Database(db_file)
+    try:
+        assert db2.get_animal("JA66")["estado"] == "ACTIVO"
+        movs = db2.query("SELECT tipo_movimiento FROM movimientos")
+        assert [m["tipo_movimiento"] for m in movs] == ["ENTRADA"]
+    finally:
+        db2.close()
