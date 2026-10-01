@@ -157,10 +157,10 @@ def registrar(app, ctx, h):
                     r_dict["usuario_avatar"] = "vaquero"
                     r_dict["canal"] = "Telegram" if (isinstance(reg_por, int) and reg_por > 1000000) else "PWA"
                 else:
-                    r_dict["usuario_nombre"] = "Software Ganadero (SG)"
+                    r_dict["usuario_nombre"] = "Importación histórica"
                     r_dict["usuario_rol"] = "SISTEMA"
                     r_dict["usuario_avatar"] = "admin"
-                    r_dict["canal"] = "Backup SG"
+                    r_dict["canal"] = "Sistema"
 
                 c_en = r_dict.get("creado_en") or r_dict.get("fecha")
                 if c_en:

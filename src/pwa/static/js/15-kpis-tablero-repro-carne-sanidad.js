@@ -159,7 +159,7 @@
       }).join("");
       h += "</table></div>";
     } else {
-      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas de Software Ganadero están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
+      h += vacio("No hay pajillas activas con saldo en el termo criogénico. Las existencias antiguas importadas están archivadas como inactivas/usadas. Use el botón «➕ Entrada Pajillas» para registrar compras nuevas.");
     }
 
     if (pajuelasInactivas.length) {
@@ -167,7 +167,7 @@
         + "<summary style='cursor:pointer; font-weight:700; font-size:12px; color:var(--texto-suave);'>"
         + "📁 Catálogo histórico / Pajillas inactivas o usadas (" + pajuelasInactivas.length + " toros) — Toca para desplegar"
         + "</summary>"
-        + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico importado de Software Ganadero (2013–2018) archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
+        + "<p style='font-size:11px; color:var(--texto-suave); margin:6px 0 8px;'>Toros del histórico 2013–2018 archivados para no generar falsas alertas en el termo actual. Puede reactivar cualquiera o entrar stock nuevo.</p>"
         + "<div class='tabla-scroll' style='max-height:240px; overflow-y:auto;'><table><tr><th>Toro / Pajilla</th><th>Raza</th><th style='text-align:center;'>Canastilla</th><th style='text-align:right;'>Saldo Ant.</th><th>Procedencia</th><th style='text-align:center;'>Acción</th></tr>"
         + pajuelasInactivas.map(function (p) {
           return "<tr>"
@@ -337,7 +337,7 @@
       h += "<div class='card' style='padding:16px; margin-bottom:14px; border-left:5px solid " + semColor + "; background:var(--superficie); box-shadow:0 2px 6px var(--sombra);'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;'>"
         + "<div>"
-        + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad Oficial (Software Ganadero)</div>"
+        + "<div style='font-size:12px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; letter-spacing:0.5px;'>Índice de Fertilidad</div>"
         + "<div style='font-size:28px; font-weight:800; color:" + semColor + "; line-height:1.2; margin:4px 0;'>"
         + (ifInfo.semaforo || "🟢") + " " + ifInfo.indice_pct + "%"
         + "</div>"
@@ -400,7 +400,7 @@
         + "<div style='font-size:14px; font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px;'>"
         + icon("chartBar", 16) + "Distribución de Frecuencias [Días Abiertos]"
         + "</div>"
-        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Desglose de vacas abiertas según tramos de días postparto (referencia SG)</div>"
+        + "<div style='font-size:12px; color:var(--texto-suave); margin-bottom:12px;'>Desglose de vacas abiertas según tramos de días postparto</div>"
         + "<div style='display:flex; flex-direction:column; gap:6px;'>";
       d.distribucion_dias_abiertos.forEach(function (tr) {
         var barColor = (tr.tramo === "0-90" || tr.tramo === "91-120") ? "var(--verde-marca)" : (tr.tramo === "121-150" || tr.tramo === "151-180" ? "#D97706" : "#DC2626");

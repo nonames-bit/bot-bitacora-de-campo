@@ -349,10 +349,10 @@ def clasificar_animal_zootecnico(
         if rz_up in ("INDETERMINADO", "I"):
             return {
                 "grado_codigo": "INDET",
-                "grado_nombre": "Indeterminados (Base SG)",
+                "grado_nombre": "Indeterminados",
                 "fraccion": "Indeterminado",
                 "chip_color": "gris",
-                "patron_formula": "Indeterminado / Base SG",
+                "patron_formula": "Indeterminado",
                 "es_tipificado": False,
             }
         if rz_up in ("C", "CEBUINO", "CEBU"):
@@ -361,7 +361,7 @@ def clasificar_animal_zootecnico(
                 "grado_nombre": "Cebuino Base",
                 "fraccion": "Cebuino",
                 "chip_color": "ambar",
-                "patron_formula": "Cebuino Comercial (Base SG)",
+                "patron_formula": "Cebuino Comercial",
                 "es_tipificado": False,
             }
         if rz_up in ("T", "TAURINO"):
@@ -370,7 +370,7 @@ def clasificar_animal_zootecnico(
                 "grado_nombre": "Taurino Base",
                 "fraccion": "Taurino",
                 "chip_color": "azul",
-                "patron_formula": "Taurino (Base SG)",
+                "patron_formula": "Taurino",
                 "es_tipificado": False,
             }
         return {
@@ -576,7 +576,7 @@ def calcular_resumen_genetico_hato(
         "PARCIAL": {"nombre": "Genealogía incompleta", "chip": "Parcial", "color": "gris", "orden": 7.5},
         "CEBU": {"nombre": "Cebuino Base", "chip": "Cebuino", "color": "ambar", "orden": 8},
         "TAURINO": {"nombre": "Taurino Base", "chip": "Taurino", "color": "azul", "orden": 9},
-        "INDET": {"nombre": "Indeterminados (Base SG)", "chip": "Indeterminado", "color": "gris", "orden": 10},
+        "INDET": {"nombre": "Indeterminados", "chip": "Indeterminado", "color": "gris", "orden": 10},
         "SIN_CLASIFICAR": {"nombre": "Sin Clasificar", "chip": "S/C", "color": "gris", "orden": 11},
     }
 

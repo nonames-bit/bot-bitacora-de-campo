@@ -802,6 +802,10 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Se quitó el Modo Campo: el TRABAJADOR entra a Registrar y su barra inferior muestra Agenda, Registrar, Manga Corral y Ficha. El GPS de ronda ("Estoy en el potrero") pasó a Registrar.
   - Pruebas: `tests/test_trabajador_registrar.py` + verificación en Chromium 390×844 (atrás cierra Más, vuelve Repro → Inventario → Tablero, avisa al salir; trabajador cae en Registrar).
 
+- [x] **PWA sin rastros de Software Ganadero (2026-10-01)**:
+  - Sistema ya no muestra la tarjeta "Backup SG", la sección "Sincronización con Software Ganadero", el filtro "Software Ganadero" ni el botón de logs "Copias de Seguridad"; el diagnóstico muestra el **último respaldo diario** de `backups/` (fecha, tamaño y cuántas copias hay) en vez de la última importación SG.
+  - Textos limpios en Reproducción (Índice de Fertilidad, días abiertos), Leche (archivo histórico 2016-2018), Genética/Inventario ("Indeterminados", "Sin desglose de raza"), Registrar ("Sugerencia de arete") y en los reportes PDF/Excel. Los datos históricos no cambian; la importación por Telegram (`/confirmar_importar`) sigue disponible.
+
 ### 📋 Hoja de Ruta Pendiente ([Ver Detalle Completo en docs/ROADMAP_FASES_4-8.md](docs/ROADMAP_FASES_4-8.md))
 > ✅ La **Fase 4 (El Despacho Matutino)** ya está implementada: briefing 05:30 AM, inseminaciones AM-PM, Voisin día 3 y reposo ≥30d, palpación/eco día 35/60, recordatorios programados (`/programar`), registro de leche (`/leche`) y alertas de celo perdido.
 - [x] **Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada (2026-09-24)**: Simulador de cruzamiento 1-toque consanguinidad 3G, ranking fertilidad toro, distocias y pérdidas gestacionales, catálogo y evaluación de técnicos inseminadores, y módulo de sincronizaciones hormonales IATF.

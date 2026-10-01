@@ -173,7 +173,7 @@ def generar_excel_inventario(db: Database) -> openpyxl.Workbook:
 
     fila_ini = _aplicar_cabecera_hoja(ws, "Informe de Inventario y Valoración de Ganado", "Hato Activo (estado = 'ACTIVO') con Valoración Comercial")
     columnas = [
-        "Arete / Tag", "Nombre", "Sexo", "Categoría SG", "Raza", "Potrero Actual",
+        "Arete / Tag", "Nombre", "Sexo", "Categoría", "Raza", "Potrero Actual",
         "Peso (kg)", "Edad (meses)", "Estado Reproductivo", "Valor Comercial Est. ($ COP)", "Hierro / Marca", "Color"
     ]
 
@@ -404,7 +404,7 @@ def generar_excel_reproduccion(db: Database) -> openpyxl.Workbook:
     # Hoja 1: Tactos y Palpaciones (Software Ganadero)
     ws1 = wb.active
     ws1.title = "Tactos y Palpaciones"
-    fila_ini1 = _aplicar_cabecera_hoja(ws1, "Tactos / Palpaciones Ginecológicas", "Diagnósticos de Gestación (SG)")
+    fila_ini1 = _aplicar_cabecera_hoja(ws1, "Tactos / Palpaciones Ginecológicas", "Diagnósticos de Gestación")
     cols1 = ["Fecha", "Vaca / Tag", "Resultado", "Días Gestación", "Método", "Hallazgo", "Detalle / Notas", "Toro / Pajuela", "Veterinario"]
     
     filas_dg = db.query("""

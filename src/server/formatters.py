@@ -1053,6 +1053,28 @@ def formatear_status(
     )
 
 
+def _ultimo_respaldo_local() -> str:
+    """Fecha y tamaño del último respaldo diario en backups/ (AAAA-MM-DD.db).
+    La carpeta es la misma que usa scripts/programador.py (BACKUPS_DIR)."""
+    raiz = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    carpeta = os.getenv("BACKUPS_DIR") or os.path.join(raiz, "backups")
+    try:
+        nombres = sorted(
+            n for n in os.listdir(carpeta)
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}\.db", n)
+        )
+    except OSError:
+        nombres = []
+    if not nombres:
+        return "Sin respaldos en el servidor"
+    ultimo = nombres[-1]
+    try:
+        mb = os.path.getsize(os.path.join(carpeta, ultimo)) / (1024 * 1024)
+    except OSError:
+        mb = 0.0
+    return f"{ultimo[:-3]} ({mb:.1f} MB · {len(nombres)} copias guardadas)"
+
+
 def formatear_tablero_sistema(
     db: Database, auth: Optional[Auth] = None, db_path: Optional[str] = None
 ) -> str:
@@ -1064,16 +1086,8 @@ def formatear_tablero_sistema(
     row_tot = db.query_one("SELECT COUNT(*) as n FROM animales")
     tot_animales = int(row_tot["n"]) if row_tot else 0
 
-    # Sincronización SG
-    ult_sync = db.ultimo_import_sg()
-    if ult_sync:
-        f_sync = str(ult_sync["fecha_iso"] or "")[:16].replace("T", " ")
-        arch_sync = ult_sync["archivo"] or "backup.zip"
-        nuevos = ult_sync["nuevos"] or 0
-        dup = ult_sync["duplicados"] or 0
-        sync_str = f"{f_sync} ({arch_sync} · +{nuevos} nuevos, {dup} existentes)"
-    else:
-        sync_str = "Sin registro de sincronización previo"
+    # Último respaldo diario de la base (scripts/programador.py, 03:00).
+    respaldo_str = _ultimo_respaldo_local()
 
     # Termo
     termo = db.query_one("SELECT * FROM termo_nitrogeno ORDER BY fecha_recarga DESC LIMIT 1")
@@ -1086,7 +1100,7 @@ def formatear_tablero_sistema(
         f"🖥️ <b>Infraestructura & Base de Datos Ganadería JA</b>\n\n"
         f"• <b>Base de Datos:</b> {html.escape(tam_str)} (Modo WAL activo)\n"
         f"• <b>Hato Activo:</b> {_fmt_es_co(activos)} animales activos ({_fmt_es_co(tot_animales)} históricos)\n"
-        f"• <b>Sincronización SG:</b> {html.escape(sync_str)}\n"
+        f"• <b>Último respaldo:</b> {html.escape(respaldo_str)}\n"
         f"• <b>Termo N₂:</b> {html.escape(termo_str)}\n"
         f"• <b>Usuarios Autorizados:</b> {n_usr} cuentas RBAC configuradas\n\n"
         f"<i>Panel reservado exclusivamente para la administración y supervisión del Propietario.</i>"
