@@ -12,6 +12,21 @@ Este documento formaliza la hoja de ruta estratégica para las **Fases 4 a 8** d
 
 ---
 
+## ✅ Estado verificado contra el código (2026-10-01)
+
+| Fase | Estado | Evidencia en el código | Lo que falta |
+|---|:---:|---|---|
+| 4 — Despacho Matutino | ✅ | `scripts/enviar_despacho.py`, `src/server/telegram_bot.py` | — |
+| 5.1 — Palpación + Termo | ✅ | `diagnosticos_gestacion`, `pajuelas_inventario`, `termo_nitrogeno`; `/pajuela_add`, `/recarga_n2`, `/kpi_reprod` | — |
+| 5.2 — Consanguinidad 3G + Fertilidad | ✅ | `Database.verificar_consanguinidad`, `/api/simular-cruzamiento` (aviso en Captura), abortos y distocia en Parto, ranking por toro en `/kpi_reprod`, OCR de factura de pajuelas (`media_handler.py`) | — |
+| 6 — Economía + Balance Forrajero | 🟡 | Balance MS 2.8 % PV y capacidad de carga (`pasture_engine.py`), clima con Open-Meteo, CHIRPS y SPI (`pronostico.py`, `spi.py`), Finanzas con KPIs de rentabilidad, costeo por animal en la ficha (`dashboard_data.py`, `costeo_zootecnico`) | El costeo por animal usa costos fijos de referencia (tratamiento, sostenimiento mensual) en vez de los insumos reales; no hay costo/kg de carne ni margen $/L de leche del hato. IDEAM no está integrado (se usa Open-Meteo/CHIRPS) |
+| 7 — PWA Oficina + Corral Offline | ✅ | PWA, fichas QR, cola offline + `/api/sync` idempotente, SOS por Telegram, OCR de aretes, báscula y bastón RFID por Web Bluetooth en Manga (`32-manga.js`) | — |
+| 8 — Visión Multimodal | 🟡 | OCR de arete (`src/vision/arete_detector.py`), NDVI Sentinel-2 vía Google Earth Engine (`scripts/actualizar_ndvi_satelital.py`) y radar SAR Sentinel-1 | Condición corporal (BCS) por foto: hoy el BCS solo se registra a mano por texto; no hay clasificador con Gemini Vision |
+
+Las rutas de "Entregables por Fase" más abajo son el plan original; el código real quedó repartido en `src/engine/`, `src/pwa/rutas/`, `src/vision/` y `scripts/`.
+
+---
+
 ## 🚀 Desglose Detallado por Fase
 
 ### 🌅 FASE 4: El Despacho Matutino — ✅ IMPLEMENTADA
@@ -28,12 +43,12 @@ Automatización proactiva de rutinas operativas diarias enviadas a primera hora 
 
 ### 🧬 FASE 5: Reproducción Completa + Termo de Inseminación
 Control reproductivo de precisión, gestión del tanque criogénico y genética asistida.
-- **[EN PROGRESO] Fase 5.1 — Evento Palpación Directo & Termo Criogénico:**
+- **[✅ IMPLEMENTADA] Fase 5.1 — Evento Palpación Directo & Termo Criogénico:**
   - Parser NLU para diagnósticos gestacionales directos (Preñada / Vacía con días de gestación).
   - Tabla `diagnosticos_gestacion` con historial y cálculo dinámico de Tasa de Concepción (%) y Servicios por Concepción (S/C) por reproductor.
   - Gestión completa del Termo Criogénico: tablas `pajuelas_inventario` y `termo_nitrogeno`, descuento automático de pajuelas al registrar servicio IA, alertas de stock crítico y control de recargas periódicas de $N_2$ (21–30 días).
   - Comandos Telegram `/pajuela_add`, `/pajuela_stock`, `/termo`, `/recarga_n2`, `/diagnosticos`, `/kpi_reprod` y teclado dedicado de Reproducción.
-- **[PENDIENTE] Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada:**
+- **[✅ IMPLEMENTADA] Fase 5.2 — Consanguinidad 3G & Fertilidad Avanzada:**
   - Simulador de Cruzamiento en 1-Toque: Análisis instantáneo de consanguinidad en 3 generaciones (3G) antes de aplicar el servicio para evitar endogamia.
   - Eventos Reproductivos Críticos: Registro formal de abortos y partos distócicos/difíciles como eventos zootécnicos propios con métricas de impacto.
   - Ranking de Fertilidad por Toro y lectura/OCR de facturas de pajuelas/$N_2$ vía `easyocr`.
@@ -41,6 +56,7 @@ Control reproductivo de precisión, gestión del tanque criogénico y genética 
 ---
 
 ### 💰 FASE 6: Economía + Balance Forrajero
+> 🟡 **Estado 2026-10-01:** Balance MS y capacidad de carga con clima ✅ (Open-Meteo/CHIRPS en lugar de IDEAM). Costeo parcial: valoración por animal con costos de referencia fijos; falta costo/kg y margen $/L con insumos reales.
 Integración bioeconómica entre productividad animal, praderas y costos operativos.
 - **Costeo de Tratamientos y Suplementación:** Imputación directa de costos de insumos veterinarios, sal mineralizada y suplementos $\rightarrow$ Cálculo dinámico de Costo/kg de carne y Margen $/L$ de leche.
 - **Balance Forrajero de Materia Seca (MS):** Estimación en tiempo real de oferta forrajera vs. demanda nutricional ($2.8\%$ del Peso Vivo $\times$ UGG del lote).
@@ -49,7 +65,7 @@ Integración bioeconómica entre productividad animal, praderas y costos operati
 ---
 
 ### 📱 FASE 7: PWA Oficina + Corral Offline
-> **Estado 2026-09-24:** A (QR) + D (dashboard) + B completa (cola offline en IndexedDB + `/api/sync` idempotente + Service Worker offline) + SOS de contingencia (Telegram) ✅ implementadas; C parcial (OCR de aretes ✅ con tesseract/easyocr opcional; lectura por bastón RFID pendiente). Ver `docs/PLAN_FASE7_PWA.md`.
+> **Estado 2026-09-24:** A (QR) + D (dashboard) + B completa (cola offline en IndexedDB + `/api/sync` idempotente + Service Worker offline) + SOS de contingencia (Telegram) ✅ implementadas; C completa (OCR de aretes ✅ con tesseract/easyocr opcional; báscula y bastón RFID por Web Bluetooth en Manga ✅). Ver `docs/PLAN_FASE7_PWA.md`.
 Herramientas visuales ejecutivas y resiliencia de captura para condiciones de nula conectividad en manga/corral.
 - **Dashboard Web Ejecutivo (PWA):** Panel gerencial web responsivo para consulta consolidada, filtros avanzados y visualización de KPIs zootécnicos.
 - **Fichas QR en PDF por Lote:** Generación masiva de fichas técnicas en PDF con códigos QR por animal o lote para impresión y lectura rápida.
@@ -59,6 +75,7 @@ Herramientas visuales ejecutivas y resiliencia de captura para condiciones de nu
 ---
 
 ### 👁️ FASE 8: Visión Multimodal Avanzada
+> 🟡 **Estado 2026-10-01:** OCR de arete ✅ y NDVI Sentinel-2 (Google Earth Engine, no `qgis-mcp`) + SAR Sentinel-1 ✅. Pendiente: BCS por fotografía con Gemini Vision.
 Inteligencia artificial visual de última generación y monitoreo satelital de pasturas.
 - **Estimación de Condición Corporal (BCS):** Clasificación automática de condición corporal (escala 1.0 a 5.0) a partir de fotografía dorsal/isquion procesada con Gemini Vision.
 - **OCR Arete Avanzado:** Algoritmos especializados para lectura de aretes sucios, borrosos, dañados o aretes tipo botón en condiciones difíciles de luz.

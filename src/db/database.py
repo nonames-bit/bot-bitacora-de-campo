@@ -1777,10 +1777,39 @@ class Database:
                         peso_kg=None, motivo=None, notas=None, registrado_por=None) -> int:
         """Registra la venta de un semoviente: crea el movimiento de VENTA, actualiza
         el estado del animal a 'VENDIDO' (sale del inventario activo) y, si se especifica
-        peso_kg, registra el pesaje de salida correspondiente."""
+        peso_kg, registra el pesaje de salida correspondiente.
+
+        Solo se vende un animal que ya existe y está ACTIVO: un arete mal escrito
+        no crea un animal nuevo "vendido" y un animal muerto o ya vendido no se
+        vuelve a vender (ValueError con el motivo). La misma venta reenviada
+        (mismo animal y fecha) devuelve el movimiento existente."""
+        tag = str(animal_tag or "").strip()
+        if not tag:
+            raise ValueError("Falta el arete del animal vendido")
+        animal = self.get_animal(tag)
+        if animal is None:
+            raise ValueError(f"No existe el animal {tag}; revise el arete")
+        existente = self._id_si_ya_existe("movimientos", {
+            "animal_id": animal["id_animal"], "fecha": iso(fecha), "tipo_movimiento": "VENTA",
+        })
+        if existente:
+            return existente
+        if animal["estado"] != "ACTIVO":
+            raise ValueError(f"El animal {tag} no está activo (estado {animal['estado'] or 'sin estado'})")
+
+        p_num = None
+        if peso_kg not in (None, ""):
+            try:
+                p_num = float(peso_kg)
+            except (TypeError, ValueError):
+                p_num = None
+            if p_num is None or p_num <= 0:
+                logger.warning("Venta de %s: peso de salida inválido %r, no se registra", tag, peso_kg)
+                p_num = None
+
         notas_partes = []
-        if peso_kg:
-            notas_partes.append(f"Peso: {peso_kg} kg")
+        if p_num:
+            notas_partes.append(f"Peso: {p_num:g} kg")
         if motivo:
             notas_partes.append(str(motivo).strip())
         if notas:
@@ -1788,20 +1817,15 @@ class Database:
         notas_full = " · ".join(notas_partes) if notas_partes else None
 
         mid = self.registrar_movimiento(
-            animal_tag=animal_tag, fecha=fecha, tipo_movimiento="VENTA",
+            animal_tag=tag, fecha=fecha, tipo_movimiento="VENTA",
             procedencia_destino=comprador, precio=precio, notas=notas_full,
             registrado_por=registrado_por,
         )
-        if peso_kg:
-            try:
-                p_num = float(peso_kg)
-                if p_num > 0:
-                    self.registrar_pesaje(
-                        animal_tag=animal_tag, fecha=fecha, peso_kg=p_num,
-                        evento="PESAJE_VENTA", registrado_por=registrado_por,
-                    )
-            except Exception:
-                pass
+        if p_num:
+            self.registrar_pesaje(
+                animal_tag=tag, fecha=fecha, peso_kg=p_num,
+                evento="PESAJE_VENTA", registrado_por=registrado_por,
+            )
         return mid
 
     def registrar_finanza(self, fecha=None, tipo=None, categoria=None, concepto=None,

@@ -293,6 +293,34 @@ def registrar(app, ctx, h):
                         procesados += 1
                         if id_local:
                             ids_ok.append(id_local)
+                    elif tipo == "movimiento" and str(payload.get("tipo_movimiento") or "").strip().upper() != "VENTA":
+                        # Movimiento genérico (entrada, compra, descarte...): se
+                        # guarda con su propio tipo. Sin tipo no se adivina,
+                        # porque tratarlo como venta sacaría al animal del hato.
+                        tipo_mov = str(payload.get("tipo_movimiento") or "").strip().upper()
+                        if not tipo_mov:
+                            errores.append(
+                                f"Movimiento {id_local or ''} NO guardado: falta el tipo (entrada, compra, venta…).")
+                            if id_local:
+                                ids_ok.append(id_local)
+                            continue
+                        p_precio = payload.get("precio")
+                        try:
+                            precio_num = float(p_precio) if p_precio is not None and str(p_precio).strip() != "" else None
+                        except (ValueError, TypeError):
+                            precio_num = None
+                        db_sync.registrar_movimiento(
+                            animal_tag=payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            tipo_movimiento=tipo_mov,
+                            procedencia_destino=payload.get("procedencia_destino"),
+                            precio=precio_num,
+                            notas=payload.get("notas"),
+                            registrado_por=uid,
+                        )
+                        procesados += 1
+                        if id_local:
+                            ids_ok.append(id_local)
                     elif tipo in ("venta", "movimiento"):
                         p_tag = payload.get("animal_tag") or payload.get("tag")
                         p_comprador = payload.get("comprador") or payload.get("procedencia_destino") or payload.get("destino")
@@ -304,16 +332,24 @@ def registrar(app, ctx, h):
                         p_peso = payload.get("peso_kg") or payload.get("peso")
                         p_motivo = payload.get("motivo")
                         p_notas = payload.get("notas")
-                        db_sync.registrar_venta(
-                            animal_tag=p_tag,
-                            fecha=fecha,
-                            comprador=p_comprador,
-                            precio=precio_num,
-                            peso_kg=p_peso,
-                            motivo=p_motivo,
-                            notas=p_notas,
-                            registrado_por=uid,
-                        )
+                        try:
+                            db_sync.registrar_venta(
+                                animal_tag=p_tag,
+                                fecha=fecha,
+                                comprador=p_comprador,
+                                precio=precio_num,
+                                peso_kg=p_peso,
+                                motivo=p_motivo,
+                                notas=p_notas,
+                                registrado_por=uid,
+                            )
+                        except ValueError as e:
+                            # Animal inexistente o ya fuera del hato: reintentar
+                            # no lo arregla, así que se avisa y sale de la cola.
+                            errores.append(f"Venta NO guardada: {e}.")
+                            if id_local:
+                                ids_ok.append(id_local)
+                            continue
                         _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                         procesados += 1
                         if id_local:
