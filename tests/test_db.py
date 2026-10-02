@@ -1064,18 +1064,25 @@ def test_kpis_financieros_margenes_unitarios_dinamicos(db):
     assert k["litros_producidos"] == 200.0
     assert k["ingresos_leche"] == 400000.0
     assert k["precio_promedio_litro_leche"] == 2000.0
-    assert k["costo_por_litro_leche"] == 500.0
-    assert k["margen_por_litro_leche"] == 1500.0
-    assert k["margen_leche_pct"] == 75.0
+    # Los $100.000 de gastos se reparten (antes se cargaban completos a la
+    # leche y otra vez completos a la carne). Sin vacas paridas conocidas,
+    # el reparto va por ingresos: leche 400.000 de 3.600.000 = 1/9.
+    assert k["reparto_metodo"] == "ingresos"
+    assert k["reparto_leche_pct"] == 11.1
+    assert k["costo_por_litro_leche"] == 55.56  # 11.111 / 200 L
+    assert k["margen_por_litro_leche"] == 1944.44
+    assert k["margen_leche_pct"] == 97.2
 
     # Verificaciones de carne
     assert k["ingresos_carne"] == 3200000.0
     assert k["animales_vendidos"] == 1
     assert k["kg_carne_estimados"] == 400.0
     assert k["precio_promedio_kg_carne"] == 8000.0  # 3200000 / 400
-    assert k["costo_por_kg_carne"] == 250.0  # 100000 / 400
-    assert k["margen_por_kg_carne"] == 7750.0  # 8000 - 250
-    assert k["margen_carne_pct"] == 96.9
+    assert k["costo_por_kg_carne"] == 222.22  # 88.889 / 400 kg
+    assert k["margen_por_kg_carne"] == 7777.78
+    assert k["margen_carne_pct"] == 97.2
+    # Lo que se reparte suma exactamente los gastos: nada se cuenta dos veces.
+    assert round(k["costo_leche_total"] + k["costo_carne_total"], 2) == 100000.0
 
 
 def test_registrar_parto_idempotente_no_duplica(db):
@@ -1260,3 +1267,73 @@ def test_transaccion_anidada_no_abre_una_segunda(db):
 
 
 
+
+
+def test_kpis_financieros_tanque_y_controles_no_se_suman(db):
+    """El control por vaca es una muestra del mismo ordeño que va al tanque:
+    sumarlos duplicaba los litros y partía a la mitad el costo por litro."""
+    db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=300.0)  # tanque
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=12.0, animal_tag="47")  # control
+    db.registrar_finanza(fecha="2026-09-02", tipo="EGRESO", categoria="SAL_MINERALES", monto=30000)
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    assert k["litros_producidos"] == 300.0
+    assert k["costo_por_litro_leche"] == 100.0  # solo leche: 30.000 / 300 L
+
+
+def test_kpis_financieros_reparto_por_vacas_en_ordeno(db):
+    from datetime import date, timedelta
+    reciente = (date.today() - timedelta(days=40)).isoformat()
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO", fecha_nacimiento="2018-01-01")
+    db.registrar_parto("V1", fecha=reciente)  # en ordeño (regla por días en leche)
+    for t in ("N1", "N2", "N3"):
+        db.registrar_animal(t, sexo="Macho", estado="ACTIVO")
+    db.registrar_animal("T1", sexo="Macho", estado="VENDIDO")
+    db.registrar_pesaje(animal_tag="T1", fecha="2026-08-25", peso_kg=400.0)
+    db.registrar_movimiento("T1", fecha="2026-09-03", tipo_movimiento="VENTA", precio=3200000)
+    db.registrar_movimiento("N1", fecha="2026-09-04", tipo_movimiento="COMPRA", precio=1000000)
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=1000.0)
+    db.registrar_finanza(fecha="2026-09-02", tipo="EGRESO", categoria="ALIMENTO", monto=400000)
+
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    # V1 cuenta para la leche: 1 de los 4 animales activos (25 %).
+    assert k["vacas_ordeno"] == 1
+    assert k["reparto_metodo"] == "vacas_ordeno"
+    assert k["reparto_leche_pct"] == 25.0
+    assert k["costo_por_litro_leche"] == 100.0  # 100.000 / 1.000 L
+    # La compra de N1 va completa a carne: 300.000 + 1.000.000 = 1.300.000 / 400 kg.
+    assert k["costo_por_kg_carne"] == 3250.0
+    assert k["desglose_costo_kg"][0] == {"categoria": "COMPRA_ANIMAL", "por_unidad": 2500.0}
+    assert k["desglose_costo_litro"] == [{"categoria": "ALIMENTO", "por_unidad": 100.0}]
+
+
+def test_kpis_financieros_sin_gastos(db):
+    db.registrar_produccion_leche(fecha="2026-09-01", litros=100.0)
+    k = db.kpis_financieros("2026-09-01", "2026-09-30")
+    assert k["sin_gastos"] is True
+    assert k["costo_por_litro_leche"] is None
+
+
+def test_tarifas_reales_con_y_sin_gastos(db):
+    from datetime import date, timedelta
+    from src.engine.costeo_real import REF_SOSTENIMIENTO_MES, REF_TRATAMIENTO, tarifas_reales
+
+    hoy = date(2026, 9, 30)
+    t = tarifas_reales(db, hoy)
+    assert t["sostenimiento_mes"] == REF_SOSTENIMIENTO_MES and not t["sostenimiento_real"]
+    assert t["tratamiento"] == REF_TRATAMIENTO and not t["tratamiento_real"]
+
+    db.registrar_animal("A1", estado="ACTIVO")
+    db.registrar_animal("A2", estado="ACTIVO")
+    hace_un_anio = (hoy - timedelta(days=364)).isoformat()
+    db.registrar_finanza(fecha=hace_un_anio, tipo="EGRESO", categoria="SAL_MINERALES", monto=600000)
+    db.registrar_finanza(fecha="2026-09-01", tipo="EGRESO", categoria="MEDICAMENTOS", monto=90000)
+    db.registrar_finanza(fecha="2026-09-01", tipo="EGRESO", categoria="REPRODUCCION", monto=500000)
+    db.registrar_tratamiento("A1", fecha="2026-09-01", producto="Ivermectina")
+    db.registrar_tratamiento("A2", fecha="2026-09-02", producto="Ivermectina")
+    db.registrar_tratamiento("A2", fecha="2026-09-03", producto="Oxitetraciclina")
+
+    t = tarifas_reales(db, hoy)
+    # 600.000 de sal / 2 cabezas / 12 meses (pajillas y drogas no entran aquí).
+    assert t["sostenimiento_real"] and t["sostenimiento_mes"] == 25000.0
+    assert t["tratamiento_real"] and t["tratamiento"] == 30000.0  # 90.000 / 3 tratamientos
