@@ -12,6 +12,8 @@ comando con su horario (hora de la finca, TZ del contenedor):
 - 06:30 todos los días   push "Tareas de hoy" (resumen de las listas de trabajo)
 - cada 30 min            push de avisos urgentes nuevos (parto atrasado o para
                          hoy/mañana, retiro que termina hoy), sin repetir
+- cada 15 min            correo de facturas de la finca: las facturas que llegan
+                         quedan "Por revisar" (solo si FACTURAS_IMAP_* está en .env)
 
 Sin dependencias nuevas: un bucle que revisa el reloj cada 30 s y ejecuta
 cada tarea como máximo una vez por día programado.
@@ -234,6 +236,31 @@ def push_urgentes(hoy: date | None = None) -> int:
         db.close()
 
 
+# ---------------------------------------------------------------------------
+# Correo de facturas (src/integrations/correo_facturas.py)
+# ---------------------------------------------------------------------------
+CORREO_FACTURAS_MINUTOS = int(os.getenv("FACTURAS_CORREO_MINUTOS", "15"))
+MEDIA = Path(os.getenv("MEDIA_DIR", "media"))
+
+
+def revisar_correo_facturas() -> int:
+    """Lee las facturas nuevas del correo de la finca y las deja por revisar."""
+    if str(RAIZ) not in sys.path:
+        sys.path.insert(0, str(RAIZ))
+    from src.integrations import correo_facturas
+    if not correo_facturas.configurado():
+        return 0
+    media = MEDIA if MEDIA.is_absolute() else RAIZ / MEDIA
+    db = _db()
+    try:
+        n = correo_facturas.revisar_correo(db, media_dir=str(media), users_file=str(USERS_FILE))
+    finally:
+        db.close()
+    if n:
+        log.info("Correo de facturas: %d factura(s) por revisar", n)
+    return n
+
+
 def avisar(texto: str) -> None:
     """Envía el texto por Telegram y push a los OWNER (y siempre lo deja en el log)."""
     log.warning("SALUD: %s", texto)
@@ -300,7 +327,14 @@ def main() -> None:
     # Primera revisión 5 min después de arrancar (deja subir app y bot).
     proxima_salud = time.monotonic() + 300
     proxima_urgentes = time.monotonic() + 120
+    proxima_correo = time.monotonic() + 180
     while True:
+        if CORREO_FACTURAS_MINUTOS > 0 and time.monotonic() >= proxima_correo:
+            proxima_correo = time.monotonic() + CORREO_FACTURAS_MINUTOS * 60
+            try:
+                revisar_correo_facturas()
+            except Exception:
+                log.exception("El correo de facturas falló")
         if URGENTES_MINUTOS > 0 and time.monotonic() >= proxima_urgentes:
             proxima_urgentes = time.monotonic() + URGENTES_MINUTOS * 60
             try:

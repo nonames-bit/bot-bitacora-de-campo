@@ -3395,7 +3395,13 @@
       }).join("")
       + "</div>";
 
-    if (fila.foto_ruta) {
+    if (fila.foto_ruta && /\.pdf$/i.test(fila.foto_ruta)) {
+      var rutaPdf = fila.foto_ruta.indexOf("/") === 0 ? fila.foto_ruta : "/" + fila.foto_ruta;
+      cuerpoHtml += "<div style='margin-top:14px;'>"
+        + "<span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block; margin-bottom:6px;'>" + icon("receipt", 13) + " Factura en PDF</span>"
+        + "<a class='tema-btn' href='" + esc(rutaPdf) + "' target='_blank' rel='noopener' style='display:inline-flex; align-items:center; gap:6px; padding:8px 14px; text-decoration:none;'>" + icon("receipt", 14) + "Abrir la factura</a>"
+        + "</div>";
+    } else if (fila.foto_ruta) {
       var ruta = fila.foto_ruta.indexOf("/") === 0 ? fila.foto_ruta : "/" + fila.foto_ruta;
       cuerpoHtml += "<div style='margin-top:14px;'>"
         + "<span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block; margin-bottom:6px;'>" + icon("camera", 13) + " Foto de la Factura / Recibo</span>"
@@ -6919,9 +6925,9 @@
       hintFoto = "Foto del recibo de quincena o planilla donde anotan la leche diaria";
       txtBtnFoto = " Tomar o Subir Recibo / Hoja";
     } else if (tipo === "gasto") {
-      titFoto = "Foto de la Factura / Recibo";
-      hintFoto = "Foto de la factura de compra, recibo de pago o comprobante";
-      txtBtnFoto = " Tomar o Subir Factura";
+      titFoto = "Foto o PDF de la Factura / Recibo";
+      hintFoto = "Foto de la factura, o el PDF que llegó al correo";
+      txtBtnFoto = " Tomar foto o subir PDF";
     }
 
     h += "<div class='cap-foto-box' style='margin-top:12px; padding:12px; border:1.5px dashed var(--borde-fuerte); border-radius:8px; background:var(--superficie);'>"
@@ -6934,7 +6940,7 @@
       + "<small style='font-size:11px; color:var(--texto-suave); display:block; margin-top:2px;'>" + esc(hintFoto) + "</small>"
       + "</div>"
       + "<div style='display:flex; gap:8px; align-items:center;'>"
-      + "<input type='file' id='cap-foto-input' accept='image/*' style='display:none;'>"
+      + "<input type='file' id='cap-foto-input' accept='" + (tipo === "gasto" ? "image/*,application/pdf" : "image/*") + "' style='display:none;'>"
       + "<button type='button' id='btn-elegir-foto' class='tema-btn' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
       + icon("camera", 13) + txtBtnFoto
       + "</button>"
@@ -6954,7 +6960,7 @@
       var tituloIa = tipo === "leche" ? "Digitalización Inteligente de Recibo (IA)" : "Digitalización Inteligente de Factura (IA)";
       var descIa = tipo === "leche"
         ? "Lee automáticamente cada renglón manuscrito, detecta fechas y suma los litros diarios."
-        : "Lee automáticamente el monto, la fecha, el proveedor y sugiere la categoría del gasto o ingreso.";
+        : "Lee la foto o el PDF y llena el monto, la fecha, el proveedor y la categoría del gasto o ingreso.";
       var btnTxtIa = tipo === "leche" ? "Leer Recibo con IA" : "Leer Factura con IA";
       h += "<div id='box-analizar-recibo-ia' style='display:none; margin-top:14px; padding:14px; border-radius:8px; background:var(--superficie); border:1.5px solid var(--verde-marca); box-shadow:0 2px 6px var(--sombra);'>"
         + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;'>"
@@ -7022,6 +7028,11 @@
     // sal + droga): si trae más de una, al guardar se anota un movimiento por
     // categoría en vez de uno solo.
     var _facturaIaDesglose = null;
+    var MAX_PDF_BYTES = 10 * 1024 * 1024;
+    var ICONO_PDF = "data:image/svg+xml;utf8," + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='#f3f1ea'/>"
+      + "<path d='M18 8h20l10 10v38H18z' fill='#fff' stroke='#2f5233' stroke-width='2.5'/>"
+      + "<text x='33' y='44' font-family='sans-serif' font-size='13' font-weight='700' fill='#b3261e' text-anchor='middle'>PDF</text></svg>");
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview)
     // + defaults inteligentes (último potrero / tag desde ficha).
@@ -7797,10 +7808,60 @@
         });
       }
 
+      // Muestra el archivo listo para adjuntar (foto comprimida o PDF de una
+      // factura electrónica) y habilita la lectura con IA.
+      function mostrarArchivoCargado(b64, nombre, tamKb, esPdf) {
+        _fotoActual = { base64: b64, nombre: nombre, tam_kb: tamKb, es_pdf: !!esPdf };
+        if (preImg) preImg.src = esPdf ? ICONO_PDF : b64;
+        if (preNom) preNom.textContent = nombre;
+        if (preTam) preTam.textContent = (esPdf ? "PDF (" + tamKb + " KB)" : "Optimizada (" + tamKb + " KB)") + " · Lista para adjuntar";
+        if (preWrap) preWrap.style.display = "flex";
+
+        _facturaIaFotoRuta = null;
+        _facturaIaDesglose = null;
+        if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
+          boxIa.style.display = "block";
+          var txtAyudaIa = _tipoCapturaActual === "leche"
+            ? "Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente."
+            : "Presiona <b>Leer Factura con IA</b> para llenar categoría, monto y proveedor automáticamente.";
+          if (estadoIa) {
+            estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
+              + "<span class='chip verde' style='font-size:11px;'>" + (esPdf ? "PDF cargado" : "Foto cargada") + "</span>"
+              + "<span style='color:var(--texto-suave); font-size:12px;'>" + txtAyudaIa + "</span>"
+              + "</div>";
+          }
+          if (previewIa) {
+            previewIa.style.display = "none";
+            previewIa.innerHTML = "";
+          }
+        }
+      }
+
       if (fileInp) {
         fileInp.addEventListener("change", function () {
           var file = fileInp.files && fileInp.files[0];
           if (!file) return;
+
+          var esPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+          if (esPdf) {
+            // Solo Ingreso / Gasto acepta PDF (facturas electrónicas del correo).
+            if (_tipoCapturaActual !== "gasto") {
+              alert("Para este registro sube una foto. El PDF solo se acepta en Ingreso / Gasto.");
+              fileInp.value = "";
+              return;
+            }
+            if (file.size > MAX_PDF_BYTES) {
+              alert("El PDF pesa más de 10 MB. Sube solo la factura o una foto de ella.");
+              fileInp.value = "";
+              return;
+            }
+            var lectorPdf = new FileReader();
+            lectorPdf.onload = function (ev) {
+              mostrarArchivoCargado(ev.target.result, file.name || "factura.pdf", Math.round(file.size / 1024), true);
+            };
+            lectorPdf.readAsDataURL(file);
+            return;
+          }
 
           var reader = new FileReader();
           reader.onload = function (ev) {
@@ -7827,36 +7888,7 @@
 
               var compressedB64 = canvas.toDataURL("image/jpeg", 0.82);
               var tamKb = Math.round((compressedB64.length * 3) / 4 / 1024);
-
-              _fotoActual = {
-                base64: compressedB64,
-                nombre: file.name || ("foto_" + _tipoCapturaActual + ".jpg"),
-                tam_kb: tamKb
-              };
-
-              if (preImg) preImg.src = compressedB64;
-              if (preNom) preNom.textContent = _fotoActual.nombre;
-              if (preTam) preTam.textContent = "Optimizada (" + tamKb + " KB) · Lista para adjuntar";
-              if (preWrap) preWrap.style.display = "flex";
-
-              _facturaIaFotoRuta = null;
-              _facturaIaDesglose = null;
-              if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
-                boxIa.style.display = "block";
-                var txtAyudaIa = _tipoCapturaActual === "leche"
-                  ? "Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente."
-                  : "Presiona <b>Leer Factura con IA</b> para llenar categoría, monto y proveedor automáticamente.";
-                if (estadoIa) {
-                  estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
-                    + "<span class='chip verde' style='font-size:11px;'>Foto cargada</span>"
-                    + "<span style='color:var(--texto-suave); font-size:12px;'>" + txtAyudaIa + "</span>"
-                    + "</div>";
-                }
-                if (previewIa) {
-                  previewIa.style.display = "none";
-                  previewIa.innerHTML = "";
-                }
-              }
+              mostrarArchivoCargado(compressedB64, file.name || ("foto_" + _tipoCapturaActual + ".jpg"), tamKb, false);
             };
             img.src = ev.target.result;
           };
@@ -10528,7 +10560,7 @@
      rechace (ver src/engine/revision.py). */
   var ICONO_REVISION = {
     parto: "parto", muerte: "skull", venta: "banknote", movimiento: "banknote",
-    traslado: "truck", traslado_masivo: "truck"
+    traslado: "truck", traslado_masivo: "truck", gasto: "receipt"
   };
 
   function fechaHoraRevision(iso) {
@@ -10545,7 +10577,10 @@
     var h = "<article class='rev-tarjeta' data-id='" + p.id + "'>"
       + "<div class='rev-cab'><span class='rev-ico'>" + icon(ICONO_REVISION[p.tipo] || "clipboard", 20) + "</span>"
       + "<div class='rev-txt'><b>" + esc(p.resumen) + "</b><small>" + meta + "</small>"
-      + (p.tiene_foto ? "<small>Trae foto adjunta</small>" : "") + "</div></div>";
+      + (p.foto_ruta
+        ? "<a class='rev-ver-factura' href='/" + esc(p.foto_ruta) + "' target='_blank' rel='noopener'>" + icon("receipt", 14) + "Ver la factura</a>"
+        : (p.tiene_foto ? "<small>Trae foto adjunta</small>" : ""))
+      + "</div></div>";
     if (p.campos && p.campos.length) {
       h += "<div class='rev-campos' hidden>";
       p.campos.forEach(function (c) {
@@ -10569,7 +10604,8 @@
     var pend = (d && d.pendientes) || [];
     var revisados = (d && d.revisados) || [];
     var h = "<h3>" + icon("clipboard", 20) + "Por revisar</h3>"
-      + "<p class='aviso'>Partos, muertes, ventas y traslados que registran los trabajadores esperan aquí. "
+      + "<p class='aviso'>Partos, muertes, ventas y traslados que registran los trabajadores esperan aquí, "
+      + "igual que las facturas que llegan al correo de la finca. "
       + "Al aprobarlos quedan registrados a nombre de quien los envió.</p>";
     if (!pend.length) {
       h += "<div class='rev-vacio'>" + icon("clipboard", 22) + "<b>No hay registros por revisar.</b></div>";

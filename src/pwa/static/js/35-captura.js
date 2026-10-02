@@ -324,9 +324,9 @@
       hintFoto = "Foto del recibo de quincena o planilla donde anotan la leche diaria";
       txtBtnFoto = " Tomar o Subir Recibo / Hoja";
     } else if (tipo === "gasto") {
-      titFoto = "Foto de la Factura / Recibo";
-      hintFoto = "Foto de la factura de compra, recibo de pago o comprobante";
-      txtBtnFoto = " Tomar o Subir Factura";
+      titFoto = "Foto o PDF de la Factura / Recibo";
+      hintFoto = "Foto de la factura, o el PDF que llegó al correo";
+      txtBtnFoto = " Tomar foto o subir PDF";
     }
 
     h += "<div class='cap-foto-box' style='margin-top:12px; padding:12px; border:1.5px dashed var(--borde-fuerte); border-radius:8px; background:var(--superficie);'>"
@@ -339,7 +339,7 @@
       + "<small style='font-size:11px; color:var(--texto-suave); display:block; margin-top:2px;'>" + esc(hintFoto) + "</small>"
       + "</div>"
       + "<div style='display:flex; gap:8px; align-items:center;'>"
-      + "<input type='file' id='cap-foto-input' accept='image/*' style='display:none;'>"
+      + "<input type='file' id='cap-foto-input' accept='" + (tipo === "gasto" ? "image/*,application/pdf" : "image/*") + "' style='display:none;'>"
       + "<button type='button' id='btn-elegir-foto' class='tema-btn' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
       + icon("camera", 13) + txtBtnFoto
       + "</button>"
@@ -359,7 +359,7 @@
       var tituloIa = tipo === "leche" ? "Digitalización Inteligente de Recibo (IA)" : "Digitalización Inteligente de Factura (IA)";
       var descIa = tipo === "leche"
         ? "Lee automáticamente cada renglón manuscrito, detecta fechas y suma los litros diarios."
-        : "Lee automáticamente el monto, la fecha, el proveedor y sugiere la categoría del gasto o ingreso.";
+        : "Lee la foto o el PDF y llena el monto, la fecha, el proveedor y la categoría del gasto o ingreso.";
       var btnTxtIa = tipo === "leche" ? "Leer Recibo con IA" : "Leer Factura con IA";
       h += "<div id='box-analizar-recibo-ia' style='display:none; margin-top:14px; padding:14px; border-radius:8px; background:var(--superficie); border:1.5px solid var(--verde-marca); box-shadow:0 2px 6px var(--sombra);'>"
         + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;'>"

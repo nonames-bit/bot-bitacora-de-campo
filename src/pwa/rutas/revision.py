@@ -40,6 +40,8 @@ def _para_cliente(p: dict) -> dict:
         "revisado_en": p.get("revisado_en"),
         "nota_revision": p.get("nota_revision"),
         "tiene_foto": bool(datos.get("foto_base64") or datos.get("foto_ruta")),
+        # Factura del correo: el revisor abre el PDF/foto antes de aprobar.
+        "foto_ruta": datos.get("foto_ruta") if p["tipo"] == "gasto" else None,
         "campos": _revision.campos_editables(origen, datos),
     }
 

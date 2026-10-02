@@ -27,6 +27,39 @@ CATEGORIAS_VALIDAS = CATEGORIAS_INGRESO + CATEGORIAS_EGRESO
 # reparte): una factura de agrotienda rara vez trae más.
 MAX_ITEMS = 30
 
+# Las facturas electrónicas llegan en PDF (correo). Gemini lee el PDF tal
+# cual; para el respaldo de NVIDIA (que solo recibe imágenes) se le pasa el
+# texto del PDF.
+MAX_PAGINAS_PDF = 3
+MAX_TEXTO_PDF = 12000
+
+
+def es_pdf_valido(raw: Optional[bytes]) -> bool:
+    """True si los bytes son un PDF que se puede abrir (no basura con .pdf)."""
+    if not raw or not raw.startswith(b"%PDF"):
+        return False
+    try:
+        import io
+
+        from pypdf import PdfReader
+        return len(PdfReader(io.BytesIO(raw)).pages) > 0
+    except Exception:
+        return False
+
+
+def texto_de_pdf(raw: bytes) -> str:
+    """Texto de las primeras páginas del PDF ("" si es escaneado o no abre)."""
+    try:
+        import io
+
+        from pypdf import PdfReader
+        lector = PdfReader(io.BytesIO(raw))
+        partes = [(pag.extract_text() or "") for pag in lector.pages[:MAX_PAGINAS_PDF]]
+        return "\n".join(partes).strip()[:MAX_TEXTO_PDF]
+    except Exception:
+        return ""
+
+
 SYSTEM_PROMPT = """Eres un asistente contable experto en digitalizar facturas y recibos de gastos e ingresos de fincas ganaderas en Colombia.
 Examinas fotografías de facturas de compra (agrotienda, droguería veterinaria, combustible, ferretería), recibos de pago a trabajadores, o comprobantes de ingresos varios.
 
@@ -82,23 +115,25 @@ def _analizar_con_nvidia_vision(image_bytes: bytes, mime_type: str, fecha_ref: s
 
     model = os.getenv("NVIDIA_VISION_MODEL") or os.getenv("NVIDIA_MODEL") or "meta/llama-3.2-90b-vision-instruct"
     url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    b64_str = base64.b64encode(image_bytes).decode("utf-8")
-    data_url = f"data:{mime_type};base64,{b64_str}"
-
     prompt_sistema = SYSTEM_PROMPT.format(fecha_ref=fecha_ref)
     prompt_usuario = "Analiza esta factura o recibo. Devuelve únicamente el JSON solicitado."
+    if mime_type == "application/pdf":
+        texto = texto_de_pdf(image_bytes)
+        if not texto:
+            return None
+        contenido_usuario: Any = f"{prompt_usuario}\n\nTexto de la factura (PDF):\n{texto}"
+    else:
+        b64_str = base64.b64encode(image_bytes).decode("utf-8")
+        contenido_usuario = [
+            {"type": "text", "text": prompt_usuario},
+            {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64_str}"}},
+        ]
 
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": prompt_sistema},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt_usuario},
-                    {"type": "image_url", "image_url": {"url": data_url}},
-                ],
-            },
+            {"role": "user", "content": contenido_usuario},
         ],
         "temperature": 0.1,
         "max_tokens": 1500,
@@ -132,8 +167,8 @@ def _analizar_con_nvidia_vision(image_bytes: bytes, mime_type: str, fecha_ref: s
 
 
 def analizar_factura_gasto(imagen: Union[bytes, str], fecha_referencia: Optional[str] = None) -> dict[str, Any]:
-    """Analiza una foto de factura/recibo de gasto o ingreso usando Gemini
-    Vision o NVIDIA NIM. Devuelve los campos listos para pre-llenar la
+    """Analiza una foto o PDF de factura/recibo de gasto o ingreso usando
+    Gemini Vision o NVIDIA NIM. Devuelve los campos listos para pre-llenar la
     captura de Finanzas (fecha, proveedor, concepto, categoría, monto)."""
     fecha_ref = fecha_referencia or date.today().isoformat()
     try:

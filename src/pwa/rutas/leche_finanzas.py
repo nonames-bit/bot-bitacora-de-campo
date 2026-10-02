@@ -337,17 +337,21 @@ def registrar(app, ctx, h):
         return jsonify(res)
 
     def _guardar_foto_factura(foto_b64: str, concepto: str, fecha_ref: str) -> Optional[str]:
-        """Guarda en disco + tabla fotos la imagen de la factura/recibo de
-        gasto o ingreso, igual que ``_guardar_foto_recibo_leche``. Devuelve
+        """Guarda en disco + tabla fotos la imagen (o el PDF) de la factura/
+        recibo de gasto o ingreso, igual que ``_guardar_foto_recibo_leche``. Devuelve
         la ruta relativa guardada, o None si falla (nunca lanza)."""
         try:
             try:
+                from ...vision.recibo_gasto_parser import es_pdf_valido
                 from ...vision.recibo_leche_parser import _extraer_bytes_e_imagen
             except (ImportError, ValueError):
+                from src.vision.recibo_gasto_parser import es_pdf_valido
                 from src.vision.recibo_leche_parser import _extraer_bytes_e_imagen
             raw_bytes, _ = _extraer_bytes_e_imagen(foto_b64)
-            if not _es_imagen_valida(raw_bytes):
-                logger.warning("Foto de factura descartada: no es una imagen válida")
+            # Las facturas electrónicas que llegan al correo vienen en PDF.
+            es_pdf = es_pdf_valido(raw_bytes)
+            if not es_pdf and not _es_imagen_valida(raw_bytes):
+                logger.warning("Foto de factura descartada: no es una imagen ni un PDF válido")
                 return None
             media_dir_abs = (
                 os.path.join(_base.RAIZ_PROYECTO, _base.MEDIA_DIR_DEFAULT)
@@ -356,7 +360,7 @@ def registrar(app, ctx, h):
             os.makedirs(media_dir_abs, exist_ok=True)
             ts = int(time.time())
             rnd = uuid.uuid4().hex[:6]
-            fname = f"factura_{ts}_{rnd}.jpg"
+            fname = f"factura_{ts}_{rnd}.{'pdf' if es_pdf else 'jpg'}"
             with open(os.path.join(media_dir_abs, fname), "wb") as f:
                 f.write(raw_bytes)
             ruta_rel = os.path.join("media", fname).replace("\\", "/")

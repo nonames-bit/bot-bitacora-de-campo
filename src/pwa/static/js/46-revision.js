@@ -4,7 +4,7 @@
      rechace (ver src/engine/revision.py). */
   var ICONO_REVISION = {
     parto: "parto", muerte: "skull", venta: "banknote", movimiento: "banknote",
-    traslado: "truck", traslado_masivo: "truck"
+    traslado: "truck", traslado_masivo: "truck", gasto: "receipt"
   };
 
   function fechaHoraRevision(iso) {
@@ -21,7 +21,10 @@
     var h = "<article class='rev-tarjeta' data-id='" + p.id + "'>"
       + "<div class='rev-cab'><span class='rev-ico'>" + icon(ICONO_REVISION[p.tipo] || "clipboard", 20) + "</span>"
       + "<div class='rev-txt'><b>" + esc(p.resumen) + "</b><small>" + meta + "</small>"
-      + (p.tiene_foto ? "<small>Trae foto adjunta</small>" : "") + "</div></div>";
+      + (p.foto_ruta
+        ? "<a class='rev-ver-factura' href='/" + esc(p.foto_ruta) + "' target='_blank' rel='noopener'>" + icon("receipt", 14) + "Ver la factura</a>"
+        : (p.tiene_foto ? "<small>Trae foto adjunta</small>" : ""))
+      + "</div></div>";
     if (p.campos && p.campos.length) {
       h += "<div class='rev-campos' hidden>";
       p.campos.forEach(function (c) {
@@ -45,7 +48,8 @@
     var pend = (d && d.pendientes) || [];
     var revisados = (d && d.revisados) || [];
     var h = "<h3>" + icon("clipboard", 20) + "Por revisar</h3>"
-      + "<p class='aviso'>Partos, muertes, ventas y traslados que registran los trabajadores esperan aquí. "
+      + "<p class='aviso'>Partos, muertes, ventas y traslados que registran los trabajadores esperan aquí, "
+      + "igual que las facturas que llegan al correo de la finca. "
       + "Al aprobarlos quedan registrados a nombre de quien los envió.</p>";
     if (!pend.length) {
       h += "<div class='rev-vacio'>" + icon("clipboard", 22) + "<b>No hay registros por revisar.</b></div>";

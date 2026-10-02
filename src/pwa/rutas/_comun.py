@@ -14,6 +14,7 @@ from .. import app as _base
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _es_imagen_valida,
 )
+from ...vision.recibo_gasto_parser import es_pdf_valido as _pdf_valido
 
 # Mismo logger que src/pwa/app.py: los mensajes salen igual que antes.
 logger = logging.getLogger("src.pwa.app")
@@ -34,7 +35,9 @@ def construir(ctx, h) -> None:
             if "," in foto_b64:
                 foto_b64 = foto_b64.split(",", 1)[1]
             raw_bytes = base64.b64decode(foto_b64)
-            if not raw_bytes or not _es_imagen_valida(raw_bytes):
+            # Un gasto puede traer el PDF de la factura electrónica en vez de foto.
+            es_pdf = tipo == "gasto" and _pdf_valido(raw_bytes)
+            if not raw_bytes or not (es_pdf or _es_imagen_valida(raw_bytes)):
                 return None
 
             media_dir_abs = os.path.join(_base.RAIZ_PROYECTO, _base.MEDIA_DIR_DEFAULT) if not os.path.isabs(_base.MEDIA_DIR_DEFAULT) else _base.MEDIA_DIR_DEFAULT
@@ -56,7 +59,9 @@ def construir(ctx, h) -> None:
             tag_clean = re.sub(r"[^A-Za-z0-9_-]+", "_", str(tag_asoc or "campo"))
             ts = int(time.time())
             rnd = uuid.uuid4().hex[:6]
-            fname = f"cap_{tipo}_{tag_clean}_{ts}_{rnd}.jpg"
+            # Prefijo gasto_ en facturas: en /media solo las ven OWNER/ADMIN.
+            fname = (f"gasto_{tag_clean}_{ts}_{rnd}.pdf" if es_pdf
+                     else f"cap_{tipo}_{tag_clean}_{ts}_{rnd}.jpg")
             dest_file = os.path.join(media_dir_abs, fname)
             with open(dest_file, "wb") as f:
                 f.write(raw_bytes)

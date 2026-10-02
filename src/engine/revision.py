@@ -15,6 +15,8 @@ import json
 import logging
 from typing import Any, Optional
 
+from .finanzas_categorias import ETIQUETAS as ETIQUETAS_FINANZAS
+
 logger = logging.getLogger(__name__)
 
 ROLES_EN_REVISION = frozenset({"TRABAJADOR"})
@@ -31,6 +33,7 @@ NOMBRE_TIPO = {
     "movimiento": "Movimiento",
     "traslado": "Traslado",
     "traslado_masivo": "Traslado de potrero",
+    "gasto": "Factura",
 }
 
 # Campos que el revisor puede corregir antes de aprobar, con su etiqueta.
@@ -59,6 +62,9 @@ ETIQUETAS_CAMPO = {
     "lote": "Lote",
     "potrero_origen": "Potrero de origen",
     "potrero_destino": "Potrero de destino",
+    "contraparte": "Proveedor",
+    "concepto": "Concepto",
+    "monto": "Monto",
     "notas": "Notas",
 }
 
@@ -125,6 +131,13 @@ def resumen(origen: str, tipo: str, datos: dict) -> str:
     elif tipo == "traslado_masivo":
         partes = [f"Traslado de todo el potrero {c.get('potrero_origen') or '?'} "
                   f"a {c.get('potrero_destino') or '?'}"]
+    elif tipo == "gasto":
+        # Facturas del correo de la finca (src/integrations/correo_facturas.py).
+        partes = ["Factura" + (f" de {c['contraparte']}" if c.get("contraparte") else "")]
+        if c.get("monto") not in (None, ""):
+            partes.append(_precio(c["monto"]))
+        cats = [g.get("categoria") for g in (c.get("desglose") or []) if isinstance(g, dict)] or [c.get("categoria")]
+        partes.append(", ".join(ETIQUETAS_FINANZAS.get(k, str(k)) for k in cats if k))
     elif tipo == "traslado":
         partes = ["Traslado" + de]
         if c.get("potrero_destino"):
@@ -141,6 +154,8 @@ def campos_editables(origen: str, datos: dict) -> list[dict]:
     for clave, etiqueta in ETIQUETAS_CAMPO.items():
         if clave not in c:
             continue
+        if clave == "monto" and c.get("desglose"):
+            continue  # repartida por categoría: el monto sale de cada parte
         valor = c[clave]
         if isinstance(valor, (dict, list)):
             continue

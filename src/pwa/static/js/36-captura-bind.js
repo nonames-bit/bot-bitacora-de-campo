@@ -6,6 +6,11 @@
     // sal + droga): si trae más de una, al guardar se anota un movimiento por
     // categoría en vez de uno solo.
     var _facturaIaDesglose = null;
+    var MAX_PDF_BYTES = 10 * 1024 * 1024;
+    var ICONO_PDF = "data:image/svg+xml;utf8," + encodeURIComponent(
+      "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' fill='#f3f1ea'/>"
+      + "<path d='M18 8h20l10 10v38H18z' fill='#fff' stroke='#2f5233' stroke-width='2.5'/>"
+      + "<text x='33' y='44' font-family='sans-serif' font-size='13' font-weight='700' fill='#b3261e' text-anchor='middle'>PDF</text></svg>");
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview)
     // + defaults inteligentes (último potrero / tag desde ficha).
@@ -781,10 +786,60 @@
         });
       }
 
+      // Muestra el archivo listo para adjuntar (foto comprimida o PDF de una
+      // factura electrónica) y habilita la lectura con IA.
+      function mostrarArchivoCargado(b64, nombre, tamKb, esPdf) {
+        _fotoActual = { base64: b64, nombre: nombre, tam_kb: tamKb, es_pdf: !!esPdf };
+        if (preImg) preImg.src = esPdf ? ICONO_PDF : b64;
+        if (preNom) preNom.textContent = nombre;
+        if (preTam) preTam.textContent = (esPdf ? "PDF (" + tamKb + " KB)" : "Optimizada (" + tamKb + " KB)") + " · Lista para adjuntar";
+        if (preWrap) preWrap.style.display = "flex";
+
+        _facturaIaFotoRuta = null;
+        _facturaIaDesglose = null;
+        if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
+          boxIa.style.display = "block";
+          var txtAyudaIa = _tipoCapturaActual === "leche"
+            ? "Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente."
+            : "Presiona <b>Leer Factura con IA</b> para llenar categoría, monto y proveedor automáticamente.";
+          if (estadoIa) {
+            estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
+              + "<span class='chip verde' style='font-size:11px;'>" + (esPdf ? "PDF cargado" : "Foto cargada") + "</span>"
+              + "<span style='color:var(--texto-suave); font-size:12px;'>" + txtAyudaIa + "</span>"
+              + "</div>";
+          }
+          if (previewIa) {
+            previewIa.style.display = "none";
+            previewIa.innerHTML = "";
+          }
+        }
+      }
+
       if (fileInp) {
         fileInp.addEventListener("change", function () {
           var file = fileInp.files && fileInp.files[0];
           if (!file) return;
+
+          var esPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || "");
+          if (esPdf) {
+            // Solo Ingreso / Gasto acepta PDF (facturas electrónicas del correo).
+            if (_tipoCapturaActual !== "gasto") {
+              alert("Para este registro sube una foto. El PDF solo se acepta en Ingreso / Gasto.");
+              fileInp.value = "";
+              return;
+            }
+            if (file.size > MAX_PDF_BYTES) {
+              alert("El PDF pesa más de 10 MB. Sube solo la factura o una foto de ella.");
+              fileInp.value = "";
+              return;
+            }
+            var lectorPdf = new FileReader();
+            lectorPdf.onload = function (ev) {
+              mostrarArchivoCargado(ev.target.result, file.name || "factura.pdf", Math.round(file.size / 1024), true);
+            };
+            lectorPdf.readAsDataURL(file);
+            return;
+          }
 
           var reader = new FileReader();
           reader.onload = function (ev) {
@@ -811,36 +866,7 @@
 
               var compressedB64 = canvas.toDataURL("image/jpeg", 0.82);
               var tamKb = Math.round((compressedB64.length * 3) / 4 / 1024);
-
-              _fotoActual = {
-                base64: compressedB64,
-                nombre: file.name || ("foto_" + _tipoCapturaActual + ".jpg"),
-                tam_kb: tamKb
-              };
-
-              if (preImg) preImg.src = compressedB64;
-              if (preNom) preNom.textContent = _fotoActual.nombre;
-              if (preTam) preTam.textContent = "Optimizada (" + tamKb + " KB) · Lista para adjuntar";
-              if (preWrap) preWrap.style.display = "flex";
-
-              _facturaIaFotoRuta = null;
-              _facturaIaDesglose = null;
-              if (boxIa && (_tipoCapturaActual === "leche" || _tipoCapturaActual === "gasto")) {
-                boxIa.style.display = "block";
-                var txtAyudaIa = _tipoCapturaActual === "leche"
-                  ? "Presiona <b>Leer Recibo con IA</b> para digitalizar los días de ordeño automáticamente."
-                  : "Presiona <b>Leer Factura con IA</b> para llenar categoría, monto y proveedor automáticamente.";
-                if (estadoIa) {
-                  estadoIa.innerHTML = "<div style='display:flex; align-items:center; gap:8px; padding:6px 10px; background:rgba(47,82,51,0.06); border-radius:6px;'>"
-                    + "<span class='chip verde' style='font-size:11px;'>Foto cargada</span>"
-                    + "<span style='color:var(--texto-suave); font-size:12px;'>" + txtAyudaIa + "</span>"
-                    + "</div>";
-                }
-                if (previewIa) {
-                  previewIa.style.display = "none";
-                  previewIa.innerHTML = "";
-                }
-              }
+              mostrarArchivoCargado(compressedB64, file.name || ("foto_" + _tipoCapturaActual + ".jpg"), tamKb, false);
             };
             img.src = ev.target.result;
           };
