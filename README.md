@@ -407,6 +407,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Config opcional por entorno: `WEBAUTHN_RP_ID`, `WEBAUTHN_RP_NAME` y `WEBAUTHN_ORIGIN` (por defecto se derivan del host). Deploy: `pip install -r requirements.txt` (entra `webauthn==3.0.1`) + recargar nginx por la cabecera `Permissions-Policy`.
   - Pruebas `tests/test_webauthn.py` (12) + rutas en `tests/test_pwa_api.py`; verificación visual móvil 390×844 con `scripts/verify_webauthn_visual.py`.
 
+- [x] **Costos reales por litro de leche y por kilo de carne (Fase 6, 2026-10-02)**:
+  - `src/engine/costeo_real.py`: los gastos de Finanzas del periodo se reparten entre leche y carne en vez de cargarle el total a cada una (antes cada peso se contaba dos veces). La compra de animales va completa a carne; el resto se reparte según la parte del hato que son vacas en ordeño (`engine/lactancia.py`) o, si no se sabe, según los ingresos de cada línea.
+  - Los litros del periodo salen del tanque; los controles por vaca solo se usan si no hay tanque (antes se sumaban ambos y el costo por litro salía a la mitad).
+  - Finanzas muestra el reparto y cuánto se va en cada categoría por litro y por kilo, y avisa cuando no hay gastos registrados.
+  - Ficha del animal: el manejo mensual por cabeza y el costo por tratamiento salen de los gastos de los últimos 12 meses; se suman los gastos anotados a nombre del animal y su precio de compra (el manejo cuenta desde la compra). Los costos de referencia solo se usan si no hay gastos, y se dice en pantalla.
 ### ⏳ En Progreso / Calibración Continua
 - [x] **Censo Oficial ICA (PDF), Costeo Zootécnico & Exportación Enriquecida en Excel (.xlsx) (2026-09-28)**:
   - **Censo Oficial de Hato para el ICA en PDF (`seccion_censo_ica`)**:

@@ -248,3 +248,36 @@ def test_datos_ficha_animal_costeo_zootecnico(db):
     assert cz["valor_comercial_estimado"] > 0
     assert cz["margen_bruto_estimado"] is not None
 
+
+
+def test_ficha_costeo_usa_gastos_reales(db):
+    """Con gastos registrados, el sostenimiento sale de la finca y no del
+    costo de referencia; los gastos a nombre del animal y su compra suman."""
+    from datetime import date, timedelta
+    from src.engine.costeo_real import REF_SOSTENIMIENTO_MES
+    from src.engine.dashboard_data import datos_ficha_animal
+
+    db.registrar_animal("V12", sexo="HEMBRA", estado="ACTIVO", fecha_nacimiento="2022-01-01")
+    ficha = datos_ficha_animal(db, "V12")
+    assert ficha["costeo_zootecnico"]["sostenimiento_real"] is False
+    assert ficha["costeo_zootecnico"]["sostenimiento_mes"] == REF_SOSTENIMIENTO_MES
+
+    hace_un_anio = (date.today() - timedelta(days=364)).isoformat()
+    db.registrar_finanza(fecha=hace_un_anio, tipo="EGRESO", categoria="SAL_MINERALES", monto=120000)
+    db.registrar_finanza(fecha=date.today().isoformat(), tipo="EGRESO", categoria="MEDICAMENTOS",
+                         monto=50000, animal_tag="V12")
+
+    cz = datos_ficha_animal(db, "V12")["costeo_zootecnico"]
+    assert cz["sostenimiento_real"] is True
+    assert cz["sostenimiento_mes"] == 10000.0  # 120.000 / 1 cabeza / 12 meses
+    assert cz["costo_sostenimiento"] == 360000.0  # nacida en la finca: tope de 36 meses
+    assert cz["costo_gastos_propios"] == 50000.0
+    assert cz["costo_total_acumulado"] == 360000.0 + 50000.0
+
+    # Comprada hace ~2 meses: el sostenimiento cuenta desde la compra.
+    db.registrar_movimiento("V12", fecha=(date.today() - timedelta(days=61)).isoformat(),
+                            tipo_movimiento="COMPRA", precio=900000)
+    cz = datos_ficha_animal(db, "V12")["costeo_zootecnico"]
+    assert cz["costo_compra"] == 900000.0
+    assert cz["costo_sostenimiento"] == 20000.0
+    assert cz["costo_total_acumulado"] == 20000.0 + 50000.0 + 900000.0

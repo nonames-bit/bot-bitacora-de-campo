@@ -3177,6 +3177,34 @@
   }
   function etiquetaCategoriaFinanza(cat) { return CATEGORIAS_FINANZAS_LABEL[cat] || cat; }
 
+  // De dónde sale el costo por litro y por kg (src/engine/costeo_real.py):
+  // los gastos del periodo repartidos entre leche y carne, sin contarlos dos veces.
+  function desgloseCostoHtml(filas, unidad) {
+    if (!filas || !filas.length) return "";
+    return filas.slice(0, 5).map(function (f) {
+      return "<span class='chip gris'>" + esc(etiquetaCategoriaFinanza(f.categoria)) + ": " + fmtMoneda(f.por_unidad) + "/" + unidad + "</span>";
+    }).join(" ");
+  }
+  function notaCostoReal(kf) {
+    if (kf.sin_gastos) {
+      return "<p class='aviso'>" + icon("alertTriangle", 14) + "No hay gastos registrados en este periodo, así que no se puede calcular el costo por litro ni por kilo. Anote sus gastos en <b>+ Ingreso / Gasto</b> o lea las facturas con foto.</p>";
+    }
+    if (kf.reparto_leche_pct == null) return "";
+    var porQue = kf.reparto_metodo === "vacas_ordeno"
+      ? kf.vacas_ordeno + " vacas en ordeño de " + kf.total_activos + " animales activos"
+      : (kf.reparto_metodo === "ingresos" ? "lo que aporta cada línea a los ingresos (no hay vacas en ordeño identificadas)"
+        : (kf.reparto_metodo === "solo_leche" ? "solo hubo leche en este periodo" : "solo hubo ganado en este periodo"));
+    var h = "<div class='aviso' style='margin-top:-6px;'>" + icon("info", 14)
+      + "<b>Costos reales</b> con sus gastos registrados (" + fmtMoneda(kf.gastos_operativos || 0) + ")"
+      + (kf.compras_animales ? " más compras de animales (" + fmtMoneda(kf.compras_animales) + ", van a carne)" : "")
+      + ". A la leche le toca el <b>" + kf.reparto_leche_pct + "%</b> de los gastos, según " + esc(porQue) + "; el resto va a carne.";
+    var dl = desgloseCostoHtml(kf.desglose_costo_litro, "L");
+    var dk = desgloseCostoHtml(kf.desglose_costo_kg, "kg");
+    if (dl) h += "<div style='margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;'>" + icon("milk", 13) + "<b>Cada litro:</b> " + dl + "</div>";
+    if (dk) h += "<div style='margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;'>" + icon("scale", 13) + "<b>Cada kilo:</b> " + dk + "</div>";
+    return h + "</div>";
+  }
+
   function renderFinanzas(d) {
     var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
     var anoActual = new Date().getFullYear();
@@ -3270,6 +3298,7 @@
       + kpiIr(kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza hato (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)"), { sec: "Desglose por categoría" })
       + kpiIr(kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta"), { sec: "Movimientos recientes" })
       + "</div>";
+    h += notaCostoReal(kf);
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
       h += "<p class='aviso' style='margin-top:-6px;'>" + icon("alertTriangle", 14) + "Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
         + (kf.ventas_sin_peso ? " " + kf.ventas_sin_peso + " venta(s) sin ningún pesaje previo quedaron fuera del cálculo." : "") + "</p>";
@@ -12700,7 +12729,7 @@
         var mColor = cz.margen_bruto_estimado >= 0 ? "var(--verde-marca)" : "var(--color-rojo-txt)";
         var mPctStr = cz.margen_bruto_pct != null ? (" (" + cz.margen_bruto_pct + "%)") : "";
         margenHtml = "<span style='font-size:18px; font-weight:800; color:" + mColor + ";'>" + fmtMoneda(cz.margen_bruto_estimado) + "</span>"
-          + "<span class='chip verde' style='font-size:11px; padding:2px 6px; font-weight:700; margin-left:6px;'>" + mPctStr + "</span>";
+          + "<span class='chip " + (cz.margen_bruto_estimado >= 0 ? "verde" : "rojo") + "' style='font-size:11px; padding:2px 6px; font-weight:700; margin-left:6px;'>" + mPctStr + "</span>";
       } else {
         margenHtml = "<span class='meta' style='font-size:13px;'>Calculable tras pesaje</span>";
       }
@@ -12725,6 +12754,8 @@
         + (cz.costo_inseminacion > 0 ? ("<span class='chip gris' title='Pajuelas e IATF'>IA: " + fmtMoneda(cz.costo_inseminacion) + "</span>") : "")
         + (cz.costo_tratamientos > 0 ? ("<span class='chip gris' title='Fármacos y tratamientos'>Sanidad: " + fmtMoneda(cz.costo_tratamientos) + "</span>") : "")
         + (cz.costo_sostenimiento > 0 ? ("<span class='chip gris' title='Pasturas y sales mineralizadas'>Manejo: " + fmtMoneda(cz.costo_sostenimiento) + "</span>") : "")
+        + (cz.costo_gastos_propios > 0 ? ("<span class='chip gris' title='Gastos anotados a nombre de este animal'>Gastos propios: " + fmtMoneda(cz.costo_gastos_propios) + "</span>") : "")
+        + (cz.costo_compra > 0 ? ("<span class='chip gris' title='Precio de compra registrado'>Compra: " + fmtMoneda(cz.costo_compra) + "</span>") : "")
         + "</div>"
         + "</div>"
         + "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>"
@@ -12736,6 +12767,16 @@
         + "<div style='font-size:11.5px; color:var(--texto-suave); display:flex; align-items:center; gap:5px;'>"
         + icon("info", 13) + "Cotización de subastas de la región (actualizada a " + esc(fechaCorta(cz.fecha_mercado)) + ")."
         + "</div>"
+        + "<div style='font-size:11.5px; color:var(--texto-suave); display:flex; align-items:flex-start; gap:5px; margin-top:4px;'>"
+        + "<span style='flex-shrink:0; display:inline-flex;'>" + icon(cz.sostenimiento_real ? "info" : "alertTriangle", 13) + "</span><span>"
+        + (cz.sostenimiento_real
+          ? ("Manejo con sus gastos reales: " + fmtMoneda(cz.sostenimiento_mes) + " por cabeza al mes (" + (cz.meses_datos < 1.5 ? "último mes" : "últimos " + Math.round(cz.meses_datos) + " meses") + ").")
+          : ("Sin gastos registrados: el manejo usa un costo de referencia de " + fmtMoneda(cz.sostenimiento_mes) + " por cabeza al mes."))
+        + (cz.costo_tratamientos > 0
+          ? (" Cada tratamiento " + fmtMoneda(cz.tratamiento_unitario) + (cz.tratamiento_real ? " (promedio real de drogas y veterinario)." : " (referencia, sin gastos de drogas registrados)."))
+          : "")
+        + (cz.costo_inseminacion > 0 && !cz.inseminacion_real ? " Alguna pajilla no tiene costo en el inventario y se tomó un valor de referencia." : "")
+        + "</span></div>"
         + "</div>";
     }
 

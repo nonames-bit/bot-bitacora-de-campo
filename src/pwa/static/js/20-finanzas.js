@@ -26,6 +26,34 @@
   }
   function etiquetaCategoriaFinanza(cat) { return CATEGORIAS_FINANZAS_LABEL[cat] || cat; }
 
+  // De dónde sale el costo por litro y por kg (src/engine/costeo_real.py):
+  // los gastos del periodo repartidos entre leche y carne, sin contarlos dos veces.
+  function desgloseCostoHtml(filas, unidad) {
+    if (!filas || !filas.length) return "";
+    return filas.slice(0, 5).map(function (f) {
+      return "<span class='chip gris'>" + esc(etiquetaCategoriaFinanza(f.categoria)) + ": " + fmtMoneda(f.por_unidad) + "/" + unidad + "</span>";
+    }).join(" ");
+  }
+  function notaCostoReal(kf) {
+    if (kf.sin_gastos) {
+      return "<p class='aviso'>" + icon("alertTriangle", 14) + "No hay gastos registrados en este periodo, así que no se puede calcular el costo por litro ni por kilo. Anote sus gastos en <b>+ Ingreso / Gasto</b> o lea las facturas con foto.</p>";
+    }
+    if (kf.reparto_leche_pct == null) return "";
+    var porQue = kf.reparto_metodo === "vacas_ordeno"
+      ? kf.vacas_ordeno + " vacas en ordeño de " + kf.total_activos + " animales activos"
+      : (kf.reparto_metodo === "ingresos" ? "lo que aporta cada línea a los ingresos (no hay vacas en ordeño identificadas)"
+        : (kf.reparto_metodo === "solo_leche" ? "solo hubo leche en este periodo" : "solo hubo ganado en este periodo"));
+    var h = "<div class='aviso' style='margin-top:-6px;'>" + icon("info", 14)
+      + "<b>Costos reales</b> con sus gastos registrados (" + fmtMoneda(kf.gastos_operativos || 0) + ")"
+      + (kf.compras_animales ? " más compras de animales (" + fmtMoneda(kf.compras_animales) + ", van a carne)" : "")
+      + ". A la leche le toca el <b>" + kf.reparto_leche_pct + "%</b> de los gastos, según " + esc(porQue) + "; el resto va a carne.";
+    var dl = desgloseCostoHtml(kf.desglose_costo_litro, "L");
+    var dk = desgloseCostoHtml(kf.desglose_costo_kg, "kg");
+    if (dl) h += "<div style='margin-top:6px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;'>" + icon("milk", 13) + "<b>Cada litro:</b> " + dl + "</div>";
+    if (dk) h += "<div style='margin-top:4px; display:flex; flex-wrap:wrap; gap:4px; align-items:center;'>" + icon("scale", 13) + "<b>Cada kilo:</b> " + dk + "</div>";
+    return h + "</div>";
+  }
+
   function renderFinanzas(d) {
     var r = d.resumen || { total_ingresos: 0, total_egresos: 0, utilidad: 0, categorias: [] };
     var anoActual = new Date().getFullYear();
@@ -119,6 +147,7 @@
       + kpiIr(kpi(kf.costo_por_cabeza != null ? fmtMoneda(kf.costo_por_cabeza) : "—", "Costo por cabeza hato (" + (kf.total_activos != null ? kf.total_activos : 0) + " animales)"), { sec: "Desglose por categoría" })
       + kpiIr(kpi(fmtMoneda(r.total_ingresos - r.total_egresos), "Utilidad Neta Periodo", (r.total_ingresos - r.total_egresos) >= 0 ? "ok" : "alerta"), { sec: "Movimientos recientes" })
       + "</div>";
+    h += notaCostoReal(kf);
     if (kf.costo_por_kg_carne != null || kf.ventas_sin_peso) {
       h += "<p class='aviso' style='margin-top:-6px;'>" + icon("alertTriangle", 14) + "Costo por kg de carne es un <b>estimado</b>: usa el último pesaje registrado antes de cada venta (no se pesa el animal en el momento exacto de vender)."
         + (kf.ventas_sin_peso ? " " + kf.ventas_sin_peso + " venta(s) sin ningún pesaje previo quedaron fuera del cálculo." : "") + "</p>";

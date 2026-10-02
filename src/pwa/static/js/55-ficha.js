@@ -876,7 +876,7 @@
         var mColor = cz.margen_bruto_estimado >= 0 ? "var(--verde-marca)" : "var(--color-rojo-txt)";
         var mPctStr = cz.margen_bruto_pct != null ? (" (" + cz.margen_bruto_pct + "%)") : "";
         margenHtml = "<span style='font-size:18px; font-weight:800; color:" + mColor + ";'>" + fmtMoneda(cz.margen_bruto_estimado) + "</span>"
-          + "<span class='chip verde' style='font-size:11px; padding:2px 6px; font-weight:700; margin-left:6px;'>" + mPctStr + "</span>";
+          + "<span class='chip " + (cz.margen_bruto_estimado >= 0 ? "verde" : "rojo") + "' style='font-size:11px; padding:2px 6px; font-weight:700; margin-left:6px;'>" + mPctStr + "</span>";
       } else {
         margenHtml = "<span class='meta' style='font-size:13px;'>Calculable tras pesaje</span>";
       }
@@ -901,6 +901,8 @@
         + (cz.costo_inseminacion > 0 ? ("<span class='chip gris' title='Pajuelas e IATF'>IA: " + fmtMoneda(cz.costo_inseminacion) + "</span>") : "")
         + (cz.costo_tratamientos > 0 ? ("<span class='chip gris' title='Fármacos y tratamientos'>Sanidad: " + fmtMoneda(cz.costo_tratamientos) + "</span>") : "")
         + (cz.costo_sostenimiento > 0 ? ("<span class='chip gris' title='Pasturas y sales mineralizadas'>Manejo: " + fmtMoneda(cz.costo_sostenimiento) + "</span>") : "")
+        + (cz.costo_gastos_propios > 0 ? ("<span class='chip gris' title='Gastos anotados a nombre de este animal'>Gastos propios: " + fmtMoneda(cz.costo_gastos_propios) + "</span>") : "")
+        + (cz.costo_compra > 0 ? ("<span class='chip gris' title='Precio de compra registrado'>Compra: " + fmtMoneda(cz.costo_compra) + "</span>") : "")
         + "</div>"
         + "</div>"
         + "<div style='background:var(--fondo); border:1px solid var(--borde); border-radius:8px; padding:12px;'>"
@@ -912,6 +914,16 @@
         + "<div style='font-size:11.5px; color:var(--texto-suave); display:flex; align-items:center; gap:5px;'>"
         + icon("info", 13) + "Cotización de subastas de la región (actualizada a " + esc(fechaCorta(cz.fecha_mercado)) + ")."
         + "</div>"
+        + "<div style='font-size:11.5px; color:var(--texto-suave); display:flex; align-items:flex-start; gap:5px; margin-top:4px;'>"
+        + "<span style='flex-shrink:0; display:inline-flex;'>" + icon(cz.sostenimiento_real ? "info" : "alertTriangle", 13) + "</span><span>"
+        + (cz.sostenimiento_real
+          ? ("Manejo con sus gastos reales: " + fmtMoneda(cz.sostenimiento_mes) + " por cabeza al mes (" + (cz.meses_datos < 1.5 ? "último mes" : "últimos " + Math.round(cz.meses_datos) + " meses") + ").")
+          : ("Sin gastos registrados: el manejo usa un costo de referencia de " + fmtMoneda(cz.sostenimiento_mes) + " por cabeza al mes."))
+        + (cz.costo_tratamientos > 0
+          ? (" Cada tratamiento " + fmtMoneda(cz.tratamiento_unitario) + (cz.tratamiento_real ? " (promedio real de drogas y veterinario)." : " (referencia, sin gastos de drogas registrados)."))
+          : "")
+        + (cz.costo_inseminacion > 0 && !cz.inseminacion_real ? " Alguna pajilla no tiene costo en el inventario y se tomó un valor de referencia." : "")
+        + "</span></div>"
         + "</div>";
     }
 

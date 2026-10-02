@@ -1991,17 +1991,28 @@ class Database:
         del animal en el momento de la venta, así que se usa el último
         pesaje conocido antes de esa fecha. Ventas sin ningún pesaje previo
         quedan excluidas del cálculo (se reportan aparte en
-        ``ventas_sin_peso`` para que quede claro que el número es parcial)."""
+        ``ventas_sin_peso`` para que quede claro que el número es parcial).
+
+        Costos reales (Fase 6): los gastos del periodo se reparten entre
+        leche y carne (compras de animales completas a carne; el resto según
+        la parte del hato que son vacas en ordeño) en vez de dividir el total
+        de gastos entre los litros y otra vez entre los kg."""
         resumen = self.resumen_finanzas(desde, hasta)
         total_ingresos = resumen["total_ingresos"]
         total_egresos = resumen["total_egresos"]
 
+        # Litros del tanque (filas sin animal). Los controles por vaca son
+        # una muestra del mismo ordeño: sumarlos al tanque duplicaba la
+        # leche. Solo si no hay tanque en el periodo se usan los controles.
         litros_row = self.query_one(
-            "SELECT SUM(litros) AS total FROM produccion_leche WHERE fecha >= ? AND fecha <= ?",
+            "SELECT SUM(CASE WHEN animal_id IS NULL THEN litros END) AS tanque, "
+            "SUM(CASE WHEN animal_id IS NOT NULL THEN litros END) AS controles "
+            "FROM produccion_leche WHERE fecha >= ? AND fecha <= ?",
             (desde, hasta),
         )
-        litros_producidos = float(litros_row["total"] or 0.0) if litros_row else 0.0
-        costo_por_litro_leche = round(total_egresos / litros_producidos, 2) if litros_producidos > 0 else None
+        litros_tanque = float(litros_row["tanque"] or 0.0) if litros_row else 0.0
+        litros_controles = float(litros_row["controles"] or 0.0) if litros_row else 0.0
+        litros_producidos = litros_tanque if litros_tanque > 0 else litros_controles
 
         margen_utilidad_pct = (
             round((total_ingresos - total_egresos) / total_ingresos * 100, 1)
@@ -2030,7 +2041,6 @@ class Database:
                 ventas_con_peso += 1
             else:
                 ventas_sin_peso += 1
-        costo_por_kg_carne = round(total_egresos / kg_total, 2) if kg_total > 0 else None
 
         # Desglose dinámico de ingresos y márgenes de lechería
         ing_leche_row = self.query_one(
@@ -2042,8 +2052,6 @@ class Database:
         litros_finanzas = float(ing_leche_row["total_l"] or 0.0) if ing_leche_row else 0.0
         base_litros_precio = litros_finanzas if litros_finanzas > 0 else litros_producidos
         precio_promedio_litro_leche = round(ingresos_leche / base_litros_precio, 2) if (ingresos_leche > 0 and base_litros_precio > 0) else None
-        margen_por_litro_leche = round(precio_promedio_litro_leche - costo_por_litro_leche, 2) if (precio_promedio_litro_leche is not None and costo_por_litro_leche is not None) else None
-        margen_leche_pct = round((margen_por_litro_leche / precio_promedio_litro_leche) * 100, 1) if (margen_por_litro_leche is not None and precio_promedio_litro_leche > 0) else None
 
         # Desglose dinámico de ingresos y márgenes de carne (ventas de ganado)
         ing_carne_row = self.query_one(
@@ -2053,8 +2061,60 @@ class Database:
         )
         ingresos_carne = float(ing_carne_row["total"] or 0.0) if ing_carne_row else 0.0
         animales_vendidos = int(ing_carne_row["n"] or 0) if ing_carne_row else 0
+
+        # Costos reales: los gastos del periodo se reparten entre leche y
+        # carne en vez de cargarle el total a cada una (ver engine/costeo_real.py).
+        try:
+            from ..engine.costeo_real import desglose_por_unidad, reparto_leche_carne
+            from ..engine.lactancia import estados_lactancia
+        except ImportError:  # ejecución directa
+            from src.engine.costeo_real import desglose_por_unidad, reparto_leche_carne  # type: ignore
+            from src.engine.lactancia import estados_lactancia  # type: ignore
+        gastos_por_cat: dict[str, float] = {}
+        compras_animales = 0.0
+        for c in resumen["categorias"]:
+            if c["tipo"] != "EGRESO":
+                continue
+            if c["categoria"] == "COMPRA_ANIMAL":
+                compras_animales += float(c["total"] or 0.0)
+            else:
+                cat = str(c["categoria"] or "OTRO_EGRESO").upper()
+                gastos_por_cat[cat] = gastos_por_cat.get(cat, 0.0) + float(c["total"] or 0.0)
+        gastos_operativos = sum(gastos_por_cat.values())
+        try:
+            hoy_ref = min(date.today(), date.fromisoformat(str(hasta)[:10]))
+        except ValueError:
+            hoy_ref = date.today()
+        try:
+            vacas_ordeno = sum(
+                1 for e in estados_lactancia(self, hoy_ref).values()
+                if e.get("estado") in ("EN_ORDENO", "PAUSADA")
+            )
+        except Exception:
+            logger.warning("No se pudo calcular el lote de ordeño para el reparto de costos", exc_info=True)
+            vacas_ordeno = 0
+        reparto = reparto_leche_carne(
+            gastos_operativos, compras_animales, vacas_ordeno, total_activos,
+            ingresos_leche, ingresos_carne, litros_producidos,
+        )
+        fraccion_leche = reparto["fraccion_leche"]
+        costo_por_litro_leche = (
+            round(reparto["costo_leche"] / litros_producidos, 2)
+            if (litros_producidos > 0 and total_egresos > 0) else None
+        )
+        costo_por_kg_carne = (
+            round(reparto["costo_carne"] / kg_total, 2)
+            if (kg_total > 0 and total_egresos > 0) else None
+        )
+        desglose_litro = desglose_por_unidad(gastos_por_cat, fraccion_leche, litros_producidos)
+        desglose_kg = desglose_por_unidad(
+            gastos_por_cat, 1 - fraccion_leche, kg_total, extra={"COMPRA_ANIMAL": compras_animales},
+        )
+
         precio_promedio_kg_carne = round(ingresos_carne / kg_total, 2) if (ingresos_carne > 0 and kg_total > 0) else None
         precio_promedio_animal = round(ingresos_carne / animales_vendidos, 2) if (ingresos_carne > 0 and animales_vendidos > 0) else None
+        margen_por_litro_leche = round(precio_promedio_litro_leche - costo_por_litro_leche, 2) if (precio_promedio_litro_leche is not None and costo_por_litro_leche is not None) else None
+        margen_leche_pct = round((margen_por_litro_leche / precio_promedio_litro_leche) * 100, 1) if (margen_por_litro_leche is not None and precio_promedio_litro_leche > 0) else None
         margen_por_kg_carne = round(precio_promedio_kg_carne - costo_por_kg_carne, 2) if (precio_promedio_kg_carne is not None and costo_por_kg_carne is not None) else None
         margen_carne_pct = round((margen_por_kg_carne / precio_promedio_kg_carne) * 100, 1) if (margen_por_kg_carne is not None and precio_promedio_kg_carne > 0) else None
 
@@ -2078,6 +2138,16 @@ class Database:
             "costo_por_kg_carne": costo_por_kg_carne,
             "margen_por_kg_carne": margen_por_kg_carne,
             "margen_carne_pct": margen_carne_pct,
+            "gastos_operativos": round(gastos_operativos, 2),
+            "compras_animales": round(compras_animales, 2),
+            "costo_leche_total": reparto["costo_leche"],
+            "costo_carne_total": reparto["costo_carne"],
+            "reparto_leche_pct": round(fraccion_leche * 100, 1),
+            "reparto_metodo": reparto["metodo"],
+            "vacas_ordeno": vacas_ordeno,
+            "sin_gastos": total_egresos <= 0,
+            "desglose_costo_litro": desglose_litro,
+            "desglose_costo_kg": desglose_kg,
             "flujo_mensual": self.flujo_caja_mensual(desde, hasta),
         }
 

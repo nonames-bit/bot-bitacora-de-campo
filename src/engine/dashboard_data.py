@@ -39,6 +39,7 @@ try:
     from .growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete
     from .genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg
     from .finanzas_categorias import CATEGORIAS_EGRESO, CATEGORIAS_INGRESO
+    from .costeo_real import REF_PAJUELA, REF_SERVICIO_MONTA, gastos_del_animal, tarifas_reales
 except ImportError:  # ejecución directa
     from src.db.database import (  # type: ignore
         POTRERO_ACTUAL_EXPR,
@@ -59,6 +60,7 @@ except ImportError:  # ejecución directa
     from src.engine.growth_engine import DIA_AJUSTE_DESTETE, peso_ajustado_destete  # type: ignore
     from src.engine.genetic_engine import calcular_resumen_genetico_hato, nombre_raza_sg  # type: ignore
     from src.engine.finanzas_categorias import CATEGORIAS_EGRESO, CATEGORIAS_INGRESO  # type: ignore
+    from src.engine.costeo_real import REF_PAJUELA, REF_SERVICIO_MONTA, gastos_del_animal, tarifas_reales  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -3373,8 +3375,11 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
 
         valor_comercial = round(peso_kg * precio_kg, 0) if peso_kg else None
 
-        # Costos acumulados directos
+        # Costos acumulados directos: con los gastos reales de la finca
+        # (engine/costeo_real.py); los de referencia solo si no hay gastos.
+        tarifas = tarifas_reales(db, hoy_date)
         c_insem = 0.0
+        insem_ref = False
         for s in (base.get("servicios") or []):
             toro_cod = (s.get("toro_pajilla") or "").strip()
             if toro_cod:
@@ -3382,18 +3387,30 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
                 if row_p and row_p["costo"]:
                     c_insem += float(row_p["costo"])
                 else:
-                    c_insem += 45000.0
+                    c_insem += REF_PAJUELA
+                    insem_ref = True
             else:
-                c_insem += 35000.0
+                c_insem += REF_SERVICIO_MONTA
+                insem_ref = True
 
         cnt_t = db.query_one("SELECT COUNT(*) AS n FROM tratamientos WHERE animal_id = ?", (aid,))
         n_trats = cnt_t["n"] if cnt_t else len(base.get("tratamientos") or [])
-        c_trat = float(n_trats * 18000.0)
+        c_trat = float(n_trats * tarifas["tratamiento"])
 
+        propios = gastos_del_animal(db, aid)
         meses_vida = max(1, round(edad_dias / 30.44)) if edad_dias else 12
-        c_sostenimiento = float(min(meses_vida, 36) * 28000.0)
+        if propios["fecha_compra"]:
+            try:
+                dias_finca = (hoy_date - date.fromisoformat(propios["fecha_compra"])).days
+                meses_vida = min(meses_vida, max(1, round(dias_finca / 30.44)))
+            except ValueError:
+                pass
+        c_sostenimiento = float(min(meses_vida, 36) * tarifas["sostenimiento_mes"])
 
-        costo_total = round(c_insem + c_trat + c_sostenimiento, 0)
+        c_propios = propios["gastos_propios"]
+        c_compra = propios["compra"]
+
+        costo_total = round(c_insem + c_trat + c_sostenimiento + c_propios + c_compra, 0)
         margen_bruto = round(valor_comercial - costo_total, 0) if valor_comercial is not None else None
         margen_pct = round((margen_bruto / valor_comercial) * 100, 1) if (valor_comercial and margen_bruto is not None) else None
 
@@ -3407,6 +3424,14 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
             "costo_inseminacion": c_insem,
             "costo_tratamientos": c_trat,
             "costo_sostenimiento": c_sostenimiento,
+            "costo_gastos_propios": c_propios,
+            "costo_compra": c_compra,
+            "sostenimiento_mes": tarifas["sostenimiento_mes"],
+            "sostenimiento_real": tarifas["sostenimiento_real"],
+            "tratamiento_unitario": tarifas["tratamiento"],
+            "tratamiento_real": tarifas["tratamiento_real"],
+            "inseminacion_real": not insem_ref,
+            "meses_datos": tarifas["meses_datos"],
             "costo_total_acumulado": costo_total,
             "margen_bruto_estimado": margen_bruto,
             "margen_bruto_pct": margen_pct,
