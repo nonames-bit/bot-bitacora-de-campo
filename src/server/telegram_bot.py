@@ -519,16 +519,19 @@ def construir_application(
         # Nombre factura_* para que en la PWA solo la vean OWNER/ADMIN
         # (soporte de pagos, ver /media en rutas/push_graficos.py).
         ruta_nueva = os.path.join(os.path.dirname(foto_path), f"factura_tg_{int(time.time())}_{uuid.uuid4().hex[:6]}.jpg")
+        ruta_guardada = ruta_nueva.replace("\\", "/")
         try:
             os.replace(foto_path, ruta_nueva)
-            db.execute("UPDATE fotos SET ruta = ? WHERE ruta = ?", (ruta_nueva, foto_path))
+            db.execute("UPDATE fotos SET ruta = ? WHERE ruta = ? OR ruta = ?",
+                       (ruta_guardada, foto_path, foto_path.replace("\\", "/")))
         except OSError:
             ruta_nueva = foto_path
+            ruta_guardada = foto_path.replace("\\", "/")
         clave = uuid.uuid4().hex[:8]
         pendientes = context.user_data.setdefault("facturas_gasto", {})
         while len(pendientes) >= 10:
             pendientes.pop(next(iter(pendientes)))
-        pendientes[clave] = {"res": res, "foto_ruta": ruta_nueva.replace("\\", "/")}
+        pendientes[clave] = {"res": res, "foto_ruta": ruta_guardada}
         teclado = InlineKeyboardMarkup([[
             InlineKeyboardButton("✅ Anotar gasto", callback_data=f"gastofac:ok:{clave}"),
             InlineKeyboardButton("❌ No anotar", callback_data=f"gastofac:no:{clave}"),
