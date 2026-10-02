@@ -332,6 +332,12 @@ class Database:
             self._asegurar_columna("animales", col, "TEXT")
         self._asegurar_columna("fotos", "ocr_text", "TEXT")
         self._asegurar_columna("manejos", "responsable", "TEXT")
+        # Mensajes directos uno a uno en el chat del equipo (NULL = canal general).
+        self._asegurar_columna("mensajes_equipo", "para_user_id", "INTEGER")
+        self._asegurar_columna("mensajes_equipo", "leido_en", "TEXT")
+        self.conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_para ON mensajes_equipo(para_user_id, user_id)"
+        )
         # Geometria real (WGS84) de potreros, importada desde el proyecto QGIS
         # de la finca (ver docs/PLAN_GEO_SATELITAL_6.2_8.2.md, Fase B).
         self._asegurar_columna("potreros", "geom_wkt_4326", "TEXT")
@@ -4636,16 +4642,21 @@ class Database:
         return res
 
     # ------------------------------------------------------------------ #
-    # Chat de equipo (canal único de avisos, broadcast entre usuarios)
+    # Chat de equipo: canal general (broadcast) + mensajes directos 1:1
     # ------------------------------------------------------------------ #
-    def registrar_mensaje_equipo(self, user_id: Optional[int], nombre: str, rol: str, texto: str) -> int:
-        """Publica un mensaje en el canal único de avisos del equipo."""
+    def registrar_mensaje_equipo(
+        self, user_id: Optional[int], nombre: str, rol: str, texto: str,
+        para_user_id: Optional[int] = None,
+    ) -> int:
+        """Publica un mensaje en el canal general (``para_user_id=None``) o
+        como mensaje directo a ese usuario."""
         return self.insert("mensajes_equipo", dict(
             user_id=user_id,
             nombre=(nombre or "Usuario").strip(),
             rol=(rol or "TRABAJADOR").strip().upper(),
             texto=texto.strip(),
             creado_en=self._ahora(),
+            para_user_id=para_user_id,
         ))
 
     def obtener_mensaje_equipo(self, id_mensaje: int) -> Optional[sqlite3.Row]:
@@ -4653,22 +4664,72 @@ class Database:
         return self.query_one("SELECT * FROM mensajes_equipo WHERE id = ?", (id_mensaje,))
 
     def listar_mensajes_equipo(self, despues_de_id: int = 0, limite: int = 50) -> list[sqlite3.Row]:
-        """Lista mensajes del canal de equipo en orden cronológico ascendente.
+        """Lista mensajes del canal general en orden cronológico ascendente.
 
-        ``despues_de_id=0`` es la carga inicial (últimos ``limite``
-        mensajes); ``despues_de_id>0`` es el polling incremental (todo lo
-        publicado después de ese id, con tope ``limite``)."""
+        Nunca incluye mensajes directos. ``despues_de_id=0`` es la carga
+        inicial (últimos ``limite`` mensajes); ``despues_de_id>0`` es el
+        polling incremental (todo lo publicado después de ese id, con tope
+        ``limite``)."""
+        return self._listar_mensajes("para_user_id IS NULL", (), despues_de_id, limite)
+
+    def listar_mensajes_directos(
+        self, yo: int, otro: int, despues_de_id: int = 0, limite: int = 50,
+    ) -> list[sqlite3.Row]:
+        """Conversación privada entre ``yo`` y ``otro`` (ambos sentidos),
+        con la misma paginación que :meth:`listar_mensajes_equipo`."""
+        return self._listar_mensajes(
+            "((user_id = ? AND para_user_id = ?) OR (user_id = ? AND para_user_id = ?))",
+            (yo, otro, otro, yo), despues_de_id, limite,
+        )
+
+    def _listar_mensajes(self, filtro: str, params: tuple, despues_de_id: int, limite: int) -> list[sqlite3.Row]:
         limite = max(1, min(int(limite or 50), 200))
         if despues_de_id > 0:
             return self.query(
-                "SELECT * FROM mensajes_equipo WHERE id > ? ORDER BY id ASC LIMIT ?",
-                (despues_de_id, limite),
+                f"SELECT * FROM mensajes_equipo WHERE {filtro} AND id > ? ORDER BY id ASC LIMIT ?",
+                (*params, despues_de_id, limite),
             )
         filas = self.query(
-            "SELECT * FROM mensajes_equipo ORDER BY id DESC LIMIT ?",
-            (limite,),
+            f"SELECT * FROM mensajes_equipo WHERE {filtro} ORDER BY id DESC LIMIT ?",
+            (*params, limite),
         )
         return list(reversed(filas))
+
+    def marcar_directos_leidos(self, yo: int, de: int) -> int:
+        """Marca como leídos los mensajes directos que ``de`` le mandó a ``yo``."""
+        cur = self.conn.execute(
+            "UPDATE mensajes_equipo SET leido_en = ? "
+            "WHERE para_user_id = ? AND user_id = ? AND leido_en IS NULL",
+            (self._ahora(), yo, de),
+        )
+        self.conn.commit()
+        return cur.rowcount
+
+    def resumen_directos(self, yo: int) -> dict[int, dict[str, Any]]:
+        """Por cada persona con la que ``yo`` tiene conversación privada:
+        mensajes sin leer, último texto y su id/fecha (para la lista de chats)."""
+        filas = self.query(
+            """
+            SELECT CASE WHEN user_id = ? THEN para_user_id ELSE user_id END AS otro,
+                   SUM(CASE WHEN para_user_id = ? AND leido_en IS NULL THEN 1 ELSE 0 END) AS no_leidos,
+                   MAX(id) AS ultimo_id
+            FROM mensajes_equipo
+            WHERE para_user_id IS NOT NULL AND (user_id = ? OR para_user_id = ?)
+            GROUP BY otro
+            """,
+            (yo, yo, yo, yo),
+        )
+        res: dict[int, dict[str, Any]] = {}
+        for f in filas:
+            ult = self.obtener_mensaje_equipo(f["ultimo_id"])
+            res[int(f["otro"])] = {
+                "no_leidos": int(f["no_leidos"] or 0),
+                "ultimo_id": f["ultimo_id"],
+                "ultimo_texto": ult["texto"] if ult else "",
+                "ultimo_en": ult["creado_en"] if ult else None,
+                "ultimo_mio": bool(ult and ult["user_id"] == yo),
+            }
+        return res
 
     def eliminar_mensaje_equipo(self, id_mensaje: int) -> bool:
         """Borra un mensaje del canal de equipo. La verificación de si el

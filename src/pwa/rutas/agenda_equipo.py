@@ -536,10 +536,25 @@ def registrar(app, ctx, h):
             pass
         return jsonify({"ok": True})
 
+    def _uid_sesion():
+        try:
+            return int(session.get("user_id"))
+        except (TypeError, ValueError):
+            return None
+
+    def _usuario_destino(para):
+        """Usuario de users.json para un mensaje directo, o None si no existe."""
+        try:
+            from ...server.auth import Auth
+        except (ImportError, ValueError):
+            from src.server.auth import Auth  # type: ignore
+        return Auth(users_file).obtener_usuario(para)
+
     @app.get("/api/mensajes-equipo")
     @_limite_api("mensajes")
     def api_mensajes_equipo():
-        """Lista el canal único de avisos del equipo (broadcast, cualquier rol autenticado)."""
+        """Lista el canal general del equipo o, con ``?con=<user_id>``, la
+        conversación privada entre el usuario actual y esa persona."""
         try:
             despues_de = int(request.args.get("despues_de") or 0)
         except (TypeError, ValueError):
@@ -548,19 +563,78 @@ def registrar(app, ctx, h):
             limite = int(request.args.get("limite") or 50)
         except (TypeError, ValueError):
             limite = 50
+        con = request.args.get("con")
         db_m = _db(db_path)
         try:
-            filas = db_m.listar_mensajes_equipo(despues_de_id=despues_de, limite=limite)
+            if con:
+                yo = _uid_sesion()
+                try:
+                    otro = int(con)
+                except (TypeError, ValueError):
+                    return jsonify({"ok": False, "error": "Destinatario inválido."}), 400
+                if yo is None:
+                    return jsonify({"ok": False, "error": "Entra con tu PIN para usar mensajes directos."}), 403
+                filas = db_m.listar_mensajes_directos(yo, otro, despues_de_id=despues_de, limite=limite)
+                db_m.marcar_directos_leidos(yo, otro)
+            else:
+                filas = db_m.listar_mensajes_equipo(despues_de_id=despues_de, limite=limite)
             mensajes = [dict(f) for f in filas]
             ultimo_id = mensajes[-1]["id"] if mensajes else despues_de
             return jsonify({"ok": True, "mensajes": mensajes, "ultimo_id": ultimo_id})
         finally:
             db_m.close()
 
+    @app.get("/api/mensajes-equipo/contactos")
+    @_limite_api("mensajes")
+    def api_mensajes_equipo_contactos():
+        """Personas a las que se les puede escribir en privado, con cuántos
+        mensajes directos sin leer tiene cada conversación."""
+        yo = _uid_sesion()
+        if yo is None:
+            return jsonify({"ok": True, "contactos": [], "no_leidos": 0, "disponible": False})
+        try:
+            from ...server.auth import Auth
+        except (ImportError, ValueError):
+            from src.server.auth import Auth  # type: ignore
+        usuarios = Auth(users_file).listar_usuarios()
+        db_m = _db(db_path)
+        try:
+            resumen = db_m.resumen_directos(yo)
+        finally:
+            db_m.close()
+        contactos = []
+        for u in usuarios:
+            try:
+                uid = int(u.get("user_id"))
+            except (TypeError, ValueError):
+                continue
+            if uid == yo:
+                continue
+            r = resumen.get(uid, {})
+            contactos.append({
+                "user_id": uid,
+                "nombre": u.get("nombre") or "Usuario",
+                "rol": str(u.get("rol") or "").upper(),
+                "no_leidos": r.get("no_leidos", 0),
+                "ultimo_id": r.get("ultimo_id"),
+                "ultimo_texto": r.get("ultimo_texto", ""),
+                "ultimo_en": r.get("ultimo_en"),
+                "ultimo_mio": r.get("ultimo_mio", False),
+            })
+        # Primero las conversaciones con actividad más reciente; luego el resto por nombre.
+        contactos.sort(key=lambda c: (-(c["ultimo_id"] or 0), c["nombre"].lower()))
+        return jsonify({
+            "ok": True,
+            "contactos": contactos,
+            "no_leidos": sum(c["no_leidos"] for c in contactos),
+            "disponible": True,
+        })
+
     @app.post("/api/mensajes-equipo")
     @_limite_api("mensajes")
     def api_mensajes_equipo_crear():
-        """Publica un mensaje en el canal de equipo (cualquier rol autenticado)."""
+        """Publica un mensaje en el canal general o, con ``para_user_id``,
+        como mensaje directo (cualquier rol autenticado)."""
         datos = request.get_json(silent=True) or {}
         texto = str(datos.get("texto") or "").strip()
         if not texto:
@@ -571,23 +645,49 @@ def registrar(app, ctx, h):
         uid = session.get("user_id")
         nombre = session.get("nombre") or "Usuario"
         rol = session.get("rol") or _rol_actual() or "TRABAJADOR"
+
+        para = None
+        if datos.get("para_user_id") not in (None, ""):
+            try:
+                para = int(datos.get("para_user_id"))
+            except (TypeError, ValueError):
+                return jsonify({"ok": False, "error": "Destinatario inválido."}), 400
+            if _uid_sesion() is None:
+                return jsonify({"ok": False, "error": "Entra con tu PIN para usar mensajes directos."}), 403
+            if para == _uid_sesion():
+                return jsonify({"ok": False, "error": "No puedes enviarte un mensaje a ti mismo."}), 400
+            if not _usuario_destino(para):
+                return jsonify({"ok": False, "error": "Esa persona ya no está en el equipo."}), 404
+
         db_m = _db(db_path)
         try:
-            mid = db_m.registrar_mensaje_equipo(user_id=uid, nombre=nombre, rol=rol, texto=texto)
+            mid = db_m.registrar_mensaje_equipo(
+                user_id=uid, nombre=nombre, rol=rol, texto=texto, para_user_id=para,
+            )
             fila = db_m.obtener_mensaje_equipo(mid)
             try:
                 from ...server.push_sender import enviar_push
             except (ImportError, ValueError):
                 from src.server.push_sender import enviar_push  # type: ignore
             try:
-                enviar_push(
-                    db_m,
-                    titulo=f"👥 {nombre}",
-                    cuerpo=texto[:120],
-                    url="/",
-                    tag="chat-equipo",
-                    excluir_user_id=uid,
-                )
+                if para is None:
+                    enviar_push(
+                        db_m,
+                        titulo=f"👥 {nombre}",
+                        cuerpo=texto[:120],
+                        url="/",
+                        tag="chat-equipo",
+                        excluir_user_id=uid,
+                    )
+                else:
+                    enviar_push(
+                        db_m,
+                        titulo=f"💬 {nombre} (privado)",
+                        cuerpo=texto[:120],
+                        url=f"/?chat={uid}",
+                        tag=f"chat-directo-{uid}",
+                        user_ids=[para],
+                    )
             except Exception:
                 logger.exception("No se pudo enviar push del chat de equipo")
             return jsonify({"ok": True, "mensaje": dict(fila) if fila else None})
@@ -596,16 +696,21 @@ def registrar(app, ctx, h):
 
     @app.delete("/api/mensajes-equipo/<int:id_mensaje>")
     def api_mensajes_equipo_eliminar(id_mensaje):
-        """Borra un mensaje del canal de equipo (autor propio, u OWNER/ADMIN para moderar)."""
+        """Borra un mensaje del chat. En el canal general: el autor, u
+        OWNER/ADMIN para moderar. Un mensaje directo solo lo borra su autor."""
         mi_uid = session.get("user_id")
         mi_rol = _rol_actual()
         db_m = _db(db_path)
         try:
             fila = db_m.obtener_mensaje_equipo(id_mensaje)
-            if not fila:
+            es_directo = bool(fila) and fila["para_user_id"] is not None
+            es_autor = bool(fila) and mi_uid is not None and str(fila["user_id"]) == str(mi_uid)
+            es_destinatario = es_directo and mi_uid is not None and str(fila["para_user_id"]) == str(mi_uid)
+            # Un mensaje privado ajeno se responde como inexistente: ni
+            # siquiera se confirma que exista.
+            if not fila or (es_directo and not (es_autor or es_destinatario)):
                 return jsonify({"ok": False, "error": "El mensaje no existe."}), 404
-            es_autor = mi_uid is not None and str(fila["user_id"]) == str(mi_uid)
-            es_moderador = mi_rol in ("OWNER", "ADMIN", "ADMINISTRADOR")
+            es_moderador = mi_rol in ("OWNER", "ADMIN", "ADMINISTRADOR") and not es_directo
             if not (es_autor or es_moderador):
                 return jsonify({"ok": False, "error": "Solo el autor o un OWNER/ADMIN pueden borrar este mensaje."}), 403
             db_m.eliminar_mensaje_equipo(id_mensaje)

@@ -414,6 +414,13 @@
 ]
 ],
 [
+"/api/mensajes-equipo/contactos",
+"api_mensajes_equipo_contactos",
+[
+"GET"
+]
+],
+[
 "/api/mercado",
 "api_mercado_precios",
 [

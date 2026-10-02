@@ -145,12 +145,18 @@
       else expandirChat(true);
     }
 
-    /* ---------- Chat de Equipo (canal de avisos entre usuarios conectados) ---------- */
+    /* ---------- Chat de Equipo: canal general + mensajes privados uno a uno ---------- */
     var ROL_ICONO_EQUIPO = { OWNER: icon("crown", 12), ADMIN: icon("shieldPlus", 12), TRABAJADOR: icon("cowboy", 12) };
     var LS_EQUIPO_VISTO = "ja_chat_equipo_visto_id";
     var equipoTabActiva = false;
     var equipoUltimoId = 0;
     var equipoUltimoVistoId = parseInt(localStorage.getItem(LS_EQUIPO_VISTO) || "0", 10) || 0;
+    // Conversación abierta: null = "Todos" (canal general); un número = privado con ese user_id.
+    var equipoConv = null;
+    var directoUltimoId = 0;
+    var equipoContactos = [];
+    var directosNoLeidos = 0;
+    var barraContactos = document.getElementById("chat-equipo-contactos");
 
     function horaCortaActual() {
       try {
@@ -186,76 +192,179 @@
     function equipoMarcarVisto(id) {
       equipoUltimoVistoId = id;
       try { localStorage.setItem(LS_EQUIPO_VISTO, String(id)); } catch (e) {}
-      if (dotEquipo) dotEquipo.classList.remove("on");
-      var bd = btnBurbuja && btnBurbuja.querySelector(".nav-badge");
-      if (bd) bd.classList.remove("on");
+      equipoRefrescarNoLeido();
     }
 
-    function equipoEncenderNoLeido() {
-      if (dotEquipo) dotEquipo.classList.add("on");
-      if (btnBurbuja) {
-        var bd = btnBurbuja.querySelector(".nav-badge");
-        if (!bd) {
-          bd = document.createElement("span");
-          bd.className = "nav-badge";
-          btnBurbuja.appendChild(bd);
-        }
-        bd.classList.add("on");
+    function equipoViendo() {
+      return equipoTabActiva && dock.classList.contains("expandido");
+    }
+
+    // Enciende o apaga el punto rojo de la pestaña "Equipo" y de la burbuja:
+    // hay algo sin leer en "Todos" o en alguna conversación privada.
+    function equipoRefrescarNoLeido() {
+      var generalSinLeer = equipoUltimoId > equipoUltimoVistoId && !(equipoViendo() && equipoConv === null);
+      var on = generalSinLeer || directosNoLeidos > 0;
+      if (dotEquipo) dotEquipo.classList.toggle("on", on);
+      if (!btnBurbuja) return;
+      var bd = btnBurbuja.querySelector(".nav-badge");
+      if (on && !bd) {
+        bd = document.createElement("span");
+        bd.className = "nav-badge";
+        btnBurbuja.appendChild(bd);
       }
+      if (bd) bd.classList.toggle("on", on);
+    }
+
+    function nombreContacto(uid) {
+      for (var i = 0; i < equipoContactos.length; i++) {
+        if (String(equipoContactos[i].user_id) === String(uid)) return equipoContactos[i].nombre;
+      }
+      return "esta persona";
+    }
+
+    function pintarContactos() {
+      if (!barraContactos) return;
+      var html = "<button type='button' class='chat-contacto" + (equipoConv === null ? " activa" : "") +
+        "' data-conv='' role='tab'>" + icon("users", 13) + "Todos</button>";
+      equipoContactos.forEach(function (c) {
+        var activa = String(equipoConv) === String(c.user_id);
+        var ic = ROL_ICONO_EQUIPO[c.rol] || icon("user", 12);
+        html += "<button type='button' class='chat-contacto" + (activa ? " activa" : "") +
+          "' data-conv='" + esc(String(c.user_id)) + "' role='tab' title='Mensaje privado a " + esc(c.nombre) + "'>" +
+          ic + esc(c.nombre) +
+          (c.no_leidos && !activa ? "<span class='chat-contacto-num'>" + (c.no_leidos > 9 ? "9+" : c.no_leidos) + "</span>" : "") +
+          "</button>";
+      });
+      barraContactos.innerHTML = html;
+    }
+
+    function cargarContactosEquipo() {
+      return fetch("/api/mensajes-equipo/contactos")
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok) return;
+          equipoContactos = d.contactos || [];
+          // La conversación abierta ya quedó leída al traer sus mensajes.
+          directosNoLeidos = 0;
+          equipoContactos.forEach(function (c) {
+            if (equipoViendo() && String(equipoConv) === String(c.user_id)) c.no_leidos = 0;
+            directosNoLeidos += c.no_leidos || 0;
+          });
+          // Sin usuario (contraseña maestra) no hay mensajes privados: solo "Todos".
+          if (barraContactos) barraContactos.dataset.disponible = d.disponible ? "1" : "";
+          if (barraContactos) barraContactos.style.display = (d.disponible && equipoTabActiva) ? "" : "none";
+          pintarContactos();
+          equipoRefrescarNoLeido();
+        }).catch(function () {});
+    }
+
+    function avisoConversacion() {
+      if (!histEquipo) return;
+      var div = document.createElement("div");
+      div.className = "chat-equipo-aviso";
+      div.textContent = equipoConv === null
+        ? "Canal de avisos del equipo. Lo que escribas aquí lo ven todos."
+        : "Mensaje privado con " + nombreContacto(equipoConv) + ". Solo lo ven ustedes dos.";
+      histEquipo.appendChild(div);
     }
 
     function renderMensajeEquipo(m) {
       if (!histEquipo) return;
       var yo = window.__usuarioActual || {};
       var esMio = yo.user_id != null && String(yo.user_id) === String(m.user_id);
-      var puedeBorrar = esMio || yo.rol === "OWNER" || yo.rol === "ADMIN";
+      var esDirecto = m.para_user_id != null;
+      var puedeBorrar = esMio || (!esDirecto && (yo.rol === "OWNER" || yo.rol === "ADMIN"));
       var div = document.createElement("div");
       div.className = "chat-msg equipo " + (esMio ? "mio" : "otro");
       div.setAttribute("data-id", m.id);
       var html = "";
-      if (!esMio) {
+      if (!esMio && !esDirecto) {
         var ic = ROL_ICONO_EQUIPO[m.rol] || icon("user", 12);
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
+      if (esDirecto && esMio && m.leido_en) html += " <span title='Leído'>✓✓</span>";
       if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje' aria-label='Borrar mensaje'>" + icon("trash", 12) + "</span>";
       html += "</div>";
       div.innerHTML = html;
       histEquipo.appendChild(div);
     }
 
+    function cargarDirectos() {
+      var conv = equipoConv;
+      if (conv === null) return Promise.resolve();
+      return fetch("/api/mensajes-equipo?con=" + encodeURIComponent(conv) + "&despues_de=" + directoUltimoId + "&limite=50")
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (!d || !d.ok || conv !== equipoConv) return;
+          var nuevos = d.mensajes || [];
+          nuevos.forEach(renderMensajeEquipo);
+          if (typeof d.ultimo_id === "number") directoUltimoId = d.ultimo_id;
+          if (nuevos.length && histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
+        }).catch(function () {});
+    }
+
     function cargarMensajesEquipo() {
+      // El canal general se consulta siempre (para el punto de no leídos);
+      // solo se pinta cuando "Todos" es la conversación abierta.
       fetch("/api/mensajes-equipo?despues_de=" + equipoUltimoId + "&limite=50")
         .then(function (r) { return r.json(); })
         .then(function (d) {
           if (!d || !d.ok) return;
           var nuevos = d.mensajes || [];
-          nuevos.forEach(renderMensajeEquipo);
+          if (equipoConv === null) nuevos.forEach(renderMensajeEquipo);
           if (typeof d.ultimo_id === "number") equipoUltimoId = d.ultimo_id;
-          if (nuevos.length) {
+          if (nuevos.length && equipoConv === null) {
             if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
-            if (equipoTabActiva && dock.classList.contains("expandido")) {
-              equipoMarcarVisto(equipoUltimoId);
-            } else if (equipoUltimoId > equipoUltimoVistoId) {
-              equipoEncenderNoLeido();
-            }
+            if (equipoViendo()) equipoMarcarVisto(equipoUltimoId);
           }
+          equipoRefrescarNoLeido();
         }).catch(function () {});
+      // Una conversación privada solo se trae (y queda leída) si está a la vista.
+      var antes = equipoViendo() ? cargarDirectos() : Promise.resolve();
+      antes.then(cargarContactosEquipo);
+    }
+
+    function abrirConversacion(conv) {
+      equipoConv = (conv === "" || conv == null) ? null : parseInt(conv, 10);
+      if (isNaN(equipoConv)) equipoConv = null;
+      directoUltimoId = 0;
+      if (histEquipo) histEquipo.innerHTML = "";
+      avisoConversacion();
+      pintarContactos();
+      if (inp) inp.placeholder = equipoConv === null
+        ? "Escribe un aviso para el equipo..."
+        : "Mensaje privado a " + nombreContacto(equipoConv) + "...";
+      if (equipoConv === null) {
+        equipoUltimoId = 0;
+        cargarMensajesEquipo();
+      } else {
+        cargarDirectos().then(cargarContactosEquipo);
+      }
     }
 
     function enviarMensajeEquipo(txt) {
+      var cuerpo = { texto: txt };
+      if (equipoConv !== null) cuerpo.para_user_id = equipoConv;
       fetch("/api/mensajes-equipo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: txt })
+        body: JSON.stringify(cuerpo)
       }).then(function (r) { return r.json(); })
         .then(function (d) {
           if (d && d.ok && d.mensaje) {
-            if (typeof d.mensaje.id === "number" && d.mensaje.id > equipoUltimoId) equipoUltimoId = d.mensaje.id;
-            renderMensajeEquipo(d.mensaje);
+            var m = d.mensaje;
+            var esDeAqui = String(m.para_user_id == null ? "" : m.para_user_id) === String(equipoConv == null ? "" : equipoConv);
+            if (!esDeAqui) return;
+            if (m.para_user_id == null) {
+              if (typeof m.id === "number" && m.id > equipoUltimoId) equipoUltimoId = m.id;
+              equipoMarcarVisto(equipoUltimoId);
+            } else if (typeof m.id === "number" && m.id > directoUltimoId) {
+              directoUltimoId = m.id;
+            }
+            renderMensajeEquipo(m);
             if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
-            equipoMarcarVisto(equipoUltimoId);
           } else if (d && d.error) {
             mostrarToast(d.error, "rojo");
           }
@@ -270,13 +379,36 @@
       if (tabEquipo) tabEquipo.classList.toggle("activa", cual === "equipo");
       if (hist) hist.style.display = cual === "ia" ? "" : "none";
       if (histEquipo) histEquipo.style.display = cual === "equipo" ? "" : "none";
+      if (barraContactos) barraContactos.style.display = (cual === "equipo" && barraContactos.dataset.disponible) ? "" : "none";
       if (btnMic) btnMic.style.display = cual === "ia" ? "" : "none";
-      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa el micrófono..." : "Escribe un aviso para el equipo...";
+      if (inp) inp.placeholder = cual === "ia" ? "Pregunta algo o pulsa el micrófono..."
+        : (equipoConv === null ? "Escribe un aviso para el equipo..." : "Mensaje privado a " + nombreContacto(equipoConv) + "...");
       if (cual === "equipo") {
-        equipoMarcarVisto(equipoUltimoId);
+        if (histEquipo && !histEquipo.firstChild) avisoConversacion();
+        if (equipoConv === null) equipoMarcarVisto(equipoUltimoId);
+        else cargarDirectos().then(cargarContactosEquipo);
         if (histEquipo) histEquipo.scrollTop = histEquipo.scrollHeight;
       }
     }
+
+    if (barraContactos) {
+      barraContactos.addEventListener("click", function (e) {
+        var b = e.target && e.target.closest ? e.target.closest(".chat-contacto") : null;
+        if (!b) return;
+        var conv = b.getAttribute("data-conv");
+        if (String(conv) === String(equipoConv == null ? "" : equipoConv)) return;
+        abrirConversacion(conv);
+      });
+    }
+
+    // Abre directamente la conversación privada con un usuario (ej. al tocar
+    // la notificación push de un mensaje privado: /?chat=<user_id>).
+    window.__abrirChatDirecto = function (uid) {
+      activarPestanaChat("equipo");
+      expandirChat(false);
+      cargarContactosEquipo().then(function () { abrirConversacion(uid); });
+    };
+    if (histEquipo && !histEquipo.firstChild) avisoConversacion();
 
     if (tabIA) tabIA.addEventListener("click", function () { activarPestanaChat("ia"); });
     if (tabEquipo) {

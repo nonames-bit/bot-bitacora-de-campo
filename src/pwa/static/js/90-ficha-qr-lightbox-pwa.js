@@ -549,5 +549,9 @@
       arrancarDesdeUrl();
       iniciarHistorial();
       if (window.__cargarMensajesEquipo) window.__cargarMensajesEquipo();
+      // /?chat=<user_id>: viene de tocar el aviso de un mensaje privado.
+      var chatDe = null;
+      try { chatDe = new URLSearchParams(window.location.search).get("chat"); } catch (eChat) { chatDe = null; }
+      if (chatDe && /^\d+$/.test(chatDe) && window.__abrirChatDirecto) window.__abrirChatDirecto(chatDe);
     });
   }

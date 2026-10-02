@@ -1675,6 +1675,63 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
   color: var(--texto-suave);
 }
 .chat-msg-borrar { cursor: pointer; opacity: .8; }
+
+/* Selector de conversación del chat de equipo: "Todos" o una persona (privado) */
+.chat-equipo-contactos {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borde);
+  background: var(--superficie);
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.chat-equipo-contactos::-webkit-scrollbar { display: none; }
+.chat-dock.colapsado .chat-equipo-contactos { display: none !important; }
+.chat-contacto {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 17px;
+  border: 1px solid var(--borde-fuerte);
+  background: var(--fondo);
+  color: var(--texto);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.chat-contacto.activa {
+  background: var(--verde-marca);
+  border-color: var(--verde-marca);
+  color: #fff;
+}
+.chat-contacto-num {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #d93025;
+  color: #fff;
+  font-size: 10.5px;
+  line-height: 18px;
+  text-align: center;
+}
+.chat-equipo-aviso {
+  align-self: center;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--texto-suave);
+  background: var(--fondo);
+  border-radius: 10px;
+  padding: 6px 10px;
+  max-width: 92%;
+}
 .chat-msg-borrar:hover { opacity: 1; }
 
 /* Modal de animales por potrero */

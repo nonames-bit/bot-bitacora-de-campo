@@ -2604,3 +2604,100 @@ def test_sync_movimiento_generico_no_vende_el_animal(db_file, client):
         assert [m["tipo_movimiento"] for m in movs] == ["ENTRADA"]
     finally:
         db2.close()
+
+
+# ---------------------------------------------------------------------------
+# Chat de equipo: mensajes directos uno a uno.
+# ---------------------------------------------------------------------------
+@pytest.fixture
+def app_equipo(tmp_path, db_file):
+    users_json = str(tmp_path / "users_dm.json")
+    with open(users_json, "w", encoding="utf-8") as f:
+        json.dump([
+            {"user_id": 100, "nombre": "Don Juan", "rol": "OWNER", "pin": "9999"},
+            {"user_id": 300, "nombre": "Carlos Vaquero", "rol": "TRABAJADOR", "pin": "7777"},
+            {"user_id": 301, "nombre": "Pedro Vaquero", "rol": "TRABAJADOR", "pin": "6666"},
+        ], f)
+    app = crear_app(db_file, users_file=users_json, password="master-password")
+
+    def entrar(pin):
+        c = app.test_client()
+        c.post("/login", data={"pin": pin})
+        return c
+    return app, entrar
+
+
+def test_mensaje_directo_solo_lo_ven_autor_y_destinatario(app_equipo):
+    _, entrar = app_equipo
+    owner, carlos, pedro = entrar("9999"), entrar("7777"), entrar("6666")
+
+    r = carlos.post("/api/mensajes-equipo", json={"texto": "Don Juan, se fue la luz", "para_user_id": 100})
+    assert r.status_code == 200
+    mid = r.get_json()["mensaje"]["id"]
+    owner.post("/api/mensajes-equipo", json={"texto": "Aviso para todos"})
+
+    # El canal general nunca muestra mensajes privados.
+    textos_general = [m["texto"] for m in pedro.get("/api/mensajes-equipo").get_json()["mensajes"]]
+    assert textos_general == ["Aviso para todos"]
+
+    # Autor y destinatario ven la conversación; un tercero no ve nada.
+    assert [m["texto"] for m in carlos.get("/api/mensajes-equipo?con=100").get_json()["mensajes"]] == ["Don Juan, se fue la luz"]
+    assert [m["texto"] for m in owner.get("/api/mensajes-equipo?con=300").get_json()["mensajes"]] == ["Don Juan, se fue la luz"]
+    assert pedro.get("/api/mensajes-equipo?con=300").get_json()["mensajes"] == []
+    assert pedro.get("/api/mensajes-equipo?con=100").get_json()["mensajes"] == []
+
+    # Ni siquiera un OWNER puede borrar un privado ajeno; un tercero lo ve como inexistente.
+    assert pedro.delete(f"/api/mensajes-equipo/{mid}").status_code == 404
+    assert owner.delete(f"/api/mensajes-equipo/{mid}").status_code == 403
+    assert carlos.delete(f"/api/mensajes-equipo/{mid}").status_code == 200
+
+
+def test_mensaje_directo_no_leidos_y_marcado_al_abrir(app_equipo):
+    _, entrar = app_equipo
+    owner, carlos = entrar("9999"), entrar("7777")
+    carlos.post("/api/mensajes-equipo", json={"texto": "Uno", "para_user_id": 100})
+    carlos.post("/api/mensajes-equipo", json={"texto": "Dos", "para_user_id": 100})
+
+    d = owner.get("/api/mensajes-equipo/contactos").get_json()
+    assert d["no_leidos"] == 2
+    por_id = {c["user_id"]: c for c in d["contactos"]}
+    assert 100 not in por_id  # uno mismo no aparece
+    assert por_id[300]["no_leidos"] == 2 and por_id[300]["ultimo_texto"] == "Dos"
+    assert d["contactos"][0]["user_id"] == 300  # conversación más reciente primero
+
+    # Lo que manda Carlos no le cuenta como "no leído" a él mismo.
+    assert carlos.get("/api/mensajes-equipo/contactos").get_json()["no_leidos"] == 0
+
+    owner.get("/api/mensajes-equipo?con=300")
+    assert owner.get("/api/mensajes-equipo/contactos").get_json()["no_leidos"] == 0
+    leidos = carlos.get("/api/mensajes-equipo?con=100").get_json()["mensajes"]
+    assert all(m["leido_en"] for m in leidos)
+
+
+def test_mensaje_directo_validaciones(app_equipo, client):
+    _, entrar = app_equipo
+    carlos = entrar("7777")
+    assert carlos.post("/api/mensajes-equipo", json={"texto": "Hola", "para_user_id": 300}).status_code == 400
+    assert carlos.post("/api/mensajes-equipo", json={"texto": "Hola", "para_user_id": 555}).status_code == 404
+    assert carlos.post("/api/mensajes-equipo", json={"texto": "Hola", "para_user_id": "abc"}).status_code == 400
+    # Con la contraseña maestra (sin usuario) no hay mensajes privados.
+    assert client.post("/api/mensajes-equipo", json={"texto": "Hola", "para_user_id": 100}).status_code == 403
+    assert client.get("/api/mensajes-equipo/contactos").get_json()["disponible"] is False
+
+
+def test_mensaje_directo_push_solo_al_destinatario(app_equipo, db_file, monkeypatch):
+    from src.server import push_sender
+
+    monkeypatch.setenv("VAPID_PRIVATE_KEY", "clave-privada-de-prueba")
+    monkeypatch.setenv("VAPID_CLAIMS_EMAIL", "owner@ejemplo.com")
+    llamadas = []
+    monkeypatch.setattr(push_sender, "webpush", lambda **kw: llamadas.append(kw))
+    db_directo = Database(db_file)
+    for uid in ("100", "300", "301"):
+        db_directo.guardar_push_suscripcion(f"https://fcm.googleapis.com/{uid}", user_id=uid, p256dh="p", auth="a")
+    db_directo.close()
+
+    _, entrar = app_equipo
+    entrar("7777").post("/api/mensajes-equipo", json={"texto": "Privado", "para_user_id": 100})
+    assert [c["subscription_info"]["endpoint"] for c in llamadas] == ["https://fcm.googleapis.com/100"]
+    assert json.loads(llamadas[0]["data"])["url"] == "/?chat=300"

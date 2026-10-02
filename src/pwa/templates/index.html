@@ -122,10 +122,11 @@
     <div class="chat-msg bot">Hola. Soy el asistente inteligente de la finca. Puedes hacerme preguntas sobre el ganado o dictarme notas de voz con el micrófono <svg class="svg-icon" viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/></svg></div>
   </div>
 
-  <!-- Historial del canal de avisos del equipo (oculto hasta elegir la pestaña "Equipo") -->
-  <div id="chat-historial-equipo" class="chat-cuerpo" style="display:none">
-    <div class="chat-msg bot">Canal de avisos del equipo. Cualquier mensaje aquí lo ven todos (OWNER, ADMIN y Trabajadores).</div>
-  </div>
+  <!-- Conversaciones del equipo: "Todos" (canal general) o una persona (mensaje privado) -->
+  <div id="chat-equipo-contactos" class="chat-equipo-contactos" style="display:none" role="tablist" aria-label="Conversaciones del equipo"></div>
+
+  <!-- Historial del chat del equipo (oculto hasta elegir la pestaña "Equipo") -->
+  <div id="chat-historial-equipo" class="chat-cuerpo" style="display:none"></div>
 
   <!-- Barra de Entrada y Grabación Estilo WhatsApp -->
   <div class="chat-dock-footer">
