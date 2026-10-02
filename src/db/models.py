@@ -547,7 +547,9 @@ CREATE INDEX IF NOT EXISTS idx_precios_mercado_fecha ON precios_mercado(fecha);
 CREATE INDEX IF NOT EXISTS idx_precios_mercado_plaza ON precios_mercado(plaza);
 CREATE INDEX IF NOT EXISTS idx_precios_mercado_producto ON precios_mercado(producto);
 
--- Canal único de avisos del equipo (broadcast, no mensajes directos).
+-- Chat del equipo: canal general de avisos (para_user_id NULL, lo ven todos)
+-- y mensajes directos uno a uno (para_user_id = destinatario, solo los ven
+-- autor y destinatario; leido_en marca cuándo el destinatario lo abrió).
 -- Denormaliza nombre/rol del autor en el momento de publicar (mismo patrón
 -- que rondas_campo/telemetria_gps) para que el mensaje siga mostrando quién
 -- lo escribió aunque luego se edite o borre ese usuario en users.json.
@@ -557,7 +559,9 @@ CREATE TABLE IF NOT EXISTS mensajes_equipo (
     nombre TEXT NOT NULL,
     rol TEXT NOT NULL,
     texto TEXT NOT NULL,
-    creado_en TEXT NOT NULL
+    creado_en TEXT NOT NULL,
+    para_user_id INTEGER,
+    leido_en TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_mensajes_equipo_creado ON mensajes_equipo(creado_en);
