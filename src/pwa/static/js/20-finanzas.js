@@ -244,7 +244,13 @@
       }).join("")
       + "</div>";
 
-    if (fila.foto_ruta) {
+    if (fila.foto_ruta && /\.pdf$/i.test(fila.foto_ruta)) {
+      var rutaPdf = fila.foto_ruta.indexOf("/") === 0 ? fila.foto_ruta : "/" + fila.foto_ruta;
+      cuerpoHtml += "<div style='margin-top:14px;'>"
+        + "<span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block; margin-bottom:6px;'>" + icon("receipt", 13) + " Factura en PDF</span>"
+        + "<a class='tema-btn' href='" + esc(rutaPdf) + "' target='_blank' rel='noopener' style='display:inline-flex; align-items:center; gap:6px; padding:8px 14px; text-decoration:none;'>" + icon("receipt", 14) + "Abrir la factura</a>"
+        + "</div>";
+    } else if (fila.foto_ruta) {
       var ruta = fila.foto_ruta.indexOf("/") === 0 ? fila.foto_ruta : "/" + fila.foto_ruta;
       cuerpoHtml += "<div style='margin-top:14px;'>"
         + "<span style='color:var(--texto-suave); font-size:11.5px; text-transform:uppercase; display:block; margin-bottom:6px;'>" + icon("camera", 13) + " Foto de la Factura / Recibo</span>"

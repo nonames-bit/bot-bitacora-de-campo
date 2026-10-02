@@ -68,7 +68,9 @@ def _extraer_bytes_e_imagen(imagen: Union[bytes, str]) -> tuple[bytes, str]:
     """Normaliza bytes o cadena Base64, devolviendo (raw_bytes, mime_type)."""
     if isinstance(imagen, bytes):
         mime = "image/jpeg"
-        if imagen.startswith(b"\x89PNG"):
+        if imagen.startswith(b"%PDF"):
+            mime = "application/pdf"
+        elif imagen.startswith(b"\x89PNG"):
             mime = "image/png"
         elif imagen.startswith(b"GIF"):
             mime = "image/gif"
@@ -79,12 +81,14 @@ def _extraer_bytes_e_imagen(imagen: Union[bytes, str]) -> tuple[bytes, str]:
     s = imagen.strip()
     mime = "image/jpeg"
     if s.startswith("data:"):
-        match = re.match(r"^data:(image/[a-zA-Z0-9.-]+);base64,", s)
+        match = re.match(r"^data:(image/[a-zA-Z0-9.-]+|application/pdf);base64,", s)
         if match:
             mime = match.group(1)
             s = s[len(match.group(0)):]
 
     raw = base64.b64decode(s)
+    if raw.startswith(b"%PDF"):
+        mime = "application/pdf"
     return raw, mime
 
 
