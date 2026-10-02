@@ -27,6 +27,13 @@ except ImportError:  # pywebpush es una dependencia opcional en dev sin .venv ac
         response = None
 
 
+# Cuánto guarda el push service (FCM/Mozilla) un aviso si el celular no
+# está conectado en ese momento. pywebpush manda TTL=0 por defecto: el aviso
+# se descarta si el celular está dormido o con la app cerrada, y solo llegaba
+# con la app abierta. 24 h cubre una noche sin señal en la finca.
+PUSH_TTL_SEGUNDOS = 24 * 3600
+
+
 def vapid_configurado() -> bool:
     """True si hay llaves VAPID y pywebpush disponible para enviar de verdad."""
     return bool(webpush is not None and os.getenv("VAPID_PRIVATE_KEY") and os.getenv("VAPID_CLAIMS_EMAIL"))
@@ -90,6 +97,8 @@ def enviar_push(
                 data=payload,
                 vapid_private_key=priv,
                 vapid_claims={"sub": f"mailto:{email}"},
+                ttl=PUSH_TTL_SEGUNDOS,
+                headers={"Urgency": "high" if urgente else "normal"},
             )
             resumen["enviados"] += 1
         except WebPushException as e:

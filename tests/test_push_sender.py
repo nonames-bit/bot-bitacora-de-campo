@@ -114,3 +114,19 @@ def test_listar_push_suscripciones_excluir_user_id(db):
     endpoints = {f["endpoint"] for f in restantes}
     # El de user_id=None se conserva (no se sabe si es el mismo autor o no).
     assert endpoints == {"https://fcm.googleapis.com/b", "https://fcm.googleapis.com/c"}
+
+
+def test_enviar_push_guarda_el_aviso_si_el_celular_esta_dormido(db, monkeypatch):
+    """Con TTL=0 (el de pywebpush) el push service descarta el aviso si el
+    celular no está conectado justo en ese momento: solo llegaba con la app
+    abierta. Debe ir con TTL de horas y urgencia alta en los urgentes."""
+    llamadas = []
+    monkeypatch.setattr(push_sender, "webpush", lambda **kw: llamadas.append(kw))
+    db.guardar_push_suscripcion("https://fcm.googleapis.com/uno", user_id="1", p256dh="p", auth="a")
+
+    push_sender.enviar_push(db, "Normal", "Cuerpo")
+    push_sender.enviar_push(db, "Parto", "Cuerpo", urgente=True)
+
+    assert all(c["ttl"] >= 3600 for c in llamadas)
+    assert llamadas[0]["headers"]["Urgency"] == "normal"
+    assert llamadas[1]["headers"]["Urgency"] == "high"
