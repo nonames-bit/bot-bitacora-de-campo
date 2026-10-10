@@ -1043,7 +1043,11 @@ class Database:
             return None
 
         vaca_id = self.resolve_animal(vaca_tag, crear=True, sexo="Hembra")
-        id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha)) if id_cria_tag else None
+        # Cría que nació muerta pero con arete anotado: si el arete es nuevo,
+        # se crea ya en estado MUERTO para que no entre al inventario activo.
+        # Un arete que ya existe no se toca (podría ser otro animal).
+        extra_cria = {"estado": "MUERTO"} if str(estado_cria or "").strip().upper() == "MUERTO" else {}
+        id_cria = self.resolve_animal(id_cria_tag, crear=True, sexo=sexo_cria, fecha_nacimiento=iso(fecha), **extra_cria) if id_cria_tag else None
         # Una pajuela (código del inventario de semen, sin animal con ese tag)
         # no es un toro del hato: crearla como macho ACTIVO sin raza inflaba
         # el inventario y perdía la raza para la composición de la cría.

@@ -102,14 +102,16 @@
     var h = "<label>Fecha del evento: <input type='date' id='cap-fecha' value='" + hoy + "' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
 
     if (tipo === "parto") {
-      h += "<label>Tipo de evento: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option><option value='ABORTO'>Aborto</option><option value='REABSORCION'>Reabsorción embrionaria</option><option value='MOMIFICACION'>Momificación fetal</option><option value='MACERACION'>Maceración fetal</option><option value='MUERTE_FETAL'>Muerte fetal</option></select></label>"
+      h += "<label>Tipo de evento: <select id='cap-tipo-evento' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='PARTO'>Parto sencillo (1 cría)</option><option value='GEMELAR'>Parto gemelar (2 crías)</option><option value='NACIDO_MUERTO'>Nacido muerto (la cría nació muerta)</option><option value='ABORTO'>Aborto</option><option value='REABSORCION'>Reabsorción embrionaria</option><option value='MOMIFICACION'>Momificación fetal</option><option value='MACERACION'>Maceración fetal</option><option value='MUERTE_FETAL'>Muerte fetal</option></select></label>"
         + "<label>Arete / Tag de la Madre (Vaca): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-parto-cria-wrap'>"
+        + "<div id='cap-cria-tag-wrap'>"
         + "<label id='cap-cria1-label'>Arete de la Cría (Nuevo): <input id='cap-cria-tag' placeholder='ej. 102 o NM_102' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<div id='cap-cria-sugerido-hint' style='font-size:11.5px; color:var(--verde-marca); margin:-4px 0 8px 2px; cursor:pointer; font-weight:600;'></div>"
+        + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Sexo de la Cría: <select id='cap-sexo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='HEMBRA'>Hembra</option><option value='MACHO'>Macho</option></select></label></div>"
-        + "<div style='flex:1;'><label>Estado Cría: <select id='cap-estado-cria' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
+        + "<div id='cap-estado-cria-wrap' style='flex:1;'><label>Estado Cría: <select id='cap-estado-cria' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='VIVO'>Vivo / Normal</option><option value='MUERTO'>Nacido Muerto</option></select></label></div>"
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso al nacer (kg): <input type='number' step='0.5' id='cap-peso-nacer' placeholder='ej. 32' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
@@ -131,11 +133,12 @@
         + "<div style='margin-top:8px;'><label>Peso al nacer Cría 2 (kg): <input type='number' step='0.5' id='cap-peso-nacer2' placeholder='ej. 28' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
-        + "<div style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
+        + "<div id='cap-pot-cria-wrap' style='flex:1;'><label>Potrero de la Cría (opcional): <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero de la Madre (opcional): <input id='cap-pot-madre' placeholder='ej. Maternidad' list='dl-potreros' autocomplete='off' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
         + "</div>"
         + "<p id='cap-perdida-aviso' class='aviso' style='display:none; margin:2px 0;'>Se registra como un evento reproductivo de la vaca (sin cría), separado de un Parto normal.</p>"
+        + "<p id='cap-nacido-muerto-aviso' class='aviso' style='display:none; margin:2px 0;'>Cuenta como parto de la vaca (empieza su lactancia), pero la cría no entra al inventario porque nació muerta.</p>"
         + "<label>Observaciones / Notas: <input id='cap-notas' placeholder='Parto distócico, ternero vigoroso, etc.' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "destete") {
       h += "<label>Arete de la Vaca (Madre): <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -221,7 +224,7 @@
         + "</div>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso de Salida en Báscula (kg, opcional): <input type='number' step='0.5' id='cap-venta-peso' placeholder='ej. 460' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
-        + "<div style='flex:1;'><label>Motivo / Destino zootécnico: <select id='cap-venta-motivo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Ceba / Sacrificio'>Ceba / Sacrificio</option><option value='Cría / Reproducción'>Cría / Reproductor</option><option value='Descarte por edad'>Descarte por vejez</option><option value='Descarte productivo'>Descarte productivo / baja leche</option><option value='Comercial / Subasta'>Comercial / Subasta</option><option value='Otro'>Otro motivo</option></select></label></div>"
+        + "<div style='flex:1;'><label>Motivo / Destino zootécnico: <select id='cap-venta-motivo' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Ceba / Sacrificio'>Ceba / Sacrificio</option><option value='Vaca en producción'>Vaca en producción (dando leche)</option><option value='Novilla'>Novilla</option><option value='Torete'>Torete</option><option value='Cría / Reproducción'>Cría / Reproductor</option><option value='Descarte por edad'>Descarte por vejez</option><option value='Descarte productivo'>Descarte productivo / baja leche</option><option value='Comercial / Subasta'>Comercial / Subasta</option><option value='Otro'>Otro motivo</option></select></label></div>"
         + "</div>"
         + "<label>Observaciones / Guía de movilización: <input id='cap-notas' placeholder='ej. Guía ICA 1234, camión de Don Pedro' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>";
     } else if (tipo === "muerte") {
