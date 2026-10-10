@@ -797,6 +797,7 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
                 "creado_por": r.get("creado_por"),
                 "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
+                "asignado_a_id": r.get("asignado_a_id"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),
                 "potrero_nombre": r.get("potrero_nombre"),
@@ -825,8 +826,10 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
                 "fecha": str(r.get("fecha_programada") or "")[:10] or None,
                 "hora": r.get("hora"),
                 "estado": r.get("estado") or "REALIZADO",
+                "creado_por": r.get("creado_por"),
                 "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
+                "asignado_a_id": r.get("asignado_a_id"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),
                 "potrero_nombre": r.get("potrero_nombre"),
@@ -4268,6 +4271,7 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "creado_por": r.get("creado_por"),
                 "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
+                "asignado_a_id": r.get("asignado_a_id"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),
                 "potrero_nombre": r.get("potrero_nombre"),
@@ -4296,8 +4300,10 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "fecha": str(r.get("fecha_programada") or "")[:10] or None,
                 "hora": r.get("hora"),
                 "estado": r.get("estado") or "REALIZADO",
+                "creado_por": r.get("creado_por"),
                 "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
+                "asignado_a_id": r.get("asignado_a_id"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),
                 "potrero_nombre": r.get("potrero_nombre"),
@@ -4341,7 +4347,7 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
     lim = (hoy + timedelta(days=dias)).isoformat()
     lim30 = (hoy + timedelta(days=30)).isoformat()
 
-    agenda = repro = sanidad = 0
+    agenda = repro = sanidad = recs = 0
 
     def _cnt_retiros_activos() -> int:
         r = db.query_one(
@@ -4408,7 +4414,8 @@ def datos_badges(db: Database, dias: int = 7) -> dict:
         logger.error("seccion badges_repro fallo", exc_info=True)
         errores["repro"] = str(e)
 
-    out: dict[str, Any] = {"agenda": agenda, "repro": repro, "sanidad": sanidad, "dias": dias}
+    out: dict[str, Any] = {"agenda": agenda, "repro": repro, "sanidad": sanidad, "dias": dias,
+                           "agenda_tareas": recs}
     if errores:
         out["errores"] = errores
     return out

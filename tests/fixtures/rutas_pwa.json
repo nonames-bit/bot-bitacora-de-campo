@@ -743,6 +743,13 @@
 ]
 ],
 [
+"/api/tareas/mias",
+"api_tareas_mias",
+[
+"GET"
+]
+],
+[
 "/api/telemetria/ping",
 "api_telemetria_ping",
 [

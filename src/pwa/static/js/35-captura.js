@@ -6,15 +6,61 @@
     { t: "Leche y termo", ids: ["leche", "pajuela", "nitrogeno"] },
     { t: "Salidas, dinero y tareas", ids: ["venta", "muerte", "gasto", "tarea"] }
   ];
-  // El operario de campo (TRABAJADOR) no vende ni maneja dinero (Jaime,
-  // 2026-10-10): no ve esos botones y el servidor igual rechaza esos
-  // registros (ver _TIPOS_NO_TRABAJADOR en rutas/sync.py).
-  var TIPOS_SOLO_GESTION = ["venta", "gasto"];
+  // El operario de campo (TRABAJADOR) no vende ni maneja dinero, y no
+  // asigna tareas: solo completa las suyas (Jaime, 2026-10-10). No ve esos
+  // botones y el servidor igual rechaza esos registros (ver
+  // _TIPOS_NO_TRABAJADOR en rutas/sync.py).
+  var TIPOS_SOLO_GESTION = ["venta", "gasto", "tarea"];
   function esOperario() {
     return ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
   }
   function tipoCapturaPermitido(id) {
     return !(esOperario() && TIPOS_SOLO_GESTION.indexOf(id) !== -1);
+  }
+  /* "Mis tareas" del operario: arriba de Registrar, que es su pantalla de
+     inicio. Se guarda la última lista en el celular para verla sin señal;
+     marcarla hecha (con foto) sí necesita conexión. */
+  var CLAVE_MIS_TAREAS = "mis_tareas_cache";
+  function _leerMisTareas() {
+    try { return JSON.parse(localStorage.getItem(CLAVE_MIS_TAREAS) || "null"); } catch (e) { return null; }
+  }
+  function htmlMisTareas(tareas) {
+    if (tareas === null) return "";
+    var h = "<div class='card mis-tareas'>"
+      + "<div class='mis-tareas-tit'>" + icon("clipboard", 18) + "<b>Mis tareas</b>"
+      + (tareas.length ? "<span class='chip ambar'>" + tareas.length + "</span>" : "<span class='chip verde'>Al día</span>")
+      + "</div>";
+    if (!tareas.length) return h + "<p class='aviso' style='margin:6px 0 0;'>No tiene tareas pendientes.</p></div>";
+    tareas.forEach(function (t) {
+      var cuando = t.faltan_dias == null ? "" : t.faltan_dias < 0 ? "Venció hace " + Math.abs(t.faltan_dias) + "d"
+        : t.faltan_dias === 0 ? "Hoy" : t.faltan_dias === 1 ? "Mañana" : "En " + t.faltan_dias + " días";
+      var clase = t.faltan_dias != null && t.faltan_dias <= 0 ? "rojo" : "gris";
+      h += "<div class='mis-tareas-item" + (t.prioridad === "URGENTE" ? " urgente" : "") + "'>"
+        + "<div class='mis-tareas-chips'>"
+        + (t.prioridad === "URGENTE" ? "<span class='chip rojo'>" + icon("alertTriangle", 12) + "Urgente</span>" : "")
+        + (cuando ? "<span class='chip " + clase + "'>" + esc(cuando) + (t.hora ? " " + esc(t.hora) : "") + "</span>" : "")
+        + (t.creado_por_nombre ? "<small>De " + esc(t.creado_por_nombre) + "</small>" : "")
+        + "</div>"
+        + "<div class='mis-tareas-msg'>" + esc(t.mensaje || "—") + "</div>"
+        + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(t.id) + "' data-rec-msg='" + esc(t.mensaje || "") + "' data-rec-asig='" + esc(t.asignado_a || "") + "' data-rec-de='" + esc(t.creado_por_nombre || "") + "'>"
+        + icon("camera", 16) + "Marcar hecha con foto</button>"
+        + "</div>";
+    });
+    return h + "</div>";
+  }
+  function cargarMisTareas() {
+    if (!esOperario()) return;
+    fetch("/api/tareas/mias", { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      var tareas = (d && d.tareas) || [];
+      try { localStorage.setItem(CLAVE_MIS_TAREAS, JSON.stringify(tareas)); } catch (e) { /* sin almacenamiento */ }
+      var box = document.getElementById("mis-tareas-op");
+      if (box) box.innerHTML = htmlMisTareas(tareas);
+    }).catch(function () { /* sin señal: queda la última lista guardada */ });
+    // El botón "Marcar hecha" usa el mismo formulario con foto de la Agenda.
+    bindAgenda();
   }
   function renderCaptura() {
     var tipos = [
@@ -50,6 +96,7 @@
       + "</div>"
       + "</div>"
       + "<div id='gps-ronda-box'></div>";
+    if (esOperario()) h += "<div id='mis-tareas-op'>" + htmlMisTareas(_leerMisTareas()) + "</div>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.

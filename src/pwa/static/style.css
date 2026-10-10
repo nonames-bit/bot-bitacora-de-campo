@@ -4702,3 +4702,13 @@ button.cap-atajo .svg-icon { margin: 0; }
 .pot-animal.visto { background: var(--color-verde-bg); }
 .pot-animal.visto .pot-tag { color: var(--color-verde-txt); }
 .pot-borrar { width: 100%; padding: 12px; cursor: pointer; }
+
+/* "Mis tareas" del operario, arriba de Registrar */
+.mis-tareas { padding: 12px 14px; margin: 0 0 12px; border-left: 4px solid var(--verde-marca); }
+.mis-tareas-tit { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.mis-tareas-item { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--borde); }
+.mis-tareas-item.urgente .mis-tareas-msg { color: var(--color-rojo-txt); }
+.mis-tareas-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mis-tareas-chips small { color: var(--texto-suave); }
+.mis-tareas-msg { font-size: 15px; font-weight: 700; margin: 6px 0 8px; overflow-wrap: anywhere; }
+.mis-tareas .btn-rec-completar { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
