@@ -110,6 +110,8 @@ def resumen(origen: str, tipo: str, datos: dict) -> str:
         tipo_ev = str(c.get("tipo_evento") or "PARTO").upper()
         titulo = "Parto" if tipo_ev == "PARTO" else tipo_ev.replace("_", " ").capitalize()
         partes = [titulo + de]
+        if tipo_ev == "PARTO" and str(c.get("estado_cria") or "").upper() == "MUERTO":
+            partes.append("cría nacida muerta")
         if c.get("sexo_cria"):
             partes.append(f"cría {str(c['sexo_cria']).lower()}")
         cria = c.get("id_cria_tag") or c.get("id_cria")
@@ -128,6 +130,8 @@ def resumen(origen: str, tipo: str, datos: dict) -> str:
         destino = c.get("comprador") or c.get("procedencia_destino") or c.get("destino")
         if destino:
             partes.append(str(destino))
+        if c.get("motivo"):
+            partes.append(str(c["motivo"]))
     elif tipo == "traslado_masivo":
         partes = [f"Traslado de todo el potrero {c.get('potrero_origen') or '?'} "
                   f"a {c.get('potrero_destino') or '?'}"]

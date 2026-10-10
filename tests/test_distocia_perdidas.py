@@ -195,3 +195,38 @@ def test_confirmacion_parto_distocia(db):
                       fecha="2026-09-20",
                       datos={"tipo_evento": "PARTO", "sexo_cria": "Macho"})
     assert "difícil" not in bot._confirmacion(ev2)
+
+
+# ---------------------------------------------------------------------------
+# Nacido muerto: parto de la vaca sin cría viva en el inventario
+# ---------------------------------------------------------------------------
+def test_nacido_muerto_sin_arete_cuenta_como_parto(db):
+    db.registrar_parto(vaca_tag="V1", fecha="2026-06-01", tipo_evento="PARTO",
+                       estado_cria="MUERTO", sexo_cria="MACHO")
+    m = db.metricas_perdidas_reproductivas()
+    assert m["partos"] == 1
+    assert m["perdidas"] == 0
+    assert m["crias_muertas_parto"] == 1
+    assert db.query_one("SELECT COUNT(*) n FROM animales WHERE estado = 'ACTIVO'")["n"] == 4
+
+
+def test_nacido_muerto_con_arete_no_entra_al_inventario(db):
+    db.registrar_parto(vaca_tag="V1", fecha="2026-06-01", tipo_evento="PARTO",
+                       estado_cria="MUERTO", id_cria_tag="V1-6")
+    cria = db.query_one("SELECT estado, madre_id FROM animales WHERE tag = 'V1-6'")
+    assert cria["estado"] == "MUERTO"
+    assert cria["madre_id"] is not None
+
+
+def test_nacido_muerto_no_cambia_animal_existente(db):
+    db.registrar_parto(vaca_tag="V2", fecha="2026-06-01", tipo_evento="PARTO",
+                       estado_cria="MUERTO", id_cria_tag="V3")
+    assert db.query_one("SELECT estado FROM animales WHERE tag = 'V3'")["estado"] == "ACTIVO"
+
+
+def test_revision_resume_nacido_muerto_y_motivo_venta():
+    from src.engine.revision import resumen
+    r = resumen("app", "parto", {"vaca_tag": "47", "tipo_evento": "PARTO", "estado_cria": "MUERTO"})
+    assert "nacida muerta" in r
+    r = resumen("app", "venta", {"animal_tag": "47", "precio": 3500000, "motivo": "Vaca en producción"})
+    assert "Vaca en producción" in r

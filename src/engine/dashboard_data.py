@@ -3086,7 +3086,8 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         partos_sin_cria = db.query(
             """
             SELECT p.id AS parto_id, NULL AS id_animal, 'Sin arete' AS tag, NULL AS nombre, p.sexo_cria AS sexo,
-                   NULL AS raza, p.fecha AS fecha_nacimiento, 'ACTIVO' AS estado,
+                   NULL AS raza, p.fecha AS fecha_nacimiento,
+                   CASE WHEN UPPER(COALESCE(p.estado_cria, '')) = 'MUERTO' THEN 'MUERTO' ELSE 'ACTIVO' END AS estado,
                    p.fecha AS fecha_parto, p.peso_nacimiento, p.estado_cria
             FROM partos p
             WHERE p.vaca_id = ? AND p.id_cria IS NULL
@@ -3859,7 +3860,9 @@ def ids_animales_sin(db: Database, clave: str, hoy: Optional[date] = None) -> se
         return {r["vaca_id"] for r in db.query(
             "SELECT DISTINCT p.vaca_id FROM partos p JOIN animales a ON a.id_animal = p.vaca_id "
             "WHERE a.estado = 'ACTIVO' AND p.fecha >= ? AND p.id_cria IS NULL "
-            "AND UPPER(COALESCE(p.tipo_evento, 'PARTO')) IN ('PARTO', 'GEMELAR')",
+            "AND UPPER(COALESCE(p.tipo_evento, 'PARTO')) IN ('PARTO', 'GEMELAR') "
+            # Nacido muerto: no hay cría que registrar.
+            "AND UPPER(COALESCE(p.estado_cria, '')) != 'MUERTO'",
             ((hoy - timedelta(days=300)).isoformat(),))}
     if clave == "peso_nacer":
         con_peso = {r["id_cria"] for r in db.query(
