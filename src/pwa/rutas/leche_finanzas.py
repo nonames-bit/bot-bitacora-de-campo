@@ -110,7 +110,11 @@ def registrar(app, ctx, h):
         precio_maximo = datos.get("precio_maximo")
         precio_minimo = datos.get("precio_minimo")
         unidad = datos.get("unidad") or "$/kg"
-        fuente = datos.get("fuente") or "MANUAL"
+        fuente = str(datos.get("fuente") or "").strip()
+        # Todo precio anotado por una persona es una cotización real: se marca
+        # MANUAL para distinguirlo de los valores de referencia.
+        if not fuente.upper().startswith("MANUAL"):
+            fuente = f"MANUAL: {fuente}" if fuente else "MANUAL"
         fecha = datos.get("fecha") or date.today().isoformat()
         notas = datos.get("notas")
 

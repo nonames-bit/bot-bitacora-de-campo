@@ -31,11 +31,14 @@
       var flecha = v > 0 ? "▲" : v < 0 ? "▼" : "—";
       var labelPlaza = precio.plaza_label || (precio.plaza === "BOGOTA" ? "Bogotá · Frig. Guadalupe" : (precio.plaza || "Bogotá · Guadalupe"));
       var labelProd = precio.producto_label || "Macho Gordo (400+ kg)";
+      var chipV = precio.es_referencia
+        ? "<span class='chip ambar' style='font-size:11px;' title='Valor de referencia, no es un precio del día'>Referencia</span>"
+        : (precio.hay_comparacion ? "<span class='chip " + colorV + "' style='font-size:11px;'>" + flecha + " " + esc(Math.abs(v)) + "%</span>" : "");
       precioHtml = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
         + "<b style='font-size:15px;'>" + fmtMoneda(precio.precio) + "/kg</b>"
-        + "<span class='chip " + colorV + "' style='font-size:11px;'>" + flecha + " " + esc(Math.abs(v)) + "%</span>"
+        + chipV
         + "</div>"
-        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc(labelProd) + " · " + esc(labelPlaza) + "</div>";
+        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc(labelProd) + " · " + esc(labelPlaza) + " · " + esc(fechaCorta(precio.fecha)) + "</div>";
     } else {
       precioHtml = "<span style='font-size:12.5px; color:var(--texto-suave);'>Sin cotizaciones registradas.</span>";
     }
@@ -47,7 +50,7 @@
       + "</div>"
       + "<div class='card' style='flex:1; min-width:180px; padding:12px 14px;'>"
       + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; display:flex; align-items:center; justify-content:space-between; gap:5px; margin-bottom:6px;'>"
-      + "<span style='display:flex; align-items:center; gap:5px;'>" + icon("scale", 13) + "Precio del día</span>"
+      + "<span style='display:flex; align-items:center; gap:5px;'>" + icon("scale", 13) + (precio && precio.es_referencia ? "Precio de referencia" : "Precio de subasta") + "</span>"
       + "<a href='#' id='link-tablero-mercado' style='font-size:11px; font-weight:600; text-decoration:none; color:var(--verde-marca);'>Ver Subastas →</a>"
       + "</div>"
       + precioHtml

@@ -471,11 +471,14 @@
       var flecha = v > 0 ? "▲" : v < 0 ? "▼" : "—";
       var labelPlaza = precio.plaza_label || (precio.plaza === "BOGOTA" ? "Bogotá · Frig. Guadalupe" : (precio.plaza || "Bogotá · Guadalupe"));
       var labelProd = precio.producto_label || "Macho Gordo (400+ kg)";
+      var chipV = precio.es_referencia
+        ? "<span class='chip ambar' style='font-size:11px;' title='Valor de referencia, no es un precio del día'>Referencia</span>"
+        : (precio.hay_comparacion ? "<span class='chip " + colorV + "' style='font-size:11px;'>" + flecha + " " + esc(Math.abs(v)) + "%</span>" : "");
       precioHtml = "<div style='display:flex; align-items:center; gap:6px; flex-wrap:wrap;'>"
         + "<b style='font-size:15px;'>" + fmtMoneda(precio.precio) + "/kg</b>"
-        + "<span class='chip " + colorV + "' style='font-size:11px;'>" + flecha + " " + esc(Math.abs(v)) + "%</span>"
+        + chipV
         + "</div>"
-        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc(labelProd) + " · " + esc(labelPlaza) + "</div>";
+        + "<div style='font-size:11px; color:var(--texto-suave); margin-top:2px;'>" + esc(labelProd) + " · " + esc(labelPlaza) + " · " + esc(fechaCorta(precio.fecha)) + "</div>";
     } else {
       precioHtml = "<span style='font-size:12.5px; color:var(--texto-suave);'>Sin cotizaciones registradas.</span>";
     }
@@ -487,7 +490,7 @@
       + "</div>"
       + "<div class='card' style='flex:1; min-width:180px; padding:12px 14px;'>"
       + "<div style='font-size:11px; font-weight:700; color:var(--texto-suave); text-transform:uppercase; display:flex; align-items:center; justify-content:space-between; gap:5px; margin-bottom:6px;'>"
-      + "<span style='display:flex; align-items:center; gap:5px;'>" + icon("scale", 13) + "Precio del día</span>"
+      + "<span style='display:flex; align-items:center; gap:5px;'>" + icon("scale", 13) + (precio && precio.es_referencia ? "Precio de referencia" : "Precio de subasta") + "</span>"
       + "<a href='#' id='link-tablero-mercado' style='font-size:11px; font-weight:600; text-decoration:none; color:var(--verde-marca);'>Ver Subastas →</a>"
       + "</div>"
       + precioHtml
@@ -3643,7 +3646,9 @@
         } else if (it.tendencia === "BAJANDO") {
           tendBadge = " <span class='chip-tendencia bajando' title='Bajó $" + Math.abs(it.variacion_pesos) + "/kg vs semana anterior'>▼ " + it.variacion_pct + "%</span>";
         } else if (it.precio_anterior) {
-          tendBadge = " <span class='chip-tendencia estable' title='Sin variación vs semana anterior'>▬ 0%</span>";
+          tendBadge = " <span class='chip-tendencia estable' title='Sin variación vs la cotización anterior'>▬ 0%</span>";
+        } else if (it.es_referencia) {
+          tendBadge = " <span class='chip-tendencia estable' title='Valor de referencia, no es un precio del día'>Ref.</span>";
         }
 
         filasProdHtml += "<div class='fila-precio'>"
@@ -3670,8 +3675,8 @@
       + "</div>"
       + "<div class='card-plaza-precios'>" + filasProdHtml + "</div>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--texto-suave); border-top:1px solid var(--borde); padding-top:6px; margin-top:4px;'>"
-      + "<span>Semana: <b>" + esc(fechaCorta(pz.fecha_actualizacion)) + "</b></span>"
-      + "<span style='text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;'>" + esc(pz.productos[claves[0]] ? pz.productos[claves[0]].fuente : "Boletín Subasta") + "</span>"
+      + "<span>Dato del: <b>" + esc(fechaCorta(pz.fecha_actualizacion)) + "</b></span>"
+      + "<span style='text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;'>" + (pz.es_referencia ? "Referencia, no es del día" : esc(pz.productos[claves[0]] ? pz.productos[claves[0]].fuente : "Anotado a mano")) + "</span>"
       + "</div>"
       + "</div>";
   }
@@ -3821,7 +3826,7 @@
     var refLecheHtml = (leche.referencias || []).map(function (it) {
       return "<div class='card-insumo'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start;'>"
-        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(it.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(it.fuente) + "</div></div>"
+        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(it.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + (it.es_referencia ? "Referencia · " : "") + esc(it.fuente) + " · " + esc(fechaCorta(it.fecha)) + "</div></div>"
         + "<div style='font-size:16px; font-weight:800; color:var(--verde-marca);'>" + fmtMoneda(it.precio) + " <span style='font-size:11px;'>/" + esc(it.unidad) + "</span></div>"
         + "</div>"
         + "</div>";
@@ -3835,7 +3840,7 @@
       }
       return "<div class='card-insumo'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start;'>"
-        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(ins.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(ins.fuente) + " · " + esc(fechaCorta(ins.fecha)) + "</div></div>"
+        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(ins.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + (ins.es_referencia ? "Referencia · " : "") + esc(ins.fuente) + " · " + esc(fechaCorta(ins.fecha)) + "</div></div>"
         + "<div style='font-size:16px; font-weight:800; color:var(--verde-marca);'>" + fmtMoneda(ins.precio) + " <span style='font-size:11px;'>/" + esc(ins.unidad) + "</span></div>"
         + "</div>"
         + novilloRel
@@ -4623,8 +4628,10 @@
         tendBadge = "<span class='chip-tendencia subiendo'>▲ +" + (k.variacion_pct > 0 ? k.variacion_pct : "") + "% (+$" + Math.abs(k.variacion_pesos) + ")</span>";
       } else if (k.tendencia === "BAJANDO") {
         tendBadge = "<span class='chip-tendencia bajando'>▼ " + k.variacion_pct + "% (-$" + Math.abs(k.variacion_pesos) + ")</span>";
-      } else {
+      } else if (k.hay_comparacion) {
         tendBadge = "<span class='chip-tendencia estable'>▬ 0.0% ($0)</span>";
+      } else {
+        tendBadge = "<span class='chip-tendencia estable' title='Sin dos cotizaciones reales para comparar'>Ref.</span>";
       }
 
       var grTxt = k.precio_granada ? ("Granada: <b>" + fmtMoneda(k.precio_granada) + "</b>") : "";
@@ -4962,13 +4969,14 @@
       : "";
 
     var btnSincronizar = puedeEditar
-      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Sincronizar Ahora</button>"
+      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Actualizar Dólar</button>"
       : "";
 
     var badgeSync = "<div style='display:inline-flex; align-items:center; gap:6px; font-size:11.5px; background:rgba(30,126,52,0.12); color:#155724; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid rgba(30,126,52,0.25);'>"
       + "<span style='display:inline-block; width:7px; height:7px; border-radius:50%; background:#28a745;'></span>"
-      + "Auto-sincronizado: <b>" + esc(fechaCorta(d.ultima_actualizacion || d.fecha_consulta)) + "</b>"
-      + (d.trm_actual ? " · TRM: <b>" + fmtMoneda(d.trm_actual) + " COP</b>" : "")
+      + (d.trm_actual
+        ? "Dólar TRM " + (d.actualizacion_automatica ? "oficial" : "de referencia") + ": <b>" + fmtMoneda(d.trm_actual) + " COP</b> · " + esc(fechaCorta(d.trm_fecha || d.fecha_consulta))
+        : "Dólar TRM sin consultar")
       + "</div>";
 
     var headerHtml = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
@@ -5020,7 +5028,7 @@
     }
 
     var avisoReferencia = (d && d.es_datos_referencia)
-      ? "<div class='chip ambar' style='margin-bottom:10px;'>" + icon("alertTriangle", 12) + "Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
+      ? "<div class='chip ambar' style='margin-bottom:10px; white-space:normal; line-height:1.35;'>" + icon("alertTriangle", 12) + "Los precios de subastas, leche e insumos son valores de referencia, no precios del día. Solo el dólar se actualiza solo. Para ver precios reales, anota lo que pagaron en la subasta con Actualizar Precios.</div>"
       : "";
 
     return headerHtml + avisoReferencia + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";
@@ -5090,7 +5098,7 @@
     if (btnSync) {
       btnSync.addEventListener("click", function () {
         btnSync.disabled = true;
-        btnSync.innerHTML = icon("refresh", 13) + " Sincronizando...";
+        btnSync.innerHTML = icon("refresh", 13) + " Consultando...";
         fetch("/api/mercado/sincronizar", {
           method: "POST",
           headers: { "Content-Type": "application/json" }
@@ -5098,7 +5106,7 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           btnSync.disabled = false;
-          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          btnSync.innerHTML = icon("refresh", 13) + " Actualizar Dólar";
           if (res && res.ok) {
             cargar(true);
           } else {
@@ -5107,7 +5115,7 @@
         })
         .catch(function (err) {
           btnSync.disabled = false;
-          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          btnSync.innerHTML = icon("refresh", 13) + " Actualizar Dólar";
           alert("Error de conexión al sincronizar: " + (err && err.message || err));
         });
       });

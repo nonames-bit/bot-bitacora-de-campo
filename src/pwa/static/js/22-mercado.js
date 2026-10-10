@@ -56,7 +56,9 @@
         } else if (it.tendencia === "BAJANDO") {
           tendBadge = " <span class='chip-tendencia bajando' title='Bajó $" + Math.abs(it.variacion_pesos) + "/kg vs semana anterior'>▼ " + it.variacion_pct + "%</span>";
         } else if (it.precio_anterior) {
-          tendBadge = " <span class='chip-tendencia estable' title='Sin variación vs semana anterior'>▬ 0%</span>";
+          tendBadge = " <span class='chip-tendencia estable' title='Sin variación vs la cotización anterior'>▬ 0%</span>";
+        } else if (it.es_referencia) {
+          tendBadge = " <span class='chip-tendencia estable' title='Valor de referencia, no es un precio del día'>Ref.</span>";
         }
 
         filasProdHtml += "<div class='fila-precio'>"
@@ -83,8 +85,8 @@
       + "</div>"
       + "<div class='card-plaza-precios'>" + filasProdHtml + "</div>"
       + "<div style='display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--texto-suave); border-top:1px solid var(--borde); padding-top:6px; margin-top:4px;'>"
-      + "<span>Semana: <b>" + esc(fechaCorta(pz.fecha_actualizacion)) + "</b></span>"
-      + "<span style='text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;'>" + esc(pz.productos[claves[0]] ? pz.productos[claves[0]].fuente : "Boletín Subasta") + "</span>"
+      + "<span>Dato del: <b>" + esc(fechaCorta(pz.fecha_actualizacion)) + "</b></span>"
+      + "<span style='text-overflow:ellipsis; overflow:hidden; white-space:nowrap; max-width:160px;'>" + (pz.es_referencia ? "Referencia, no es del día" : esc(pz.productos[claves[0]] ? pz.productos[claves[0]].fuente : "Anotado a mano")) + "</span>"
       + "</div>"
       + "</div>";
   }
@@ -234,7 +236,7 @@
     var refLecheHtml = (leche.referencias || []).map(function (it) {
       return "<div class='card-insumo'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start;'>"
-        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(it.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(it.fuente) + "</div></div>"
+        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(it.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + (it.es_referencia ? "Referencia · " : "") + esc(it.fuente) + " · " + esc(fechaCorta(it.fecha)) + "</div></div>"
         + "<div style='font-size:16px; font-weight:800; color:var(--verde-marca);'>" + fmtMoneda(it.precio) + " <span style='font-size:11px;'>/" + esc(it.unidad) + "</span></div>"
         + "</div>"
         + "</div>";
@@ -248,7 +250,7 @@
       }
       return "<div class='card-insumo'>"
         + "<div style='display:flex; justify-content:space-between; align-items:flex-start;'>"
-        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(ins.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + esc(ins.fuente) + " · " + esc(fechaCorta(ins.fecha)) + "</div></div>"
+        + "<div><div style='font-size:13.5px; font-weight:700; color:var(--texto);'>" + esc(ins.nombre) + "</div><div style='font-size:11.5px; color:var(--texto-suave); margin-top:2px;'>" + (ins.es_referencia ? "Referencia · " : "") + esc(ins.fuente) + " · " + esc(fechaCorta(ins.fecha)) + "</div></div>"
         + "<div style='font-size:16px; font-weight:800; color:var(--verde-marca);'>" + fmtMoneda(ins.precio) + " <span style='font-size:11px;'>/" + esc(ins.unidad) + "</span></div>"
         + "</div>"
         + novilloRel

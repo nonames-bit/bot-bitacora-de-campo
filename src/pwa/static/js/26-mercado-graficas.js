@@ -320,13 +320,14 @@
       : "";
 
     var btnSincronizar = puedeEditar
-      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Sincronizar Ahora</button>"
+      ? "<button type='button' class='tema-btn' id='btn-sincronizar-mercado' style='font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px; font-weight:600; cursor:pointer;'>" + icon("refresh", 13) + "Actualizar Dólar</button>"
       : "";
 
     var badgeSync = "<div style='display:inline-flex; align-items:center; gap:6px; font-size:11.5px; background:rgba(30,126,52,0.12); color:#155724; padding:3px 10px; border-radius:12px; font-weight:600; border:1px solid rgba(30,126,52,0.25);'>"
       + "<span style='display:inline-block; width:7px; height:7px; border-radius:50%; background:#28a745;'></span>"
-      + "Auto-sincronizado: <b>" + esc(fechaCorta(d.ultima_actualizacion || d.fecha_consulta)) + "</b>"
-      + (d.trm_actual ? " · TRM: <b>" + fmtMoneda(d.trm_actual) + " COP</b>" : "")
+      + (d.trm_actual
+        ? "Dólar TRM " + (d.actualizacion_automatica ? "oficial" : "de referencia") + ": <b>" + fmtMoneda(d.trm_actual) + " COP</b> · " + esc(fechaCorta(d.trm_fecha || d.fecha_consulta))
+        : "Dólar TRM sin consultar")
       + "</div>";
 
     var headerHtml = "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
@@ -378,7 +379,7 @@
     }
 
     var avisoReferencia = (d && d.es_datos_referencia)
-      ? "<div class='chip ambar' style='margin-bottom:10px;'>" + icon("alertTriangle", 12) + "Datos de referencia de jul-sep 2026. Actualiza con el botón Sincronizar.</div>"
+      ? "<div class='chip ambar' style='margin-bottom:10px; white-space:normal; line-height:1.35;'>" + icon("alertTriangle", 12) + "Los precios de subastas, leche e insumos son valores de referencia, no precios del día. Solo el dólar se actualiza solo. Para ver precios reales, anota lo que pagaron en la subasta con Actualizar Precios.</div>"
       : "";
 
     return headerHtml + avisoReferencia + subnavHtml + "<div id='mercado-contenido-tab'>" + cuerpoHtml + "</div>";
@@ -448,7 +449,7 @@
     if (btnSync) {
       btnSync.addEventListener("click", function () {
         btnSync.disabled = true;
-        btnSync.innerHTML = icon("refresh", 13) + " Sincronizando...";
+        btnSync.innerHTML = icon("refresh", 13) + " Consultando...";
         fetch("/api/mercado/sincronizar", {
           method: "POST",
           headers: { "Content-Type": "application/json" }
@@ -456,7 +457,7 @@
         .then(function (r) { return r.json(); })
         .then(function (res) {
           btnSync.disabled = false;
-          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          btnSync.innerHTML = icon("refresh", 13) + " Actualizar Dólar";
           if (res && res.ok) {
             cargar(true);
           } else {
@@ -465,7 +466,7 @@
         })
         .catch(function (err) {
           btnSync.disabled = false;
-          btnSync.innerHTML = icon("refresh", 13) + " Sincronizar Ahora";
+          btnSync.innerHTML = icon("refresh", 13) + " Actualizar Dólar";
           alert("Error de conexión al sincronizar: " + (err && err.message || err));
         });
       });
