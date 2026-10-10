@@ -113,6 +113,22 @@ MAPEO_TECNICOS_SG: dict[str, str] = {
 }
 
 
+
+_PREFIJOS_DOCUMENTO = ("factura_", "recibo_")
+_RE_CAPTION_DOCUMENTO = re.compile(r"\b(factura|recibo)s?\b", re.IGNORECASE)
+
+
+def _es_documento_foto(fila) -> bool:
+    """True si la fila de ``fotos`` es una factura o un recibo (evidencia de
+    gasto/ingreso/leche guardada por la PWA, el correo o Telegram), no una
+    foto de un animal."""
+    ruta = str(fila["ruta"] or "")
+    nombre = os.path.basename(ruta.replace("\\", "/")).lower()
+    if nombre.startswith(_PREFIJOS_DOCUMENTO) or nombre.endswith(".pdf"):
+        return True
+    return bool(_RE_CAPTION_DOCUMENTO.search(str(fila["caption"] or "")))
+
+
 class Database:
     """Envoltorio de sqlite3 con helpers de resolución tag → id y CRUD."""
 
@@ -3063,6 +3079,8 @@ class Database:
         )
         vinculadas = 0
         for f in filas:
+            if _es_documento_foto(f):
+                continue
             cand_tag = None
             if f["caption"]:
                 cand_tag = nlu.extraer_tag(f["caption"])
@@ -3082,36 +3100,52 @@ class Database:
         return vinculadas
 
     def fotos_de(self, animal_tag_or_id, limit: int = 5) -> list[sqlite3.Row]:
-        """Fotos de un animal. El match "difuso" (caption/ocr/ruta con el tag
-        como substring, ej. buscando 'JA14' calzaría con 'JA14-7') solo debe
-        aplicar a fotos huérfanas (animal_id IS NULL) -- si no, una foto ya
-        vinculada a OTRO animal (ej. una cría cuyo tag "JA14-7" contiene el
-        tag del padre "JA14") se filtraba también en la ficha equivocada."""
+        """Fotos de un animal: las vinculadas a su animal_id y, además, las
+        huérfanas (animal_id IS NULL) que lo mencionan por su arete.
+
+        El match de huérfanas usa el arete REAL del animal, nunca su id
+        interno: la ficha llama con el id numérico y un LIKE '%57%' calzaba
+        con el nombre de casi cualquier archivo ('factura_1760573...'), así
+        que la ficha del toro T02 mostraba la foto de una factura. El arete
+        debe aparecer como palabra completa ('T02' no calza en 'KT021') y las
+        facturas/recibos guardados en fotos nunca cuentan como foto del animal.
+        Una foto ya vinculada a OTRO animal (ej. la cría JA14-7) no se filtra
+        en la ficha de JA14 porque solo se buscan huérfanas."""
         aid = self.resolve_animal(animal_tag_or_id)
-        tag_str = str(animal_tag_or_id).strip()
-        tag_like = f"%{tag_str}%"
+        tags: list[str] = []
+        if not (isinstance(animal_tag_or_id, int) and not isinstance(animal_tag_or_id, bool)):
+            tags.append(str(animal_tag_or_id).strip())
         if aid is not None:
-            return self.query(
-                "SELECT * FROM fotos WHERE animal_id = ? "
-                "   OR (animal_id IS NULL AND ("
-                "       UPPER(tag) = UPPER(?) "
-                "       OR UPPER(caption) LIKE UPPER(?) "
-                "       OR UPPER(ocr_text) LIKE UPPER(?) "
-                "       OR UPPER(ruta) LIKE UPPER(?)"
-                "   )) "
-                "ORDER BY id DESC LIMIT ?",
-                (aid, tag_str, tag_like, tag_like, tag_like, limit),
-            )
-        return self.query(
-            "SELECT * FROM fotos WHERE animal_id IS NULL AND ("
-            "   UPPER(tag) = UPPER(?) "
-            "   OR UPPER(caption) LIKE UPPER(?) "
-            "   OR UPPER(ocr_text) LIKE UPPER(?) "
-            "   OR UPPER(ruta) LIKE UPPER(?)"
-            ") "
-            "ORDER BY id DESC LIMIT ?",
-            (tag_str, tag_like, tag_like, tag_like, limit),
-        )
+            fila = self.query_one("SELECT tag FROM animales WHERE id_animal = ?", (aid,))
+            if fila and fila["tag"]:
+                tags.append(str(fila["tag"]).strip())
+        tags = list(dict.fromkeys(t.upper() for t in tags if t))
+
+        candidatas: dict[int, sqlite3.Row] = {}
+        if aid is not None:
+            for f in self.query(
+                "SELECT * FROM fotos WHERE animal_id = ? ORDER BY id DESC LIMIT ?",
+                (aid, limit * 4 + 20),
+            ):
+                if not _es_documento_foto(f):
+                    candidatas[f["id"]] = f
+        for tag in tags:
+            like = f"%{tag}%"
+            patron = re.compile(r"(?<![A-Z0-9])" + re.escape(tag) + r"(?![A-Z0-9])")
+            for f in self.query(
+                "SELECT * FROM fotos WHERE animal_id IS NULL AND ("
+                "   UPPER(tag) = ? OR UPPER(caption) LIKE ? "
+                "   OR UPPER(ocr_text) LIKE ? OR UPPER(ruta) LIKE ?"
+                ") ORDER BY id DESC LIMIT ?",
+                (tag, like, like, like, limit * 4 + 20),
+            ):
+                if f["id"] in candidatas or _es_documento_foto(f):
+                    continue
+                if str(f["tag"] or "").strip().upper() == tag or any(
+                    patron.search(str(f[c] or "").upper()) for c in ("caption", "ocr_text", "ruta")
+                ):
+                    candidatas[f["id"]] = f
+        return sorted(candidatas.values(), key=lambda f: f["id"], reverse=True)[:limit]
 
     def ultimas_fotos(self, limit: int = 10) -> list[sqlite3.Row]:
         return self.query("SELECT * FROM fotos ORDER BY id DESC LIMIT ?", (limit,))

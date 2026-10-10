@@ -172,7 +172,7 @@
           objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
         }
 
-        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> → ") : "";
         var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
         var asignacionChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
         var prioChip = (rc.prioridad === "URGENTE") ? ("<span class='chip rojo' style='font-size:11px; font-weight:700;'>" + icon("alertTriangle", 12) + "URGENTE</span> ") : "";
