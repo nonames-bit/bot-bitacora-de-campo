@@ -103,6 +103,6 @@ def test_operario_abre_potreros(tmp_path):
 
 def test_app_js_vista_del_operario():
     js = (Path(__file__).resolve().parent.parent / "src" / "pwa" / "static" / "app.js").read_text(encoding="utf-8")
-    assert 'var TIPOS_SOLO_GESTION = ["venta", "gasto"]' in js
+    assert 'var TIPOS_SOLO_GESTION = ["venta", "gasto", "tarea"]' in js
     assert '"agenda", "potreros"]' in js
     assert "function renderPotreros" in js and "precargarPotreros();" in js

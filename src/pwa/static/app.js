@@ -5719,11 +5719,14 @@
       + "<h3 style='margin:0;'>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + pdfBtn + "</div>" + erroresHtml(d);
     // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
     // apilado, táctil grande, sin recargar la página.
-    // Crear evento / tarea asignada de campo: formulario móvil táctil grande
+    // Crear evento / tarea asignada de campo: formulario móvil táctil grande.
+    // Solo el dueño y el administrador asignan tareas; el operario solo ve y
+    // completa las suyas (Jaime, 2026-10-10; el servidor también lo exige).
+    var esOp = ((window.__usuarioActual && window.__usuarioActual.rol) || d.rol || "").toUpperCase() === "TRABAJADOR";
     var hoyIso = new Date().toISOString().slice(0, 10);
-    h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
+    if (!esOp) h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
       + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nueva Tarea / Evento Asignado</b>"
-      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
+      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Escoja a la persona del equipo. Le llega aviso al celular y la ve en \"Mis tareas\" al abrir Registrar; la marca hecha con foto.</p>"
       + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div style='display:flex; gap:8px;'>"
       + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
@@ -5783,7 +5786,7 @@
     };
 
     if (recs.length) {
-      h += "<h4>" + icon("calendar") + "Tareas Asignadas y Recordatorios Pendientes (" + recs.length + ")</h4>";
+      h += "<h4>" + icon("calendar") + (esOp ? "Mis tareas pendientes (" : "Tareas Asignadas y Recordatorios Pendientes (") + recs.length + ")</h4>";
       h += "<div style='display:flex; flex-direction:column; gap:10px; margin-bottom:16px;'>";
       recs.forEach(function (rc) {
         var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
@@ -5805,14 +5808,14 @@
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
           + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
           + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-          + icon("check", 14) + "Marcar Realizado (Acknowledge)"
+          + (esOp ? icon("camera", 14) + "Marcar hecha con foto" : icon("check", 14) + "Marcar Realizado (Acknowledge)")
           + "</button>"
           + "</div>"
           + "</div>";
       });
       h += "</div>";
     } else {
-      h += "<p class='aviso'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+      h += "<p class='aviso'>" + icon("sparkles", 14) + (esOp ? "No tiene tareas pendientes." : "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.") + "</p>";
     }
 
     if (recsComp.length) {
@@ -6129,10 +6132,22 @@
       if (!el || !window.__integrantesEquipo) return;
       var html = window.__integrantesEquipo.map(function (it) {
         var rolTxt = it.rol ? (" (" + esc(it.rol) + ")") : "";
-        return "<option value='" + esc(it.nombre) + "'>" + esc(it.nombre) + rolTxt + "</option>";
+        var idAttr = it.id != null ? (" data-id='" + esc(it.id) + "'") : "";
+        return "<option value='" + esc(it.nombre) + "'" + idAttr + ">" + esc(it.nombre) + rolTxt + "</option>";
       }).join("");
       el.innerHTML = html;
       if (seleccionDefault) el.value = seleccionDefault;
+      else {
+        // "Para": de entrada el primer operario, no quien está asignando.
+        var op = window.__integrantesEquipo.filter(function (it) { return it.tipo === "USUARIO" && String(it.rol).toUpperCase() === "TRABAJADOR"; })[0];
+        if (op) el.value = op.nombre;
+      }
+    }
+
+    function idOpcionElegida(sel) {
+      var op = sel && sel.selectedOptions && sel.selectedOptions[0];
+      var v = op ? op.getAttribute("data-id") : null;
+      return v ? parseInt(v, 10) : null;
     }
 
     fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
@@ -6168,7 +6183,9 @@
         var tag = (document.getElementById("ag-tag") || {}).value || "";
         var pot = (document.getElementById("ag-potrero") || {}).value || "";
         var tipoTarea = (document.getElementById("ag-tipo-tarea") || {}).value || "GENERAL";
-        var asignado = (document.getElementById("ag-asignado") || {}).value || "";
+        var selAsig = document.getElementById("ag-asignado");
+        var asignado = (selAsig && selAsig.value) || "";
+        var asignadoId = idOpcionElegida(selAsig);
         var desc = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
         var fecha = ((document.getElementById("ag-fecha") || {}).value || "").trim();
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
@@ -6193,7 +6210,8 @@
             fecha: fecha,
             hora: hora || null,
             creado_por_nombre: deNombre || null,
-            asignado_a: asignado.trim() || "Encargado",
+            asignado_a: asignado.trim() || "Todo el equipo",
+            asignado_a_id: asignadoId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag.trim() : null,
             potrero_nombre: objTipo === "potrero" ? pot.trim() : null,
@@ -6296,6 +6314,7 @@
         var pot = ((document.getElementById("modal-tarea-potrero") || {}).value || "").trim();
         var deNombre = ((document.getElementById("modal-tarea-de") || {}).value || "").trim();
         var paraNombre = ((document.getElementById("modal-tarea-para") || {}).value || "").trim();
+        var paraId = idOpcionElegida(document.getElementById("modal-tarea-para"));
         var desc = ((document.getElementById("modal-tarea-desc") || {}).value || "").trim();
         var fecha = ((document.getElementById("modal-tarea-fecha") || {}).value || "").trim();
         var prio = ((document.getElementById("modal-tarea-prioridad") || {}).value || "NORMAL").trim();
@@ -6316,7 +6335,8 @@
             fecha: fecha,
             hora: null,
             creado_por_nombre: deNombre || null,
-            asignado_a: paraNombre || "Equipo",
+            asignado_a: paraNombre || "Todo el equipo",
+            asignado_a_id: paraId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag : null,
             potrero_nombre: objTipo === "potrero" ? pot : null,
@@ -6448,6 +6468,12 @@
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
+        // El operario firma con su nombre (lo pone el servidor) y la foto es obligatoria.
+        var esOpAck = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        var lblPor = inpAckPor && inpAckPor.closest ? inpAckPor.closest("label") : null;
+        if (lblPor) lblPor.style.display = esOpAck ? "none" : "";
+        var lblFoto = document.getElementById("ack-foto-label");
+        if (lblFoto) lblFoto.textContent = esOpAck ? "Foto de la tarea hecha (obligatoria):" : "Foto de comprobante (opcional):";
         if (modalAck) modalAck.style.display = "flex";
       });
     }
@@ -6460,6 +6486,11 @@
         if (!rid) return;
         var btnConf = document.getElementById("btn-confirmar-ack");
         var fbAck = document.getElementById("ack-feedback");
+        var esOpEnv = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        if (esOpEnv && !_ackFotoB64) {
+          if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("camera", 14) + "Tome la foto de la tarea hecha.</span>";
+          return;
+        }
         if (btnConf) btnConf.disabled = true;
         if (fbAck) fbAck.textContent = "Registrando cumplimiento...";
         var payloadAck = {
@@ -6883,15 +6914,61 @@
     { t: "Leche y termo", ids: ["leche", "pajuela", "nitrogeno"] },
     { t: "Salidas, dinero y tareas", ids: ["venta", "muerte", "gasto", "tarea"] }
   ];
-  // El operario de campo (TRABAJADOR) no vende ni maneja dinero (Jaime,
-  // 2026-10-10): no ve esos botones y el servidor igual rechaza esos
-  // registros (ver _TIPOS_NO_TRABAJADOR en rutas/sync.py).
-  var TIPOS_SOLO_GESTION = ["venta", "gasto"];
+  // El operario de campo (TRABAJADOR) no vende ni maneja dinero, y no
+  // asigna tareas: solo completa las suyas (Jaime, 2026-10-10). No ve esos
+  // botones y el servidor igual rechaza esos registros (ver
+  // _TIPOS_NO_TRABAJADOR en rutas/sync.py).
+  var TIPOS_SOLO_GESTION = ["venta", "gasto", "tarea"];
   function esOperario() {
     return ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
   }
   function tipoCapturaPermitido(id) {
     return !(esOperario() && TIPOS_SOLO_GESTION.indexOf(id) !== -1);
+  }
+  /* "Mis tareas" del operario: arriba de Registrar, que es su pantalla de
+     inicio. Se guarda la última lista en el celular para verla sin señal;
+     marcarla hecha (con foto) sí necesita conexión. */
+  var CLAVE_MIS_TAREAS = "mis_tareas_cache";
+  function _leerMisTareas() {
+    try { return JSON.parse(localStorage.getItem(CLAVE_MIS_TAREAS) || "null"); } catch (e) { return null; }
+  }
+  function htmlMisTareas(tareas) {
+    if (tareas === null) return "";
+    var h = "<div class='card mis-tareas'>"
+      + "<div class='mis-tareas-tit'>" + icon("clipboard", 18) + "<b>Mis tareas</b>"
+      + (tareas.length ? "<span class='chip ambar'>" + tareas.length + "</span>" : "<span class='chip verde'>Al día</span>")
+      + "</div>";
+    if (!tareas.length) return h + "<p class='aviso' style='margin:6px 0 0;'>No tiene tareas pendientes.</p></div>";
+    tareas.forEach(function (t) {
+      var cuando = t.faltan_dias == null ? "" : t.faltan_dias < 0 ? "Venció hace " + Math.abs(t.faltan_dias) + "d"
+        : t.faltan_dias === 0 ? "Hoy" : t.faltan_dias === 1 ? "Mañana" : "En " + t.faltan_dias + " días";
+      var clase = t.faltan_dias != null && t.faltan_dias <= 0 ? "rojo" : "gris";
+      h += "<div class='mis-tareas-item" + (t.prioridad === "URGENTE" ? " urgente" : "") + "'>"
+        + "<div class='mis-tareas-chips'>"
+        + (t.prioridad === "URGENTE" ? "<span class='chip rojo'>" + icon("alertTriangle", 12) + "Urgente</span>" : "")
+        + (cuando ? "<span class='chip " + clase + "'>" + esc(cuando) + (t.hora ? " " + esc(t.hora) : "") + "</span>" : "")
+        + (t.creado_por_nombre ? "<small>De " + esc(t.creado_por_nombre) + "</small>" : "")
+        + "</div>"
+        + "<div class='mis-tareas-msg'>" + esc(t.mensaje || "—") + "</div>"
+        + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(t.id) + "' data-rec-msg='" + esc(t.mensaje || "") + "' data-rec-asig='" + esc(t.asignado_a || "") + "' data-rec-de='" + esc(t.creado_por_nombre || "") + "'>"
+        + icon("camera", 16) + "Marcar hecha con foto</button>"
+        + "</div>";
+    });
+    return h + "</div>";
+  }
+  function cargarMisTareas() {
+    if (!esOperario()) return;
+    fetch("/api/tareas/mias", { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      var tareas = (d && d.tareas) || [];
+      try { localStorage.setItem(CLAVE_MIS_TAREAS, JSON.stringify(tareas)); } catch (e) { /* sin almacenamiento */ }
+      var box = document.getElementById("mis-tareas-op");
+      if (box) box.innerHTML = htmlMisTareas(tareas);
+    }).catch(function () { /* sin señal: queda la última lista guardada */ });
+    // El botón "Marcar hecha" usa el mismo formulario con foto de la Agenda.
+    bindAgenda();
   }
   function renderCaptura() {
     var tipos = [
@@ -6927,6 +7004,7 @@
       + "</div>"
       + "</div>"
       + "<div id='gps-ronda-box'></div>";
+    if (esOperario()) h += "<div id='mis-tareas-op'>" + htmlMisTareas(_leerMisTareas()) + "</div>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
@@ -11680,7 +11758,7 @@
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto);
       if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
-        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
+        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + (((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR" ? "Ver mis tareas" : "Ver en Tablero") + "</button></div>";
       }
       html += "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
@@ -11898,7 +11976,10 @@
         var btnTab = e.target && e.target.closest ? e.target.closest(".btn-ir-tablero-tarea") : null;
         if (btnTab) {
           e.preventDefault();
-          if (typeof irA === "function") irA("tablero");
+          // El operario no tiene Tablero: sus tareas están arriba de Registrar.
+          var esOpChat = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+          irAVista(esOpChat ? "captura" : "tablero");
+          cargar(true);
           colapsarChat();
         }
       });
@@ -15387,6 +15468,7 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
+        cargarMisTareas();
       }
       return;
     }
@@ -15521,7 +15603,9 @@
       else if (actual === "agenda") html = renderAgenda(d);
       else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
-      if (actual === "tablero") bindTablero();
+      // bindAgenda también arma los botones de tareas del Tablero
+      // ("Asignar Tarea", "Completar"), que antes solo servían tras abrir la Agenda.
+      if (actual === "tablero") { bindTablero(); bindAgenda(); }
       if (actual === "repro") bindRepro();
       if (actual === "carne") bindCarne();
       if (actual === "pasturas") bindPasturas();

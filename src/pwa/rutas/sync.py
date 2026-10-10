@@ -11,6 +11,8 @@ from flask import jsonify, request, session
 from ...engine import lactancia as _lactancia
 from ...engine import revision as _revision
 from ...engine.finanzas_categorias import normalizar_categoria
+from ...server.auth import Auth
+from .. import tareas_equipo
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
     _invalidar_tareas,
@@ -47,7 +49,9 @@ def registrar(app, ctx, h):
     # 2026-10-10: "ellos no venden nada"): la PWA ya no le muestra esos
     # botones y aquí se rechazan. A diferencia de los de arriba, salen de la
     # cola offline (van en ids_ok) porque reintentarlos nunca los arregla.
-    _TIPOS_NO_TRABAJADOR = ("venta", "movimiento", "gasto")
+    # Igual con las tareas: las asignan el dueño y el administrador; el
+    # operario solo las completa (Jaime, 2026-10-10).
+    _TIPOS_NO_TRABAJADOR = ("venta", "movimiento", "gasto", "tarea", "recordatorio")
 
     def _foto_media_existente(db_inst, ruta: Any) -> Optional[str]:
         """Acepta la ruta de foto que envía el cliente solo si es una foto ya
@@ -131,7 +135,10 @@ def registrar(app, ctx, h):
                 errores.append(f"Permisos insuficientes para '{tipo}' ({id_local or tipo})")
                 continue
             if tipo in _TIPOS_NO_TRABAJADOR and str(rol_sync or "").upper() == "TRABAJADOR":
-                errores.append(f"'{tipo}' NO guardado: el operario no registra ventas ni dinero.")
+                if tipo in ("tarea", "recordatorio"):
+                    errores.append(f"'{tipo}' NO guardado: las tareas las asignan el dueño o el administrador.")
+                else:
+                    errores.append(f"'{tipo}' NO guardado: el operario no registra ventas ni dinero.")
                 if id_local:
                     ids_ok.append(id_local)
                 continue
@@ -498,12 +505,21 @@ def registrar(app, ctx, h):
                         ids_ok.append(id_local)
                 elif tipo in ("tarea", "recordatorio"):
                     msg_tarea = payload.get("mensaje") or payload.get("descripcion") or f"Tarea: {payload.get('tipo_tarea', 'Campo')}"
+                    try:
+                        usuarios_sync = Auth(users_file).listar_usuarios()
+                    except Exception:
+                        usuarios_sync = []
+                    asig_nom, asig_id = tareas_equipo.resolver_asignado(
+                        usuarios_sync, payload.get("asignado_a"), payload.get("asignado_a_id"),
+                    )
                     db_sync.registrar_recordatorio(
                         mensaje=msg_tarea,
                         fecha_programada=fecha,
                         hora=payload.get("hora"),
                         creado_por=uid,
-                        asignado_a=payload.get("asignado_a"),
+                        creado_por_nombre=session.get("nombre") or (_rol_actual() or "Usuario"),
+                        asignado_a=asig_nom,
+                        asignado_a_id=asig_id,
                         tipo_objetivo=payload.get("tipo_objetivo"),
                         animal_tag=payload.get("animal_tag") or payload.get("tag"),
                         potrero_nombre=payload.get("potrero_nombre") or payload.get("potrero"),

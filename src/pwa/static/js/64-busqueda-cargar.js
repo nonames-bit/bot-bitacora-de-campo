@@ -365,6 +365,7 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
+        cargarMisTareas();
       }
       return;
     }
@@ -499,7 +500,9 @@
       else if (actual === "agenda") html = renderAgenda(d);
       else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
-      if (actual === "tablero") bindTablero();
+      // bindAgenda también arma los botones de tareas del Tablero
+      // ("Asignar Tarea", "Completar"), que antes solo servían tras abrir la Agenda.
+      if (actual === "tablero") { bindTablero(); bindAgenda(); }
       if (actual === "repro") bindRepro();
       if (actual === "carne") bindCarne();
       if (actual === "pasturas") bindPasturas();

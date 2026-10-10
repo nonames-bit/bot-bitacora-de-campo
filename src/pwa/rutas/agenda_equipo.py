@@ -10,6 +10,7 @@ from datetime import date
 import logging
 from flask import jsonify, request, session
 from ...utils import to_date
+from .. import tareas_equipo
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _EXTENSIONES_IMAGEN_PERMITIDAS,
     _db,
@@ -44,16 +45,51 @@ def registrar(app, ctx, h):
         dias = max(1, min(dias, 60))
         out = datos_agenda(db_path, dias=dias)
         out["rol"] = _rol_actual()
+        if str(out["rol"] or "").upper() == "TRABAJADOR":
+            # El operario solo ve las tareas que le tocan a él.
+            uid, nombre = session.get("user_id"), _nombre_sesion()
+            for k in ("recordatorios", "recordatorios_completados"):
+                out[k] = [t for t in out.get(k) or [] if tareas_equipo.es_tarea_de(t, uid, nombre)]
         return jsonify(out)
+
+    def _usuarios():
+        try:
+            try:
+                from ...server.auth import Auth
+            except (ImportError, ValueError):
+                from src.server.auth import Auth  # type: ignore
+            return Auth(users_file).listar_usuarios()
+        except Exception:
+            return []
+
+    def _nombre_sesion():
+        uid = session.get("user_id")
+        for u in _usuarios() if uid is not None else []:
+            if str(u.get("user_id")) == str(uid):
+                return tareas_equipo.nombre_usuario(u)
+        return session.get("nombre") or session.get("username") or ""
+
+    @app.get("/api/tareas/mias")
+    def api_tareas_mias():
+        """Tareas pendientes de quien está en la app ("Mis tareas" del operario)."""
+        out = datos_agenda(db_path, dias=7)
+        uid, nombre = session.get("user_id"), _nombre_sesion()
+        mias = [t for t in out.get("recordatorios") or [] if tareas_equipo.es_tarea_de(t, uid, nombre)]
+        return jsonify({"ok": True, "tareas": mias})
 
     @app.post("/api/agenda/recordatorio")
     def api_agenda_crear_recordatorio():
         """Crea un evento/recordatorio o tarea asignada de campo (misma tabla de /programar)."""
+        if not tareas_equipo.puede_asignar(_rol_actual()):
+            return jsonify({"ok": False, "error": "Solo el dueño o el administrador asignan tareas."}), 403
         datos = request.get_json(silent=True) or request.form or {}
         mensaje = str(datos.get("mensaje") or "").strip()
         fecha = str(datos.get("fecha") or "").strip()
         hora = str(datos.get("hora") or "").strip() or None
-        asignado_a = str(datos.get("asignado_a") or "").strip() or None
+        usuarios = _usuarios()
+        asignado_a, asignado_a_id = tareas_equipo.resolver_asignado(
+            usuarios, datos.get("asignado_a"), datos.get("asignado_a_id"),
+        )
         tipo_objetivo = str(datos.get("tipo_objetivo") or "").strip().upper() or None
         animal_tag = str(datos.get("animal_tag") or datos.get("tag") or "").strip().upper() or None
         potrero_nombre = str(datos.get("potrero_nombre") or datos.get("potrero") or "").strip() or None
@@ -84,6 +120,7 @@ def registrar(app, ctx, h):
                 creado_por=uid,
                 creado_por_nombre=nombre_creador,
                 asignado_a=asignado_a,
+                asignado_a_id=asignado_a_id,
                 tipo_objetivo=tipo_objetivo,
                 animal_tag=animal_tag,
                 potrero_nombre=potrero_nombre,
@@ -103,7 +140,22 @@ def registrar(app, ctx, h):
                 db_r.conn.commit()
             except Exception:
                 pass
-            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora, "asignado_a": asignado_a, "creado_por_nombre": nombre_creador})
+            # Aviso al celular del responsable; si la tarea es para "el
+            # equipo", a todos los operarios.
+            if asignado_a_id is not None:
+                destinos = [asignado_a_id]
+            else:
+                destinos = [
+                    u.get("user_id") for u in usuarios
+                    if str(u.get("rol") or "").upper() == "TRABAJADOR"
+                    and tareas_equipo.es_tarea_de({"asignado_a": asignado_a}, u.get("user_id"), tareas_equipo.nombre_usuario(u))
+                ]
+            urgente = "URGENTE · " if prioridad == "URGENTE" else ""
+            tareas_equipo.avisar(
+                db_r, f"📋 {urgente}Tarea de {nombre_creador}", mensaje,
+                [d for d in destinos if str(d) != str(uid)],
+            )
+            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora, "asignado_a": asignado_a, "asignado_a_id": asignado_a_id, "creado_por_nombre": nombre_creador})
         except Exception:
             logger.exception("Error creando recordatorio de agenda")
             return jsonify({"ok": False, "error": "No se pudo crear el recordatorio."}), 500
@@ -119,7 +171,14 @@ def registrar(app, ctx, h):
         datos = request.get_json(silent=True) or request.form or {}
         notas = str(datos.get("notas") or datos.get("notas_completado") or "").strip() or None
         foto_b64 = datos.get("foto_base64")
-        completado_por = str(datos.get("completado_por") or session.get("nombre") or (_rol_actual() or "Usuario")).strip()
+        es_operario = str(_rol_actual() or "").upper() == "TRABAJADOR"
+        if es_operario:
+            # El operario firma con su propio nombre y siempre manda la foto.
+            completado_por = _nombre_sesion() or "Operario"
+            if not (foto_b64 and isinstance(foto_b64, str)):
+                return jsonify({"ok": False, "error": "Tome la foto de la tarea hecha para enviarla como evidencia."}), 400
+        else:
+            completado_por = str(datos.get("completado_por") or _nombre_sesion() or (_rol_actual() or "Usuario")).strip()
         db_r = _db(db_path)
         try:
             fila = db_r.query_one(
@@ -129,6 +188,10 @@ def registrar(app, ctx, h):
                 return jsonify({"ok": False, "error": "El recordatorio no existe."}), 404
             fila = dict(fila)
             uid = session.get("user_id") if session is not None else None
+            if es_operario and not tareas_equipo.es_tarea_de(fila, uid, _nombre_sesion()):
+                return jsonify({"ok": False, "error": "Esta tarea es de otra persona."}), 403
+            if str(fila.get("estado") or "").upper() == "REALIZADO":
+                return jsonify({"ok": False, "error": "Esta tarea ya se marcó como hecha."}), 409
             foto_ruta = None
             if foto_b64 and isinstance(foto_b64, str):
                 tag_ref = fila.get("animal_tag") or "tarea"
@@ -158,6 +221,14 @@ def registrar(app, ctx, h):
                 db_r.conn.commit()
             except Exception:
                 pass
+
+            # Aviso a quien la asignó.
+            if fila.get("creado_por") is not None and str(fila.get("creado_por")) != str(uid):
+                tareas_equipo.avisar(
+                    db_r, f"✅ {completado_por} terminó una tarea",
+                    str(fila.get("mensaje") or "") + (" 📷" if foto_ruta else ""),
+                    [fila.get("creado_por")], url="/?v=agenda",
+                )
 
             return jsonify({
                 "ok": True,
@@ -275,13 +346,11 @@ def registrar(app, ctx, h):
             for u in auth_inst.listar_usuarios():
                 nom = (u.get("nombre") or u.get("username") or "").strip()
                 if nom and not any(it["nombre"].lower() == nom.lower() for it in integrantes):
-                    integrantes.append({"nombre": nom, "rol": u.get("rol"), "tipo": "USUARIO"})
+                    integrantes.append({"nombre": nom, "rol": u.get("rol"), "tipo": "USUARIO", "id": u.get("user_id")})
         except Exception:
             pass
-        roles_base = ["Encargado", "Administrador", "Veterinario", "Mayordomo", "Trabajador"]
-        for r in roles_base:
-            if not any(it["nombre"].lower() == r.lower() for it in integrantes):
-                integrantes.append({"nombre": r, "rol": r.upper(), "tipo": "ROL"})
+        # Además de cada persona, "Todo el equipo": la ven todos los operarios.
+        integrantes.append({"nombre": "Todo el equipo", "rol": "TRABAJADOR", "tipo": "ROL"})
         return jsonify({"ok": True, "integrantes": integrantes})
 
     @app.get("/api/buscar")
@@ -383,7 +452,15 @@ def registrar(app, ctx, h):
             dias = int(request.args.get("dias") or 7)
         except (TypeError, ValueError):
             dias = 7
-        out = datos_badges(db_path, dias=max(1, min(dias, 60)))
+        dias = max(1, min(dias, 60))
+        out = datos_badges(db_path, dias=dias)
+        if str(_rol_actual() or "").upper() == "TRABAJADOR":
+            # En el número de la Agenda del operario solo cuentan sus tareas.
+            ventana = datos_agenda(db_path, dias=dias).get("recordatorios") or []
+            uid, nombre = session.get("user_id"), _nombre_sesion()
+            mias = sum(1 for t in ventana if tareas_equipo.es_tarea_de(t, uid, nombre)
+                       and (t.get("faltan_dias") is None or t["faltan_dias"] <= dias))
+            out["agenda"] = max(0, out["agenda"] - out.get("agenda_tareas", 0)) + mias
         # Bandeja "Por revisar": solo OWNER/ADMIN ven el contador.
         if _rol_actual() in ("OWNER", "ADMIN"):
             db_b = _db(db_path)
