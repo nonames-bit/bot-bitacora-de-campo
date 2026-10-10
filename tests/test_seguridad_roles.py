@@ -64,12 +64,19 @@ def test_sync_bloquea_iatf_e_ingreso_para_trabajador(tmp_path):
     r = trab.post("/api/sync", json={"eventos": [
         {"tipo": "inseminador", "id_local": "a1", "payload": {"nombre": "Pepe"}},
         {"tipo": "gasto", "id_local": "a2", "payload": {"tipo_finanza": "INGRESO", "categoria": "LECHE", "monto": 100}},
-        {"tipo": "gasto", "id_local": "a3", "payload": {"tipo_finanza": "EGRESO", "categoria": "SAL", "monto": -5}},
+        {"tipo": "gasto", "id_local": "a3", "payload": {"tipo_finanza": "EGRESO", "categoria": "SAL", "monto": 50}},
+    ]}).get_json()
+    # Desde 2026-10-10 el trabajador tampoco registra gastos (EGRESO): salen
+    # de la cola (ids_ok) sin guardarse. El inseminador sigue sin salir.
+    assert r["ids_ok"] == ["a2", "a3"]
+    assert len(r["errores"]) == 3
+    # La foto de un gasto solo se acepta si ya está registrada en media/.
+    adm = _cliente(app, "2222")
+    r2 = adm.post("/api/sync", json={"eventos": [
         {"tipo": "gasto", "id_local": "a4", "payload": {"tipo_finanza": "EGRESO", "categoria": "SAL", "monto": 50,
                                                           "foto_ruta": "../../etc/passwd"}},
     ]}).get_json()
-    assert r["ids_ok"] == ["a4"]
-    assert len(r["errores"]) == 3
+    assert r2["ids_ok"] == ["a4"]
     db = Database(db_path)
     try:
         filas = db.query("SELECT tipo, monto, foto_ruta FROM finanzas")

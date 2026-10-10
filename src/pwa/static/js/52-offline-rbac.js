@@ -265,7 +265,14 @@
       // corral. El mapa satelital sigue exclusivo de oficina (ver
       // /api/mapa/datos): el botón GPS de Registrar localiza y guarda la
       // ronda sin mapa.
-      var permitidas = ["captura", "manga", "ficha", "agenda"];
+      // "Potreros" (2026-10-10): lista de animales por potrero para
+      // verificar en campo si están todos; se precarga para usarla sin señal.
+      var permitidas = ["captura", "manga", "ficha", "agenda", "potreros"];
+      precargarPotreros();
+      // Sus 5 vistas ya están en la barra: "Más" solo repetiría las mismas y
+      // obligaría a una segunda fila en el celular.
+      var btnMasT = document.getElementById("btn-nav-mas");
+      if (btnMasT) btnMasT.classList.add("sin-mas");
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
         if (!v) return; // e.g. #btn-nav-mas
@@ -275,7 +282,7 @@
         }
         if (permitidas.indexOf(v) !== -1) {
           b.style.display = "";
-          // Con solo 4 vistas, todas caben en la barra inferior del celular.
+          // Con solo 5 vistas, todas caben en la barra inferior del celular.
           b.classList.remove("nav-secundario");
           b.classList.add("nav-primario");
         } else {

@@ -816,6 +816,11 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
   - Pantalla **Por revisar** (menú Gestión, solo OWNER/ADMIN, con contador): cada registro muestra quién lo envió, por dónde y cuándo, con **Aprobar**, **Corregir** (editar los campos y aprobar) y **Rechazar** (con motivo). Al aprobar se registra a nombre del trabajador; el canal del equipo avisa la aprobación o el rechazo.
   - Pruebas: `tests/test_revision_trabajador.py` + verificación en Chromium 390×844 y 1366×860.
 
+- [x] **Vista del operario: sin ventas ni dinero, con "Potreros" para contar en campo (2026-10-10)**:
+  - El **TRABAJADOR** ya no ve **Venta Animal** ni **Ingreso / Gasto** en Registrar (ni "Vender" en la ficha). El servidor también los rechaza desde ese rol en `/api/sync` (`_TIPOS_NO_TRABAJADOR`, salen de la cola offline) y en `/api/finanzas/analizar-factura`. Las ventas suyas que ya estaban en "Por revisar" se pueden seguir aprobando.
+  - Pantalla nueva **Potreros** (barra del operario; también en Hato para OWNER/ADMIN): cada potrero con sus animales activos (`/api/potreros/listado`, `listado_potreros()`, solo `estado = 'ACTIVO'`). Al abrir uno se marca cada animal a medida que se ve; el contador fijo arriba dice cuántos faltan y "Solo los que faltan" deja la lista corta. Las marcas son solo ayuda en ese celular (por el día) y no crean registros. La lista se precarga al entrar y funciona sin señal.
+  - Pruebas: `tests/test_operario_potreros.py` + verificación en Chromium 390×844 (también sin conexión).
+
 - [x] **PWA con íconos propios en vez de emojis (Fase C, 2026-10-01)**:
   - Los ~550 emojis de pantallas, botones, avisos y menús se cambiaron por los íconos SVG de la app (`icon()` en `ja-core.js`, trazo y color del tema; se añadieron ~45 íconos Lucide que faltaban). Los semáforos 🟢🟡🔴 se pintan como puntos de color del tema (`dot()`); en textos planos (alertas, toasts, placeholders) el emoji simplemente se quitó.
   - Los emojis que manda el servidor (semáforos de potreros/estado) se siguen leyendo pero se dibujan como punto. Pruebas: `tests/test_iconos_sin_emojis.py`.

@@ -29,8 +29,8 @@ def registrar(app, ctx, h):
 
 
     # Tipos de /api/sync restringidos por rol. Se alinean con lo que la UI
-    # ofrece a cada rol: la Captura Rápida del TRABAJADOR incluye pajuelas,
-    # nitrógeno y gastos (EGRESO), pero IATF e inseminadores solo existen en
+    # ofrece a cada rol: la Captura Rápida del TRABAJADOR incluye pajuelas y
+    # nitrógeno (ya no gastos ni ventas, ver abajo), pero IATF e inseminadores solo existen en
     # la vista de Reproducción (OWNER/ADMIN) y sus endpoints dedicados los
     # prohíben a roles de campo. Sin este mapa, /api/sync era una puerta
     # trasera a esas acciones.
@@ -43,6 +43,11 @@ def registrar(app, ctx, h):
         "iatf_inseminar": _ROLES_GESTION,
         "lote_iatf_inseminar": _ROLES_GESTION,
     }
+    # Ventas e ingresos/gastos no son trabajo del operario de campo (Jaime,
+    # 2026-10-10: "ellos no venden nada"): la PWA ya no le muestra esos
+    # botones y aquí se rechazan. A diferencia de los de arriba, salen de la
+    # cola offline (van en ids_ok) porque reintentarlos nunca los arregla.
+    _TIPOS_NO_TRABAJADOR = ("venta", "movimiento", "gasto")
 
     def _foto_media_existente(db_inst, ruta: Any) -> Optional[str]:
         """Acepta la ruta de foto que envía el cliente solo si es una foto ya
@@ -124,6 +129,11 @@ def registrar(app, ctx, h):
             roles_req = _ROLES_SYNC.get(tipo)
             if roles_req and rol_sync not in roles_req:
                 errores.append(f"Permisos insuficientes para '{tipo}' ({id_local or tipo})")
+                continue
+            if tipo in _TIPOS_NO_TRABAJADOR and str(rol_sync or "").upper() == "TRABAJADOR":
+                errores.append(f"'{tipo}' NO guardado: el operario no registra ventas ni dinero.")
+                if id_local:
+                    ids_ok.append(id_local)
                 continue
 
             n_ids_previos = len(ids_ok)

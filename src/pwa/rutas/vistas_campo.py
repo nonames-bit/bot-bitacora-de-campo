@@ -157,6 +157,21 @@ def registrar(app, ctx, h):
         finally:
             db_p.close()
 
+    @app.get("/api/potreros/listado")
+    def api_potreros_listado():
+        """Pantalla "Potreros" (todos los roles, también el operario): cada
+        potrero con sus animales activos, para verificar en campo si están
+        todos. Una sola respuesta para que quede guardada y sirva sin señal."""
+        db_p = _db(db_path)
+        try:
+            try:
+                from ...engine.dashboard_data import listado_potreros
+            except (ImportError, ValueError):
+                from src.engine.dashboard_data import listado_potreros  # type: ignore
+            return jsonify(listado_potreros(db_p))
+        finally:
+            db_p.close()
+
     @app.get("/api/potrero/animales")
     def api_potrero_animales_query():
         pot_ref = request.args.get("potrero") or request.args.get("q") or ""

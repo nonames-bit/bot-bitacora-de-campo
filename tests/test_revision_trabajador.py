@@ -148,8 +148,15 @@ def test_corregir_y_aprobar(tmp_path):
 
 def test_aprobar_con_error_lo_deja_pendiente(tmp_path):
     app, db_path = _setup(tmp_path)
-    _cliente(app, "3333").post("/api/sync", json={"eventos": [
-        {"tipo": "venta", "payload": {"animal_tag": "NOEXISTE", "precio": 1000}}]})
+    # El trabajador ya no puede registrar ventas (2026-10-10), pero una venta
+    # suya que quedó en la bandeja de antes todavía se puede aprobar.
+    db = Database(db_path)
+    try:
+        revision.poner_en_revision(
+            db, origen="app", tipo="venta", datos={"animal_tag": "NOEXISTE", "precio": 1000},
+            fecha="2026-09-30", registrado_por=4, registrado_por_nombre="Pedro", canal="App")
+    finally:
+        db.close()
     adm = _cliente(app, "2222")
     pid = adm.get("/api/revision/pendientes").get_json()["pendientes"][0]["id"]
     r = adm.post(f"/api/revision/{pid}/aprobar", json={})

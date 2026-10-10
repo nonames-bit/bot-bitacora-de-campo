@@ -1894,6 +1894,52 @@ def animales_de_potrero(db: Database, potrero_ref: str | int, hoy: Optional[date
     }
 
 
+def listado_potreros(db: Database, hoy: Optional[date] = None) -> dict:
+    """Todos los potreros con animales ACTIVOS y la lista de cada uno, en una
+    sola respuesta. Es la pantalla "Potreros" del operario: la descarga una vez
+    con señal y luego verifica en campo sin internet (el service worker guarda
+    la última copia). Usa ``animales_de_potrero`` para que la categoría sea la
+    misma de Pasturas. Regla Fundamental de Inventario: solo estado = 'ACTIVO'.
+    """
+    filas = db.query("""
+        WITH ult_traslado AS (
+            SELECT animal_id, potrero_destino,
+                   ROW_NUMBER() OVER (PARTITION BY animal_id ORDER BY fecha DESC, id DESC) as rn
+            FROM traslados WHERE potrero_destino IS NOT NULL
+        )
+        SELECT COALESCE(a.potrero_id, ut.potrero_destino) as pot_actual, COUNT(*) as n
+        FROM animales a
+        LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
+        WHERE a.estado = 'ACTIVO'
+        GROUP BY pot_actual
+    """)
+    potreros = []
+    for f in filas:
+        pid = f["pot_actual"]
+        if pid is not None and not db.get_potrero(int(pid)):
+            continue  # potrero borrado al que algún animal todavía apunta
+        res = animales_de_potrero(db, "SIN POTRERO" if pid is None else int(pid), hoy=hoy)
+        if not res.get("ok") or not res.get("total"):
+            continue
+        potreros.append({
+            "id": res["potrero"]["id"],
+            "nombre": res["potrero_nombre"],
+            "total": res["total"],
+            "animales": [
+                {"tag": a["tag"], "nombre": a["nombre"], "sexo": a["sexo"], "edad": a["edad"],
+                 "categoria": a["categoria_sg"], "categoria_desc": a["categoria_desc"]}
+                for a in res["animales"]
+            ],
+        })
+    potreros.sort(key=lambda p: (p["id"] == -1, str(p["nombre"]).upper()))
+    return {
+        "ok": True,
+        "fecha": (hoy or date.today()).isoformat(),
+        "total_animales": sum(p["total"] for p in potreros),
+        "potreros": potreros,
+    }
+
+
 def animales_por_grupo_inventario(
     db: Database,
     tipo: str,

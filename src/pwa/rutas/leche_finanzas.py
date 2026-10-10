@@ -381,6 +381,9 @@ def registrar(app, ctx, h):
 
     @app.post("/api/finanzas/analizar-factura")
     def api_finanzas_analizar_factura():
+        # El operario no registra gastos (ver _TIPOS_NO_TRABAJADOR en sync.py).
+        if _rol_actual() == "TRABAJADOR":
+            return jsonify({"ok": False, "error": "Permisos insuficientes"}), 403
         datos = request.get_json(silent=True) or {}
         foto_b64 = datos.get("foto_base64")
         fecha_ref = datos.get("fecha_referencia") or date.today().isoformat()
