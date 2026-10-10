@@ -69,6 +69,34 @@ def es_tarea_de(tarea: dict, uid: Any, nombre: Any) -> bool:
     return bool(nombre) and asig == str(nombre).strip().lower()
 
 
+def puede_ver(tarea: dict, rol: Any, uid: Any, nombre: Any, usuarios: Iterable[dict]) -> bool:
+    """Quién ve qué tarea (Jaime, 2026-10-10): el dueño ve todas; el
+    administrador, las suyas y las de los trabajadores; el operario, solo
+    las suyas."""
+    rol = str(rol or "").upper()
+    if rol == "TRABAJADOR":
+        return es_tarea_de(tarea, uid, nombre)
+    if rol != "ADMIN":
+        return True
+    if es_tarea_de(tarea, uid, nombre) or (uid is not None and str(tarea.get("creado_por")) == str(uid)):
+        return True
+    asig_id = tarea.get("asignado_a_id")
+    asig = str(tarea.get("asignado_a") or "").strip().lower()
+    for u in usuarios or []:
+        if (asig_id not in (None, "") and str(u.get("user_id")) == str(asig_id)) or (
+                asig_id in (None, "") and asig and nombre_usuario(u).lower() == asig):
+            return str(u.get("rol") or "").upper() == "TRABAJADOR"
+    return False
+
+
+def filtrar(out: dict, claves: Iterable[str], rol: Any, uid: Any, nombre: Any,
+            usuarios: Iterable[dict]) -> None:
+    usuarios = list(usuarios or [])
+    for k in claves:
+        if k in out:
+            out[k] = [t for t in out.get(k) or [] if puede_ver(t, rol, uid, nombre, usuarios)]
+
+
 def avisar(db, titulo: str, cuerpo: str, user_ids: list, url: str = "/?v=captura") -> None:
     """Notificación al celular de esas personas. Nunca falla: sin llaves
     VAPID o sin suscripción simplemente no llega."""

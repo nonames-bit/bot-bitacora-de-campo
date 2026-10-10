@@ -134,3 +134,20 @@ def test_numero_de_agenda_del_operario_cuenta_solo_las_suyas(cliente):
     assert cliente.get("/api/badges").get_json()["agenda"] == 2
     _entrar(cliente, 2)
     assert cliente.get("/api/badges").get_json()["agenda"] == 1
+
+
+def test_dueno_ve_todas_admin_solo_suyas_y_de_trabajadores(cliente):
+    _entrar(cliente, 1)
+    _crear(cliente, mensaje="Para Pepito", asignado_a_id=2)
+    _crear(cliente, mensaje="Para Ana", asignado_a_id=4)
+    rid_jaime = _crear(cliente, mensaje="Para Jaime", asignado_a_id=1).get_json()["id"]
+    assert len(cliente.get("/api/agenda").get_json()["recordatorios"]) == 3
+    assert len(cliente.get("/api/tablero").get_json()["tareas_asignadas"]) == 3
+
+    _entrar(cliente, 4)
+    agenda = sorted(t["mensaje"] for t in cliente.get("/api/agenda").get_json()["recordatorios"])
+    assert agenda == ["Para Ana", "Para Pepito"]
+    tablero = sorted(t["mensaje"] for t in cliente.get("/api/tablero").get_json()["tareas_asignadas"])
+    assert tablero == ["Para Ana", "Para Pepito"]
+    r = cliente.post(f"/api/agenda/recordatorio/{rid_jaime}/completar", json={"notas": "x"})
+    assert r.status_code == 403

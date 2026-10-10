@@ -45,11 +45,9 @@ def registrar(app, ctx, h):
         dias = max(1, min(dias, 60))
         out = datos_agenda(db_path, dias=dias)
         out["rol"] = _rol_actual()
-        if str(out["rol"] or "").upper() == "TRABAJADOR":
-            # El operario solo ve las tareas que le tocan a él.
-            uid, nombre = session.get("user_id"), _nombre_sesion()
-            for k in ("recordatorios", "recordatorios_completados"):
-                out[k] = [t for t in out.get(k) or [] if tareas_equipo.es_tarea_de(t, uid, nombre)]
+        # Dueño: todas; administrador: suyas y de trabajadores; operario: suyas.
+        tareas_equipo.filtrar(out, ("recordatorios", "recordatorios_completados"), out["rol"],
+                              session.get("user_id"), _nombre_sesion(), _usuarios())
         return jsonify(out)
 
     def _usuarios():
@@ -188,7 +186,7 @@ def registrar(app, ctx, h):
                 return jsonify({"ok": False, "error": "El recordatorio no existe."}), 404
             fila = dict(fila)
             uid = session.get("user_id") if session is not None else None
-            if es_operario and not tareas_equipo.es_tarea_de(fila, uid, _nombre_sesion()):
+            if not tareas_equipo.puede_ver(fila, _rol_actual(), uid, _nombre_sesion(), _usuarios()):
                 return jsonify({"ok": False, "error": "Esta tarea es de otra persona."}), 403
             if str(fila.get("estado") or "").upper() == "REALIZADO":
                 return jsonify({"ok": False, "error": "Esta tarea ya se marcó como hecha."}), 409
