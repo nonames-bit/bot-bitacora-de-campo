@@ -5263,6 +5263,18 @@ class Database:
               unidad, fuente, notas, ahora))
         return cursor.lastrowid or 0
 
+    @staticmethod
+    def _precio_mercado_es_real(fuente: Optional[str], producto: Optional[str] = None) -> bool:
+        """True si la cotización la anotó una persona (MANUAL) o es la TRM consultada en línea.
+
+        La semilla jul-sep 2026 y las antiguas copias diarias "AUTOMATICO" de una
+        tabla fija son valores de referencia, no precios del día.
+        """
+        f = (fuente or "").upper()
+        if f.startswith("MANUAL"):
+            return True
+        return f.startswith("AUTOMATICO") and (producto or "").upper() == "DOLAR_TRM" and "REFERENCIA BASE" not in f
+
     def obtener_datos_mercado_completos(self) -> dict[str, Any]:
         """Consolida los indicadores de mercado, subastas, comparativas, tendencias y calculadora de flete."""
         self.sembrar_precios_mercado_iniciales()
@@ -5280,13 +5292,21 @@ class Database:
                 curr.id, curr.fecha, curr.plaza, curr.producto, curr.precio_promedio, curr.precio_maximo, curr.precio_minimo,
                 curr.unidad, curr.fuente, curr.notas, curr.creado_en,
                 prev.precio_promedio as precio_anterior,
-                prev.fecha as fecha_anterior
+                prev.fecha as fecha_anterior,
+                prev.fuente as fuente_anterior
             FROM ranked curr
             LEFT JOIN ranked prev ON curr.plaza = prev.plaza AND curr.producto = prev.producto AND prev.rn = 2
             WHERE curr.rn = 1
             ORDER BY curr.plaza, curr.producto
         """
         filas = [dict(r) for r in self.query(sql_recientes)]
+        # La variación solo tiene sentido entre dos cotizaciones reales: con valores
+        # de referencia (fijos) saldría siempre 0% o una tendencia inventada.
+        for r in filas:
+            r["es_referencia"] = not self._precio_mercado_es_real(r.get("fuente"), r.get("producto"))
+            if r["es_referencia"] or not self._precio_mercado_es_real(r.get("fuente_anterior"), r.get("producto")):
+                r["precio_anterior"] = None
+                r["fecha_anterior"] = None
 
         # Consultar histórico temporal de las últimas 12 semanas para graficar tendencias
         sql_historico = """
@@ -5342,6 +5362,10 @@ class Database:
                     "productos": {}
                 }
 
+            if str(row["fecha"]) > str(subastas_dict[pz]["fecha_actualizacion"]):
+                subastas_dict[pz]["fecha_actualizacion"] = row["fecha"]
+            subastas_dict[pz]["es_referencia"] = subastas_dict[pz].get("es_referencia", True) and row["es_referencia"]
+
             precio_act = float(row["precio_promedio"])
             precio_ant = float(row["precio_anterior"]) if row.get("precio_anterior") is not None else None
             if precio_ant is not None and precio_ant > 0:
@@ -5365,6 +5389,8 @@ class Database:
                 "unidad": row["unidad"],
                 "fuente": row["fuente"],
                 "notas": row["notas"],
+                "fecha": row["fecha"],
+                "es_referencia": row["es_referencia"],
                 "precio_anterior": precio_ant,
                 "fecha_anterior": row.get("fecha_anterior"),
                 "variacion_pesos": var_pesos,
@@ -5403,6 +5429,7 @@ class Database:
                     "precio_promedio": pr_actual,
                     "precio": pr_actual,
                     "precio_anterior": p_data.get("precio_anterior"),
+                    "es_referencia": p_data["es_referencia"],
                     "precio_minimo": p_data["precio_minimo"],
                     "precio_maximo": p_data["precio_maximo"],
                     "variacion_pesos": p_data["variacion_pesos"],
@@ -5439,6 +5466,7 @@ class Database:
             granada_item = next((x for x in items_cat if x["plaza_key"] == "GRANADA"), None)
 
             resumen_tendencias[cat] = {
+                "hay_comparacion": bool(precios_ant),
                 "promedio_mercado": prom_act,
                 "promedio_anterior": prom_ant,
                 "variacion_pesos": v_pesos,
@@ -5451,14 +5479,21 @@ class Database:
                 "variacion_granada_pesos": granada_item["variacion_pesos"] if granada_item else 0.0,
             }
 
-        # Mensaje interpretativo sintetizado para toma de decisiones
+        # Mensaje interpretativo sintetizado para toma de decisiones (con los datos reales de la tabla)
         mg_tend = resumen_tendencias.get("MACHO_GORDO", {})
-        texto_interpretativo = (
-            f"📈 Mercado de Macho Gordo con tendencia {'ALCISTA' if mg_tend.get('tendencia') == 'SUBIENDO' else ('BAJISTA' if mg_tend.get('tendencia') == 'BAJANDO' else 'ESTABLE')} "
-            f"({'+' if mg_tend.get('variacion_pct', 0) > 0 else ''}{mg_tend.get('variacion_pct', 0)}% semanal). "
-            f"Catama ($8.550/kg) lidera precios en los Llanos y Bogotá ($9.150/kg) en mercado terminal. "
-            f"Granada cotiza en $8.450/kg con variación de {'+' if mg_tend.get('variacion_granada_pesos', 0) > 0 else ''}{mg_tend.get('variacion_granada_pesos', 0)} $/kg."
-        )
+        mg_items = comparativa_por_categoria.get("MACHO_GORDO", [])
+        mg_top = next((x for x in mg_items if x["plaza_key"] not in ("PROMEDIO_NACIONAL",)), None)
+        if mg_tend.get("hay_comparacion"):
+            tend_txt = {"SUBIENDO": "ALCISTA", "BAJANDO": "BAJISTA"}.get(mg_tend.get("tendencia"), "ESTABLE")
+            signo = "+" if mg_tend.get("variacion_pct", 0) > 0 else ""
+            texto_interpretativo = f"📈 Macho Gordo con tendencia {tend_txt} ({signo}{mg_tend.get('variacion_pct', 0)}% vs la cotización anterior). "
+        else:
+            texto_interpretativo = "Macho Gordo: aún no hay dos cotizaciones reales seguidas para calcular la tendencia. "
+        if mg_top:
+            texto_interpretativo += f"Mejor precio: {mg_top['nombre']} (${mg_top['precio_promedio']:,.0f}/kg)".replace(",", ".")
+            if mg_tend.get("precio_granada"):
+                texto_interpretativo += f"; Granada ${mg_tend['precio_granada']:,.0f}/kg".replace(",", ".")
+            texto_interpretativo += "."
         resumen_tendencias["mensaje_interpretativo"] = texto_interpretativo
 
         # Precio real de leche liquidado en la finca (desde finanzas)
@@ -5500,6 +5535,7 @@ class Database:
                     "unidad": row["unidad"],
                     "fuente": row["fuente"],
                     "fecha": row["fecha"],
+                    "es_referencia": row["es_referencia"],
                     "historico_semanal": historial_series.get(pz, {}).get(prod, [])
                 })
             elif pz == "ARIARI_LOCAL" or prod == "DOLAR_TRM":
@@ -5515,28 +5551,21 @@ class Database:
                     "unidad": row["unidad"],
                     "fuente": row["fuente"],
                     "fecha": row["fecha"],
+                    "es_referencia": row["es_referencia"],
                     "kg_novillo_equivalentes": kg_novillo_req,
                     "historico_semanal": historial_series.get(pz, {}).get(prod, [])
                 })
 
         max_fecha = max((r["fecha"] for r in filas), default=date.today().isoformat())
-        # ¿Todos los datos vienen de la semilla de referencia (jul-sep 2026)?
-        # Basta un solo registro MANUAL o AUTOMATICO para dejar de ser referencia.
-        try:
-            row_no_ref = self.query_one(
-                "SELECT 1 AS x FROM precios_mercado "
-                "WHERE fuente IS NOT NULL AND (fuente LIKE 'MANUAL%' OR fuente LIKE 'AUTOMATICO%') LIMIT 1"
-            )
-        except Exception:
-            row_no_ref = None
-        es_datos_referencia = row_no_ref is None
+        # ¿Ningún precio de subasta/leche/insumo es real? (la TRM no cuenta: es solo el dólar)
+        es_datos_referencia = all(r["es_referencia"] for r in filas if r["producto"] != "DOLAR_TRM")
         try:
             row_max = self.query_one("SELECT MAX(fecha) AS mf FROM precios_mercado")
             fecha_ultimo_dato = (row_max["mf"] if row_max else None) or None
         except Exception:
             fecha_ultimo_dato = max_fecha if filas else None
-        es_auto = any((r.get("fuente") or "").startswith("AUTOMATICO") for r in filas)
         trm_row = next((r for r in filas if r["producto"] == "DOLAR_TRM"), None)
+        es_auto = bool(trm_row and not trm_row["es_referencia"])
         trm_actual = float(trm_row["precio_promedio"]) if trm_row else None
         trm_ant = float(trm_row["precio_anterior"]) if trm_row and trm_row.get("precio_anterior") is not None else None
         trm_var_pct = round(((trm_actual - trm_ant) / trm_ant) * 100, 2) if trm_actual and trm_ant and trm_ant > 0 else 0.0
@@ -5552,6 +5581,7 @@ class Database:
             "trm_anterior": trm_ant,
             "trm_variacion_pct": trm_var_pct,
             "trm_tendencia": trm_tend,
+            "trm_fecha": trm_row["fecha"] if trm_row else None,
             "ubicacion_finca": "Mesetas, Meta (Región Ariari)",
             "subastas": list(subastas_dict.values()),
             "comparativa_por_categoria": comparativa_por_categoria,
@@ -5582,11 +5612,12 @@ class Database:
         fila = self.query_one(
             """
             WITH ranked AS (
-                SELECT fecha, precio_promedio,
+                SELECT fecha, precio_promedio, fuente,
                        ROW_NUMBER() OVER (ORDER BY fecha DESC, id DESC) AS rn
                 FROM precios_mercado WHERE plaza = ? AND producto = ?
             )
-            SELECT curr.fecha, curr.precio_promedio AS precio, prev.precio_promedio AS precio_anterior
+            SELECT curr.fecha, curr.precio_promedio AS precio, curr.fuente,
+                   prev.precio_promedio AS precio_anterior, prev.fuente AS fuente_anterior
             FROM ranked curr LEFT JOIN ranked prev ON prev.rn = 2
             WHERE curr.rn = 1
             """,
@@ -5595,7 +5626,10 @@ class Database:
         if not fila:
             return None
         precio = float(fila["precio"])
+        es_referencia = not self._precio_mercado_es_real(fila["fuente"], producto)
         precio_ant = float(fila["precio_anterior"]) if fila["precio_anterior"] is not None else None
+        if es_referencia or not self._precio_mercado_es_real(fila["fuente_anterior"], producto):
+            precio_ant = None
         variacion_pct = round((precio - precio_ant) / precio_ant * 100, 2) if precio_ant else 0.0
         plaza_label = "Bogotá · Frig. Guadalupe" if plaza == "BOGOTA" else plaza.title()
         return {
@@ -5605,6 +5639,8 @@ class Database:
             "producto_label": "Macho Gordo (400+ kg)",
             "precio": precio,
             "variacion_pct": variacion_pct,
+            "hay_comparacion": precio_ant is not None,
+            "es_referencia": es_referencia,
             "fecha": fila["fecha"],
         }
 

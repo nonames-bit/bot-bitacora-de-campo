@@ -4,7 +4,7 @@ Corre en el servicio ``tareas`` de docker-compose.yml. Cada tarea es un
 comando con su horario (hora de la finca, TZ del contenedor):
 
 - 03:00 todos los días   respaldo local de la base (30 días de rotación)
-- 06:00 todos los días   precios de mercado
+- 06:00 todos los días   dólar TRM oficial (mercado)
 - 06:00 cada 3 días      NDVI satelital
 - 06:05 los lunes        lluvia satelital (CHIRPS)
 - cada 15 min            alerta de salud por Telegram (y push) a los OWNER

@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Job de Sincronización Automática Diaria: Precios de Subastas Ganaderas, TRM e Insumos.
+"""Tarea diaria de mercado: TRM oficial del día y titulares ganaderos.
 
-Actualiza automáticamente en SQLite (`data/bitacora.db`):
-- Dólar TRM Oficial (Superintendencia Financiera / Banco de la República).
-- Precios de subastas regionales (Granada, Guamal, San Martín, Puerto López, Catama, Yopal, Bogotá, Nacional).
-- Insumos agropecuarios críticos del Ariari (urea, sal mineralizada 8% y 10%, alambre de púas).
-- Precios de referencia de leche (Queseras locales, Industria, MinAgricultura USP).
+Guarda en SQLite (`data/bitacora.db`) la TRM oficial (Superintendencia
+Financiera, con DolarAPI de respaldo). Los precios de subastas, leche e insumos
+no tienen fuente automática: se anotan en la app con "Actualizar Precios".
 
 Uso:
     python scripts/actualizar_precios_mercado.py [--db data/bitacora.db] [--forzar]

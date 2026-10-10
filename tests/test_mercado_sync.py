@@ -111,36 +111,95 @@ def test_sincronizar_precios_mercado_completo(tmp_path):
         "fuente": "AUTOMATICO: Datos Abiertos (Test)",
         "ok": True
     }), patch("src.integrations.mercado_sync.consultar_titulares_mercado", return_value=[]):
-        
-        # 1. Primera ejecución: debe actualizar todos los precios
+
+        # 1. Primera ejecución: solo guarda la TRM (lo único con fuente automática)
         res1 = sincronizar_precios_mercado(db, forzar=False)
         assert res1["ok"] is True
         assert res1["actualizado"] is True
         assert res1["trm"] == 4120.0
-        assert res1["filas_actualizadas"] >= 40
+        assert res1["filas_actualizadas"] == 1
+        hoy = date.today().isoformat()
+        n_hoy = db.query_one("SELECT COUNT(*) AS c FROM precios_mercado WHERE fecha = ?", (hoy,))["c"]
+        assert n_hoy == 1
 
-        # Verificar en base de datos
+        # Verificar en base de datos: subastas siguen siendo referencia (semilla)
         datos = db.obtener_datos_mercado_completos()
         assert datos["trm_actual"] == 4120.0
         assert datos["actualizacion_automatica"] is True
+        assert datos["es_datos_referencia"] is True
 
         plazas_guardadas = {s["plaza_key"] for s in datos["subastas"]}
-        assert "GRANADA" in plazas_guardadas
-        assert "GUAMAL" in plazas_guardadas
-        assert "CATAMA" in plazas_guardadas
-        assert "BOGOTA" in plazas_guardadas
+        assert {"GRANADA", "GUAMAL", "CATAMA", "BOGOTA"} <= plazas_guardadas
 
-        # 2. Segunda ejecución (mismo día): idempotencia (no reescribe a menos que se fuerce)
+        # 2. Segunda ejecución (mismo día): idempotencia
         res2 = sincronizar_precios_mercado(db, forzar=False)
         assert res2["ok"] is True
         assert res2["actualizado"] is False
 
-        # 3. Tercera ejecución con forzar=True: debe actualizar
+        # 3. Con forzar=True vuelve a consultar sin duplicar la TRM del día
         res3 = sincronizar_precios_mercado(db, forzar=True)
-        assert res3["ok"] is True
         assert res3["actualizado"] is True
+        n_trm = db.query_one(
+            "SELECT COUNT(*) AS c FROM precios_mercado WHERE fecha = ? AND producto = 'DOLAR_TRM'", (hoy,)
+        )["c"]
+        assert n_trm == 1
 
     db.close()
+
+
+def test_sincronizar_sin_internet_no_guarda_trm_de_respaldo(db):
+    with patch("src.integrations.mercado_sync.consultar_trm_oficial", return_value={
+        "valor": 4085.0, "fecha": date.today().isoformat(),
+        "fuente": "AUTOMATICO: Banco de la República (Referencia Base)", "ok": False,
+    }), patch("src.integrations.mercado_sync.consultar_titulares_mercado", return_value=[]):
+        res = sincronizar_precios_mercado(db)
+    assert res["actualizado"] is False
+    n = db.query_one(
+        "SELECT COUNT(*) AS c FROM precios_mercado WHERE fecha = ?", (date.today().isoformat(),)
+    )["c"]
+    assert n == 0
+
+
+def test_sync_borra_copias_fijas_y_no_las_muestra_como_reales(db):
+    # Filas como las que guardaba la versión anterior: la misma tabla fija cada día.
+    db.sembrar_precios_mercado_iniciales()
+    for fec in ("2026-10-09", "2026-10-10"):
+        db.registrar_precio_mercado(plaza="BOGOTA", producto="MACHO_GORDO", precio_promedio=9150.0,
+                                    fuente="AUTOMATICO: Frigorífico Guadalupe / DANE SIPSA", fecha=fec)
+    # Antes de limpiar: se marca como referencia y sin variación inventada
+    ref = db.precio_referencia_hoy("BOGOTA", "MACHO_GORDO")
+    assert ref["es_referencia"] is True
+    assert ref["hay_comparacion"] is False
+
+    with patch("src.integrations.mercado_sync.consultar_trm_oficial", return_value={
+        "valor": 3900.0, "fecha": "2026-10-10", "fuente": "AUTOMATICO: Test", "ok": True,
+    }), patch("src.integrations.mercado_sync.consultar_titulares_mercado", return_value=[]):
+        sincronizar_precios_mercado(db)
+    n_fijas = db.query_one(
+        "SELECT COUNT(*) AS c FROM precios_mercado WHERE fuente LIKE 'AUTOMATICO%' AND producto <> 'DOLAR_TRM'"
+    )["c"]
+    assert n_fijas == 0
+    assert db.precio_referencia_hoy("BOGOTA", "MACHO_GORDO")["fecha"] == "2026-09-09"
+
+
+def test_variacion_real_entre_dos_precios_manuales(db):
+    db.sembrar_precios_mercado_iniciales()
+    db.registrar_precio_mercado(plaza="BOGOTA", producto="MACHO_GORDO", precio_promedio=9000.0,
+                                fuente="MANUAL", fecha="2026-10-03")
+    db.registrar_precio_mercado(plaza="BOGOTA", producto="MACHO_GORDO", precio_promedio=9180.0,
+                                fuente="MANUAL: Guadalupe", fecha="2026-10-10")
+    ref = db.precio_referencia_hoy("BOGOTA", "MACHO_GORDO")
+    assert ref["es_referencia"] is False
+    assert ref["hay_comparacion"] is True
+    assert ref["variacion_pct"] == 2.0
+
+    datos = db.obtener_datos_mercado_completos()
+    bog = next(s for s in datos["subastas"] if s["plaza_key"] == "BOGOTA")
+    assert bog["productos"]["MACHO_GORDO"]["tendencia"] == "SUBIENDO"
+    # Un precio real sobre la semilla no inventa variación contra la referencia
+    gr = next(s for s in datos["subastas"] if s["plaza_key"] == "GRANADA")
+    assert gr["productos"]["MACHO_GORDO"]["precio_anterior"] is None
+    assert gr["productos"]["MACHO_GORDO"]["es_referencia"] is True
 
 
 def test_datos_mercado_tendencias_y_comparativa(tmp_path):

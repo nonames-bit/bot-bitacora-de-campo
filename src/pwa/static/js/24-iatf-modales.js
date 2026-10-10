@@ -474,8 +474,10 @@
         tendBadge = "<span class='chip-tendencia subiendo'>▲ +" + (k.variacion_pct > 0 ? k.variacion_pct : "") + "% (+$" + Math.abs(k.variacion_pesos) + ")</span>";
       } else if (k.tendencia === "BAJANDO") {
         tendBadge = "<span class='chip-tendencia bajando'>▼ " + k.variacion_pct + "% (-$" + Math.abs(k.variacion_pesos) + ")</span>";
-      } else {
+      } else if (k.hay_comparacion) {
         tendBadge = "<span class='chip-tendencia estable'>▬ 0.0% ($0)</span>";
+      } else {
+        tendBadge = "<span class='chip-tendencia estable' title='Sin dos cotizaciones reales para comparar'>Ref.</span>";
       }
 
       var grTxt = k.precio_granada ? ("Granada: <b>" + fmtMoneda(k.precio_granada) + "</b>") : "";
