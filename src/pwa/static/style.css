@@ -4702,3 +4702,17 @@ button.cap-atajo .svg-icon { margin: 0; }
 .pot-animal.visto { background: var(--color-verde-bg); }
 .pot-animal.visto .pot-tag { color: var(--color-verde-txt); }
 .pot-borrar { width: 100%; padding: 12px; cursor: pointer; }
+.pot-ver-ficha { flex: none; display: inline-flex; align-items: center; gap: 4px; padding: 8px 10px; min-height: 40px; border-radius: 8px; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--color-verde-txt); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.pot-a-inventario { padding: 10px 14px; cursor: pointer; margin-bottom: 4px; }
+/* "Volver al conteo" flota sobre la ficha abierta desde Potreros. */
+#btn-volver-conteo { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 60; display: inline-flex; align-items: center; gap: 8px; padding: 12px 18px; border: none; border-radius: 999px; background: var(--verde-marca); color: #fff; font: inherit; font-size: 15px; font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); cursor: pointer; max-width: calc(100vw - 32px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#btn-volver-conteo .svg-icon { transform: rotate(180deg); }
+@media (min-width: 900px) { #btn-volver-conteo { bottom: 24px; } }
+.pot-guardar { width: 100%; margin: 4px 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.pot-historial { margin-top: 18px; }
+.pot-historial h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.pot-hist-item { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; margin: 0 0 8px; }
+.pot-hist-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pot-hist-item small { color: var(--texto-suave); font-size: 12.5px; overflow-wrap: anywhere; }
+.pot-hist-item .pot-hist-falta { color: var(--color-ambar-txt); font-weight: 600; }
+.pot-hist-item .pot-hist-ok { color: var(--color-verde-txt); font-weight: 600; }

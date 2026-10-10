@@ -612,7 +612,7 @@
           objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
         }
 
-        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> → ") : "";
         var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
         var asignacionChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
         var prioChip = (rc.prioridad === "URGENTE") ? ("<span class='chip rojo' style='font-size:11px; font-weight:700;'>" + icon("alertTriangle", 12) + "URGENTE</span> ") : "";
@@ -5399,6 +5399,7 @@
     var h = "<div class='seccion-head-barra inv-head-barra'>"
       + "<h3>" + icon("cow") + "Inventario y Población</h3>"
       + "<div class='head-acciones-fila'>"
+      + "<button type='button' class='tema-btn' data-accion='ir-conteo-potreros' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("fence", 14) + "Contar por potrero</button>"
       + btnCrear
       + barraDescargaSeccion("inventario", "Inventario")
       + expBtn
@@ -5791,7 +5792,7 @@
         if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
         else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
 
-        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> → ") : "";
         var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
         var asigChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
         var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>" + icon("alertTriangle", 12) + "URGENTE</span> " : "";
@@ -6441,7 +6442,7 @@
           var asigInfo = "";
           if (de || asig) {
             var deTxt = de ? ("De: <b>" + esc(de) + "</b> ") : "";
-            var paraTxt = asig ? ("➔ Para: <b>" + esc(asig) + "</b>") : "";
+            var paraTxt = asig ? ("→ Para: <b>" + esc(asig) + "</b>") : "";
             asigInfo = "<br><small style='color:var(--texto-suave);'>" + deTxt + paraTxt + "</small>";
           }
           txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;
@@ -11241,6 +11242,12 @@
   var _potListado = null;
   var _potSel = null; // id del potrero abierto (null = lista de potreros)
   var _potSoloFaltan = false;
+  var _potConteos = null; // historial de /api/potreros/conteos (null = sin cargar)
+  var _potVolverTag = null; // animal cuya ficha se abrió desde el conteo
+
+  function _potEsOperario() {
+    return ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+  }
 
   function _potClaveMarcas() {
     return "potreros_marcas_" + new Date().toISOString().slice(0, 10);
@@ -11274,7 +11281,10 @@
     if (sel) return _renderPotreroDetalle(sel);
     _potSel = null;
 
-    var h = "<h3>" + icon("fence", 20) + "Potreros</h3>"
+    // Para OWNER/ADMIN el conteo vive dentro de Inventario (Jaime,
+    // 2026-10-10); el operario lo tiene directo en su barra.
+    var h = (_potEsOperario() ? "" : "<button type='button' class='tema-btn pot-a-inventario'>← Inventario</button>")
+      + "<h3>" + icon("fence", 20) + "Contar por potrero</h3>"
       + "<p class='aviso'>Toque un potrero para ver sus animales y márquelos a medida que los vea. "
       + "Sirve sin señal con la última lista descargada"
       + (_potListado.fecha ? " (" + esc(_potListado.fecha) + ")" : "") + ".</p>";
@@ -11290,7 +11300,77 @@
         + "<span class='pot-info'><b>" + esc(p.nombre) + "</b><small>" + p.total + (p.total === 1 ? " animal" : " animales") + "</small></span>"
         + estado + "</button>";
     });
+    h += "</div>";
+    return h + _potHtmlHistorial(null, 10);
+  }
+
+  // Últimos conteos guardados (de todos los potreros o de uno).
+  function _potHtmlHistorial(potId, max) {
+    if (!_potConteos) return "<div class='pot-historial' data-pot-hist='" + esc(potId === null ? "" : potId) + "'></div>";
+    var lista = _potConteos.filter(function (c) { return potId === null || String(c.potrero_id) === String(potId); }).slice(0, max);
+    var h = "<div class='pot-historial'><h4>" + icon("clipboard", 16) + (potId === null ? "Últimos conteos guardados" : "Conteos anteriores de este potrero") + "</h4>";
+    if (!lista.length) return h + "<p class='aviso'>Todavía no hay conteos guardados.</p></div>";
+    lista.forEach(function (c) {
+      var completo = c.vistos >= c.total;
+      var faltan = (c.faltantes || []);
+      h += "<div class='card pot-hist-item'>"
+        + "<div class='pot-hist-cab'><b>" + esc(c.potrero || "Potrero") + "</b>"
+        + "<span class='chip " + (completo ? "verde" : "ambar") + "'>" + c.vistos + " de " + c.total + "</span></div>"
+        + "<small>" + esc(c.fecha || "") + (c.hora ? " · " + esc(c.hora) : "") + (c.por ? " · " + esc(c.por) : "") + "</small>"
+        + (completo ? "<small class='pot-hist-ok'>Estaban todos.</small>"
+          : "<small class='pot-hist-falta'>Faltaron: " + faltan.map(esc).join(", ") + "</small>")
+        + "</div>";
+    });
     return h + "</div>";
+  }
+
+  function _potCargarHistorial() {
+    fetch("/api/potreros/conteos?limite=60").then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      _potConteos = (d && d.conteos) || [];
+      if (actual === "potreros") _potRepintar(true);
+    }).catch(function () { /* sin señal y sin copia: no se muestra historial */ });
+  }
+
+  function _potHoraAhora() {
+    var d = new Date();
+    return ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+  }
+
+  // Guarda el conteo como registro (auditoría). Va por /api/sync y, sin
+  // señal, queda en la cola offline hasta que haya conexión.
+  function _potGuardarConteo(p) {
+    var m = _potMarcas[String(p.id)] || {};
+    var vistos = [], faltantes = [];
+    p.animales.forEach(function (a) { (m[a.tag] ? vistos : faltantes).push(a.tag); });
+    if (!vistos.length) {
+      mostrarToast("Marque los animales que vio antes de guardar.", "ambar");
+      return;
+    }
+    var pregunta = faltantes.length
+      ? "Faltan " + faltantes.length + ": " + faltantes.slice(0, 12).join(", ") + (faltantes.length > 12 ? "…" : "") + ".\n¿Guardar el conteo así?"
+      : "Están todos (" + p.total + "). ¿Guardar el conteo?";
+    if (!confirm(pregunta)) return;
+    var fecha = new Date().toISOString().slice(0, 10);
+    var hora = _potHoraAhora();
+    var nombreUsuario = (window.__usuarioActual && window.__usuarioActual.nombre) || "";
+    var sinSenal = navigator.onLine === false;
+    enviarEventoLt("conteo_potrero", {
+      potrero_id: p.id, potrero_nombre: p.nombre, hora: hora,
+      vistos: vistos, faltantes: faltantes
+    });
+    // Se muestra de una en el historial, aunque aún no haya subido.
+    _potConteos = _potConteos || [];
+    _potConteos.unshift({ fecha: fecha, hora: hora, potrero_id: p.id, potrero: p.nombre, total: p.total,
+      vistos: vistos.length, faltantes: faltantes, por: nombreUsuario });
+    delete _potMarcas[String(p.id)];
+    _potGuardarMarcas();
+    _potSel = null;
+    _potRepintar();
+    window.scrollTo(0, 0);
+    mostrarToast(sinSenal ? "Conteo guardado. Se envía cuando haya señal." : "Conteo guardado.", "verde");
   }
 
   function _renderPotreroDetalle(p) {
@@ -11317,11 +11397,14 @@
         + "<input type='checkbox' data-tag='" + esc(a.tag) + "'" + (visto ? " checked" : "") + ">"
         + "<span class='pot-tag'>" + esc(a.tag) + "</span>"
         + "<span class='pot-nombre'>" + esc(nombre) + "<small>" + esc(a.categoria_desc || a.categoria || "") + (a.edad && a.edad !== "S/D" ? " · " + esc(a.edad) : "") + "</small></span>"
+        + "<button type='button' class='pot-ver-ficha' data-tag='" + esc(a.tag) + "' aria-label='Ver ficha de " + esc(a.tag) + "'>"
+        + icon("eye", 16) + "<span>Ficha</span></button>"
         + "</label>";
     });
     h += "</div>";
+    h += "<button type='button' class='btn-guardar-manga pot-guardar'>" + icon("save", 16) + "Guardar conteo</button>";
     if (vistos) h += "<button type='button' class='btn-sec pot-borrar'>Empezar de nuevo</button>";
-    return h;
+    return h + _potHtmlHistorial(p.id, 3);
   }
 
   function bindPotreros() {
@@ -11364,6 +11447,28 @@
         el.hidden = !!oculto;
       });
     });
+    // Ver la ficha (color, foto) cuando el número no se lee bien, y volver al
+    // mismo potrero con las marcas intactas (están en _potMarcas).
+    qa(".pot-ver-ficha", vista).forEach(function (b) {
+      b.addEventListener("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        _potVolverTag = b.getAttribute("data-tag");
+        abrirFichaDesdeTag(_potVolverTag);
+        _potMostrarVolver();
+      });
+    });
+    var aInv = vista.querySelector(".pot-a-inventario");
+    if (aInv) aInv.addEventListener("click", function () {
+      irAVista("inventario");
+      cargar();
+      window.scrollTo(0, 0);
+    });
+    var guardar = vista.querySelector(".pot-guardar");
+    if (guardar) guardar.addEventListener("click", function () {
+      var p = (_potListado.potreros || []).filter(function (x) { return String(x.id) === String(_potSel); })[0];
+      if (p) _potGuardarConteo(p);
+    });
     var borrar = vista.querySelector(".pot-borrar");
     if (borrar) borrar.addEventListener("click", function () {
       if (!confirm("¿Borrar las marcas de este potrero y empezar a contar de nuevo?")) return;
@@ -11387,6 +11492,41 @@
       if (nb) { nb.value = textoBusq; nb.dispatchEvent(new Event("input")); }
     }
     if (mantenerScroll) window.scrollTo(0, y);
+  }
+
+  // Botón fijo "Volver al conteo" mientras se mira la ficha. Usa el atrás
+  // del historial (igual que el botón atrás del celular) para no apilar vistas.
+  function _potMostrarVolver() {
+    var viejo = document.getElementById("btn-volver-conteo");
+    if (viejo) viejo.remove();
+    var p = (_potListado && _potListado.potreros || []).filter(function (x) { return String(x.id) === String(_potSel); })[0];
+    var b = document.createElement("button");
+    b.type = "button";
+    b.id = "btn-volver-conteo";
+    b.innerHTML = icon("arrowRight", 16) + "<span>Volver al conteo" + (p ? " de " + esc(p.nombre) : "") + "</span>";
+    b.addEventListener("click", function () {
+      b.remove();
+      if (_historialListo && window.history.length > 1) {
+        window.history.back();
+      } else {
+        irAVista("potreros");
+        cargar();
+      }
+    });
+    document.body.appendChild(b);
+  }
+  function _potQuitarVolver() {
+    var b = document.getElementById("btn-volver-conteo");
+    if (b) b.remove();
+  }
+
+  // Al volver de la ficha se deja a la vista el animal que se fue a mirar.
+  function _potIrAlAnimal() {
+    if (!_potVolverTag || !vista) return;
+    var tag = _potVolverTag;
+    _potVolverTag = null;
+    var fila = qa(".pot-animal", vista).filter(function (el) { return el.getAttribute("data-tag") === tag; })[0];
+    if (fila && fila.scrollIntoView) fila.scrollIntoView({ block: "center" });
   }
 
   // El operario abre "Potreros" en el potrero, donde casi nunca hay señal:
@@ -11679,7 +11819,7 @@
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto);
-      if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
+      if (m.texto && m.texto.indexOf("Tarea asignada") >= 0) {
         html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
       }
       html += "</div>";
@@ -12462,12 +12602,13 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "gps") b.style.display = "none";
+        // "Potreros" (conteo) para OWNER/ADMIN se abre desde Inventario.
+        if (v === "gps" || v === "potreros") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v === "gps") m.style.display = "none";
+        if (v === "gps" || v === "potreros") m.style.display = "none";
         else if (v !== "sistema" && v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
@@ -12482,12 +12623,12 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "sistema" || v === "gps") b.style.display = "none";
+        if (v === "sistema" || v === "gps" || v === "potreros") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v === "sistema" || v === "gps" || m.id === "sheet-item-deshacer") m.style.display = "none";
+        if (v === "sistema" || v === "gps" || v === "potreros" || m.id === "sheet-item-deshacer") m.style.display = "none";
         else if (v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "TRABAJADOR") {
@@ -14003,6 +14144,7 @@
         }
       }
       else if (acc === "reload") { location.reload(); }
+      else if (acc === "ir-conteo-potreros") { _potSel = null; irAVista("potreros"); cargar(); window.scrollTo(0, 0); }
       else if (acc === "ir-mapa-satelital") { e.preventDefault(); irAVista("mapa"); cargar(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
       else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }
@@ -15429,12 +15571,16 @@
     if (actual === "potreros") {
       // El refresco silencioso no interrumpe al operario mientras marca.
       if (!animar) return;
-      _potSel = null;
+      // _potSel se conserva: al volver de una ficha sigue abierto el mismo
+      // potrero. Entrar desde el menú o Inventario lo pone en null.
+      _potQuitarVolver();
       skeleton(vista, "potreros");
       fetchJSON("/api/potreros/listado", function (d) {
         if (!vista) return;
         montarVista(vista, renderPotreros(d), true);
         bindPotreros();
+        _potIrAlAnimal();
+        _potCargarHistorial();
       }, vista);
       return;
     }
@@ -15975,6 +16121,7 @@
       }
       var v = b.getAttribute("data-v");
       if (!v) return;
+      if (v === "potreros") _potSel = null; // desde el menú: lista de potreros
       if (v === "ficha" && actual === "ficha") {
         var inpFicha = q("#f-tag");
         if (inpFicha) inpFicha.value = "";
@@ -16009,6 +16156,7 @@
       }
     }
     actual = v;
+    if (v !== "ficha") _potQuitarVolver();
     if (_historialListo && !_navegandoHistorial && v !== vistaPrevia) {
       try { window.history.pushState({ ja: "vista", v: v }, ""); } catch (eHist) {}
     }

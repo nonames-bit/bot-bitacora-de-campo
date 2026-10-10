@@ -391,6 +391,7 @@
         }
       }
       else if (acc === "reload") { location.reload(); }
+      else if (acc === "ir-conteo-potreros") { _potSel = null; irAVista("potreros"); cargar(); window.scrollTo(0, 0); }
       else if (acc === "ir-mapa-satelital") { e.preventDefault(); irAVista("mapa"); cargar(); }
       else if (acc === "crear-animal") { mostrarFormularioAnimal(null, elAcc.getAttribute("data-tag-nuevo") || ""); }
       else if (acc === "editar-animal") { mostrarFormularioAnimal(window.__ultimaFicha || null); }

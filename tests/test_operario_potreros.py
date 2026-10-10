@@ -106,3 +106,35 @@ def test_app_js_vista_del_operario():
     assert 'var TIPOS_SOLO_GESTION = ["venta", "gasto"]' in js
     assert '"agenda", "potreros"]' in js
     assert "function renderPotreros" in js and "precargarPotreros();" in js
+
+
+def test_conteo_de_potrero_queda_registrado(tmp_path):
+    # Jaime (2026-10-10): cada conteo queda como registro con fecha, quién
+    # contó y qué animales faltaron. Llega por la cola offline (/api/sync).
+    app, db_path = _setup(tmp_path)
+    trab = _cliente(app, "3333")
+    r = trab.post("/api/sync", json={"eventos": [
+        {"tipo": "conteo_potrero", "id_local": "c1", "fecha": "2026-10-10",
+         "payload": {"potrero_id": 1, "potrero_nombre": "La Loma", "hora": "15:20",
+                     "vistos": ["47"], "faltantes": ["50"]}},
+        {"tipo": "conteo_potrero", "id_local": "c2", "payload": {"potrero_id": 1, "vistos": [], "faltantes": []}},
+    ]}).get_json()
+    assert set(r["ids_ok"]) == {"c1", "c2"}
+    assert len(r["errores"]) == 1 and "Conteo NO guardado" in r["errores"][0]
+    # Reenviar el mismo conteo desde la cola no lo duplica.
+    trab.post("/api/sync", json={"eventos": [
+        {"tipo": "conteo_potrero", "id_local": "c1", "payload": {"potrero_id": 1, "vistos": ["47"]}}]})
+    conteos = _cliente(app, "1234").get("/api/potreros/conteos?potrero_id=1").get_json()["conteos"]
+    assert len(conteos) == 1
+    c = conteos[0]
+    assert (c["fecha"], c["hora"], c["potrero"], c["total"], c["vistos"]) == ("2026-10-10", "15:20", "La Loma", 2, 1)
+    assert c["faltantes"] == ["50"] and c["por"] == "Pedro"
+    # No toca el inventario.
+    assert _contar(db_path, "SELECT COUNT(*) AS n FROM animales WHERE estado = 'ACTIVO'") == 4
+
+
+def test_app_js_conteo_con_ficha_e_inventario():
+    js = (Path(__file__).resolve().parent.parent / "src" / "pwa" / "static" / "app.js").read_text(encoding="utf-8")
+    assert "data-accion='ir-conteo-potreros'" in js  # botón en Inventario
+    assert "pot-ver-ficha" in js and "btn-volver-conteo" in js
+    assert 'enviarEventoLt("conteo_potrero"' in js

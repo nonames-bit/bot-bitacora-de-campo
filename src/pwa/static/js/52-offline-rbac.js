@@ -221,12 +221,13 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "gps") b.style.display = "none";
+        // "Potreros" (conteo) para OWNER/ADMIN se abre desde Inventario.
+        if (v === "gps" || v === "potreros") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v === "gps") m.style.display = "none";
+        if (v === "gps" || v === "potreros") m.style.display = "none";
         else if (v !== "sistema" && v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "ADMIN" || rol === "ADMINISTRADOR") {
@@ -241,12 +242,12 @@
       if (sheetDeshacer) sheetDeshacer.style.display = "none";
       qa("#nav-principal button").forEach(function (b) {
         var v = b.getAttribute("data-v");
-        if (v === "sistema" || v === "gps") b.style.display = "none";
+        if (v === "sistema" || v === "gps" || v === "potreros") b.style.display = "none";
         else b.style.display = "";
       });
       qa("#modal-mas-modulos .modulo-item").forEach(function (m) {
         var v = m.getAttribute("data-v");
-        if (v === "sistema" || v === "gps" || m.id === "sheet-item-deshacer") m.style.display = "none";
+        if (v === "sistema" || v === "gps" || v === "potreros" || m.id === "sheet-item-deshacer") m.style.display = "none";
         else if (v !== "usuarios") m.style.display = "";
       });
     } else if (rol === "TRABAJADOR") {
