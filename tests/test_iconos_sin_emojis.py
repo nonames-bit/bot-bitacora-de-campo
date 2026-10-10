@@ -5,7 +5,8 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent / "src" / "pwa"
 EMOJI = re.compile("[\U0001F300-\U0001FAFF☀-➿⬀-⯿⌀-⏿]")
-PERMITIDOS = {"🟢", "🟡", "🟠", "🔴", "⚪", "🌱", "✓"}
+# 📋: el JS reconoce el aviso "📋 Tarea asignada" que arma el servidor.
+PERMITIDOS = {"🟢", "🟡", "🟠", "🔴", "⚪", "🌱", "✓", "📋"}
 
 
 def test_index_sin_emojis():

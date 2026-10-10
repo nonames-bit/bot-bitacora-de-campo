@@ -551,7 +551,7 @@
           var asigInfo = "";
           if (de || asig) {
             var deTxt = de ? ("De: <b>" + esc(de) + "</b> ") : "";
-            var paraTxt = asig ? ("➔ Para: <b>" + esc(asig) + "</b>") : "";
+            var paraTxt = asig ? ("→ Para: <b>" + esc(asig) + "</b>") : "";
             asigInfo = "<br><small style='color:var(--texto-suave);'>" + deTxt + paraTxt + "</small>";
           }
           txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;

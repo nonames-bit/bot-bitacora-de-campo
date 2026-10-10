@@ -1337,3 +1337,42 @@ def test_tarifas_reales_con_y_sin_gastos(db):
     # 600.000 de sal / 2 cabezas / 12 meses (pajillas y drogas no entran aquí).
     assert t["sostenimiento_real"] and t["sostenimiento_mes"] == 25000.0
     assert t["tratamiento_real"] and t["tratamiento"] == 30000.0  # 90.000 / 3 tratamientos
+
+
+def test_fotos_de_por_id_no_trae_facturas_cuyo_nombre_contiene_el_numero(db):
+    """Regresión: la ficha del toro T02 mostraba la foto de una factura. La
+    ficha pide las fotos con el id interno del animal (un número), y el match
+    difuso buscaba ese número dentro del nombre del archivo de cualquier foto
+    sin animal: 'media/factura_1760..._abc.jpg' casi siempre lo contiene."""
+    aid = db.registrar_animal("T02", nombre="PERLA OHIO 2B", sexo="Macho")
+    db.registrar_foto(f"media/factura_17601{aid}23_ab12cd.jpg", animal_tag=None,
+                      caption="Factura/Recibo: Sal mineralizada")
+    db.registrar_foto(f"media/recibo_leche_17602{aid}45_ef34ab.jpg", animal_tag=None,
+                      caption="Recibo Quincenal: 1-15 oct")
+    assert db.fotos_de(aid) == []
+
+    db.registrar_foto("media/perfil_T02_1760000000_aa11bb.jpg", animal_tag="T02",
+                      caption="Foto de perfil · T02")
+    fotos = db.fotos_de(aid)
+    assert [f["ruta"] for f in fotos] == ["media/perfil_T02_1760000000_aa11bb.jpg"]
+
+
+def test_fotos_de_no_trae_facturas_aunque_mencionen_el_arete(db):
+    """Una factura (sin animal) cuyo texto leído trae 'T02' no es foto del toro."""
+    db.registrar_animal("T02", sexo="Macho")
+    db.insert("fotos", {"animal_id": None, "tag": None, "fecha": "2026-10-01",
+                        "ruta": "media/factura_1760000000_abcdef.jpg",
+                        "caption": "Factura/Recibo: compra", "ocr_text": "REF T02 SAL 40KG"})
+    db.insert("fotos", {"animal_id": None, "tag": None, "fecha": "2026-10-01",
+                        "ruta": "media/factura_correo_1760000001_abcdef.pdf",
+                        "caption": "Factura/Recibo: T02"})
+    assert db.fotos_de("T02") == []
+
+
+def test_fotos_de_huerfana_no_calza_tag_dentro_de_otra_palabra(db):
+    db.registrar_animal("T02", sexo="Macho")
+    db.insert("fotos", {"animal_id": None, "tag": None, "fecha": "2026-10-01",
+                        "ruta": "media/foto_99_1.jpg", "caption": "Lote KT021 en la manga"})
+    db.insert("fotos", {"animal_id": None, "tag": None, "fecha": "2026-10-01",
+                        "ruta": "media/foto_99_2.jpg", "caption": "El toro T02 en la manga"})
+    assert [f["ruta"] for f in db.fotos_de("T02")] == ["media/foto_99_2.jpg"]
