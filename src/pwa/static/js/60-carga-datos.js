@@ -19,7 +19,8 @@
     mercado:   { kpis: 3, graf: 0, tabla: 8 },
     usuarios:  { kpis: 0, graf: 0, tabla: 5 },
     revision:  { kpis: 0, graf: 0, tabla: 4 },
-    reportes:  { kpis: 0, graf: 0, tabla: 8 }
+    reportes:  { kpis: 0, graf: 0, tabla: 8 },
+    potreros:  { kpis: 0, graf: 0, tabla: 8 }
   };
   function htmlSkeleton(v) {
     var cfg = ESQUELETOS[v] || ESQUELETOS.tablero;
@@ -396,6 +397,7 @@
       else if (acc === "capturar-evento" || acc === "vender-animal") {
         e.preventDefault();
         var tipoCap = elAcc.getAttribute("data-tipo") || (acc === "vender-animal" ? "venta" : "pesaje");
+        if (!tipoCapturaPermitido(tipoCap)) return;
         var tagC = elAcc.getAttribute("data-tag") || (window.__ultimaFicha && window.__ultimaFicha.tag) || "";
         var potC = elAcc.getAttribute("data-potrero") || "";
         var farmC = elAcc.getAttribute("data-farmaco") || "";

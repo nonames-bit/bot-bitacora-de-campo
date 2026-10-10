@@ -6,6 +6,16 @@
     { t: "Leche y termo", ids: ["leche", "pajuela", "nitrogeno"] },
     { t: "Salidas, dinero y tareas", ids: ["venta", "muerte", "gasto", "tarea"] }
   ];
+  // El operario de campo (TRABAJADOR) no vende ni maneja dinero (Jaime,
+  // 2026-10-10): no ve esos botones y el servidor igual rechaza esos
+  // registros (ver _TIPOS_NO_TRABAJADOR en rutas/sync.py).
+  var TIPOS_SOLO_GESTION = ["venta", "gasto"];
+  function esOperario() {
+    return ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+  }
+  function tipoCapturaPermitido(id) {
+    return !(esOperario() && TIPOS_SOLO_GESTION.indexOf(id) !== -1);
+  }
   function renderCaptura() {
     var tipos = [
       { id: "parto", nom: "Parto", ico: "cowCalf" },
@@ -25,7 +35,8 @@
       { id: "muerte", nom: "Muerte / Baja", ico: "cowSkull" },
       { id: "gasto", nom: "Ingreso / Gasto", ico: "banknote" },
       { id: "tarea", nom: "Asignar Tarea", ico: "calendar" }
-    ];
+    ].filter(function (t) { return tipoCapturaPermitido(t.id); });
+    if (!tipoCapturaPermitido(_tipoCapturaActual)) _tipoCapturaActual = "parto";
 
     // GPS y Manga van como dos botones chicos (ícono arriba, texto abajo,
     // igual que la barra inferior) para no gastar media pantalla del celular.
@@ -66,7 +77,8 @@
     if (otros.length) grupos.push({ t: "Otros", items: otros });
     grupos.forEach(function (g) {
       if (!g.items.length) return;
-      h += "<div class='cap-grupo-titulo'>" + esc(g.t) + "</div>";
+      var titulo = esOperario() ? g.t.replace(", dinero y", " y") : g.t;
+      h += "<div class='cap-grupo-titulo'>" + esc(titulo) + "</div>";
       g.items.forEach(function (t) {
         var act = t.id === _tipoCapturaActual ? "act" : "";
         h += "<button type='button' class='btn-punto " + act + "' data-cap-tipo='" + t.id + "'>" + icon(t.ico, 16) + "<span>" + t.nom + "</span></button>";

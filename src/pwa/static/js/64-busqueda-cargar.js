@@ -404,6 +404,19 @@
       return;
     }
 
+    if (actual === "potreros") {
+      // El refresco silencioso no interrumpe al operario mientras marca.
+      if (!animar) return;
+      _potSel = null;
+      skeleton(vista, "potreros");
+      fetchJSON("/api/potreros/listado", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderPotreros(d), true);
+        bindPotreros();
+      }, vista);
+      return;
+    }
+
     if (actual === "revision") {
       if (animar) skeleton(vista, "revision");
       fetchJSON("/api/revision/pendientes", function (d) {

@@ -554,6 +554,13 @@
 ]
 ],
 [
+"/api/potreros/listado",
+"api_potreros_listado",
+[
+"GET"
+]
+],
+[
 "/api/preguntar",
 "api_preguntar",
 [

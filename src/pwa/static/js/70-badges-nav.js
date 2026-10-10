@@ -188,6 +188,7 @@
     sistema: "Sistema",
     revision: "Por revisar",
     reportes: "Reportes",
+    potreros: "Potreros",
     mercado: "Subastas",
     ayuda: "Ayuda"
   };
