@@ -75,11 +75,14 @@ def registrar(app, ctx, h):
         db_r = _db(db_path)
         try:
             uid = session.get("user_id") if session is not None else None
+            creador_req = str(datos.get("creado_por_nombre") or "").strip()
+            nombre_creador = creador_req or session.get("nombre") or session.get("username") or (_rol_actual() or "Usuario")
             rid = db_r.registrar_recordatorio(
                 mensaje=mensaje,
                 fecha_programada=fecha,
                 hora=hora,
                 creado_por=uid,
+                creado_por_nombre=nombre_creador,
                 asignado_a=asignado_a,
                 tipo_objetivo=tipo_objetivo,
                 animal_tag=animal_tag,
@@ -91,8 +94,8 @@ def registrar(app, ctx, h):
             try:
                 dest = f" a {asignado_a}" if asignado_a else ""
                 obj = f" ({animal_tag or potrero_nombre})" if (animal_tag or potrero_nombre) else ""
-                texto_aviso = f"📋 Tarea asignada{dest}{obj}: {mensaje}"
-                nombre_creador = session.get("nombre") or (_rol_actual() or "Usuario")
+                de_quien = f" de {nombre_creador}" if nombre_creador else ""
+                texto_aviso = f"📋 Tarea asignada{de_quien}{dest}{obj}: {mensaje}"
                 db_r.conn.execute(
                     "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
                     (uid, nombre_creador, _rol_actual() or "USUARIO", texto_aviso, db_r._ahora()),
@@ -100,7 +103,7 @@ def registrar(app, ctx, h):
                 db_r.conn.commit()
             except Exception:
                 pass
-            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora, "asignado_a": asignado_a})
+            return jsonify({"ok": True, "id": rid, "fecha": fecha, "hora": hora, "asignado_a": asignado_a, "creado_por_nombre": nombre_creador})
         except Exception:
             logger.exception("Error creando recordatorio de agenda")
             return jsonify({"ok": False, "error": "No se pudo crear el recordatorio."}), 500
@@ -124,6 +127,7 @@ def registrar(app, ctx, h):
             )
             if not fila:
                 return jsonify({"ok": False, "error": "El recordatorio no existe."}), 404
+            fila = dict(fila)
             uid = session.get("user_id") if session is not None else None
             foto_ruta = None
             if foto_b64 and isinstance(foto_b64, str):
@@ -131,8 +135,8 @@ def registrar(app, ctx, h):
                 fid_foto = _guardar_foto_evento(db_r, {"foto_base64": foto_b64, "animal_tag": tag_ref}, "tarea", date.today().isoformat(), uid)
                 if fid_foto:
                     foto_row = db_r.query_one("SELECT ruta FROM fotos WHERE id = ?", (fid_foto,))
-                    if foto_row and foto_row.get("ruta"):
-                        foto_ruta = foto_row["ruta"]
+                    if foto_row and dict(foto_row).get("ruta"):
+                        foto_ruta = dict(foto_row)["ruta"]
 
             db_r.completar_recordatorio(
                 rid,
@@ -145,7 +149,8 @@ def registrar(app, ctx, h):
             try:
                 obj = f" ({fila.get('animal_tag') or fila.get('potrero_nombre')})" if (fila.get('animal_tag') or fila.get('potrero_nombre')) else ""
                 detalle = f" · {notas}" if notas else ""
-                texto_aviso = f"✅ Tarea realizada por {completado_por}{obj}: {fila.get('mensaje')}{detalle}"
+                con_foto = " 📷 [con foto soporte]" if foto_ruta else ""
+                texto_aviso = f"✅ Tarea realizada por {completado_por}{obj}: {fila.get('mensaje')}{detalle}{con_foto}"
                 db_r.conn.execute(
                     "INSERT INTO mensajes_equipo (user_id, nombre, rol, texto, creado_en) VALUES (?, ?, ?, ?, ?)",
                     (uid, completado_por, _rol_actual() or "USUARIO", texto_aviso, db_r._ahora()),
@@ -259,9 +264,8 @@ def registrar(app, ctx, h):
 
     @app.get("/api/equipo/integrantes")
     def api_equipo_integrantes():
-        """Lista roles estándar y usuarios activos para asignación de tareas de campo."""
-        roles_base = ["Encargado", "Administrador", "Veterinario", "Trabajador"]
-        integrantes = [{"nombre": r, "tipo": "ROL"} for r in roles_base]
+        """Lista usuarios registrados activos y roles estándar para asignación de tareas de campo."""
+        integrantes = []
         try:
             try:
                 from ...server.auth import Auth
@@ -274,6 +278,10 @@ def registrar(app, ctx, h):
                     integrantes.append({"nombre": nom, "rol": u.get("rol"), "tipo": "USUARIO"})
         except Exception:
             pass
+        roles_base = ["Encargado", "Administrador", "Veterinario", "Mayordomo", "Trabajador"]
+        for r in roles_base:
+            if not any(it["nombre"].lower() == r.lower() for it in integrantes):
+                integrantes.append({"nombre": r, "rol": r.upper(), "tipo": "ROL"})
         return jsonify({"ok": True, "integrantes": integrantes})
 
     @app.get("/api/buscar")
@@ -714,6 +722,19 @@ def registrar(app, ctx, h):
             if not (es_autor or es_moderador):
                 return jsonify({"ok": False, "error": "Solo el autor o un OWNER/ADMIN pueden borrar este mensaje."}), 403
             db_m.eliminar_mensaje_equipo(id_mensaje)
+            return jsonify({"ok": True})
+        finally:
+            db_m.close()
+
+    @app.post("/api/mensajes-equipo/vaciar")
+    def api_mensajes_equipo_vaciar():
+        """Vacía todo el historial de avisos del equipo (solo OWNER o ADMIN)."""
+        mi_rol = _rol_actual()
+        if mi_rol not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"ok": False, "error": "Solo el propietario o administrador puede vaciar el chat del equipo."}), 403
+        db_m = _db(db_path)
+        try:
+            db_m.vaciar_mensajes_equipo()
             return jsonify({"ok": True})
         finally:
             db_m.close()

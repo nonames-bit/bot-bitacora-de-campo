@@ -489,14 +489,12 @@
       + "<option value='PESAJE'>Pesaje</option>"
       + "<option value='GENERAL'>General</option>"
       + "</select></label>"
-      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Adjudicar / Asignar a:<br>"
-      + "<input id='ag-asignado' list='dl-equipo-agenda' placeholder='ej. Encargado o Administrador' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
-      + "<datalist id='dl-equipo-agenda'>"
-      + "<option value='Encargado'></option>"
-      + "<option value='Administrador'></option>"
-      + "<option value='Veterinario'></option>"
-      + "<option value='Trabajador'></option>"
-      + "</datalist></label>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Asignado por (De):<br>"
+      + "<select id='ag-creado-por' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'></select>"
+      + "</label>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Asignar a (Para):<br>"
+      + "<select id='ag-asignado' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'></select>"
+      + "</label>"
       + "</div>"
       + "<label style='font-size:13px; font-weight:600;'>Instrucción / ¿Qué hay que hacer?<br>"
       + "<input id='ag-mensaje' maxlength='500' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar maleza en callejón' autocomplete='off' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'>"
@@ -530,7 +528,9 @@
         if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
         else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
 
-        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + esc(rc.asignado_a) + "</span> ") : "";
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
+        var asigChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
         var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>" + icon("alertTriangle", 12) + "URGENTE</span> " : "";
 
         h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "'>"
@@ -540,8 +540,8 @@
           + "</div>"
           + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
-          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
-          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
+          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
           + icon("check", 14) + "Marcar Realizado (Acknowledge)"
           + "</button>"
           + "</div>"

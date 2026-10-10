@@ -282,7 +282,11 @@
         var ic = ROL_ICONO_EQUIPO[m.rol] || icon("user", 12);
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
-      html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
+      html += "<div class='chat-msg-texto'>" + esc(m.texto);
+      if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
+        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
+      }
+      html += "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
       if (esDirecto && esMio && m.leido_en) html += " <span title='Leído'>✓✓</span>";
       if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje' aria-label='Borrar mensaje'>" + icon("trash", 12) + "</span>";
@@ -459,9 +463,48 @@
       });
     }
 
-    if (btnLimpiar && hist) {
+    if (btnLimpiar) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+        if (equipoTabActiva) {
+          var yo = window.__usuarioActual || {};
+          var puedeVaciar = yo.rol === "OWNER" || yo.rol === "ADMIN";
+          if (!puedeVaciar) {
+            mostrarToast("Solo el Administrador o Propietario puede vaciar el canal del equipo", "ambar");
+            return;
+          }
+          if (!confirm("¿Deseas vaciar todo el historial de avisos del equipo?")) return;
+          fetch("/api/mensajes-equipo/vaciar", { method: "POST" })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d && d.ok) {
+                if (histEquipo) {
+                  histEquipo.innerHTML = "<div class='chat-msg bot'>Canal de avisos del equipo vaciado.</div>";
+                }
+                equipoUltimoId = 0;
+                mostrarToast("Historial del equipo vaciado", "verde");
+              } else {
+                mostrarToast((d && d.error) || "Error al vaciar chat del equipo", "rojo");
+              }
+            }).catch(function (err) {
+              mostrarToast("Sin conexión: " + err.message, "rojo");
+            });
+        } else {
+          if (hist) {
+            hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+            mostrarToast("Conversación de Asistente IA reiniciada", "verde");
+          }
+        }
+      });
+    }
+
+    if (histEquipo) {
+      histEquipo.addEventListener("click", function (e) {
+        var btnTab = e.target && e.target.closest ? e.target.closest(".btn-ir-tablero-tarea") : null;
+        if (btnTab) {
+          e.preventDefault();
+          if (typeof irA === "function") irA("tablero");
+          colapsarChat();
+        }
       });
     }
 

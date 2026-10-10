@@ -7,7 +7,7 @@
     automáticos de sincronización.
 #>
 param(
-    [string]$NombreTarea = "BitacoraVigilanteCopiasSG"
+    [string[]]$NombresTareas = @("VigilarCopiasSG", "BitacoraVigilanteCopiasSG")
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,22 +16,24 @@ Write-Host "==========================================================" -Foregro
 Write-Host "  DESINSTALADOR: Vigilante de Copias Software Ganadero     " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
-# 1. Verificar si la tarea programada existe
-try {
-    $tarea = Get-ScheduledTask -TaskName $NombreTarea -ErrorAction SilentlyContinue
-} catch {
-    $tarea = $null
-}
-
-if ($tarea) {
-    Write-Host "[1/2] Deteniendo y eliminando tarea programada '$NombreTarea'..." -ForegroundColor Yellow
+# 1. Verificar si las tareas programadas existen y eliminarlas
+foreach ($nombre in $NombresTareas) {
     try {
-        Stop-ScheduledTask -TaskName $NombreTarea -ErrorAction SilentlyContinue
-    } catch {}
-    Unregister-ScheduledTask -TaskName $NombreTarea -Confirm:$false
-    Write-Host "  -> Tarea programada eliminada correctamente." -ForegroundColor Green
-} else {
-    Write-Host "[1/2] La tarea programada '$NombreTarea' no esta registrada en Windows." -ForegroundColor Gray
+        $tarea = Get-ScheduledTask -TaskName $nombre -ErrorAction SilentlyContinue
+    } catch {
+        $tarea = $null
+    }
+
+    if ($tarea) {
+        Write-Host "[1/2] Deteniendo y eliminando tarea programada '$nombre'..." -ForegroundColor Yellow
+        try {
+            Stop-ScheduledTask -TaskName $nombre -ErrorAction SilentlyContinue
+        } catch {}
+        Unregister-ScheduledTask -TaskName $nombre -Confirm:$false
+        Write-Host "  -> Tarea programada '$nombre' eliminada correctamente." -ForegroundColor Green
+    } else {
+        Write-Host "[1/2] La tarea programada '$nombre' no esta registrada en Windows." -ForegroundColor Gray
+    }
 }
 
 # 2. Verificar si hay procesos residuales de PowerShell ejecutando vigilar_copias

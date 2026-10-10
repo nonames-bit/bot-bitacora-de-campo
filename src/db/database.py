@@ -175,6 +175,7 @@ class Database:
             if "recordatorios_programados" in tablas:
                 cols_r = {r[1] for r in self.conn.execute("PRAGMA table_info(recordatorios_programados)").fetchall()}
                 for col_name, col_type in [
+                    ("creado_por_nombre", "TEXT"),
                     ("asignado_a", "TEXT"),
                     ("asignado_a_id", "INTEGER"),
                     ("tipo_objetivo", "TEXT"),
@@ -2162,12 +2163,14 @@ class Database:
         }
 
     def registrar_recordatorio(self, mensaje: str, fecha_programada=None, hora=None,
-                               creado_por=None, asignado_a=None, asignado_a_id=None,
+                               creado_por=None, creado_por_nombre=None,
+                               asignado_a=None, asignado_a_id=None,
                                tipo_objetivo=None, animal_tag=None, potrero_nombre=None,
                                tipo_tarea=None, prioridad="NORMAL") -> int:
         return self.insert("recordatorios_programados", dict(
             mensaje=mensaje, fecha_programada=iso(fecha_programada) if fecha_programada else None,
-            hora=hora, creado_por=creado_por, estado="PENDIENTE", creado_en=self._ahora(),
+            hora=hora, creado_por=creado_por, creado_por_nombre=creado_por_nombre,
+            estado="PENDIENTE", creado_en=self._ahora(),
             asignado_a=asignado_a, asignado_a_id=asignado_a_id,
             tipo_objetivo=tipo_objetivo, animal_tag=animal_tag, potrero_nombre=potrero_nombre,
             tipo_tarea=tipo_tarea, prioridad=prioridad or "NORMAL",
@@ -4743,6 +4746,11 @@ class Database:
         if not existente:
             return False
         self.execute("DELETE FROM mensajes_equipo WHERE id = ?", (id_mensaje,))
+        return True
+
+    def vaciar_mensajes_equipo(self) -> bool:
+        """Elimina todos los mensajes del canal de equipo (moderación / reset por admin)."""
+        self.execute("DELETE FROM mensajes_equipo")
         return True
 
     # ------------------------------------------------------------------ #

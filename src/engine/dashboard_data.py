@@ -765,6 +765,81 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         errores["precio_hoy"] = str(e)
         precio_hoy = None
 
+    tareas_asignadas: list[dict] = []
+    tareas_realizadas_hoy: list[dict] = []
+    try:
+        rows_rec = db.query(
+            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      COALESCE(creado_por_nombre, '') AS creado_por_nombre,
+                      asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
+                      tipo_tarea, prioridad, completado_en, completado_por,
+                      notas_completado, foto_completado
+               FROM recordatorios_programados
+               WHERE estado = 'PENDIENTE'
+               ORDER BY
+                 CASE WHEN UPPER(COALESCE(prioridad, 'NORMAL')) = 'URGENTE' THEN 0 ELSE 1 END,
+                 CASE WHEN fecha_programada IS NULL THEN 1 ELSE 0 END,
+                 fecha_programada, hora, id LIMIT 30"""
+        )
+        for r in _filas_dict(rows_rec):
+            fprog = str(r.get("fecha_programada") or "")[:10] or None
+            try:
+                faltan = (date.fromisoformat(fprog) - hoy).days if fprog else None
+            except Exception:
+                faltan = None
+            tareas_asignadas.append({
+                "id": r.get("id"),
+                "mensaje": r.get("mensaje"),
+                "fecha": fprog,
+                "hora": r.get("hora"),
+                "faltan_dias": faltan,
+                "estado": r.get("estado") or "PENDIENTE",
+                "creado_por": r.get("creado_por"),
+                "creado_por_nombre": r.get("creado_por_nombre"),
+                "asignado_a": r.get("asignado_a"),
+                "tipo_objetivo": r.get("tipo_objetivo"),
+                "animal_tag": r.get("animal_tag"),
+                "potrero_nombre": r.get("potrero_nombre"),
+                "tipo_tarea": r.get("tipo_tarea"),
+                "prioridad": r.get("prioridad") or "NORMAL",
+            })
+    except Exception as e:
+        logger.error("seccion tablero tareas_asignadas fallo", exc_info=True)
+        errores["tareas_asignadas"] = str(e)
+
+    try:
+        rows_comp = db.query(
+            """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      COALESCE(creado_por_nombre, '') AS creado_por_nombre,
+                      asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
+                      tipo_tarea, prioridad, completado_en, completado_por,
+                      notas_completado, foto_completado
+               FROM recordatorios_programados
+               WHERE estado IN ('REALIZADO', 'ENVIADO')
+               ORDER BY COALESCE(completado_en, fecha_programada) DESC, id DESC LIMIT 15"""
+        )
+        for r in _filas_dict(rows_comp):
+            tareas_realizadas_hoy.append({
+                "id": r.get("id"),
+                "mensaje": r.get("mensaje"),
+                "fecha": str(r.get("fecha_programada") or "")[:10] or None,
+                "hora": r.get("hora"),
+                "estado": r.get("estado") or "REALIZADO",
+                "creado_por_nombre": r.get("creado_por_nombre"),
+                "asignado_a": r.get("asignado_a"),
+                "tipo_objetivo": r.get("tipo_objetivo"),
+                "animal_tag": r.get("animal_tag"),
+                "potrero_nombre": r.get("potrero_nombre"),
+                "tipo_tarea": r.get("tipo_tarea"),
+                "prioridad": r.get("prioridad") or "NORMAL",
+                "completado_en": r.get("completado_en"),
+                "completado_por": r.get("completado_por"),
+                "notas_completado": r.get("notas_completado"),
+                "foto_completado": r.get("foto_completado"),
+            })
+    except Exception:
+        pass
+
     out = {
         "activos": activos,
         "hembras": hembras,
@@ -780,6 +855,8 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "eventos_recientes": eventos_recientes,
         "clima_hoy": clima_hoy,
         "precio_hoy": precio_hoy,
+        "tareas_asignadas": tareas_asignadas,
+        "tareas_realizadas_hoy": tareas_realizadas_hoy,
     }
     if errores:
         out["errores"] = errores
@@ -4156,23 +4233,24 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
     except Exception as e:
         logger.error("seccion agenda_retiros fallo", exc_info=True)
         errores["retiros"] = str(e)
-    # Recordatorios de campo (/programar): vencidos + próximos en ventana.
+
+    # Recordatorios de campo (/programar): tareas pendientes de todo el equipo
     # Reusa la misma tabla y estados PENDIENTE/ENVIADO/REALIZADO del Despacho Matutino.
     recordatorios: list[dict] = []
     recordatorios_completados: list[dict] = []
     try:
         rows_rec = db.query(
             """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      COALESCE(creado_por_nombre, '') AS creado_por_nombre,
                       asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
                       tipo_tarea, prioridad, completado_en, completado_por,
                       notas_completado, foto_completado
                FROM recordatorios_programados
                WHERE estado = 'PENDIENTE'
-                 AND (fecha_programada IS NULL OR fecha_programada <= ?)
                ORDER BY
+                 CASE WHEN UPPER(COALESCE(prioridad, 'NORMAL')) = 'URGENTE' THEN 0 ELSE 1 END,
                  CASE WHEN fecha_programada IS NULL THEN 1 ELSE 0 END,
-                 fecha_programada, hora, id LIMIT 80""",
-            (limite,),
+                 fecha_programada, hora, id LIMIT 80"""
         )
         for r in _filas_dict(rows_rec):
             fprog = str(r.get("fecha_programada") or "")[:10] or None
@@ -4187,6 +4265,8 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "hora": r.get("hora"),
                 "faltan_dias": faltan,
                 "estado": r.get("estado") or "PENDIENTE",
+                "creado_por": r.get("creado_por"),
+                "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),
@@ -4201,6 +4281,7 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
     try:
         rows_comp = db.query(
             """SELECT id, mensaje, fecha_programada, hora, estado, creado_por,
+                      COALESCE(creado_por_nombre, '') AS creado_por_nombre,
                       asignado_a, asignado_a_id, tipo_objetivo, animal_tag, potrero_nombre,
                       tipo_tarea, prioridad, completado_en, completado_por,
                       notas_completado, foto_completado
@@ -4215,6 +4296,7 @@ def datos_agenda(db: Database, dias: int = 7) -> dict:
                 "fecha": str(r.get("fecha_programada") or "")[:10] or None,
                 "hora": r.get("hora"),
                 "estado": r.get("estado") or "REALIZADO",
+                "creado_por_nombre": r.get("creado_por_nombre"),
                 "asignado_a": r.get("asignado_a"),
                 "tipo_objetivo": r.get("tipo_objetivo"),
                 "animal_tag": r.get("animal_tag"),

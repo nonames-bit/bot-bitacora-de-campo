@@ -421,6 +421,13 @@
 ]
 ],
 [
+"/api/mensajes-equipo/vaciar",
+"api_mensajes_equipo_vaciar",
+[
+"POST"
+]
+],
+[
 "/api/mercado",
 "api_mercado_precios",
 [

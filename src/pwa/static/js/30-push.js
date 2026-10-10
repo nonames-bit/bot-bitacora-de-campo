@@ -235,14 +235,35 @@
         if (wrapAgPotrero) wrapAgPotrero.style.display = (obj === "potrero") ? "" : "none";
       });
     });
+    function poblarIntegrantesEnSelect(el, seleccionDefault) {
+      if (!el || !window.__integrantesEquipo) return;
+      var html = window.__integrantesEquipo.map(function (it) {
+        var rolTxt = it.rol ? (" (" + esc(it.rol) + ")") : "";
+        return "<option value='" + esc(it.nombre) + "'>" + esc(it.nombre) + rolTxt + "</option>";
+      }).join("");
+      el.innerHTML = html;
+      if (seleccionDefault) el.value = seleccionDefault;
+    }
+
     fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.integrantes) return;
+      window.__integrantesEquipo = d.integrantes;
       var dl = document.getElementById("dl-equipo-agenda");
       if (dl) {
         dl.innerHTML = d.integrantes.map(function (it) {
           return "<option value='" + esc(it.nombre) + "'>" + esc(it.rol ? it.rol : "") + "</option>";
         }).join("");
       }
+      var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+      var selAgDe = document.getElementById("ag-creado-por");
+      var selAgPara = document.getElementById("ag-asignado");
+      if (selAgDe && selAgDe.tagName === "SELECT") poblarIntegrantesEnSelect(selAgDe, miNombre);
+      if (selAgPara && selAgPara.tagName === "SELECT") poblarIntegrantesEnSelect(selAgPara, "");
+
+      var selModDe = document.getElementById("modal-tarea-de");
+      var selModPara = document.getElementById("modal-tarea-para");
+      if (selModDe) poblarIntegrantesEnSelect(selModDe, miNombre);
+      if (selModPara) poblarIntegrantesEnSelect(selModPara, "");
     }).catch(function () {});
 
     // Alta de evento/tarea asignada desde la Agenda (POST /api/agenda/recordatorio).
@@ -269,6 +290,9 @@
         var prefix = (objTipo === "animal" && tag.trim()) ? (tag.trim() + ": ") : ((objTipo === "potrero" && pot.trim()) ? (pot.trim() + ": ") : "");
         var mensajeFinal = prefix + desc;
 
+        var selDe = document.getElementById("ag-creado-por");
+        var deNombre = (selDe && selDe.value) || (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+
         if (btn) btn.disabled = true;
         if (fb) fb.textContent = "Guardando tarea...";
         fetch("/api/agenda/recordatorio", {
@@ -278,6 +302,7 @@
             mensaje: mensajeFinal,
             fecha: fecha,
             hora: hora || null,
+            creado_por_nombre: deNombre || null,
             asignado_a: asignado.trim() || "Encargado",
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag.trim() : null,
@@ -299,6 +324,130 @@
           }).catch(function (err) {
             if (btn) btn.disabled = false;
             if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
+          });
+      });
+    }
+
+    // Modal de Nueva Tarea Rápida (disparado desde Tablero o botón flotante)
+    var modalTarea = document.getElementById("modal-nueva-tarea-rapida");
+    var formModalTarea = document.getElementById("form-modal-nueva-tarea");
+    var btnCerrarModalTarea = document.getElementById("btn-cerrar-modal-tarea");
+    var btnCancModalTarea = document.getElementById("btn-cancelar-modal-tarea");
+
+    function cerrarModalTarea() {
+      if (modalTarea) modalTarea.style.display = "none";
+      var fb = document.getElementById("modal-tarea-feedback");
+      if (fb) fb.textContent = "";
+      var desc = document.getElementById("modal-tarea-desc");
+      if (desc) desc.value = "";
+      var tag = document.getElementById("modal-tarea-tag");
+      if (tag) tag.value = "";
+      var pot = document.getElementById("modal-tarea-potrero");
+      if (pot) pot.value = "";
+    }
+
+    function abrirModalTarea() {
+      if (!modalTarea) return;
+      var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+      var selDe = document.getElementById("modal-tarea-de");
+      var selPara = document.getElementById("modal-tarea-para");
+      if (selDe && window.__integrantesEquipo) poblarIntegrantesEnSelect(selDe, miNombre);
+      if (selPara && window.__integrantesEquipo && !selPara.value) poblarIntegrantesEnSelect(selPara, "");
+      var inpF = document.getElementById("modal-tarea-fecha");
+      if (inpF && !inpF.value) {
+        var hoy = new Date();
+        inpF.value = hoy.toISOString().slice(0, 10);
+      }
+      modalTarea.style.display = "flex";
+      setTimeout(function () {
+        var inpDesc = document.getElementById("modal-tarea-desc");
+        if (inpDesc) inpDesc.focus();
+      }, 100);
+    }
+
+    if (btnCerrarModalTarea && !btnCerrarModalTarea.__bound) {
+      btnCerrarModalTarea.__bound = true;
+      btnCerrarModalTarea.addEventListener("click", cerrarModalTarea);
+    }
+    if (btnCancModalTarea && !btnCancModalTarea.__bound) {
+      btnCancModalTarea.__bound = true;
+      btnCancModalTarea.addEventListener("click", cerrarModalTarea);
+    }
+    if (modalTarea && !modalTarea.__bound) {
+      modalTarea.__bound = true;
+      modalTarea.addEventListener("click", function (e) {
+        if (e.target === modalTarea) cerrarModalTarea();
+      });
+    }
+
+    // Toggle tipo de objetivo en modal rápido (animal / potrero / general)
+    qa(".btn-modal-obj").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        qa(".btn-modal-obj").forEach(function (b) { b.classList.remove("act"); });
+        btn.classList.add("act");
+        var obj = btn.getAttribute("data-obj") || "animal";
+        var inpObj = document.getElementById("modal-tarea-obj");
+        if (inpObj) inpObj.value = obj;
+        var wrapAnim = document.getElementById("modal-wrap-animal");
+        var wrapPot = document.getElementById("modal-wrap-potrero");
+        if (wrapAnim) wrapAnim.style.display = (obj === "animal") ? "" : "none";
+        if (wrapPot) wrapPot.style.display = (obj === "potrero") ? "" : "none";
+      });
+    });
+
+    if (formModalTarea && !formModalTarea.__bound) {
+      formModalTarea.__bound = true;
+      formModalTarea.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fb = document.getElementById("modal-tarea-feedback");
+        var btnSub = document.getElementById("btn-guardar-modal-tarea");
+        var objTipo = (document.getElementById("modal-tarea-obj") || {}).value || "animal";
+        var tag = ((document.getElementById("modal-tarea-tag") || {}).value || "").trim().toUpperCase();
+        var pot = ((document.getElementById("modal-tarea-potrero") || {}).value || "").trim();
+        var deNombre = ((document.getElementById("modal-tarea-de") || {}).value || "").trim();
+        var paraNombre = ((document.getElementById("modal-tarea-para") || {}).value || "").trim();
+        var desc = ((document.getElementById("modal-tarea-desc") || {}).value || "").trim();
+        var fecha = ((document.getElementById("modal-tarea-fecha") || {}).value || "").trim();
+        var prio = ((document.getElementById("modal-tarea-prioridad") || {}).value || "NORMAL").trim();
+
+        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Elija la fecha límite.</span>"; return; }
+
+        var prefix = (objTipo === "animal" && tag) ? (tag + ": ") : ((objTipo === "potrero" && pot) ? (pot + ": ") : "");
+        var mensajeFinal = prefix + desc;
+
+        if (btnSub) btnSub.disabled = true;
+        if (fb) fb.textContent = "Guardando tarea...";
+        fetch("/api/agenda/recordatorio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mensaje: mensajeFinal,
+            fecha: fecha,
+            hora: null,
+            creado_por_nombre: deNombre || null,
+            asignado_a: paraNombre || "Equipo",
+            tipo_objetivo: objTipo.toUpperCase(),
+            animal_tag: objTipo === "animal" ? tag : null,
+            potrero_nombre: objTipo === "potrero" ? pot : null,
+            tipo_tarea: "GENERAL",
+            prioridad: prio
+          })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (out) {
+            if (btnSub) btnSub.disabled = false;
+            if (!out.ok || !out.j.ok) {
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + esc((out.j && out.j.error) || "Error al asignar.") + "</span>";
+              return;
+            }
+            cerrarModalTarea();
+            mostrarToast("¡Tarea asignada a " + esc(paraNombre || "el equipo") + "!", "verde");
+            vibrarConfirmacion();
+            cargar(true);
+            actualizarBadges();
+          }).catch(function (err) {
+            if (btnSub) btnSub.disabled = false;
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Error de conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -378,23 +527,40 @@
       });
     }
 
-    // Al pulsar "Marcar Realizado (Acknowledge)"
-    qa(".btn-rec-completar").forEach(function (b) {
-      b.addEventListener("click", function () {
+    // Delegación global de clics para "Marcar Realizado (Acknowledge)" y "+ Asignar Tarea"
+    if (!document.__tareasDelegadasBound) {
+      document.__tareasDelegadasBound = true;
+      document.addEventListener("click", function (e) {
+        var btnNueva = e.target && e.target.closest ? e.target.closest("#btn-tablero-nueva-tarea") : null;
+        if (btnNueva) {
+          e.preventDefault();
+          abrirModalTarea();
+          return;
+        }
+
+        var b = e.target && e.target.closest ? e.target.closest(".btn-rec-completar") : null;
+        if (!b) return;
+        e.preventDefault();
         var rid = b.getAttribute("data-rec-id");
         var msg = b.getAttribute("data-rec-msg") || "";
         var asig = b.getAttribute("data-rec-asig") || "";
+        var de = b.getAttribute("data-rec-de") || "";
         if (!rid) return;
         if (inpAckId) inpAckId.value = rid;
         if (txtAckInfo) {
-          var asigInfo = asig ? ("<br><small style='color:var(--texto-suave);'>Asignado a: <b>" + esc(asig) + "</b></small>") : "";
+          var asigInfo = "";
+          if (de || asig) {
+            var deTxt = de ? ("De: <b>" + esc(de) + "</b> ") : "";
+            var paraTxt = asig ? ("➔ Para: <b>" + esc(asig) + "</b>") : "";
+            asigInfo = "<br><small style='color:var(--texto-suave);'>" + deTxt + paraTxt + "</small>";
+          }
           txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
         if (modalAck) modalAck.style.display = "flex";
       });
-    });
+    }
 
     if (formAck && !formAck.__bound) {
       formAck.__bound = true;

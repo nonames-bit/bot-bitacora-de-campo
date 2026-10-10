@@ -262,6 +262,7 @@ CREATE TABLE IF NOT EXISTS recordatorios_programados (
     fecha_programada TEXT,
     hora TEXT,
     creado_por INTEGER,
+    creado_por_nombre TEXT,
     estado TEXT DEFAULT 'PENDIENTE',
     creado_en TEXT,
     asignado_a TEXT,

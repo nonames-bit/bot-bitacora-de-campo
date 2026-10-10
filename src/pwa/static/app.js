@@ -582,6 +582,107 @@
     }, { enableHighAccuracy: true, timeout: 15000 });
   }
 
+  function renderTareasAsignadasTablero(recs, recsComp) {
+    recs = recs || [];
+    recsComp = recsComp || [];
+    var nPendientes = recs.length;
+    var badgePend = nPendientes > 0
+      ? "<span class='chip ambar' style='font-weight:700;'>" + nPendientes + " pendientes</span>"
+      : "<span class='chip verde' style='font-weight:700;'>Al día</span>";
+
+    var h = "<div class='card lt-card-tablero' style='padding:14px 16px; margin-bottom:14px; border-left:4px solid var(--verde-marca);'>"
+      + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;'>"
+      + "<div style='display:flex; align-items:center; gap:8px; font-size:15px; font-weight:700; color:var(--texto);'>"
+      + icon("pin", 17) + "Tareas Asignadas al Equipo " + badgePend
+      + "</div>"
+      + "<button type='button' class='btn-guardar-manga' id='btn-tablero-nueva-tarea' style='padding:6px 12px; font-size:12.5px; width:auto; display:inline-flex; align-items:center; gap:5px; cursor:pointer;'>"
+      + icon("plus", 13) + "Asignar Tarea</button>"
+      + "</div>";
+
+    if (!nPendientes) {
+      h += "<p class='aviso' style='margin:6px 0 10px; font-size:12.5px;'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Puedes asignar tareas entre el equipo (ej. Jaime a Sebas) con el botón de arriba.</p>";
+    } else {
+      h += "<div style='display:flex; flex-direction:column; gap:8px; margin-bottom:10px;'>";
+      recs.forEach(function (rc) {
+        var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
+        var objChip = "";
+        if (rc.animal_tag) {
+          objChip = "<a href='#' class='chip azul ficha-link' data-ir-ficha='" + esc(rc.animal_tag) + "' style='text-decoration:none; display:inline-flex; align-items:center; gap:4px; font-weight:700;'>" + icon("cow", 12) + esc(rc.animal_tag) + "</a> ";
+        } else if (rc.potrero_nombre) {
+          objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
+        }
+
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
+        var asignacionChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
+        var prioChip = (rc.prioridad === "URGENTE") ? ("<span class='chip rojo' style='font-size:11px; font-weight:700;'>" + icon("alertTriangle", 12) + "URGENTE</span> ") : "";
+
+        var urgChip = "";
+        if (rc.faltan_dias != null) {
+          var clUrg = rc.faltan_dias <= 0 ? "rojo" : (rc.faltan_dias <= 2 ? "ambar" : "gris");
+          var txtUrg = rc.faltan_dias < 0 ? ("Venció " + Math.abs(rc.faltan_dias) + "d") : (rc.faltan_dias === 0 ? "HOY" : ("En " + rc.faltan_dias + "d"));
+          urgChip = "<span class='chip " + clUrg + "' style='font-size:11px; font-weight:700;'>" + txtUrg + "</span>";
+        }
+
+        h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "' style='padding:10px 12px; border:1px solid var(--borde); border-radius:10px; background:var(--superficie); margin-bottom:2px;'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;'>"
+          + "<div>" + objChip + asignacionChip + prioChip + urgChip + "</div>"
+          + "<small style='color:var(--texto-suave); font-weight:600; font-size:11.5px;'>" + icon("calendar", 12) + fh + "</small>"
+          + "</div>"
+          + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
+          + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:6px;'>"
+          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:11px; padding:5px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:3px; background:none; border:none; cursor:pointer;'>" + icon("trash", 12) + "Eliminar</button>") : "")
+          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12px; padding:6px 12px; width:auto; display:inline-flex; align-items:center; gap:5px; cursor:pointer;'>"
+          + icon("check", 13) + "Completar / Acknowledge"
+          + "</button>"
+          + "</div>"
+          + "</div>";
+      });
+      h += "</div>";
+    }
+
+    if (recsComp && recsComp.length) {
+      h += "<details style='margin-top:10px; border-top:1px dashed var(--borde); padding-top:8px;'>"
+        + "<summary style='font-size:12.5px; font-weight:700; color:var(--verde-marca); cursor:pointer; outline:none; display:inline-flex; align-items:center; gap:4px;'>"
+        + icon("shieldCheck", 14) + "Ver tareas cumplidas recientemente (" + recsComp.length + ") con foto/soporte"
+        + "</summary>"
+        + "<div style='display:flex; flex-direction:column; gap:6px; margin-top:8px;'>";
+
+      recsComp.forEach(function (rc) {
+        var fechaComp = esc(rc.completado_en || rc.fecha || "—");
+        var objChip = "";
+        if (rc.animal_tag) {
+          objChip = "<span class='chip azul' style='font-size:11px;'>" + icon("cow", 11) + esc(rc.animal_tag) + "</span> ";
+        } else if (rc.potrero_nombre) {
+          objChip = "<span class='chip azul' style='font-size:11px;'>" + icon("leaf", 11) + esc(rc.potrero_nombre) + "</span> ";
+        }
+        var quien = esc(rc.completado_por || rc.asignado_a || "Equipo");
+
+        var fotoHtml = "";
+        if (rc.foto_completado) {
+          fotoHtml = "<div style='margin-top:6px;'><a href='/" + esc(rc.foto_completado) + "' target='_blank' style='display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--verde-marca); text-decoration:none; font-weight:600;'>"
+            + "<img src='/" + esc(rc.foto_completado) + "' alt='Comprobante' style='width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid var(--borde);'>"
+            + "<span>Ver foto soporte ↗</span></a></div>";
+        }
+
+        h += "<div style='padding:8px 12px; border:1px solid var(--borde); border-radius:8px; background:var(--superficie); font-size:12.5px; border-left:3px solid var(--verde-marca);'>"
+          + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;'>"
+          + "<div>" + objChip + "<span class='chip verde' style='font-size:10.5px; font-weight:700;'>" + icon("check", 11) + "REALIZADA</span></div>"
+          + "<small style='color:var(--texto-suave); font-size:11px;'>" + icon("clock", 12) + fechaComp + "</small>"
+          + "</div>"
+          + "<div style='font-weight:600; font-size:13px; margin:3px 0;'>" + esc(rc.mensaje || "—") + "</div>"
+          + "<div style='font-size:11.5px; color:var(--texto-suave);'>" + icon("user", 12) + "Completada por: <b>" + quien + "</b></div>"
+          + (rc.notas_completado ? ("<div style='font-size:11.5px; margin-top:3px; padding:4px 8px; background:var(--fondo); border-radius:4px; font-style:italic;'>" + icon("chat", 12) + esc(rc.notas_completado) + "</div>") : "")
+          + fotoHtml
+          + "</div>";
+      });
+      h += "</div></details>";
+    }
+
+    h += "</div>";
+    return h;
+  }
+
   function renderTablero(d) {
     window.__datosUltimoTablero = d;
     if (d && d.clima_hoy) {
@@ -610,6 +711,7 @@
       + kpiLink(kpi(d.retiros_activos, "Retiros", d.retiros_activos > 0 ? "alerta" : ""), "sanidad", "tratamientos") + "</div>";
     h += erroresHtml(d);
     h += renderTareasHoy(d.tareas_conteos, d.datos_revisar_n);
+    h += renderTareasAsignadasTablero(d.tareas_asignadas, d.tareas_realizadas_hoy);
     h += renderResumenDiaTablero(d);
     h += grafico("evolucion", "Evolución del rebaño");
 
@@ -5650,14 +5752,12 @@
       + "<option value='PESAJE'>Pesaje</option>"
       + "<option value='GENERAL'>General</option>"
       + "</select></label>"
-      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Adjudicar / Asignar a:<br>"
-      + "<input id='ag-asignado' list='dl-equipo-agenda' placeholder='ej. Encargado o Administrador' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'>"
-      + "<datalist id='dl-equipo-agenda'>"
-      + "<option value='Encargado'></option>"
-      + "<option value='Administrador'></option>"
-      + "<option value='Veterinario'></option>"
-      + "<option value='Trabajador'></option>"
-      + "</datalist></label>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Asignado por (De):<br>"
+      + "<select id='ag-creado-por' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'></select>"
+      + "</label>"
+      + "<label style='flex:1; min-width:140px; font-size:13px; font-weight:600;'>Asignar a (Para):<br>"
+      + "<select id='ag-asignado' style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:14px; min-height:44px; box-sizing:border-box;'></select>"
+      + "</label>"
       + "</div>"
       + "<label style='font-size:13px; font-weight:600;'>Instrucción / ¿Qué hay que hacer?<br>"
       + "<input id='ag-mensaje' maxlength='500' placeholder='ej. Aplicar 10ml oxitetraciclina IM o fumigar maleza en callejón' autocomplete='off' required style='width:100%; margin-top:4px; padding:10px; border-radius:8px; border:1px solid var(--borde-fuerte); font-size:15px; min-height:44px; box-sizing:border-box;'>"
@@ -5691,7 +5791,9 @@
         if (rc.animal_tag) objChip = "<span class='chip azul'>" + icon("cow", 12) + esc(rc.animal_tag) + "</span> ";
         else if (rc.potrero_nombre) objChip = "<span class='chip azul'>" + icon("leaf", 12) + esc(rc.potrero_nombre) + "</span> ";
 
-        var asigChip = rc.asignado_a ? ("<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + esc(rc.asignado_a) + "</span> ") : "";
+        var deQuien = rc.creado_por_nombre ? ("De: <b>" + esc(rc.creado_por_nombre) + "</b> ➔ ") : "";
+        var paraQuien = rc.asignado_a ? ("Para: <b style='color:var(--verde-marca);'>" + esc(rc.asignado_a) + "</b>") : "Equipo";
+        var asigChip = "<span class='chip verde' style='font-size:11.5px;'>" + icon("user", 12) + deQuien + paraQuien + "</span> ";
         var prioChip = (rc.prioridad === "URGENTE") ? "<span class='chip rojo' style='font-size:11px;'>" + icon("alertTriangle", 12) + "URGENTE</span> " : "";
 
         h += "<div class='tarea-card " + (rc.prioridad === "URGENTE" ? "urgente" : "normal") + "'>"
@@ -5701,8 +5803,8 @@
           + "</div>"
           + "<div style='font-size:14px; font-weight:700; color:var(--texto); margin:4px 0;'>" + esc(rc.mensaje || "—") + "</div>"
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
-          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
-          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
+          + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
+          + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
           + icon("check", 14) + "Marcar Realizado (Acknowledge)"
           + "</button>"
           + "</div>"
@@ -6023,14 +6125,35 @@
         if (wrapAgPotrero) wrapAgPotrero.style.display = (obj === "potrero") ? "" : "none";
       });
     });
+    function poblarIntegrantesEnSelect(el, seleccionDefault) {
+      if (!el || !window.__integrantesEquipo) return;
+      var html = window.__integrantesEquipo.map(function (it) {
+        var rolTxt = it.rol ? (" (" + esc(it.rol) + ")") : "";
+        return "<option value='" + esc(it.nombre) + "'>" + esc(it.nombre) + rolTxt + "</option>";
+      }).join("");
+      el.innerHTML = html;
+      if (seleccionDefault) el.value = seleccionDefault;
+    }
+
     fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
       if (!d || !d.integrantes) return;
+      window.__integrantesEquipo = d.integrantes;
       var dl = document.getElementById("dl-equipo-agenda");
       if (dl) {
         dl.innerHTML = d.integrantes.map(function (it) {
           return "<option value='" + esc(it.nombre) + "'>" + esc(it.rol ? it.rol : "") + "</option>";
         }).join("");
       }
+      var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+      var selAgDe = document.getElementById("ag-creado-por");
+      var selAgPara = document.getElementById("ag-asignado");
+      if (selAgDe && selAgDe.tagName === "SELECT") poblarIntegrantesEnSelect(selAgDe, miNombre);
+      if (selAgPara && selAgPara.tagName === "SELECT") poblarIntegrantesEnSelect(selAgPara, "");
+
+      var selModDe = document.getElementById("modal-tarea-de");
+      var selModPara = document.getElementById("modal-tarea-para");
+      if (selModDe) poblarIntegrantesEnSelect(selModDe, miNombre);
+      if (selModPara) poblarIntegrantesEnSelect(selModPara, "");
     }).catch(function () {});
 
     // Alta de evento/tarea asignada desde la Agenda (POST /api/agenda/recordatorio).
@@ -6057,6 +6180,9 @@
         var prefix = (objTipo === "animal" && tag.trim()) ? (tag.trim() + ": ") : ((objTipo === "potrero" && pot.trim()) ? (pot.trim() + ": ") : "");
         var mensajeFinal = prefix + desc;
 
+        var selDe = document.getElementById("ag-creado-por");
+        var deNombre = (selDe && selDe.value) || (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+
         if (btn) btn.disabled = true;
         if (fb) fb.textContent = "Guardando tarea...";
         fetch("/api/agenda/recordatorio", {
@@ -6066,6 +6192,7 @@
             mensaje: mensajeFinal,
             fecha: fecha,
             hora: hora || null,
+            creado_por_nombre: deNombre || null,
             asignado_a: asignado.trim() || "Encargado",
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag.trim() : null,
@@ -6087,6 +6214,130 @@
           }).catch(function (err) {
             if (btn) btn.disabled = false;
             if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("xCircle", 14) + "Sin conexión: " + esc(err.message || err) + "</span>";
+          });
+      });
+    }
+
+    // Modal de Nueva Tarea Rápida (disparado desde Tablero o botón flotante)
+    var modalTarea = document.getElementById("modal-nueva-tarea-rapida");
+    var formModalTarea = document.getElementById("form-modal-nueva-tarea");
+    var btnCerrarModalTarea = document.getElementById("btn-cerrar-modal-tarea");
+    var btnCancModalTarea = document.getElementById("btn-cancelar-modal-tarea");
+
+    function cerrarModalTarea() {
+      if (modalTarea) modalTarea.style.display = "none";
+      var fb = document.getElementById("modal-tarea-feedback");
+      if (fb) fb.textContent = "";
+      var desc = document.getElementById("modal-tarea-desc");
+      if (desc) desc.value = "";
+      var tag = document.getElementById("modal-tarea-tag");
+      if (tag) tag.value = "";
+      var pot = document.getElementById("modal-tarea-potrero");
+      if (pot) pot.value = "";
+    }
+
+    function abrirModalTarea() {
+      if (!modalTarea) return;
+      var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || "";
+      var selDe = document.getElementById("modal-tarea-de");
+      var selPara = document.getElementById("modal-tarea-para");
+      if (selDe && window.__integrantesEquipo) poblarIntegrantesEnSelect(selDe, miNombre);
+      if (selPara && window.__integrantesEquipo && !selPara.value) poblarIntegrantesEnSelect(selPara, "");
+      var inpF = document.getElementById("modal-tarea-fecha");
+      if (inpF && !inpF.value) {
+        var hoy = new Date();
+        inpF.value = hoy.toISOString().slice(0, 10);
+      }
+      modalTarea.style.display = "flex";
+      setTimeout(function () {
+        var inpDesc = document.getElementById("modal-tarea-desc");
+        if (inpDesc) inpDesc.focus();
+      }, 100);
+    }
+
+    if (btnCerrarModalTarea && !btnCerrarModalTarea.__bound) {
+      btnCerrarModalTarea.__bound = true;
+      btnCerrarModalTarea.addEventListener("click", cerrarModalTarea);
+    }
+    if (btnCancModalTarea && !btnCancModalTarea.__bound) {
+      btnCancModalTarea.__bound = true;
+      btnCancModalTarea.addEventListener("click", cerrarModalTarea);
+    }
+    if (modalTarea && !modalTarea.__bound) {
+      modalTarea.__bound = true;
+      modalTarea.addEventListener("click", function (e) {
+        if (e.target === modalTarea) cerrarModalTarea();
+      });
+    }
+
+    // Toggle tipo de objetivo en modal rápido (animal / potrero / general)
+    qa(".btn-modal-obj").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        qa(".btn-modal-obj").forEach(function (b) { b.classList.remove("act"); });
+        btn.classList.add("act");
+        var obj = btn.getAttribute("data-obj") || "animal";
+        var inpObj = document.getElementById("modal-tarea-obj");
+        if (inpObj) inpObj.value = obj;
+        var wrapAnim = document.getElementById("modal-wrap-animal");
+        var wrapPot = document.getElementById("modal-wrap-potrero");
+        if (wrapAnim) wrapAnim.style.display = (obj === "animal") ? "" : "none";
+        if (wrapPot) wrapPot.style.display = (obj === "potrero") ? "" : "none";
+      });
+    });
+
+    if (formModalTarea && !formModalTarea.__bound) {
+      formModalTarea.__bound = true;
+      formModalTarea.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var fb = document.getElementById("modal-tarea-feedback");
+        var btnSub = document.getElementById("btn-guardar-modal-tarea");
+        var objTipo = (document.getElementById("modal-tarea-obj") || {}).value || "animal";
+        var tag = ((document.getElementById("modal-tarea-tag") || {}).value || "").trim().toUpperCase();
+        var pot = ((document.getElementById("modal-tarea-potrero") || {}).value || "").trim();
+        var deNombre = ((document.getElementById("modal-tarea-de") || {}).value || "").trim();
+        var paraNombre = ((document.getElementById("modal-tarea-para") || {}).value || "").trim();
+        var desc = ((document.getElementById("modal-tarea-desc") || {}).value || "").trim();
+        var fecha = ((document.getElementById("modal-tarea-fecha") || {}).value || "").trim();
+        var prio = ((document.getElementById("modal-tarea-prioridad") || {}).value || "NORMAL").trim();
+
+        if (!desc) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Escriba qué hay que hacer.</span>"; return; }
+        if (!fecha) { if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Elija la fecha límite.</span>"; return; }
+
+        var prefix = (objTipo === "animal" && tag) ? (tag + ": ") : ((objTipo === "potrero" && pot) ? (pot + ": ") : "");
+        var mensajeFinal = prefix + desc;
+
+        if (btnSub) btnSub.disabled = true;
+        if (fb) fb.textContent = "Guardando tarea...";
+        fetch("/api/agenda/recordatorio", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            mensaje: mensajeFinal,
+            fecha: fecha,
+            hora: null,
+            creado_por_nombre: deNombre || null,
+            asignado_a: paraNombre || "Equipo",
+            tipo_objetivo: objTipo.toUpperCase(),
+            animal_tag: objTipo === "animal" ? tag : null,
+            potrero_nombre: objTipo === "potrero" ? pot : null,
+            tipo_tarea: "GENERAL",
+            prioridad: prio
+          })
+        }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (out) {
+            if (btnSub) btnSub.disabled = false;
+            if (!out.ok || !out.j.ok) {
+              if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>" + esc((out.j && out.j.error) || "Error al asignar.") + "</span>";
+              return;
+            }
+            cerrarModalTarea();
+            mostrarToast("¡Tarea asignada a " + esc(paraNombre || "el equipo") + "!", "verde");
+            vibrarConfirmacion();
+            cargar(true);
+            actualizarBadges();
+          }).catch(function (err) {
+            if (btnSub) btnSub.disabled = false;
+            if (fb) fb.innerHTML = "<span style='color:var(--rojo-alerta);'>Error de conexión: " + esc(err.message || err) + "</span>";
           });
       });
     }
@@ -6166,23 +6417,40 @@
       });
     }
 
-    // Al pulsar "Marcar Realizado (Acknowledge)"
-    qa(".btn-rec-completar").forEach(function (b) {
-      b.addEventListener("click", function () {
+    // Delegación global de clics para "Marcar Realizado (Acknowledge)" y "+ Asignar Tarea"
+    if (!document.__tareasDelegadasBound) {
+      document.__tareasDelegadasBound = true;
+      document.addEventListener("click", function (e) {
+        var btnNueva = e.target && e.target.closest ? e.target.closest("#btn-tablero-nueva-tarea") : null;
+        if (btnNueva) {
+          e.preventDefault();
+          abrirModalTarea();
+          return;
+        }
+
+        var b = e.target && e.target.closest ? e.target.closest(".btn-rec-completar") : null;
+        if (!b) return;
+        e.preventDefault();
         var rid = b.getAttribute("data-rec-id");
         var msg = b.getAttribute("data-rec-msg") || "";
         var asig = b.getAttribute("data-rec-asig") || "";
+        var de = b.getAttribute("data-rec-de") || "";
         if (!rid) return;
         if (inpAckId) inpAckId.value = rid;
         if (txtAckInfo) {
-          var asigInfo = asig ? ("<br><small style='color:var(--texto-suave);'>Asignado a: <b>" + esc(asig) + "</b></small>") : "";
+          var asigInfo = "";
+          if (de || asig) {
+            var deTxt = de ? ("De: <b>" + esc(de) + "</b> ") : "";
+            var paraTxt = asig ? ("➔ Para: <b>" + esc(asig) + "</b>") : "";
+            asigInfo = "<br><small style='color:var(--texto-suave);'>" + deTxt + paraTxt + "</small>";
+          }
           txtAckInfo.innerHTML = "<b>" + icon("pin", 14) + esc(msg) + "</b>" + asigInfo;
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
         if (modalAck) modalAck.style.display = "flex";
       });
-    });
+    }
 
     if (formAck && !formAck.__bound) {
       formAck.__bound = true;
@@ -11410,7 +11678,11 @@
         var ic = ROL_ICONO_EQUIPO[m.rol] || icon("user", 12);
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
-      html += "<div class='chat-msg-texto'>" + esc(m.texto) + "</div>";
+      html += "<div class='chat-msg-texto'>" + esc(m.texto);
+      if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
+        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
+      }
+      html += "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
       if (esDirecto && esMio && m.leido_en) html += " <span title='Leído'>✓✓</span>";
       if (puedeBorrar) html += " <span class='chat-msg-borrar' data-id='" + m.id + "' title='Borrar mensaje' aria-label='Borrar mensaje'>" + icon("trash", 12) + "</span>";
@@ -11587,9 +11859,48 @@
       });
     }
 
-    if (btnLimpiar && hist) {
+    if (btnLimpiar) {
       btnLimpiar.addEventListener("click", function () {
-        hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+        if (equipoTabActiva) {
+          var yo = window.__usuarioActual || {};
+          var puedeVaciar = yo.rol === "OWNER" || yo.rol === "ADMIN";
+          if (!puedeVaciar) {
+            mostrarToast("Solo el Administrador o Propietario puede vaciar el canal del equipo", "ambar");
+            return;
+          }
+          if (!confirm("¿Deseas vaciar todo el historial de avisos del equipo?")) return;
+          fetch("/api/mensajes-equipo/vaciar", { method: "POST" })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+              if (d && d.ok) {
+                if (histEquipo) {
+                  histEquipo.innerHTML = "<div class='chat-msg bot'>Canal de avisos del equipo vaciado.</div>";
+                }
+                equipoUltimoId = 0;
+                mostrarToast("Historial del equipo vaciado", "verde");
+              } else {
+                mostrarToast((d && d.error) || "Error al vaciar chat del equipo", "rojo");
+              }
+            }).catch(function (err) {
+              mostrarToast("Sin conexión: " + err.message, "rojo");
+            });
+        } else {
+          if (hist) {
+            hist.innerHTML = "<div class='chat-msg bot'><div class='chat-msg-texto'>Conversación reiniciada. Puedes hacerme cualquier consulta sobre el ganado o dictarme notas de voz " + icon("mic", 14) + "</div><div class='chat-msg-hora'>" + horaCortaActual() + "</div></div>";
+            mostrarToast("Conversación de Asistente IA reiniciada", "verde");
+          }
+        }
+      });
+    }
+
+    if (histEquipo) {
+      histEquipo.addEventListener("click", function (e) {
+        var btnTab = e.target && e.target.closest ? e.target.closest(".btn-ir-tablero-tarea") : null;
+        if (btnTab) {
+          e.preventDefault();
+          if (typeof irA === "function") irA("tablero");
+          colapsarChat();
+        }
       });
     }
 

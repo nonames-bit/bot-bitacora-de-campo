@@ -955,6 +955,22 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
         - Pruebas unitarias en `tests/test_pwa_api.py` (`test_subir_foto_animal_exitoso`, `test_subir_foto_animal_no_existente_devuelve_404`, `test_subir_foto_animal_imagen_invalida_devuelve_400`).
         - Regenerado y validado mapa de rutas en `tests/test_rutas_mapa.py` y build de JS con `test_js_construido.py`.
         - Verificación y capturas visuales en viewport móvil (390×844) con `browser_subagent`.
+- [x] **Gestión de Tareas Asignadas en Tablero, Acknowledge con Soporte y Limpieza de Chat (2026-10-10)** 📋✅:
+    - **Desinstalación de Tarea Programada de Copias SG en Windows**:
+        - Desregistrada y purgada la tarea programada `VigilarCopiasSG` en Windows Task Scheduler que provocaba la apertura intermitente de la consola negra. Actualizado `scripts/desinstalar_tarea_programada.ps1`.
+    - **Visualización y Asignación de Tareas en Tablero**:
+        - Añadida sección destacada `📋 Tareas Asignadas al Equipo` en el Tablero principal (`05-vistas-tablero-gps.js`), mostrando asignador y responsable (`De: X ➔ Para: Y`), objetivo (animal con link a ficha o potrero), fecha límite y prioridad.
+        - Modal rápido de asignación con selectores de integrantes del equipo (`#modal-nueva-tarea-rapida`).
+    - **Flujo de Cumplimiento (Acknowledge) con Nota y Foto**:
+        - Botón `[Completar / Acknowledge]` en cada tarea; modal para ingresar notas y adjuntar/tomar foto de evidencia procesada con compresión cliente y validada con PIL.
+        - Persistencia de notas y fotos en `recordatorios_programados` y tabla `fotos`, visualizable en el acordeón `Realizadas hoy / Recientes` del Tablero.
+        - Notificación automática con insignia de foto al chat del equipo.
+    - **Limpieza de Chat de Equipo**:
+        - Corregido `#btn-limpiar-chat` en `50-asistente-chat-voz.js`: ahora vacía el chat del equipo mediante confirmación y llamada al nuevo endpoint `POST /api/mensajes-equipo/vaciar` para roles autorizados.
+    - **Pruebas y Verificación**:
+        - Creado `tests/test_tareas_tablero_equipo.py` validando el ciclo completo al 100%.
+
+
 
 
 ---
