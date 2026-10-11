@@ -9,25 +9,32 @@ en la bandeja "Por revisar" para que un OWNER/ADMIN lo apruebe con un toque.
 Nada entra a Finanzas sin esa aprobación: cualquiera puede escribirle a ese
 correo.
 
-Configuración (.env del servidor; sin usuario y clave no hace nada):
+Configuración: el dueño pega el correo y la contraseña de aplicación en la
+PWA (Sistema → Correo, solo OWNER) y quedan en ``data/correo_facturas.json``
+junto a la base (permiso 600; no va a la nube con las copias). Si ese archivo
+no existe se usan las variables del .env del servidor:
 
 - FACTURAS_IMAP_USUARIO   correo de la finca (ej. facturas.finca@gmail.com)
 - FACTURAS_IMAP_CLAVE     clave de aplicación del correo (no la normal)
 - FACTURAS_IMAP_HOST      servidor IMAP (por defecto imap.gmail.com)
 - FACTURAS_IMAP_CARPETA   carpeta a revisar (por defecto INBOX)
+
+Cada revisión deja su resultado en ``data/correo_facturas_estado.json`` para
+que la PWA muestre cuándo se revisó por última vez y si hubo error.
 """
 from __future__ import annotations
 
 import email
 import imaplib
 import io
+import json
 import logging
 import os
 import re
 import time
 import uuid
 import zipfile
-from datetime import date
+from datetime import date, datetime
 from email.header import decode_header, make_header
 from email.message import Message
 from email.utils import parseaddr
@@ -41,17 +48,143 @@ MAX_ADJUNTO_BYTES = 10 * 1024 * 1024
 _EXT_IMAGEN = (".jpg", ".jpeg", ".png", ".webp")
 
 
+def _carpeta_datos() -> str:
+    """La carpeta de la base (data/ en Docker), compartida por app y tareas."""
+    db = os.getenv("BITACORA_DB", "").strip() or os.path.join("data", "bitacora.db")
+    return os.path.dirname(os.path.abspath(db))
+
+
+def ruta_ajustes() -> str:
+    return os.getenv("FACTURAS_CONFIG_FILE", "").strip() or os.path.join(_carpeta_datos(), "correo_facturas.json")
+
+
+def ruta_estado() -> str:
+    return os.path.join(os.path.dirname(ruta_ajustes()), "correo_facturas_estado.json")
+
+
+def _leer_json(ruta: str) -> dict:
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+        return datos if isinstance(datos, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def _escribir_json(ruta: str, datos: dict, privado: bool = False) -> None:
+    os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    tmp = f"{ruta}.{uuid.uuid4().hex[:6]}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600 if privado else 0o644)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(datos, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ruta)
+
+
+def _es_real(valor: str) -> bool:
+    return bool(valor) and not re.match(r"^(pegar|cambie)_", valor)
+
+
+def limpiar_clave(clave: str) -> str:
+    """Google muestra la contraseña de aplicación en grupos ("abcd efgh ...")."""
+    return re.sub(r"\s+", "", clave or "")
+
+
+def credenciales() -> Optional[dict]:
+    """{usuario, clave, host, origen} con lo guardado en la app o, si no hay,
+    con el .env. None si falta el usuario o la clave."""
+    guardado = _leer_json(ruta_ajustes())
+    usuario = str(guardado.get("usuario") or "").strip()
+    clave = limpiar_clave(str(guardado.get("clave") or ""))
+    if usuario and clave:
+        host = str(guardado.get("host") or "").strip()
+        origen = "app"
+    else:
+        usuario = os.getenv("FACTURAS_IMAP_USUARIO", "").strip()
+        clave = limpiar_clave(os.getenv("FACTURAS_IMAP_CLAVE", ""))
+        host = os.getenv("FACTURAS_IMAP_HOST", "").strip()
+        origen = "servidor"
+    if not (_es_real(usuario) and _es_real(clave)):
+        return None
+    return {"usuario": usuario, "clave": clave, "host": host or "imap.gmail.com", "origen": origen}
+
+
 def configurado() -> bool:
-    """True si el .env trae usuario y clave reales (no los de ejemplo)."""
-    valores = [os.getenv(k, "").strip() for k in ("FACTURAS_IMAP_USUARIO", "FACTURAS_IMAP_CLAVE")]
-    return all(v and not re.match(r"^(pegar|cambie)_", v) for v in valores)
+    """True si hay usuario y clave reales (de la app o del .env)."""
+    return credenciales() is not None
 
 
-def _conectar_imap() -> imaplib.IMAP4:
-    host = os.getenv("FACTURAS_IMAP_HOST", "").strip() or "imap.gmail.com"
-    imap = imaplib.IMAP4_SSL(host, timeout=60)
-    imap.login(os.environ["FACTURAS_IMAP_USUARIO"].strip(), os.environ["FACTURAS_IMAP_CLAVE"].strip())
+def guardar_ajustes(usuario: str, clave: str) -> None:
+    _escribir_json(ruta_ajustes(), {"usuario": usuario.strip(), "clave": limpiar_clave(clave),
+                                    "guardado_en": datetime.now().isoformat(timespec="seconds")},
+                   privado=True)
+
+
+def borrar_ajustes() -> None:
+    for ruta in (ruta_ajustes(), ruta_estado()):
+        try:
+            os.remove(ruta)
+        except FileNotFoundError:
+            pass
+
+
+def leer_estado() -> dict:
+    return _leer_json(ruta_estado())
+
+
+def anotar_estado(ok: bool, *, facturas: int = 0, error: str = "") -> None:
+    try:
+        _escribir_json(ruta_estado(), {"revisado_en": datetime.now().isoformat(timespec="seconds"),
+                                       "ok": ok, "facturas": facturas, "error": error})
+    except OSError:
+        logger.warning("No se pudo guardar el estado del correo de facturas")
+
+
+def explicar_error(exc: BaseException) -> str:
+    """El error de IMAP en palabras para el dueño."""
+    texto = str(exc)
+    if isinstance(exc, imaplib.IMAP4.error) and re.search(r"AUTHENTICATIONFAILED|Invalid credentials|LOGIN failed",
+                                                         texto, re.IGNORECASE):
+        return ("Gmail no aceptó el correo o la clave. Usa la contraseña de aplicación de 16 letras "
+                "(no la clave normal) y revisa que la verificación en 2 pasos esté activa.")
+    if isinstance(exc, imaplib.IMAP4.error) and "IMAP" in texto.upper() and "disabled" in texto.lower():
+        return "El correo tiene apagado el acceso IMAP. Actívalo en Gmail → Configuración → Reenvío y POP/IMAP."
+    if isinstance(exc, (OSError, TimeoutError)):
+        return "No hubo conexión con el servidor del correo. Intenta de nuevo en un rato."
+    return f"El correo respondió con un error: {texto[:200]}"
+
+
+def _conectar_imap(cred: Optional[dict] = None) -> imaplib.IMAP4:
+    cred = cred or credenciales()
+    if not cred:
+        raise RuntimeError("El correo de facturas no está configurado.")
+    imap = imaplib.IMAP4_SSL(cred["host"], timeout=60)
+    imap.login(cred["usuario"], cred["clave"])
     return imap
+
+
+def probar_conexion(usuario: str, clave: str, host: str = "imap.gmail.com",
+                    conectar: Optional[Callable[[dict], Any]] = None) -> dict:
+    """Entra al buzón y cuenta los correos sin leer. {ok, sin_leer} o {ok: False, error}."""
+    cred = {"usuario": usuario.strip(), "clave": limpiar_clave(clave), "host": host or "imap.gmail.com"}
+    try:
+        imap = (conectar or _conectar_imap)(cred)
+    except Exception as e:  # noqa: BLE001 - se le explica al dueño
+        return {"ok": False, "error": explicar_error(e)}
+    try:
+        carpeta = os.getenv("FACTURAS_IMAP_CARPETA", "").strip() or "INBOX"
+        estado, _ = imap.select(carpeta, readonly=True)
+        if estado != "OK":
+            return {"ok": False, "error": f"No se encontró la carpeta {carpeta} en el correo."}
+        estado, datos = imap.search(None, "UNSEEN")
+        sin_leer = len((datos[0] or b"").split()) if estado == "OK" and datos else 0
+        return {"ok": True, "sin_leer": sin_leer}
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": explicar_error(e)}
+    finally:
+        try:
+            imap.logout()
+        except Exception:
+            pass
 
 
 def _texto_cabecera(valor: Optional[str]) -> str:
