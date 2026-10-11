@@ -76,6 +76,9 @@ GPS, etc.) la maneja app.js directo contra IndexedDB, no este archivo.
 // inline, cumple script-src 'self'); aria-live/roles/tabs y bump v85.
 // v86: Animaciones contextuales en el header (vaca_echada en descanso nocturno y vaca_con_cria para fichas de paridas), easter egg interactivo con métricas en vivo y lluvia animada en header.
 // v87: Login con huella / Face ID (WebAuthn) en la PWA -- botón "Ingresar con huella" en /login, activación por dispositivo desde el menú de perfil y revocación por OWNER/ADMIN; /api/webauthn* se sirve siempre de red (nunca desde caché).
+// v88: Aviso "Hay una versión nueva" + versión visible en el menú; los
+// estáticos con ?v= que no están en caché se piden a la red (antes se servía
+// el app.js viejo tras cada actualización hasta cerrar y abrir la app).
 // BLOQUE 3: versionado automático por hash — CACHE y ?v= usan el token
 // __PWA_VERSION__ que Flask sustituye al servir /sw.js (sin bump manual).
 // P1.4 (auditoría 2026-09-23): (a) no se cachean /api/grafico* ni URLs con
@@ -214,9 +217,11 @@ self.addEventListener("fetch", function (e) {
     // nunca se reutilizan. Igual cualquier URL con parámetro volátil t=.
     // (v87) WebAuthn tampoco se cachea: los challenge/verificación son de un
     // solo uso y una respuesta vieja de /api/webauthn* rompería el login.
+    // (v88) /api/version tampoco: una copia vieja diría "al día" sin serlo.
     // Estas URLs se sirven solo de red (sin escribir ni leer caché).
     var volatil = url.pathname.indexOf("/api/grafico") === 0
       || url.pathname.indexOf("/api/webauthn") === 0
+      || url.pathname === "/api/version"
       || url.searchParams.has("t");
     if (volatil) {
       e.respondWith(
@@ -252,13 +257,26 @@ self.addEventListener("fetch", function (e) {
     return;
   }
 
-  // Estáticos: cache-first (con fallback ignoreSearch para que la entrada
-  // canónica sin ?v= sirva también las peticiones con ?v=<hash>).
+  // Estáticos: cache-first. Si la página pide una versión concreta
+  // (?v=<hash>) que no está en caché, se busca en la red ANTES de caer a la
+  // copia sin ?v=: si no, tras una actualización del servidor la página
+  // nueva seguía corriendo el app.js viejo guardado en caché. Sin red, se
+  // sirve la copia que haya (ignoreSearch).
+  var pideVersion = url.searchParams.has("v");
   e.respondWith(
     caches.match(req).then(function (hit) {
-      return hit || caches.match(req, { ignoreSearch: true });
-    }).then(function (hit) {
-      return hit || fetch(req).then(function (r) { return guardarEnCache(req, r); });
+      if (hit) return hit;
+      if (pideVersion) {
+        return fetch(req).then(function (r) { return guardarEnCache(req, r); })
+          .catch(function () {
+            return caches.match(req, { ignoreSearch: true }).then(function (h2) {
+              return h2 || new Response("", { status: 503 });
+            });
+          });
+      }
+      return caches.match(req, { ignoreSearch: true }).then(function (h2) {
+        return h2 || fetch(req).then(function (r) { return guardarEnCache(req, r); });
+      });
     })
   );
 });

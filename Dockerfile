@@ -31,6 +31,10 @@ COPY src ./src
 COPY scripts ./scripts
 COPY docs/GanaderiaJA_Logo.jpg ./docs/GanaderiaJA_Logo.jpg
 
+# Fecha de esta versión (hora de la finca): la app la muestra en el menú
+# ("Versión de la app"). Solo cambia cuando cambia el código copiado arriba.
+RUN date '+%Y-%m-%d %H:%M' > src/pwa/fecha_version.txt
+
 # Usuario sin privilegios: la app nunca corre como root.
 RUN useradd --uid 1000 --create-home --shell /usr/sbin/nologin bitacora \
     && mkdir -p /app/data /app/media /app/backups \

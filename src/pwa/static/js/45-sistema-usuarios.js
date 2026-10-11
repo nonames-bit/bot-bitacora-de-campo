@@ -108,7 +108,9 @@
     // Telegram con parse_mode HTML): trae <b>/<i> intencionales y sus valores
     // dinámicos ya vienen escapados del lado del servidor -- no re-escapar aquí
     // o los tags salen literales en vez de renderizarse.
-    h += marcaPestana("estado") + "<h4>" + icon("grid") + "Diagnóstico General</h4>"
+    h += marcaPestana("estado") + "<div class='card'><h4 style='margin-top:0;'>" + icon("refresh") + "Versión de la app</h4>"
+      + "<div id='sistema-version-estado' class='version-app-panel'>" + htmlEstadoVersion() + "</div></div>";
+    h += "<h4>" + icon("grid") + "Diagnóstico General</h4>"
       + "<pre style='background:var(--superficie); color:var(--texto); border:1px solid var(--borde-fuerte); padding:12px; border-radius:8px; font-size:12px; white-space:pre-wrap; overflow-x:auto; line-height:1.4;'>"
       + (d.texto || "Sin diagnóstico disponible.") + "</pre>";
 

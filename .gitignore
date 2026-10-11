@@ -102,3 +102,4 @@ docs/Manuales Informacion/Manual29SoftwareGanadero.pdf
 # es .agents/skills; las copias de .claude/.opencode quedan locales sin versión
 # para evitar drift manual.
 .claude/skills/
+src/pwa/fecha_version.txt
