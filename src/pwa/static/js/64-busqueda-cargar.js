@@ -408,12 +408,16 @@
     if (actual === "potreros") {
       // El refresco silencioso no interrumpe al operario mientras marca.
       if (!animar) return;
-      _potSel = null;
+      // _potSel se conserva: al volver de una ficha sigue abierto el mismo
+      // potrero. Entrar desde el menú o Inventario lo pone en null.
+      _potQuitarVolver();
       skeleton(vista, "potreros");
       fetchJSON("/api/potreros/listado", function (d) {
         if (!vista) return;
         montarVista(vista, renderPotreros(d), true);
         bindPotreros();
+        _potIrAlAnimal();
+        _potCargarHistorial();
       }, vista);
       return;
     }

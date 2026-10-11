@@ -136,6 +136,7 @@
     var h = "<div class='seccion-head-barra inv-head-barra'>"
       + "<h3>" + icon("cow") + "Inventario y Población</h3>"
       + "<div class='head-acciones-fila'>"
+      + "<button type='button' class='tema-btn' data-accion='ir-conteo-potreros' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("fence", 14) + "Contar por potrero</button>"
       + btnCrear
       + barraDescargaSeccion("inventario", "Inventario")
       + expBtn

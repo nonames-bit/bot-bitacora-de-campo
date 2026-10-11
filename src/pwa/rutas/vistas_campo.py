@@ -184,6 +184,25 @@ def registrar(app, ctx, h):
         finally:
             db_p.close()
 
+    @app.get("/api/potreros/conteos")
+    def api_potreros_conteos():
+        """Historial de conteos guardados desde "Contar por potrero"."""
+        from ...engine.conteos_potrero import listar_conteos
+        pid = request.args.get("potrero_id")
+        try:
+            pid = int(pid) if pid not in (None, "") else None
+        except ValueError:
+            return jsonify({"ok": False, "error": "potrero_id inválido"}), 400
+        try:
+            limite = int(request.args.get("limite") or 20)
+        except ValueError:
+            limite = 20
+        db_p = _db(db_path)
+        try:
+            return jsonify({"ok": True, "conteos": listar_conteos(db_p, pid, limite)})
+        finally:
+            db_p.close()
+
     @app.get("/api/potrero/animales")
     def api_potrero_animales_query():
         pot_ref = request.args.get("potrero") or request.args.get("q") or ""

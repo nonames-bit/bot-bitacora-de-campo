@@ -589,6 +589,13 @@
 ]
 ],
 [
+"/api/potreros/conteos",
+"api_potreros_conteos",
+[
+"GET"
+]
+],
+[
 "/api/potreros/listado",
 "api_potreros_listado",
 [
