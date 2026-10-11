@@ -5647,47 +5647,54 @@ class Database:
             ]
         }
 
+    _ETIQUETAS_PLAZA_MERCADO = {
+        "BOGOTA": "Bogotá · Frig. Guadalupe",
+        "GRANADA": "Granada (Meta)",
+        "GUAMAL": "Guamal (Meta)",
+        "SAN_MARTIN": "San Martín (Meta)",
+        "PUERTO_LOPEZ": "Puerto López (Meta)",
+        "CATAMA": "Villavicencio (Catama)",
+        "YOPAL": "Yopal (Casanare)",
+        "PROMEDIO_NACIONAL": "Promedio Nacional",
+    }
+
     def precio_referencia_hoy(self, plaza: str = "BOGOTA", producto: str = "MACHO_GORDO") -> Optional[dict[str, Any]]:
-        """Última cotización + variación vs. la anterior para UNA plaza/producto
-        puntual -- widget "Precio del día" del Tablero (Bogotá Guadalupe por defecto). Reusa
-        el mismo patrón LAG (ROW_NUMBER + self-join) de obtener_datos_mercado_completos, pero
-        filtrado a una sola serie para no pagar el costo de consolidar las 8
-        plazas y todas las categorías solo para mostrar un número en el Tablero.
+        """Precio para la tarjeta del Tablero (y la valoración de la ficha).
+
+        Si alguien anotó un precio real (MANUAL) del producto en cualquier plaza,
+        se usa el más reciente de esos; si no, el valor de referencia de ``plaza``.
+        La variación compara contra el precio real anterior de la misma plaza.
         """
         self.sembrar_precios_mercado_iniciales()
-        fila = self.query_one(
-            """
-            WITH ranked AS (
-                SELECT fecha, precio_promedio, fuente,
-                       ROW_NUMBER() OVER (ORDER BY fecha DESC, id DESC) AS rn
-                FROM precios_mercado WHERE plaza = ? AND producto = ?
-            )
-            SELECT curr.fecha, curr.precio_promedio AS precio, curr.fuente,
-                   prev.precio_promedio AS precio_anterior, prev.fuente AS fuente_anterior
-            FROM ranked curr LEFT JOIN ranked prev ON prev.rn = 2
-            WHERE curr.rn = 1
-            """,
-            (plaza, producto),
-        )
-        if not fila:
+        filas = [dict(r) for r in self.query(
+            "SELECT plaza, fecha, precio_promedio, fuente FROM precios_mercado "
+            "WHERE producto = ? ORDER BY fecha DESC, id DESC",
+            (producto,),
+        )]
+        reales = [r for r in filas if self._precio_mercado_es_real(r["fuente"], producto)]
+        if reales:
+            actual = reales[0]
+            previas = [r for r in reales[1:] if r["plaza"] == actual["plaza"]]
+            anterior = previas[0] if previas else None
+        else:
+            actual = next((r for r in filas if r["plaza"] == plaza), None)
+            anterior = None
+        if not actual:
             return None
-        precio = float(fila["precio"])
-        es_referencia = not self._precio_mercado_es_real(fila["fuente"], producto)
-        precio_ant = float(fila["precio_anterior"]) if fila["precio_anterior"] is not None else None
-        if es_referencia or not self._precio_mercado_es_real(fila["fuente_anterior"], producto):
-            precio_ant = None
+        precio = float(actual["precio_promedio"])
+        precio_ant = float(anterior["precio_promedio"]) if anterior else None
         variacion_pct = round((precio - precio_ant) / precio_ant * 100, 2) if precio_ant else 0.0
-        plaza_label = "Bogotá · Frig. Guadalupe" if plaza == "BOGOTA" else plaza.title()
+        pz = actual["plaza"]
         return {
-            "plaza": plaza,
-            "plaza_label": plaza_label,
+            "plaza": pz,
+            "plaza_label": self._ETIQUETAS_PLAZA_MERCADO.get(pz, pz.replace("_", " ").title()),
             "producto": producto,
             "producto_label": "Macho Gordo (400+ kg)",
             "precio": precio,
             "variacion_pct": variacion_pct,
             "hay_comparacion": precio_ant is not None,
-            "es_referencia": es_referencia,
-            "fecha": fila["fecha"],
+            "es_referencia": not reales,
+            "fecha": actual["fecha"],
         }
 
     # ------------------------------------------------------------------ #

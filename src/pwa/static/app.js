@@ -4029,7 +4029,8 @@
       ["DOLAR_TRM", "Dólar TRM Oficial (Banco República)"]
     ].map(function (pr) { return "<option value='" + pr[0] + "'>" + pr[1] + "</option>"; }).join("");
 
-    var hoyFmt = new Date().toISOString().slice(0, 10);
+    var _hoy = new Date();
+    var hoyFmt = _hoy.getFullYear() + "-" + String(_hoy.getMonth() + 1).padStart(2, "0") + "-" + String(_hoy.getDate()).padStart(2, "0");
 
     var formHtml = "<form id='form-actualizar-mercado' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<label style='font-size:12.5px; font-weight:600;'>Plaza / Mercado:"

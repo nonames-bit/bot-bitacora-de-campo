@@ -291,3 +291,22 @@ def test_resiembra_forzada_preserva_precio_manual_sync(db):
     )
     assert fila is not None
 
+
+
+def test_tablero_usa_ultimo_precio_real_de_cualquier_plaza(db):
+    db.sembrar_precios_mercado_iniciales()
+    ref = db.precio_referencia_hoy()
+    assert ref["es_referencia"] is True and ref["plaza"] == "BOGOTA"
+
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO", precio_promedio=8600.0,
+                                fuente="MANUAL", fecha="2026-10-04")
+    ref = db.precio_referencia_hoy()
+    assert ref["es_referencia"] is False
+    assert ref["plaza"] == "GRANADA" and ref["precio"] == 8600.0
+    assert ref["hay_comparacion"] is False  # la semilla de Granada no cuenta
+
+    db.registrar_precio_mercado(plaza="GRANADA", producto="MACHO_GORDO", precio_promedio=8772.0,
+                                fuente="MANUAL", fecha="2026-10-11")
+    ref = db.precio_referencia_hoy()
+    assert ref["precio"] == 8772.0 and ref["variacion_pct"] == 2.0
+    assert ref["plaza_label"] == "Granada (Meta)"
