@@ -301,3 +301,57 @@ def test_correo_sin_factura_se_marca_leido_sin_pendiente(tmp_path):
         assert db.contar_pendientes() == 0
     finally:
         db.close()
+
+
+def test_factura_de_venta_del_proveedor_se_toma_como_gasto(tmp_path):
+    """El proveedor la llama "factura de venta" y la IA a veces dice INGRESO;
+    en el buzón de facturas todo es compra de la finca."""
+    db = Database(str(tmp_path / "b.db")).create_tables()
+    imap = FakeImap([_correo([("Factura FV-101.pdf", _pdf("FACTURA DE VENTA POS"), "application/pdf")])])
+    res = dict(RES_SAL_Y_DROGA, tipo="INGRESO", categoria_sugerida="OTRO_INGRESO")
+    try:
+        r = correo_facturas.revisar_correo_detalle(
+            db, media_dir=str(tmp_path / "media"), conectar=lambda: imap, analizar=lambda raw, f: dict(res))
+        assert r["facturas"] == 1 and r["correos"][0]["resultado"] == "por_revisar"
+        assert db.listar_pendientes("PENDIENTE")[0]["datos"]["tipo_finanza"] == "EGRESO"
+    finally:
+        db.close()
+
+
+def test_detalle_dice_que_paso_con_cada_correo(tmp_path):
+    db = Database(str(tmp_path / "b.db")).create_tables()
+    imap = FakeImap([_correo([("factura.pdf", _pdf(), "application/pdf")], "<a@x>"),
+                     _correo([], "<b@x>")])
+    try:
+        r = correo_facturas.revisar_correo_detalle(
+            db, media_dir=str(tmp_path / "media"), conectar=lambda: imap,
+            analizar=lambda raw, f: {"ok": False, "error": "Gemini sin llave"})
+    finally:
+        db.close()
+    assert [c["resultado"] for c in r["correos"]] == ["error", "sin_adjunto"]
+    assert "Gemini sin llave" in r["correos"][0]["nota"]
+    assert imap.leidos == {b"2"}  # el que falló queda sin leer para reintentar
+
+
+def test_revisar_a_mano_mira_los_ultimos_dias_aunque_esten_leidos(tmp_path):
+    db = Database(str(tmp_path / "b.db")).create_tables()
+    imap = FakeImap([_correo([("factura.pdf", _pdf(), "application/pdf")])])
+    imap.leidos.add(b"1")  # ya se abrió en el celular
+    criterios = []
+    buscar = imap.search
+    imap.search = lambda ch, crit: (criterios.append(crit), ("OK", [b"1"]))[1] if crit.startswith("SINCE") else buscar(ch, crit)
+    try:
+        assert correo_facturas.revisar_correo(db, media_dir=str(tmp_path / "media"), conectar=lambda: imap,
+                                              analizar=lambda raw, f: dict(RES_SAL_Y_DROGA)) == 0
+        r = correo_facturas.revisar_correo_detalle(db, media_dir=str(tmp_path / "media"), conectar=lambda: imap,
+                                                   analizar=lambda raw, f: dict(RES_SAL_Y_DROGA), dias_atras=3)
+    finally:
+        db.close()
+    assert r["facturas"] == 1 and criterios[0].startswith("SINCE ")
+
+
+def test_estado_conserva_los_ultimos_correos(tmp_path, monkeypatch):
+    monkeypatch.setenv("FACTURAS_CONFIG_FILE", str(tmp_path / "correo_facturas.json"))
+    correo_facturas.anotar_estado(True, facturas=0, correos=[{"asunto": "Fwd: factura", "resultado": "error", "nota": "x"}])
+    correo_facturas.anotar_estado(True, facturas=0, correos=[])
+    assert correo_facturas.leer_estado()["correos"][0]["asunto"] == "Fwd: factura"

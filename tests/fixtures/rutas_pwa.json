@@ -133,6 +133,13 @@
 ]
 ],
 [
+"/api/correo-facturas/revisar",
+"api_correo_facturas_revisar",
+[
+"POST"
+]
+],
+[
 "/api/cria-activa",
 "api_cria_activa",
 [

@@ -124,16 +124,34 @@ def test_solo_el_owner(entorno):
 
 def test_programador_anota_cada_revision(entorno, monkeypatch):
     correo_facturas.guardar_ajustes("ja.ganaderia@gmail.com", "abcdefghijklmnop")
-    monkeypatch.setattr(correo_facturas, "revisar_correo", lambda db, **kw: 2)
+    monkeypatch.setattr(correo_facturas, "revisar_correo_detalle",
+                        lambda db, **kw: {"facturas": 2, "correos": [{"asunto": "Fwd: FV-101", "resultado": "por_revisar", "nota": ""}]})
     monkeypatch.setattr(programador, "_db", lambda: type("D", (), {"close": lambda self: None})())
     assert programador.revisar_correo_facturas() == 2
     e = correo_facturas.leer_estado()
-    assert e["ok"] and e["facturas"] == 2 and e["revisado_en"]
+    assert e["ok"] and e["facturas"] == 2 and e["revisado_en"] and e["correos"][0]["asunto"] == "Fwd: FV-101"
 
     def falla(db, **kw):
         raise imaplib.IMAP4.error("AUTHENTICATIONFAILED")
-    monkeypatch.setattr(correo_facturas, "revisar_correo", falla)
+    monkeypatch.setattr(correo_facturas, "revisar_correo_detalle", falla)
     with pytest.raises(imaplib.IMAP4.error):
         programador.revisar_correo_facturas()
     e = correo_facturas.leer_estado()
     assert not e["ok"] and "contraseña de aplicación" in e["error"]
+
+
+def test_revisar_ahora_desde_la_app(entorno, monkeypatch):
+    app, _ = entorno
+    correo_facturas.guardar_ajustes("ja.ganaderia@gmail.com", "abcdefghijklmnop")
+    llamadas = {}
+
+    def detalle(db, **kw):
+        llamadas.update(kw)
+        return {"facturas": 1, "correos": [{"asunto": "Fwd: FV-101", "resultado": "por_revisar",
+                                            "nota": "Quedó en Gestión → Por revisar."}]}
+    monkeypatch.setattr(correo_facturas, "revisar_correo_detalle", detalle)
+    c = _cliente(app, "1234")
+    d = c.post("/api/correo-facturas/revisar").get_json()
+    assert d["ok"] and d["facturas"] == 1 and llamadas["dias_atras"] == 3
+    assert c.get("/api/correo-facturas").get_json()["estado"]["correos"][0]["asunto"] == "Fwd: FV-101"
+    assert _cliente(app, "2222").post("/api/correo-facturas/revisar").status_code == 403

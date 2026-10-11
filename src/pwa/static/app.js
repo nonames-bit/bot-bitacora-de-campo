@@ -11347,6 +11347,17 @@
       + ": " + esc(e.error || "error desconocido") + "</p>";
   }
 
+  var ICONO_RESULTADO = { por_revisar: "check", ya_estaba: "check", sin_adjunto: "info", no_factura: "info", error: "alert" };
+
+  function htmlUltimosCorreos(correos) {
+    if (!correos || !correos.length) return "";
+    return "<div class='cf-correos'><small>Últimos correos leídos</small>" + correos.map(function (c) {
+      var cls = c.resultado === "error" ? "cf-error" : (c.resultado === "por_revisar" || c.resultado === "ya_estaba" ? "cf-ok" : "");
+      return "<div class='cf-correo " + cls + "'>" + icon(ICONO_RESULTADO[c.resultado] || "info", 14)
+        + "<div><b>" + esc(c.asunto || "(sin asunto)") + "</b><span>" + esc(c.nota || "") + "</span></div></div>";
+    }).join("") + "</div>";
+  }
+
   function htmlFormCorreo(usuario) {
     return "<form id='cf-form' class='cf-form' autocomplete='off'>"
       + "<label for='cf-usuario'>Correo de la finca</label>"
@@ -11365,11 +11376,13 @@
     if (!d.configurado) return h + htmlFormCorreo("");
     h += "<div class='cf-actual'><div><small>Revisando</small><b>" + esc(d.usuario) + "</b></div>"
       + "<div class='resp-acciones'>"
-      + "<button type='button' class='btn-sec' id='cf-probar'>" + icon("refresh", 14) + "Probar ahora</button>"
+      + "<button type='button' id='cf-revisar'>" + icon("search", 14) + "Revisar ahora</button>"
+      + "<button type='button' class='btn-sec' id='cf-probar'>" + icon("refresh", 14) + "Probar conexión</button>"
       + (d.origen === "app" ? "<button type='button' class='btn-sec' id='cf-cambiar'>" + icon("pencil", 14) + "Cambiar</button>" : "")
       + "</div></div>"
       + htmlEstadoBuzon(d)
-      + "<p id='cf-resultado' class='cf-estado' hidden></p>";
+      + "<p id='cf-resultado' class='cf-estado' hidden></p>"
+      + htmlUltimosCorreos((d.estado || {}).correos);
     if (d.origen === "servidor") {
       h += "<p class='cf-estado'>" + icon("info", 14) + "Este correo está puesto en el servidor (.env). Para cambiarlo desde aquí, "
         + "<a href='#' id='cf-cambiar-servidor'>escribe otro</a>; lo de la app reemplaza al del servidor.</p>";
@@ -11417,6 +11430,23 @@
         mostrarToast(err.message, "rojo");
         b.disabled = false;
         b.innerHTML = icon("check", 14) + "Probar y guardar";
+      });
+    });
+    var bRevisar = panel.querySelector("#cf-revisar");
+    if (bRevisar) bRevisar.addEventListener("click", function () {
+      bRevisar.disabled = true;
+      bRevisar.textContent = "Leyendo el correo…";
+      pedirCorreo("POST", "/api/correo-facturas/revisar").then(function (d) {
+        if (!d.ok) throw new Error(d.error || "No se pudo revisar el correo.");
+        var n = Number(d.facturas || 0);
+        mostrarToast(n ? n + (n === 1 ? " factura nueva en Por revisar" : " facturas nuevas en Por revisar")
+          : (d.correos && d.correos.length ? "Revisado. Mira abajo qué pasó con cada correo." : "No hay correos de los últimos 3 días."),
+          n ? "verde" : "ambar");
+        cargarCorreoFacturas();
+      }).catch(function (err) {
+        mostrarToast(err.message, "rojo");
+        bRevisar.disabled = false;
+        bRevisar.innerHTML = icon("search", 14) + "Revisar ahora";
       });
     });
     var bProbar = panel.querySelector("#cf-probar");
