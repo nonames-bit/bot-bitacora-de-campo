@@ -5720,11 +5720,14 @@
       + "<h3 style='margin:0;'>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + pdfBtn + "</div>" + erroresHtml(d);
     // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
     // apilado, táctil grande, sin recargar la página.
-    // Crear evento / tarea asignada de campo: formulario móvil táctil grande
+    // Crear evento / tarea asignada de campo: formulario móvil táctil grande.
+    // Solo el dueño y el administrador asignan tareas; el operario solo ve y
+    // completa las suyas (Jaime, 2026-10-10; el servidor también lo exige).
+    var esOp = ((window.__usuarioActual && window.__usuarioActual.rol) || d.rol || "").toUpperCase() === "TRABAJADOR";
     var hoyIso = new Date().toISOString().slice(0, 10);
-    h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
+    if (!esOp) h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
       + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nueva Tarea / Evento Asignado</b>"
-      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
+      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Escoja a la persona del equipo. Le llega aviso al celular y la ve en \"Mis tareas\" al abrir Registrar; la marca hecha con foto.</p>"
       + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div style='display:flex; gap:8px;'>"
       + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
@@ -5784,7 +5787,7 @@
     };
 
     if (recs.length) {
-      h += "<h4>" + icon("calendar") + "Tareas Asignadas y Recordatorios Pendientes (" + recs.length + ")</h4>";
+      h += "<h4>" + icon("calendar") + (esOp ? "Mis tareas pendientes (" : "Tareas Asignadas y Recordatorios Pendientes (") + recs.length + ")</h4>";
       h += "<div style='display:flex; flex-direction:column; gap:10px; margin-bottom:16px;'>";
       recs.forEach(function (rc) {
         var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
@@ -5806,14 +5809,14 @@
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
           + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
           + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-          + icon("check", 14) + "Marcar Realizado (Acknowledge)"
+          + (esOp ? icon("camera", 14) + "Marcar hecha con foto" : icon("check", 14) + "Marcar Realizado (Acknowledge)")
           + "</button>"
           + "</div>"
           + "</div>";
       });
       h += "</div>";
     } else {
-      h += "<p class='aviso'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+      h += "<p class='aviso'>" + icon("sparkles", 14) + (esOp ? "No tiene tareas pendientes." : "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.") + "</p>";
     }
 
     if (recsComp.length) {
@@ -6130,10 +6133,22 @@
       if (!el || !window.__integrantesEquipo) return;
       var html = window.__integrantesEquipo.map(function (it) {
         var rolTxt = it.rol ? (" (" + esc(it.rol) + ")") : "";
-        return "<option value='" + esc(it.nombre) + "'>" + esc(it.nombre) + rolTxt + "</option>";
+        var idAttr = it.id != null ? (" data-id='" + esc(it.id) + "'") : "";
+        return "<option value='" + esc(it.nombre) + "'" + idAttr + ">" + esc(it.nombre) + rolTxt + "</option>";
       }).join("");
       el.innerHTML = html;
       if (seleccionDefault) el.value = seleccionDefault;
+      else {
+        // "Para": de entrada el primer operario, no quien está asignando.
+        var op = window.__integrantesEquipo.filter(function (it) { return it.tipo === "USUARIO" && String(it.rol).toUpperCase() === "TRABAJADOR"; })[0];
+        if (op) el.value = op.nombre;
+      }
+    }
+
+    function idOpcionElegida(sel) {
+      var op = sel && sel.selectedOptions && sel.selectedOptions[0];
+      var v = op ? op.getAttribute("data-id") : null;
+      return v ? parseInt(v, 10) : null;
     }
 
     fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
@@ -6169,7 +6184,9 @@
         var tag = (document.getElementById("ag-tag") || {}).value || "";
         var pot = (document.getElementById("ag-potrero") || {}).value || "";
         var tipoTarea = (document.getElementById("ag-tipo-tarea") || {}).value || "GENERAL";
-        var asignado = (document.getElementById("ag-asignado") || {}).value || "";
+        var selAsig = document.getElementById("ag-asignado");
+        var asignado = (selAsig && selAsig.value) || "";
+        var asignadoId = idOpcionElegida(selAsig);
         var desc = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
         var fecha = ((document.getElementById("ag-fecha") || {}).value || "").trim();
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
@@ -6194,7 +6211,8 @@
             fecha: fecha,
             hora: hora || null,
             creado_por_nombre: deNombre || null,
-            asignado_a: asignado.trim() || "Encargado",
+            asignado_a: asignado.trim() || "Todo el equipo",
+            asignado_a_id: asignadoId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag.trim() : null,
             potrero_nombre: objTipo === "potrero" ? pot.trim() : null,
@@ -6297,6 +6315,7 @@
         var pot = ((document.getElementById("modal-tarea-potrero") || {}).value || "").trim();
         var deNombre = ((document.getElementById("modal-tarea-de") || {}).value || "").trim();
         var paraNombre = ((document.getElementById("modal-tarea-para") || {}).value || "").trim();
+        var paraId = idOpcionElegida(document.getElementById("modal-tarea-para"));
         var desc = ((document.getElementById("modal-tarea-desc") || {}).value || "").trim();
         var fecha = ((document.getElementById("modal-tarea-fecha") || {}).value || "").trim();
         var prio = ((document.getElementById("modal-tarea-prioridad") || {}).value || "NORMAL").trim();
@@ -6317,7 +6336,8 @@
             fecha: fecha,
             hora: null,
             creado_por_nombre: deNombre || null,
-            asignado_a: paraNombre || "Equipo",
+            asignado_a: paraNombre || "Todo el equipo",
+            asignado_a_id: paraId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag : null,
             potrero_nombre: objTipo === "potrero" ? pot : null,
@@ -6449,6 +6469,12 @@
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
+        // El operario firma con su nombre (lo pone el servidor) y la foto es obligatoria.
+        var esOpAck = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        var lblPor = inpAckPor && inpAckPor.closest ? inpAckPor.closest("label") : null;
+        if (lblPor) lblPor.style.display = esOpAck ? "none" : "";
+        var lblFoto = document.getElementById("ack-foto-label");
+        if (lblFoto) lblFoto.textContent = esOpAck ? "Foto de la tarea hecha (obligatoria):" : "Foto de comprobante (opcional):";
         if (modalAck) modalAck.style.display = "flex";
       });
     }
@@ -6461,6 +6487,11 @@
         if (!rid) return;
         var btnConf = document.getElementById("btn-confirmar-ack");
         var fbAck = document.getElementById("ack-feedback");
+        var esOpEnv = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        if (esOpEnv && !_ackFotoB64) {
+          if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("camera", 14) + "Tome la foto de la tarea hecha.</span>";
+          return;
+        }
         if (btnConf) btnConf.disabled = true;
         if (fbAck) fbAck.textContent = "Registrando cumplimiento...";
         var payloadAck = {
@@ -6884,15 +6915,61 @@
     { t: "Leche y termo", ids: ["leche", "pajuela", "nitrogeno"] },
     { t: "Salidas, dinero y tareas", ids: ["venta", "muerte", "gasto", "tarea"] }
   ];
-  // El operario de campo (TRABAJADOR) no vende ni maneja dinero (Jaime,
-  // 2026-10-10): no ve esos botones y el servidor igual rechaza esos
-  // registros (ver _TIPOS_NO_TRABAJADOR en rutas/sync.py).
-  var TIPOS_SOLO_GESTION = ["venta", "gasto"];
+  // El operario de campo (TRABAJADOR) no vende ni maneja dinero, y no
+  // asigna tareas: solo completa las suyas (Jaime, 2026-10-10). No ve esos
+  // botones y el servidor igual rechaza esos registros (ver
+  // _TIPOS_NO_TRABAJADOR en rutas/sync.py).
+  var TIPOS_SOLO_GESTION = ["venta", "gasto", "tarea"];
   function esOperario() {
     return ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
   }
   function tipoCapturaPermitido(id) {
     return !(esOperario() && TIPOS_SOLO_GESTION.indexOf(id) !== -1);
+  }
+  /* "Mis tareas" del operario: arriba de Registrar, que es su pantalla de
+     inicio. Se guarda la última lista en el celular para verla sin señal;
+     marcarla hecha (con foto) sí necesita conexión. */
+  var CLAVE_MIS_TAREAS = "mis_tareas_cache";
+  function _leerMisTareas() {
+    try { return JSON.parse(localStorage.getItem(CLAVE_MIS_TAREAS) || "null"); } catch (e) { return null; }
+  }
+  function htmlMisTareas(tareas) {
+    if (tareas === null) return "";
+    var h = "<div class='card mis-tareas'>"
+      + "<div class='mis-tareas-tit'>" + icon("clipboard", 18) + "<b>Mis tareas</b>"
+      + (tareas.length ? "<span class='chip ambar'>" + tareas.length + "</span>" : "<span class='chip verde'>Al día</span>")
+      + "</div>";
+    if (!tareas.length) return h + "<p class='aviso' style='margin:6px 0 0;'>No tiene tareas pendientes.</p></div>";
+    tareas.forEach(function (t) {
+      var cuando = t.faltan_dias == null ? "" : t.faltan_dias < 0 ? "Venció hace " + Math.abs(t.faltan_dias) + "d"
+        : t.faltan_dias === 0 ? "Hoy" : t.faltan_dias === 1 ? "Mañana" : "En " + t.faltan_dias + " días";
+      var clase = t.faltan_dias != null && t.faltan_dias <= 0 ? "rojo" : "gris";
+      h += "<div class='mis-tareas-item" + (t.prioridad === "URGENTE" ? " urgente" : "") + "'>"
+        + "<div class='mis-tareas-chips'>"
+        + (t.prioridad === "URGENTE" ? "<span class='chip rojo'>" + icon("alertTriangle", 12) + "Urgente</span>" : "")
+        + (cuando ? "<span class='chip " + clase + "'>" + esc(cuando) + (t.hora ? " " + esc(t.hora) : "") + "</span>" : "")
+        + (t.creado_por_nombre ? "<small>De " + esc(t.creado_por_nombre) + "</small>" : "")
+        + "</div>"
+        + "<div class='mis-tareas-msg'>" + esc(t.mensaje || "—") + "</div>"
+        + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(t.id) + "' data-rec-msg='" + esc(t.mensaje || "") + "' data-rec-asig='" + esc(t.asignado_a || "") + "' data-rec-de='" + esc(t.creado_por_nombre || "") + "'>"
+        + icon("camera", 16) + "Marcar hecha con foto</button>"
+        + "</div>";
+    });
+    return h + "</div>";
+  }
+  function cargarMisTareas() {
+    if (!esOperario()) return;
+    fetch("/api/tareas/mias", { credentials: "same-origin" }).then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(function (d) {
+      var tareas = (d && d.tareas) || [];
+      try { localStorage.setItem(CLAVE_MIS_TAREAS, JSON.stringify(tareas)); } catch (e) { /* sin almacenamiento */ }
+      var box = document.getElementById("mis-tareas-op");
+      if (box) box.innerHTML = htmlMisTareas(tareas);
+    }).catch(function () { /* sin señal: queda la última lista guardada */ });
+    // El botón "Marcar hecha" usa el mismo formulario con foto de la Agenda.
+    bindAgenda();
   }
   function renderCaptura() {
     var tipos = [
@@ -6928,6 +7005,7 @@
       + "</div>"
       + "</div>"
       + "<div id='gps-ronda-box'></div>";
+    if (esOperario()) h += "<div id='mis-tareas-op'>" + htmlMisTareas(_leerMisTareas()) + "</div>";
 
     // BLOQUE 4: stepper de captura en 3 pasos (1=tipo, 2=datos, 3=preview).
     // El form envuelve los 3 pasos; el submit real solo vive en el paso 3.
@@ -10318,6 +10396,9 @@
     // Copias de seguridad: se llenan al abrir (ver 48-respaldos.js).
     h += marcaPestana("copias") + "<div id='respaldos-panel' class='card'><p style='color:var(--texto-suave);'>Cargando copias…</p></div>";
 
+    // Correo de facturas: se llena al abrir (ver 49-correo-facturas.js).
+    h += marcaPestana("correo") + "<div id='correo-facturas-panel' class='card'><p style='color:var(--texto-suave);'>Cargando correo…</p></div>";
+
     // 5. Visor de Logs con selector de canal (Todos, Telegram, PWA)
     h += marcaPestana("logs") + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-top:20px;'>"
       + "<h4>" + icon("clipboard", 16) + "Visor de Logs en Vivo</h4>"
@@ -10332,6 +10413,7 @@
     return armarPestanas("sistema", h, [
       { k: "estado", t: "Estado", icono: "grid" },
       { k: "copias", t: "Copias", icono: "archive" },
+      { k: "correo", t: "Correo", icono: "receipt" },
       { k: "actividad", t: "Actividad", icono: "clipboard" },
       { k: "usuarios", t: "Sesiones", icono: "users" },
       { k: "logs", t: "Logs", icono: "notes" }
@@ -10385,6 +10467,7 @@
 
     cargarLogs(_canalLogsActual);
     cargarRespaldos();
+    cargarCorreoFacturas();
 
     var btnRef = document.getElementById("btn-refrescar-logs");
     if (btnRef) btnRef.addEventListener("click", function () { cargarLogs(_canalLogsActual); });
@@ -11232,6 +11315,143 @@
       });
     });
   }
+  /* ---------- Correo de facturas: Sistema → Correo, solo OWNER ----------
+     El dueño pega el correo de la finca y la contraseña de aplicación de
+     Gmail; el servidor los prueba antes de guardarlos y nunca devuelve la
+     clave. Muestra cuándo se revisó el buzón por última vez. Rutas en
+     src/pwa/rutas/sistema.py (/api/correo-facturas). */
+
+  var MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+  function horaRevision(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(iso || "");
+    if (!m) return (iso || "").replace("T", " ");
+    var h = Number(m[4]);
+    return Number(m[3]) + " " + MESES_CORTOS[Number(m[2]) - 1] + ", " + (h % 12 || 12) + ":" + m[5]
+      + (h < 12 ? " a. m." : " p. m.");
+  }
+
+  function htmlEstadoBuzon(d) {
+    var e = (d && d.estado) || {};
+    if (!e.revisado_en) {
+      return "<p class='cf-estado'>" + icon("clock", 14) + "Todavía no se ha revisado. La app mira el buzón cada "
+        + esc(d.cada_minutos || 15) + " minutos.</p>";
+    }
+    if (e.ok) {
+      var n = Number(e.facturas || 0);
+      return "<p class='cf-estado cf-ok'>" + icon("check", 14) + "Revisado " + esc(horaRevision(e.revisado_en))
+        + (n ? " · " + n + (n === 1 ? " factura nueva" : " facturas nuevas") + " en Por revisar" : " · sin facturas nuevas")
+        + "</p>";
+    }
+    return "<p class='cf-estado cf-error'>" + icon("alert", 14) + "Falló la revisión de " + esc(horaRevision(e.revisado_en))
+      + ": " + esc(e.error || "error desconocido") + "</p>";
+  }
+
+  function htmlFormCorreo(usuario) {
+    return "<form id='cf-form' class='cf-form' autocomplete='off'>"
+      + "<label for='cf-usuario'>Correo de la finca</label>"
+      + "<input id='cf-usuario' type='email' inputmode='email' autocapitalize='none' placeholder='finca@gmail.com' value='" + esc(usuario || "") + "'>"
+      + "<label for='cf-clave'>Contraseña de aplicación (16 letras)</label>"
+      + "<input id='cf-clave' type='password' autocomplete='new-password' autocapitalize='none' spellcheck='false' placeholder='abcd efgh ijkl mnop'>"
+      + "<small>No es la clave normal del correo. Se saca en myaccount.google.com/apppasswords con la verificación en 2 pasos activa.</small>"
+      + "<button type='submit' id='cf-guardar'>" + icon("check", 14) + "Probar y guardar</button>"
+      + "</form>";
+  }
+
+  function htmlCorreoFacturas(d) {
+    var h = "<h4 style='margin:0 0 6px;'>" + icon("receipt", 16) + "Correo de facturas</h4>"
+      + "<p class='aviso' style='margin:0 0 10px;'>Las facturas que lleguen a este correo (PDF, .zip de factura electrónica o foto) "
+      + "se leen solas y quedan en Gestión → Por revisar para que las apruebes.</p>";
+    if (!d.configurado) return h + htmlFormCorreo("");
+    h += "<div class='cf-actual'><div><small>Revisando</small><b>" + esc(d.usuario) + "</b></div>"
+      + "<div class='resp-acciones'>"
+      + "<button type='button' class='btn-sec' id='cf-probar'>" + icon("refresh", 14) + "Probar ahora</button>"
+      + (d.origen === "app" ? "<button type='button' class='btn-sec' id='cf-cambiar'>" + icon("pencil", 14) + "Cambiar</button>" : "")
+      + "</div></div>"
+      + htmlEstadoBuzon(d)
+      + "<p id='cf-resultado' class='cf-estado' hidden></p>";
+    if (d.origen === "servidor") {
+      h += "<p class='cf-estado'>" + icon("info", 14) + "Este correo está puesto en el servidor (.env). Para cambiarlo desde aquí, "
+        + "<a href='#' id='cf-cambiar-servidor'>escribe otro</a>; lo de la app reemplaza al del servidor.</p>";
+    }
+    h += "<div id='cf-cambio' hidden>" + htmlFormCorreo(d.usuario)
+      + (d.origen === "app" ? "<button type='button' class='btn-peligro' id='cf-quitar' style='margin-top:10px;'>" + icon("trash", 14) + "Dejar de revisar este correo</button>" : "")
+      + "</div>";
+    return h;
+  }
+
+  function cargarCorreoFacturas() {
+    var panel = document.getElementById("correo-facturas-panel");
+    if (!panel) return;
+    fetch("/api/correo-facturas").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d || !d.ok) throw new Error((d && d.error) || "Sin acceso");
+      panel.innerHTML = htmlCorreoFacturas(d);
+      bindCorreoFacturas(panel);
+    }).catch(function (e) {
+      panel.innerHTML = "<p class='aviso'>No se pudo cargar el correo de facturas: " + esc(e.message) + "</p>";
+    });
+  }
+
+  function pedirCorreo(metodo, url, cuerpo) {
+    return fetch(url, {
+      method: metodo, headers: { "Content-Type": "application/json" },
+      body: cuerpo ? JSON.stringify(cuerpo) : undefined
+    }).then(function (r) { return r.json(); });
+  }
+
+  function bindCorreoFacturas(panel) {
+    var form = panel.querySelector("#cf-form");
+    if (form) form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var b = panel.querySelector("#cf-guardar");
+      var usuario = panel.querySelector("#cf-usuario").value.trim();
+      var clave = panel.querySelector("#cf-clave").value;
+      b.disabled = true;
+      b.textContent = "Probando con Gmail…";
+      pedirCorreo("POST", "/api/correo-facturas", { usuario: usuario, clave: clave }).then(function (d) {
+        if (!d.ok) throw new Error(d.error || "No se pudo guardar.");
+        var n = Number(d.sin_leer || 0);
+        mostrarToast("Correo conectado. " + (n ? n + " sin leer; se revisan en los próximos minutos." : "El buzón está vacío."), "verde");
+        cargarCorreoFacturas();
+      }).catch(function (err) {
+        mostrarToast(err.message, "rojo");
+        b.disabled = false;
+        b.innerHTML = icon("check", 14) + "Probar y guardar";
+      });
+    });
+    var bProbar = panel.querySelector("#cf-probar");
+    if (bProbar) bProbar.addEventListener("click", function () {
+      var out = panel.querySelector("#cf-resultado");
+      bProbar.disabled = true;
+      pedirCorreo("POST", "/api/correo-facturas/probar").then(function (d) {
+        out.hidden = false;
+        out.className = "cf-estado " + (d.ok ? "cf-ok" : "cf-error");
+        out.innerHTML = d.ok
+          ? icon("check", 14) + "Conectado. Hay " + Number(d.sin_leer || 0) + " correo(s) sin leer en el buzón."
+          : icon("alert", 14) + esc(d.error || "No se pudo entrar al correo.");
+      }).catch(function (err) { mostrarToast(err.message, "rojo"); })
+        .then(function () { bProbar.disabled = false; });
+    });
+    function abrirCambio(e) {
+      if (e) e.preventDefault();
+      var c = panel.querySelector("#cf-cambio");
+      c.hidden = false;
+      panel.querySelector("#cf-clave").focus();
+    }
+    var bCambiar = panel.querySelector("#cf-cambiar");
+    if (bCambiar) bCambiar.addEventListener("click", abrirCambio);
+    var aServidor = panel.querySelector("#cf-cambiar-servidor");
+    if (aServidor) aServidor.addEventListener("click", abrirCambio);
+    var bQuitar = panel.querySelector("#cf-quitar");
+    if (bQuitar) bQuitar.addEventListener("click", function () {
+      if (!confirm("¿Dejar de revisar este correo? Las facturas que ya están en Finanzas no se tocan.")) return;
+      pedirCorreo("DELETE", "/api/correo-facturas").then(function (d) {
+        if (!d.ok) throw new Error(d.error || "No se pudo quitar.");
+        mostrarToast("Ya no se revisa ese correo", "verde");
+        cargarCorreoFacturas();
+      }).catch(function (err) { mostrarToast(err.message, "rojo"); });
+    });
+  }
   /* ---------- Potreros: ¿están todos? (consulta del operario) ----------
      Jaime (2026-10-10): el operario necesita ver qué animales hay en cada
      potrero para verificar en campo si están todos o falta alguno. Solo
@@ -11819,8 +12039,8 @@
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto);
-      if (m.texto && m.texto.indexOf("Tarea asignada") >= 0) {
-        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
+      if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
+        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + (((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR" ? "Ver mis tareas" : "Ver en Tablero") + "</button></div>";
       }
       html += "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
@@ -12038,7 +12258,10 @@
         var btnTab = e.target && e.target.closest ? e.target.closest(".btn-ir-tablero-tarea") : null;
         if (btnTab) {
           e.preventDefault();
-          if (typeof irA === "function") irA("tablero");
+          // El operario no tiene Tablero: sus tareas están arriba de Registrar.
+          var esOpChat = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+          irAVista(esOpChat ? "captura" : "tablero");
+          cargar(true);
           colapsarChat();
         }
       });
@@ -15529,6 +15752,7 @@
       if (vista) {
         montarVista(vista, renderCaptura(), animar);
         bindCaptura();
+        cargarMisTareas();
       }
       return;
     }
@@ -15667,7 +15891,9 @@
       else if (actual === "agenda") html = renderAgenda(d);
       else if (actual === "finanzas") html = renderFinanzas(d);
       montarVista(vista, html, animar);
-      if (actual === "tablero") bindTablero();
+      // bindAgenda también arma los botones de tareas del Tablero
+      // ("Asignar Tarea", "Completar"), que antes solo servían tras abrir la Agenda.
+      if (actual === "tablero") { bindTablero(); bindAgenda(); }
       if (actual === "repro") bindRepro();
       if (actual === "carne") bindCarne();
       if (actual === "pasturas") bindPasturas();

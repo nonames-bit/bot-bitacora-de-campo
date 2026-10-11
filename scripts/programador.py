@@ -254,8 +254,13 @@ def revisar_correo_facturas() -> int:
     db = _db()
     try:
         n = correo_facturas.revisar_correo(db, media_dir=str(media), users_file=str(USERS_FILE))
+    except Exception as e:
+        # Queda anotado para que el dueño lo vea en Sistema → Correo.
+        correo_facturas.anotar_estado(False, error=correo_facturas.explicar_error(e))
+        raise
     finally:
         db.close()
+    correo_facturas.anotar_estado(True, facturas=n)
     if n:
         log.info("Correo de facturas: %d factura(s) por revisar", n)
     return n

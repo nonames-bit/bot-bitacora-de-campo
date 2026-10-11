@@ -283,8 +283,8 @@
         html += "<div class='chat-msg-cabecera'>" + ic + esc(m.nombre) + "<span class='chat-msg-rol'>" + esc(m.rol) + "</span></div>";
       }
       html += "<div class='chat-msg-texto'>" + esc(m.texto);
-      if (m.texto && m.texto.indexOf("Tarea asignada") >= 0) {
-        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + "Ver en Tablero</button></div>";
+      if (m.texto && m.texto.indexOf("📋 Tarea asignada") >= 0) {
+        html += "<div style='margin-top:6px;'><button type='button' class='btn-ir-tablero-tarea' style='font-size:11px; padding:4px 8px; border-radius:6px; background:var(--verde-marca); color:#fff; border:none; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + icon("pin", 11) + (((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR" ? "Ver mis tareas" : "Ver en Tablero") + "</button></div>";
       }
       html += "</div>";
       html += "<div class='chat-msg-hora'>" + equipoHoraCorta(m.creado_en);
@@ -502,7 +502,10 @@
         var btnTab = e.target && e.target.closest ? e.target.closest(".btn-ir-tablero-tarea") : null;
         if (btnTab) {
           e.preventDefault();
-          if (typeof irA === "function") irA("tablero");
+          // El operario no tiene Tablero: sus tareas están arriba de Registrar.
+          var esOpChat = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+          irAVista(esOpChat ? "captura" : "tablero");
+          cargar(true);
           colapsarChat();
         }
       });

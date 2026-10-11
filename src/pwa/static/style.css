@@ -4556,6 +4556,23 @@ button.btn-peligro:hover { background: rgba(220, 38, 38, 0.08); }
 .resp-confirmar-fila { display: flex; gap: 6px; flex-wrap: wrap; }
 .resp-confirmar-fila input { flex: 1; min-width: 0; font-family: var(--font-mono); letter-spacing: 1px; }
 
+/* ---------- Sistema → Correo de facturas ---------- */
+.cf-form { display: grid; gap: 6px; }
+.cf-form label { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.cf-form input { width: 100%; box-sizing: border-box; }
+.cf-form small { color: var(--texto-suave); font-size: 12px; line-height: 1.4; }
+.cf-form button[type=submit] { margin-top: 6px; justify-self: start; }
+.cf-actual { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border: 1px solid var(--borde); border-radius: 10px; }
+.cf-actual small { display: block; color: var(--texto-suave); font-size: 11.5px; }
+.cf-actual b { word-break: break-all; }
+.cf-estado { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; margin: 10px 0 0; line-height: 1.4; }
+.cf-estado[hidden] { display: none; }
+.cf-estado.cf-ok { color: var(--verde-marca); }
+.cf-estado.cf-error { color: var(--rojo, #c0392b); }
+#cf-cambio { margin-top: 12px; }
+#cf-cambio[hidden] { display: none; }
+
 /* ---------- Registrar: GPS y Manga como botones chicos ---------- */
 .cap-cabecera { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
 .cap-atajos { display: flex; gap: 6px; flex: 0 0 auto; }
@@ -4716,3 +4733,13 @@ button.cap-atajo .svg-icon { margin: 0; }
 .pot-hist-item small { color: var(--texto-suave); font-size: 12.5px; overflow-wrap: anywhere; }
 .pot-hist-item .pot-hist-falta { color: var(--color-ambar-txt); font-weight: 600; }
 .pot-hist-item .pot-hist-ok { color: var(--color-verde-txt); font-weight: 600; }
+
+/* "Mis tareas" del operario, arriba de Registrar */
+.mis-tareas { padding: 12px 14px; margin: 0 0 12px; border-left: 4px solid var(--verde-marca); }
+.mis-tareas-tit { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+.mis-tareas-item { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--borde); }
+.mis-tareas-item.urgente .mis-tareas-msg { color: var(--color-rojo-txt); }
+.mis-tareas-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mis-tareas-chips small { color: var(--texto-suave); }
+.mis-tareas-msg { font-size: 15px; font-weight: 700; margin: 6px 0 8px; overflow-wrap: anywhere; }
+.mis-tareas .btn-rec-completar { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }

@@ -9,6 +9,7 @@ from datetime import date
 import logging
 from flask import jsonify, request, session
 from .. import app as _base
+from .. import tareas_equipo
 from ...utils import to_date
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
@@ -34,6 +35,17 @@ def registrar(app, ctx, h):
         pot = (request.args.get("potrero") or "").strip() or None
         out = datos_tablero(db_path, potrero=pot)
         out["rol"] = _rol_actual()
+        # Tareas del equipo: el dueño ve todas; el administrador, las suyas y
+        # las de los trabajadores (ver tareas_equipo.puede_ver).
+        try:
+            from ...server.auth import Auth
+            usuarios = Auth(ctx.users_file).listar_usuarios()
+        except Exception:
+            usuarios = []
+        uid = session.get("user_id")
+        yo = next((u for u in usuarios if str(u.get("user_id")) == str(uid)), None)
+        nombre = tareas_equipo.nombre_usuario(yo) if yo else (session.get("nombre") or "")
+        tareas_equipo.filtrar(out, ("tareas_asignadas", "tareas_realizadas_hoy"), out["rol"], uid, nombre, usuarios)
         return jsonify(out)
 
     @app.get("/api/repro")

@@ -239,10 +239,22 @@
       if (!el || !window.__integrantesEquipo) return;
       var html = window.__integrantesEquipo.map(function (it) {
         var rolTxt = it.rol ? (" (" + esc(it.rol) + ")") : "";
-        return "<option value='" + esc(it.nombre) + "'>" + esc(it.nombre) + rolTxt + "</option>";
+        var idAttr = it.id != null ? (" data-id='" + esc(it.id) + "'") : "";
+        return "<option value='" + esc(it.nombre) + "'" + idAttr + ">" + esc(it.nombre) + rolTxt + "</option>";
       }).join("");
       el.innerHTML = html;
       if (seleccionDefault) el.value = seleccionDefault;
+      else {
+        // "Para": de entrada el primer operario, no quien está asignando.
+        var op = window.__integrantesEquipo.filter(function (it) { return it.tipo === "USUARIO" && String(it.rol).toUpperCase() === "TRABAJADOR"; })[0];
+        if (op) el.value = op.nombre;
+      }
+    }
+
+    function idOpcionElegida(sel) {
+      var op = sel && sel.selectedOptions && sel.selectedOptions[0];
+      var v = op ? op.getAttribute("data-id") : null;
+      return v ? parseInt(v, 10) : null;
     }
 
     fetch("/api/equipo/integrantes").then(function (r) { return r.json(); }).then(function (d) {
@@ -278,7 +290,9 @@
         var tag = (document.getElementById("ag-tag") || {}).value || "";
         var pot = (document.getElementById("ag-potrero") || {}).value || "";
         var tipoTarea = (document.getElementById("ag-tipo-tarea") || {}).value || "GENERAL";
-        var asignado = (document.getElementById("ag-asignado") || {}).value || "";
+        var selAsig = document.getElementById("ag-asignado");
+        var asignado = (selAsig && selAsig.value) || "";
+        var asignadoId = idOpcionElegida(selAsig);
         var desc = ((document.getElementById("ag-mensaje") || {}).value || "").trim();
         var fecha = ((document.getElementById("ag-fecha") || {}).value || "").trim();
         var hora = ((document.getElementById("ag-hora") || {}).value || "").trim();
@@ -303,7 +317,8 @@
             fecha: fecha,
             hora: hora || null,
             creado_por_nombre: deNombre || null,
-            asignado_a: asignado.trim() || "Encargado",
+            asignado_a: asignado.trim() || "Todo el equipo",
+            asignado_a_id: asignadoId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag.trim() : null,
             potrero_nombre: objTipo === "potrero" ? pot.trim() : null,
@@ -406,6 +421,7 @@
         var pot = ((document.getElementById("modal-tarea-potrero") || {}).value || "").trim();
         var deNombre = ((document.getElementById("modal-tarea-de") || {}).value || "").trim();
         var paraNombre = ((document.getElementById("modal-tarea-para") || {}).value || "").trim();
+        var paraId = idOpcionElegida(document.getElementById("modal-tarea-para"));
         var desc = ((document.getElementById("modal-tarea-desc") || {}).value || "").trim();
         var fecha = ((document.getElementById("modal-tarea-fecha") || {}).value || "").trim();
         var prio = ((document.getElementById("modal-tarea-prioridad") || {}).value || "NORMAL").trim();
@@ -426,7 +442,8 @@
             fecha: fecha,
             hora: null,
             creado_por_nombre: deNombre || null,
-            asignado_a: paraNombre || "Equipo",
+            asignado_a: paraNombre || "Todo el equipo",
+            asignado_a_id: paraId,
             tipo_objetivo: objTipo.toUpperCase(),
             animal_tag: objTipo === "animal" ? tag : null,
             potrero_nombre: objTipo === "potrero" ? pot : null,
@@ -558,6 +575,12 @@
         }
         var miNombre = (window.__usuarioActual && (window.__usuarioActual.nombre || window.__usuarioActual.username)) || asig || "Encargado";
         if (inpAckPor) inpAckPor.value = miNombre;
+        // El operario firma con su nombre (lo pone el servidor) y la foto es obligatoria.
+        var esOpAck = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        var lblPor = inpAckPor && inpAckPor.closest ? inpAckPor.closest("label") : null;
+        if (lblPor) lblPor.style.display = esOpAck ? "none" : "";
+        var lblFoto = document.getElementById("ack-foto-label");
+        if (lblFoto) lblFoto.textContent = esOpAck ? "Foto de la tarea hecha (obligatoria):" : "Foto de comprobante (opcional):";
         if (modalAck) modalAck.style.display = "flex";
       });
     }
@@ -570,6 +593,11 @@
         if (!rid) return;
         var btnConf = document.getElementById("btn-confirmar-ack");
         var fbAck = document.getElementById("ack-feedback");
+        var esOpEnv = ((window.__usuarioActual && window.__usuarioActual.rol) || "").toUpperCase() === "TRABAJADOR";
+        if (esOpEnv && !_ackFotoB64) {
+          if (fbAck) fbAck.innerHTML = "<span style='color:var(--rojo-alerta);'>" + icon("camera", 14) + "Tome la foto de la tarea hecha.</span>";
+          return;
+        }
         if (btnConf) btnConf.disabled = true;
         if (fbAck) fbAck.textContent = "Registrando cumplimiento...";
         var payloadAck = {

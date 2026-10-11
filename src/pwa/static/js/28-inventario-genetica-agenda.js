@@ -457,11 +457,14 @@
       + "<h3 style='margin:0;'>" + icon("calendar") + "Agenda próximos " + esc(d.dias) + " días</h3>" + pdfBtn + "</div>" + erroresHtml(d);
     // Crear evento/recordatorio (misma tabla de /programar): formulario móvil
     // apilado, táctil grande, sin recargar la página.
-    // Crear evento / tarea asignada de campo: formulario móvil táctil grande
+    // Crear evento / tarea asignada de campo: formulario móvil táctil grande.
+    // Solo el dueño y el administrador asignan tareas; el operario solo ve y
+    // completa las suyas (Jaime, 2026-10-10; el servidor también lo exige).
+    var esOp = ((window.__usuarioActual && window.__usuarioActual.rol) || d.rol || "").toUpperCase() === "TRABAJADOR";
     var hoyIso = new Date().toISOString().slice(0, 10);
-    h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
+    if (!esOp) h += "<div class='card' style='padding:14px 16px; margin:10px 0 16px; border-left:4px solid var(--verde-marca);'>"
       + "<b style='font-size:14px; display:flex; align-items:center; gap:6px;'>" + icon("plus", 14) + "Nueva Tarea / Evento Asignado</b>"
-      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Asigna tareas a un responsable (ej. Encargado, Administrador) para un animal o potrero. Genera recordatorios en el Despacho, la campanita y permite confirmar cumplimiento con foto y notas.</p>"
+      + "<p class='aviso' style='margin:4px 0 10px; font-size:12px;'>Escoja a la persona del equipo. Le llega aviso al celular y la ve en \"Mis tareas\" al abrir Registrar; la marca hecha con foto.</p>"
       + "<form id='form-nuevo-recordatorio' style='display:flex; flex-direction:column; gap:10px;'>"
       + "<div style='display:flex; gap:8px;'>"
       + "<button type='button' class='tema-btn ag-obj-btn act' data-obj='animal' style='flex:1; padding:8px; font-size:13px;'>" + icon("cow", 14) + "Animal</button>"
@@ -521,7 +524,7 @@
     };
 
     if (recs.length) {
-      h += "<h4>" + icon("calendar") + "Tareas Asignadas y Recordatorios Pendientes (" + recs.length + ")</h4>";
+      h += "<h4>" + icon("calendar") + (esOp ? "Mis tareas pendientes (" : "Tareas Asignadas y Recordatorios Pendientes (") + recs.length + ")</h4>";
       h += "<div style='display:flex; flex-direction:column; gap:10px; margin-bottom:16px;'>";
       recs.forEach(function (rc) {
         var fh = esc(rc.fecha || "—") + (rc.hora ? " " + esc(rc.hora) : "");
@@ -543,14 +546,14 @@
           + "<div style='display:flex; justify-content:flex-end; align-items:center; gap:8px; margin-top:4px;'>"
           + (window.__usuarioActual && window.__usuarioActual.rol === "OWNER" ? ("<button type='button' class='btn-eliminar-evento' data-accion='eliminar-evento' data-tipo='tarea' data-id='" + esc(rc.id) + "' data-desc='Tarea: " + esc(rc.mensaje || "") + "' title='Eliminar tarea (solo OWNER)' style='font-size:12px; padding:6px 8px; color:var(--color-rojo-txt); font-weight:600; display:inline-flex; align-items:center; gap:4px; background:none; border:none; cursor:pointer;'>" + icon("trash", 13) + "<span>Eliminar</span></button>") : "")
           + "<button type='button' class='btn-guardar-manga btn-rec-completar' data-rec-id='" + esc(rc.id) + "' data-rec-msg='" + esc(rc.mensaje || "") + "' data-rec-asig='" + esc(rc.asignado_a || "") + "' data-rec-de='" + esc(rc.creado_por_nombre || "") + "' data-rec-tag='" + esc(rc.animal_tag || "") + "' style='font-size:12.5px; padding:7px 14px; width:auto; display:inline-flex; align-items:center; gap:6px; cursor:pointer;'>"
-          + icon("check", 14) + "Marcar Realizado (Acknowledge)"
+          + (esOp ? icon("camera", 14) + "Marcar hecha con foto" : icon("check", 14) + "Marcar Realizado (Acknowledge)")
           + "</button>"
           + "</div>"
           + "</div>";
       });
       h += "</div>";
     } else {
-      h += "<p class='aviso'>" + icon("sparkles", 14) + "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.</p>";
+      h += "<p class='aviso'>" + icon("sparkles", 14) + (esOp ? "No tiene tareas pendientes." : "Sin tareas asignadas pendientes. Use el formulario de arriba para asignar o agendar una nueva tarea.") + "</p>";
     }
 
     if (recsComp.length) {
