@@ -14,6 +14,7 @@ from .. import app as _base
 from ...engine import respaldos as _respaldos
 from ...engine import revision as _revision
 from ...engine.dashboard_data import _filas_dict
+from ...integrations import correo_facturas as _correo
 from ...utils import to_date
 from ..app import (  # helpers de módulo compartidos (ver src/pwa/app.py)
     _db,
@@ -470,3 +471,60 @@ def registrar(app, ctx, h):
         finally:
             db_av.close()
         return jsonify({"ok": True, "copia_previa": seguridad})
+
+    # ---------- Correo de facturas (Sistema → Correo, solo OWNER) ----------
+    # El dueño pega aquí el correo y la contraseña de aplicación en vez de
+    # editar el .env del servidor. La clave nunca se devuelve al navegador.
+    def _solo_owner_correo():
+        return jsonify({"ok": False, "error": "Solo el propietario configura el correo de facturas."}), 403
+
+    def _estado_correo() -> dict:
+        cred = _correo.credenciales()
+        return {"ok": True, "configurado": bool(cred), "usuario": cred["usuario"] if cred else "",
+                "origen": cred["origen"] if cred else None, "estado": _correo.leer_estado(),
+                "cada_minutos": int(os.getenv("FACTURAS_CORREO_MINUTOS", "15"))}
+
+    @app.get("/api/correo-facturas")
+    def api_correo_facturas():
+        if _rol_actual() != "OWNER":
+            return _solo_owner_correo()
+        return jsonify(_estado_correo())
+
+    @app.post("/api/correo-facturas")
+    def api_correo_facturas_guardar():
+        """Prueba el correo y la clave y, si Gmail los acepta, los guarda."""
+        if _rol_actual() != "OWNER":
+            return _solo_owner_correo()
+        cuerpo = request.get_json(silent=True) or {}
+        usuario = str(cuerpo.get("usuario") or "").strip()
+        clave = _correo.limpiar_clave(str(cuerpo.get("clave") or ""))
+        if "@" not in usuario or len(usuario) > 200:
+            return jsonify({"ok": False, "error": "Escribe el correo completo, por ejemplo finca@gmail.com."}), 400
+        if not clave or len(clave) > 200:
+            return jsonify({"ok": False, "error": "Pega la contraseña de aplicación de 16 letras."}), 400
+        prueba = _correo.probar_conexion(usuario, clave)
+        if not prueba["ok"]:
+            return jsonify(prueba), 422
+        _correo.guardar_ajustes(usuario, clave)
+        logger.warning("%s configuró el correo de facturas (%s)", session.get("nombre") or "El propietario", usuario)
+        res = _estado_correo()
+        res["sin_leer"] = prueba["sin_leer"]
+        return jsonify(res)
+
+    @app.post("/api/correo-facturas/probar")
+    def api_correo_facturas_probar():
+        """Vuelve a entrar al buzón con lo guardado, sin cambiar nada."""
+        if _rol_actual() != "OWNER":
+            return _solo_owner_correo()
+        cred = _correo.credenciales()
+        if not cred:
+            return jsonify({"ok": False, "error": "Todavía no hay un correo configurado."}), 400
+        prueba = _correo.probar_conexion(cred["usuario"], cred["clave"], cred["host"])
+        return jsonify(prueba), (200 if prueba["ok"] else 422)
+
+    @app.delete("/api/correo-facturas")
+    def api_correo_facturas_borrar():
+        if _rol_actual() != "OWNER":
+            return _solo_owner_correo()
+        _correo.borrar_ajustes()
+        return jsonify(_estado_correo())
