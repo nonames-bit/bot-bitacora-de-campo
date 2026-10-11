@@ -131,10 +131,14 @@ def leer_estado() -> dict:
     return _leer_json(ruta_estado())
 
 
-def anotar_estado(ok: bool, *, facturas: int = 0, error: str = "") -> None:
+def anotar_estado(ok: bool, *, facturas: int = 0, error: str = "", correos: Optional[list] = None) -> None:
+    """Guarda el resultado de una revisión. Los últimos correos leídos se
+    conservan aunque en esta vuelta no haya llegado nada nuevo."""
+    anteriores = leer_estado().get("correos") or []
     try:
         _escribir_json(ruta_estado(), {"revisado_en": datetime.now().isoformat(timespec="seconds"),
-                                       "ok": ok, "facturas": facturas, "error": error})
+                                       "ok": ok, "facturas": facturas, "error": error,
+                                       "correos": ((correos or []) + anteriores)[:5]})
     except OSError:
         logger.warning("No se pudo guardar el estado del correo de facturas")
 
@@ -281,25 +285,48 @@ def payload_gasto(res: dict, *, foto_ruta: str, remitente: str, asunto: str, cor
 
 
 def procesar_mensaje(db, msg: Message, *, media_dir: str, analizar: Callable[..., dict],
-                     users_file: Optional[str] = None) -> tuple[int, bool]:
+                     users_file: Optional[str] = None) -> dict:
     """Lee las facturas de un correo y las deja por revisar.
-    Devuelve (facturas puestas en revisión, se_puede_marcar_leido). Si la IA
-    falló (sin red o sin llaves) el correo queda sin leer para reintentar."""
+
+    Devuelve {asunto, puestas, marcar, resultado, nota}. ``marcar`` dice si el
+    correo se puede marcar leído; si la IA falló (sin red o sin llaves) queda
+    sin leer para reintentar. ``resultado`` es "por_revisar", "ya_estaba",
+    "sin_adjunto", "no_factura" o "error" y ``nota`` lo explica en palabras
+    para la pantalla Sistema → Correo.
+
+    Todo lo que llega a este buzón es una compra de la finca, así que una
+    "factura de venta" del proveedor (que la IA a veces marca como INGRESO)
+    se toma como gasto; igual pasa por la bandeja antes de entrar a Finanzas.
+    """
     from ..engine.revision import poner_en_revision
 
     correo_id = (msg.get("Message-ID") or "").strip()
-    if _ya_procesado(db, correo_id):
-        return 0, True
-    remitente = parseaddr(_texto_cabecera(msg.get("From")))[1]
     asunto = _texto_cabecera(msg.get("Subject"))[:150]
-    puestas = 0
-    for i, (_nombre, raw) in enumerate(documentos_de_correo(msg)):
+    salida = {"asunto": asunto or "(sin asunto)", "puestas": 0, "marcar": True, "resultado": "", "nota": ""}
+    if _ya_procesado(db, correo_id):
+        salida.update(resultado="ya_estaba", nota="Ya estaba en Por revisar.")
+        return salida
+    remitente = parseaddr(_texto_cabecera(msg.get("From")))[1]
+    documentos = documentos_de_correo(msg)
+    if not documentos:
+        salida.update(resultado="sin_adjunto", nota="No trae PDF, .zip ni foto de factura.")
+        return salida
+    descartes = []
+    for i, (_nombre, raw) in enumerate(documentos):
         res = analizar(raw, date.today().isoformat())
         if not res.get("ok"):
             logger.warning("No se pudo leer una factura del correo (%s): %s", asunto, res.get("error"))
-            return puestas, False
-        if not res.get("es_factura") or res.get("tipo") != "EGRESO" or not res.get("monto_total"):
+            salida.update(marcar=False, resultado="error",
+                          nota=f"La IA no pudo leer la factura: {res.get('error') or 'sin detalle'}. "
+                               "Se vuelve a intentar en la próxima revisión.")
+            return salida
+        if not res.get("es_factura"):
+            descartes.append("la IA dice que no es una factura")
             continue
+        if not res.get("monto_total"):
+            descartes.append("no se le encontró el total")
+            continue
+        res = dict(res, tipo="EGRESO")
         fecha = res.get("fecha") or date.today().isoformat()
         foto_ruta = _guardar_documento(db, raw, media_dir, res.get("concepto") or "", fecha)
         datos = payload_gasto(res, foto_ruta=foto_ruta, remitente=remitente, asunto=asunto,
@@ -307,26 +334,43 @@ def procesar_mensaje(db, msg: Message, *, media_dir: str, analizar: Callable[...
         poner_en_revision(db, origen="app", tipo="gasto", datos=datos, fecha=fecha,
                           registrado_por=None, registrado_por_nombre=NOMBRE_REMITENTE,
                           canal="correo", users_file=users_file)
-        puestas += 1
-    return puestas, True
+        salida["puestas"] += 1
+    if salida["puestas"]:
+        salida.update(resultado="por_revisar", nota="Quedó en Gestión → Por revisar.")
+    else:
+        salida.update(resultado="no_factura", nota="No se anotó: " + "; ".join(dict.fromkeys(descartes)) + ".")
+    return salida
 
 
-def revisar_correo(db, *, media_dir: str = "media", users_file: Optional[str] = None,
-                   conectar: Callable[[], Any] = _conectar_imap,
-                   analizar: Optional[Callable[..., dict]] = None) -> int:
-    """Revisa los correos no leídos y deja sus facturas por revisar.
-    Devuelve cuántas facturas quedaron en la bandeja."""
+def _criterio_busqueda(dias_atras: Optional[int]) -> str:
+    """UNSEEN en la revisión automática. A mano se miran los últimos días
+    aunque ya estén leídos (por si el correo se abrió en el celular)."""
+    if not dias_atras:
+        return "UNSEEN"
+    desde = date.fromordinal(date.today().toordinal() - dias_atras)
+    meses = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    return f"SINCE {desde.day:02d}-{meses[desde.month - 1]}-{desde.year}"
+
+
+def revisar_correo_detalle(db, *, media_dir: str = "media", users_file: Optional[str] = None,
+                           conectar: Callable[[], Any] = _conectar_imap,
+                           analizar: Optional[Callable[..., dict]] = None,
+                           dias_atras: Optional[int] = None) -> dict:
+    """Revisa el buzón y deja sus facturas por revisar.
+    Devuelve {facturas, correos: [lo que pasó con cada correo]}."""
     if analizar is None:
         from ..vision.recibo_gasto_parser import analizar_factura_gasto as analizar
     carpeta = os.getenv("FACTURAS_IMAP_CARPETA", "").strip() or "INBOX"
     imap = conectar()
-    total = 0
+    total, correos = 0, []
     try:
         imap.select(carpeta)
-        estado, datos = imap.search(None, "UNSEEN")
+        estado, datos = imap.search(None, _criterio_busqueda(dias_atras))
         if estado != "OK":
-            return 0
-        ids = (datos[0] or b"").split()[:MAX_CORREOS_POR_VUELTA]
+            return {"facturas": 0, "correos": []}
+        # Los más nuevos primero cuando se revisa a mano.
+        ids = (datos[0] or b"").split()
+        ids = (ids[::-1] if dias_atras else ids)[:MAX_CORREOS_POR_VUELTA]
         for num in ids:
             # BODY.PEEK no marca el correo como leído hasta que se procese bien.
             estado, partes = imap.fetch(num, "(BODY.PEEK[])")
@@ -334,18 +378,25 @@ def revisar_correo(db, *, media_dir: str = "media", users_file: Optional[str] = 
             if estado != "OK" or not crudo:
                 continue
             try:
-                puestas, marcar = procesar_mensaje(db, email.message_from_bytes(crudo), media_dir=media_dir,
-                                                   analizar=analizar, users_file=users_file)
-            except Exception:
+                r = procesar_mensaje(db, email.message_from_bytes(crudo), media_dir=media_dir,
+                                     analizar=analizar, users_file=users_file)
+            except Exception as e:  # noqa: BLE001 - se anota y se reintenta
                 logger.exception("Falló un correo de facturas; se reintenta en la próxima vuelta")
-                continue
-            total += puestas
-            if marcar:
+                r = {"asunto": "(correo)", "puestas": 0, "marcar": False, "resultado": "error",
+                     "nota": f"Falló al leerlo ({type(e).__name__}: {str(e)[:120]}). Se reintenta."}
+            total += r["puestas"]
+            correos.append({k: r[k] for k in ("asunto", "resultado", "nota")})
+            if r["marcar"]:
                 imap.store(num, "+FLAGS", "\\Seen")
     finally:
         try:
             imap.logout()
         except Exception:
             pass
-    return total
+    return {"facturas": total, "correos": correos}
 
+
+def revisar_correo(db, **kw) -> int:
+    """Igual que ``revisar_correo_detalle`` pero solo devuelve cuántas
+    facturas quedaron en la bandeja."""
+    return revisar_correo_detalle(db, **kw)["facturas"]

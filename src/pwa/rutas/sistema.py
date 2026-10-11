@@ -522,6 +522,30 @@ def registrar(app, ctx, h):
         prueba = _correo.probar_conexion(cred["usuario"], cred["clave"], cred["host"])
         return jsonify(prueba), (200 if prueba["ok"] else 422)
 
+    @app.post("/api/correo-facturas/revisar")
+    def api_correo_facturas_revisar():
+        """Revisa el buzón ya mismo (últimos 3 días, aunque estén leídos) y
+        dice qué pasó con cada correo."""
+        if _rol_actual() != "OWNER":
+            return _solo_owner_correo()
+        if not _correo.configurado():
+            return jsonify({"ok": False, "error": "Todavía no hay un correo configurado."}), 400
+        media = _base.MEDIA_DIR_DEFAULT
+        if not os.path.isabs(media):
+            media = os.path.join(_base.RAIZ_PROYECTO, media)
+        db_c = _db(db_path)
+        try:
+            res = _correo.revisar_correo_detalle(db_c, media_dir=media, users_file=users_file, dias_atras=3)
+        except Exception as e:
+            error = _correo.explicar_error(e)
+            _correo.anotar_estado(False, error=error)
+            logger.exception("Falló la revisión manual del correo de facturas")
+            return jsonify({"ok": False, "error": error}), 502
+        finally:
+            db_c.close()
+        _correo.anotar_estado(True, facturas=res["facturas"], correos=res["correos"])
+        return jsonify({"ok": True, **res})
+
     @app.delete("/api/correo-facturas")
     def api_correo_facturas_borrar():
         if _rol_actual() != "OWNER":
