@@ -713,6 +713,27 @@ CREATE TABLE IF NOT EXISTS webauthn_credenciales (
 );
 
 CREATE INDEX IF NOT EXISTS idx_webauthn_credenciales_user ON webauthn_credenciales(user_id);
+
+-- Conteos de potrero (pantalla "Contar por potrero", 2026-10-10): registro de
+-- auditoría de cada vez que alguien revisa en campo que estén todos los
+-- animales de un potrero. vistos/faltantes son listas JSON de aretes.
+CREATE TABLE IF NOT EXISTS conteos_potrero (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fecha TEXT NOT NULL,
+    hora TEXT,
+    potrero_id INTEGER,
+    potrero_nombre TEXT,
+    total INTEGER NOT NULL,
+    vistos INTEGER NOT NULL,
+    faltantes TEXT,
+    vistos_tags TEXT,
+    notas TEXT,
+    registrado_por INTEGER,
+    registrado_por_nombre TEXT,
+    creado_en TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_conteos_potrero_fecha ON conteos_potrero(potrero_id, fecha);
 """
 
 # Orden de creación (potreros y animales antes que sus referencias).

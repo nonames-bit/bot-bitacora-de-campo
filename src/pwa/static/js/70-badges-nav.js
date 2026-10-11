@@ -434,6 +434,7 @@
       }
       var v = b.getAttribute("data-v");
       if (!v) return;
+      if (v === "potreros") _potSel = null; // desde el menú: lista de potreros
       if (v === "ficha" && actual === "ficha") {
         var inpFicha = q("#f-tag");
         if (inpFicha) inpFicha.value = "";
@@ -468,6 +469,7 @@
       }
     }
     actual = v;
+    if (v !== "ficha") _potQuitarVolver();
     if (_historialListo && !_navegandoHistorial && v !== vistaPrevia) {
       try { window.history.pushState({ ja: "vista", v: v }, ""); } catch (eHist) {}
     }

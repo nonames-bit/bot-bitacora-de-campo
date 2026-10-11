@@ -9,6 +9,7 @@ import logging
 from typing import Any, Optional
 from flask import jsonify, request, session
 from ...engine import lactancia as _lactancia
+from ...engine import conteos_potrero as _conteos
 from ...engine import revision as _revision
 from ...engine.finanzas_categorias import normalizar_categoria
 from ...server.auth import Auth
@@ -411,6 +412,18 @@ def registrar(app, ctx, h):
                         notas=payload.get("notas"),
                     )
                     _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
+                    procesados += 1
+                    if id_local:
+                        ids_ok.append(id_local)
+                elif tipo == "conteo_potrero":
+                    # Auditoría de "Contar por potrero": no toca animales.
+                    try:
+                        _conteos.registrar_conteo(db_sync, payload, fecha, uid, nombre_usuario)
+                    except ValueError as e:
+                        errores.append(f"Conteo NO guardado: {e}.")
+                        if id_local:
+                            ids_ok.append(id_local)
+                        continue
                     procesados += 1
                     if id_local:
                         ids_ok.append(id_local)
