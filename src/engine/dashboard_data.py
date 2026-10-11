@@ -758,13 +758,6 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         errores["clima_hoy"] = str(e)
         clima_hoy = None
 
-    try:
-        precio_hoy = db.precio_referencia_hoy(plaza="BOGOTA", producto="MACHO_GORDO")
-    except Exception as e:
-        logger.error("seccion precio_hoy fallo", exc_info=True)
-        errores["precio_hoy"] = str(e)
-        precio_hoy = None
-
     tareas_asignadas: list[dict] = []
     tareas_realizadas_hoy: list[dict] = []
     try:
@@ -857,7 +850,6 @@ def conteos_tablero(db: Database, potrero: Optional[str] = None) -> dict:
         "potrero_filtro": potrero,
         "eventos_recientes": eventos_recientes,
         "clima_hoy": clima_hoy,
-        "precio_hoy": precio_hoy,
         "tareas_asignadas": tareas_asignadas,
         "tareas_realizadas_hoy": tareas_realizadas_hoy,
     }
