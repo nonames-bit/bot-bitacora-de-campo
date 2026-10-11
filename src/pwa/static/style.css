@@ -4743,3 +4743,173 @@ button.cap-atajo .svg-icon { margin: 0; }
 .mis-tareas-chips small { color: var(--texto-suave); }
 .mis-tareas-msg { font-size: 15px; font-weight: 700; margin: 6px 0 8px; overflow-wrap: anywhere; }
 .mis-tareas .btn-rec-completar { width: 100%; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+
+/* ---------- Botones y pestañas con más presencia (siguen el tema) ----------
+   Cada tema define sus colores de botón aquí abajo; las reglas de más abajo
+   solo usan estas variables, así que al cambiar de tema los botones cambian
+   solos. --btn-fondo es el relleno del botón principal y de la pestaña
+   activa (en oscuro es un verde más hondo que --verde-marca para que la
+   letra blanca se lea), --btn-tinte el fondo de las pestañas sin elegir y
+   --btn-borde su borde. */
+:root, :root[data-theme="green"] {
+  --btn-fondo: #2F5233;
+  --btn-fondo-hover: #23402A;
+  --btn-texto: #FFFFFF;
+  --btn-tinte: #EDF3EC;
+  --btn-borde: #A4C1A8;
+  --btn-sombra: rgba(47, 82, 51, 0.30);
+  --btn-brillo: rgba(255, 255, 255, 0.16);
+  --btn-grosor: 1px;
+}
+:root[data-theme="light"] {
+  --btn-fondo: #1A1A1A;
+  --btn-fondo-hover: #333333;
+  --btn-texto: #FFFFFF;
+  --btn-tinte: #F2F2F0;
+  --btn-borde: #D4D4D0;
+  --btn-sombra: rgba(0, 0, 0, 0.22);
+  --btn-brillo: rgba(255, 255, 255, 0.14);
+  --btn-grosor: 1px;
+}
+:root[data-theme="dark"] {
+  --btn-fondo: #2E7D32;
+  --btn-fondo-hover: #388E3C;
+  --btn-texto: #FFFFFF;
+  --btn-tinte: #222A23;
+  --btn-borde: #3E5240;
+  --btn-sombra: rgba(0, 0, 0, 0.55);
+  --btn-brillo: rgba(255, 255, 255, 0.12);
+  --btn-grosor: 1px;
+}
+:root[data-theme="sun"] {
+  --btn-fondo: #143516;
+  --btn-fondo-hover: #000000;
+  --btn-texto: #FFFFFF;
+  --btn-tinte: #E8F5E9;
+  --btn-borde: #000000;
+  --btn-sombra: transparent;
+  --btn-brillo: transparent;
+  --btn-grosor: 2px;
+}
+
+/* Botón principal: relleno del tema con un leve brillo arriba. */
+button {
+  background: linear-gradient(180deg, var(--btn-brillo), transparent) var(--btn-fondo);
+  color: var(--btn-texto);
+}
+button:hover { background-color: var(--btn-fondo-hover); }
+
+/* Rellenos con relieve: botones principales y lo que está elegido. */
+button:not([class]),
+button.tema-btn.act:not(header .tema-btn),
+button.btn-sec.act,
+.btn-punto.act,
+.manga-tab-btn.act,
+.mercado-tab-btn.act,
+.gen-filtros .chip.act,
+.rep-btn:not(.rep-btn-sec),
+.cf-form button[type=submit],
+.mis-tareas .btn-rec-completar,
+.ficha-acciones-campo button.chip {
+  background: linear-gradient(180deg, var(--btn-brillo), transparent) var(--btn-fondo);
+  color: var(--btn-texto);
+  border-color: var(--btn-fondo);
+  box-shadow: 0 2px 6px var(--btn-sombra), inset 0 1px 0 var(--btn-brillo);
+}
+button:not([class]):hover,
+.rep-btn:not(.rep-btn-sec):hover,
+.btn-punto.act:hover,
+.ficha-acciones-campo button.chip:hover {
+  background-color: var(--btn-fondo-hover);
+  color: var(--btn-texto);
+  box-shadow: 0 4px 12px var(--btn-sombra), inset 0 1px 0 var(--btn-brillo);
+}
+
+/* Secundarios (contorno): borde más marcado y sombra suave. */
+button.tema-btn:not(header .tema-btn):not(.act),
+button.btn-sec:not(.act),
+.rep-btn.rep-btn-sec,
+button.cap-atajo,
+.btn-punto:not(.act) {
+  border: var(--btn-grosor) solid var(--btn-borde);
+  box-shadow: 0 1px 3px var(--btn-sombra);
+}
+button.tema-btn:not(header .tema-btn):not(.act):hover,
+button.btn-sec:not(.act):hover,
+.rep-btn.rep-btn-sec:hover,
+button.cap-atajo:hover,
+.btn-punto:not(.act):hover {
+  background: var(--btn-tinte);
+  border-color: var(--verde-marca);
+}
+
+/* Pestañas: las no elegidas con fondo tintado y borde; la elegida rellena,
+   en negrita y con sombra. Aplica a la ficha del animal y a las vistas con
+   pestañas (Reproducción, Leche, Sistema, Mercado, Manga). */
+#ficha-tabs .mini button,
+#ficha-tabs nav.mini button {
+  background: var(--btn-tinte) !important;
+  border: var(--btn-grosor) solid var(--btn-borde) !important;
+  color: var(--texto) !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  min-height: 34px !important;
+  padding: 6px 14px !important;
+  box-shadow: 0 1px 2px var(--btn-sombra) !important;
+  transition: background-color .15s ease, box-shadow .15s ease, transform .1s ease !important;
+}
+#ficha-tabs .mini button .svg-icon,
+.pestanas .pestana .svg-icon,
+.mercado-tab-btn .svg-icon,
+.manga-tab-btn .svg-icon { color: var(--verde-marca); }
+#ficha-tabs .mini button:hover,
+#ficha-tabs nav.mini button:hover {
+  border-color: var(--verde-marca) !important;
+  box-shadow: 0 3px 8px var(--btn-sombra) !important;
+}
+#ficha-tabs .mini button.act,
+#ficha-tabs nav.mini button.act {
+  background: linear-gradient(180deg, var(--btn-brillo), transparent) var(--btn-fondo) !important;
+  border-color: var(--btn-fondo) !important;
+  color: var(--btn-texto) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 3px 10px var(--btn-sombra), inset 0 1px 0 var(--btn-brillo) !important;
+}
+#ficha-tabs .mini button:active { transform: scale(.96) !important; }
+
+.pestanas { background: var(--btn-tinte); border-color: var(--btn-borde); }
+.pestanas .pestana { color: var(--texto); }
+.pestanas .pestana:hover { background: var(--superficie); color: var(--texto); box-shadow: 0 1px 3px var(--btn-sombra); }
+.pestanas .pestana.activa,
+.pestanas .pestana.activa:hover {
+  background: linear-gradient(180deg, var(--btn-brillo), transparent) var(--btn-fondo);
+  color: var(--btn-texto);
+  box-shadow: 0 3px 10px var(--btn-sombra), inset 0 1px 0 var(--btn-brillo);
+}
+
+.mercado-tab-btn:not(.act),
+.manga-tab-btn:not(.act) {
+  background: var(--btn-tinte);
+  border: var(--btn-grosor) solid var(--btn-borde);
+  color: var(--texto);
+  box-shadow: 0 1px 2px var(--btn-sombra);
+}
+
+/* Lo elegido o relleno lleva el ícono del mismo color que la letra. */
+#ficha-tabs .mini button.act .svg-icon,
+.pestanas .pestana.activa .svg-icon,
+.mercado-tab-btn.act .svg-icon,
+.manga-tab-btn.act .svg-icon { color: inherit; }
+
+/* Al tocar: se hunde un poco. */
+button:active,
+.rep-btn:active,
+.pestanas .pestana:active,
+.mercado-tab-btn:active,
+.manga-tab-btn:active { transform: scale(.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  button:active, .rep-btn:active, .pestanas .pestana:active,
+  .mercado-tab-btn:active, .manga-tab-btn:active,
+  #ficha-tabs .mini button:active { transform: none !important; }
+}

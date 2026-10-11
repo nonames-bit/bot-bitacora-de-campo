@@ -216,7 +216,7 @@
     head += "<div class='ficha-head-acciones' style='display:flex; flex-direction:column; gap:6px; align-self:flex-start;'>"
       + "<button type='button' class='tema-btn' data-accion='buscar-otro-animal' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Buscar otra ficha de animal (Ctrl+K)'>"
       + icon("search", 14) + "Buscar otro</button>"
-      + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/pdf' target='_blank' class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; background:var(--verde-marca); color:#fff; font-weight:700; border:none; box-shadow:0 1px 3px rgba(0,0,0,0.12);' title='Descargar Ficha Técnica Oficial (PDF) con semáforo zootécnico y genealogía'>"
+      + "<a href='/api/ficha/" + encodeURIComponent(f.tag) + "/pdf' target='_blank' class='tema-btn' style='font-size:12px; padding:6px 10px; text-decoration:none; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; background:var(--btn-fondo, var(--verde-marca)); color:#fff; font-weight:700; border:none; box-shadow:0 2px 6px var(--btn-sombra, rgba(0,0,0,0.12));' title='Descargar Ficha Técnica Oficial (PDF) con semáforo zootécnico y genealogía'>"
       + icon("filePdf", 15) + "Ficha PDF</a>"
       + "<button type='button' class='tema-btn' data-accion='cambiar-foto-animal' data-tag='" + esc(f.tag) + "' style='font-size:12px; padding:6px 10px; white-space:nowrap; display:inline-flex; align-items:center; gap:5px; cursor:pointer; font-weight:600;' title='Tomar con cámara o subir foto de perfil'>"
       + icon("camera", 14) + "Foto</button>"
