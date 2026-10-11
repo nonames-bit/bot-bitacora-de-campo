@@ -4922,3 +4922,53 @@ button:active,
   .mercado-tab-btn:active, .manga-tab-btn:active,
   #ficha-tabs .mini button:active { transform: none !important; }
 }
+
+/* ---------- Versión de la app (85-version-app.js) ---------- */
+.version-app-panel { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; margin: 6px 0 8px; }
+.version-app-linea { color: var(--texto); }
+.version-app-codigo { font-family: var(--font-mono); font-size: 11px; color: var(--texto-suave); margin-left: 4px; }
+.version-app-estado { display: flex; align-items: center; gap: 2px; color: var(--texto-suave); }
+.version-app-estado.al-dia { color: var(--verde-marca); font-weight: 600; }
+.version-app-estado.nueva { color: #8A5A00; font-weight: 700; }
+.version-app-panel .version-app-actualizar { align-self: flex-start; }
+.version-app-buscar { align-self: flex-start; font-size: 12.5px; padding: 6px 14px; }
+.aviso-version-nueva {
+  position: fixed;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  right: 12px;
+  max-width: 520px;
+  margin: 0 auto;
+  z-index: 10050;
+  display: flex;
+  align-items: stretch;
+  background: #8A5A00;
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+.aviso-version-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 14.5px;
+  text-align: left;
+  padding: 13px 14px;
+  cursor: pointer;
+  min-height: 48px;
+}
+.aviso-version-cerrar {
+  background: rgba(0, 0, 0, 0.18);
+  border: 0;
+  color: inherit;
+  font-size: 22px;
+  line-height: 1;
+  width: 46px;
+  cursor: pointer;
+}

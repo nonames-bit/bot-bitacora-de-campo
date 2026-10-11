@@ -775,6 +775,28 @@ def _calcular_pwa_version() -> str:
     return h.hexdigest()[:8]
 
 
+def _fecha_version() -> str:
+    """Fecha y hora (de la finca) en que se armó esta versión de la app.
+
+    En Docker la escribe el Dockerfile al construir la imagen
+    (src/pwa/fecha_version.txt); sin ese archivo (desarrollo) se usa la
+    fecha de modificación de app.js. Formato "AAAA-MM-DD HH:MM".
+    """
+    _archivo = os.path.join(BASE_DIR, "fecha_version.txt")
+    try:
+        with open(_archivo, encoding="utf-8") as _f:
+            _txt = _f.read().strip()
+        if _txt:
+            return _txt[:16]
+    except OSError:
+        pass
+    try:
+        _mtime = os.path.getmtime(os.path.join(BASE_DIR, "static", "app.js"))
+        return time.strftime("%Y-%m-%d %H:%M", time.localtime(_mtime))
+    except OSError:
+        return ""
+
+
 def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAULT,
               password: Optional[str] = None, login_store_path: Optional[str] = None):
     """Construye la app Flask. Devuelve None si Flask no está instalado.
@@ -836,6 +858,9 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
     # es decir el nombre de la función de vista, no la URL).
     _RUTAS_PUBLICAS = {
         "login_form", "login_submit", "static", "manifest", "sw_js", "offline_page",
+        # Versión de la app: el aviso "Hay una versión nueva" la consulta
+        # (no expone datos de la finca).
+        "version_app",
         # WebAuthn: el login con huella ocurre SIN sesión todavía. El POST ya
         # queda protegido por el chequeo de Origin/Referer de más abajo.
         "webauthn_disponible", "webauthn_login_opciones", "webauthn_login_verificar",
@@ -1066,6 +1091,7 @@ def crear_app(db_path: str = DB_PATH_DEFAULT, users_file: str = USERS_FILE_DEFAU
         clave_esperada=clave_esperada,
         db_path=db_path,
         pwa_version=pwa_version,
+        pwa_fecha_version=_fecha_version(),
         users_file=users_file,
     )
     h = SimpleNamespace(

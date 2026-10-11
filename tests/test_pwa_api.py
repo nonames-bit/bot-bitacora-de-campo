@@ -74,6 +74,24 @@ def test_webauthn_rutas_publicas_disponibles_sin_sesion(db_file):
     assert c.post("/api/webauthn/login/opciones", json={}).status_code in (200, 503)
 
 
+def test_version_app_publica_y_coincide_con_la_pagina(db_file):
+    """/api/version responde sin sesión con el mismo hash que usa ?v= en la página."""
+    import re
+
+    app = crear_app(db_file, password="clave-de-prueba")
+    c = app.test_client()
+    r = c.get("/api/version")
+    assert r.status_code == 200
+    assert r.headers.get("Cache-Control") == "no-store"
+    d = r.get_json()
+    assert d["version"] == app.config["PWA_VERSION"]
+    assert re.match(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$", d["fecha"])
+    c.post("/login", data={"password": "clave-de-prueba"})
+    html = c.get("/").get_data(as_text=True)
+    assert "/static/app.js?v=" + d["version"] in html
+    assert 'id="menu-version-estado"' in html
+
+
 def test_pagina_html_sin_sesion_redirige_a_login(db_file):
     app = crear_app(db_file, password="clave-de-prueba")
     c = app.test_client()

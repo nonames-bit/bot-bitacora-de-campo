@@ -876,6 +876,13 @@
 ]
 ],
 [
+"/api/version",
+"version_app",
+[
+"GET"
+]
+],
+[
 "/api/voz",
 "api_voz",
 [

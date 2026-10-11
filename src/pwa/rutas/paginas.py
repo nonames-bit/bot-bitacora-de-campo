@@ -6,11 +6,12 @@ from __future__ import annotations
 
 import os
 import re
-from flask import render_template
+from flask import jsonify, render_template
 
 
 def registrar(app, ctx, h):
     pwa_version = ctx.pwa_version
+    pwa_fecha_version = getattr(ctx, "pwa_fecha_version", "")
 
     @app.get("/")
     def index():
@@ -34,6 +35,15 @@ def registrar(app, ctx, h):
             cuerpo_sw = _f.read().replace("__PWA_VERSION__", pwa_version)
         resp = app.response_class(cuerpo_sw, content_type="application/javascript; charset=utf-8")
         resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return resp
+
+    @app.get("/api/version")
+    def version_app():
+        # Versión que está sirviendo el servidor ahora mismo. La app la
+        # compara con la que tiene cargada para avisar "Hay una versión
+        # nueva" y la muestra en el menú. Pública y sin caché HTTP.
+        resp = jsonify({"version": pwa_version, "fecha": pwa_fecha_version})
+        resp.headers["Cache-Control"] = "no-store"
         return resp
 
     @app.get("/offline.html")
