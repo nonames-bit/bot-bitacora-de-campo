@@ -11,6 +11,7 @@ from ...db.database import Database
 from ...parsers import nlp_engine as nlu
 from ...utils import iso, normalizar
 from .helpers import _potrero_variantes, extraer_nombre_potrero
+from .hato import HatoQueryMixin
 from .historial import HistorialQueryMixin
 from .inventario import InventarioQueryMixin
 from .pasturas import PasturasQueryMixin
@@ -35,6 +36,7 @@ def _registrar_consulta_sin_entender(texto: str) -> None:
 
 
 class QueryEngine(
+    HatoQueryMixin,
     HistorialQueryMixin,
     InventarioQueryMixin,
     PasturasQueryMixin,
@@ -111,6 +113,15 @@ class QueryEngine(
         if tag and re.search(r"\b(?:cuando\s+se\s+movi[oó]|cuando\s+se\s+traslad[oó]|cuando\s+se\s+cambi[oó]|cuando\s+fue\s+el\s+traslado|cuando\s+entr[oó]|traslados?|movimientos?)\b", t):
             return self._ultimo_traslado(tag)
 
+        # 1c. Hato presente: conteos por categoría, estado reproductivo y
+        # listas de Tareas. Solo sin animal puntual, sin potrero, raza, edad
+        # en años, periodo ni eventos históricos (vendidos, muertos, nacidos),
+        # que tienen sus propias ramas más abajo.
+        if not tag_con_digito:
+            r_hato = self._responder_hato(t)
+            if r_hato:
+                return r_hato
+
         # 1c-bis. Conteos de inventario por edad exacta o por estado (vendidos/muertos).
         # "cuant" (sin exigir la palabra completa) para tolerar errores de dictado
         # por voz como "cuantoa" en vez de "cuantos".
@@ -135,7 +146,7 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("VENTA", rango[0], rango[1], rango[2])
-        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b", t) and re.search(_TIENE_PERIODO, t):
+        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b|\bcompramos\b", t) and re.search(_TIENE_PERIODO, t):
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("COMPRA", rango[0], rango[1], rango[2])
@@ -195,6 +206,8 @@ class QueryEngine(
             return self._animales_por_peso(umbral_peso, comparador=comparador_peso)
 
         # 1c. Consultas de lista de reproducción (varios animales a la vez, no un tag puntual)
+        if re.search(r"\bdias?\s+abiert[oa]s?\b", t) and tag_con_digito and not re.search(r"\bmas\s+de\b", t):
+            return self._dias_abiertos_animal(tag)
         if re.search(r"\bdias?\s+abiert[oa]s?\b", t):
             m = re.search(r"(\d+)\s*dias?\s+abiert[oa]s?", t) or re.search(r"mas\s+de\s+(\d+)", t)
             umbral = int(m.group(1)) if m else 90
@@ -203,7 +216,12 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._partos_periodo(rango[0], rango[1], rango[2])
-        if re.search(r"\btern|\bcrias?\b", t) and re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t) and re.search(r"\bcuant[oa]s?\b|\bnaci", t):
+        if re.search(r"\btern|\bcrias?\b|\banimales?\b|\bnacimientos?\b|\bbecerr", t) and re.search(r"\bnaci", t) and not re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t):
+            rango_crias = self._rango_periodo(t) if re.search(_TIENE_PERIODO, t) else None
+            if rango_crias:
+                return self._partos_periodo(rango_crias[0], rango_crias[1], rango_crias[2])
+            return self._partos_periodo("0001-01-01", iso(self.hoy), "en total (histórico)")
+        if re.search(r"\btern|\bcrias?\b", t) and re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t) and re.search(r"\bnaci", t):
             sexo = "macho" if re.search(r"\bmacho", t) else "hembra"
             rango_crias = self._rango_periodo(t) if re.search(_TIENE_PERIODO, t) else None
             if rango_crias:
@@ -300,10 +318,16 @@ class QueryEngine(
 
         # 6b. Producción de leche
         if re.search(r"\blitros?\b|\bleche\b|\bordeñ[eoó]|\bcontrol\s+lechero\b", t):
+            if not tag_con_digito and (not tag or self.db.resolve_animal(tag) is None):
+                if re.search(r"\bayer\b", t):
+                    return self._leche_hato(iso(self.hoy - timedelta(days=1)))
+                if re.search(r"\bhoy\b", t):
+                    return self._leche_hato(iso(self.hoy))
+                return self._leche_hato()
             return self._leche(tag)
 
         # 7. Pesaje y crecimiento
-        if re.search(r"\bpes[oó]\b|\bpesaje\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
+        if re.search(r"\bpes[oó]\b|\bpesa\b|\bpesaje\b|\bganancia\b|\bgmd\b|\bkg\b|\bkilos\b", t):
             return self._pesaje(tag)
 
         # 7b. Condición corporal
@@ -365,11 +389,11 @@ class QueryEngine(
             # inventario por potrero tiene prioridad si menciona potrero
             if re.search(r"\bpotrero", t):
                 # "inventario potreros" o "total por potrero"
-                if re.search(r"\b(?:total|inventario|listar|mostrar|resumen|conteo|distribuci[oó]n)\b", t):
+                if re.search(r"\b(?:total|inventario|listar|mostrar|resumen|conteo|distribuci[oó]n)\b|\bpor\s+potreros?\b", t):
                     mostrar_vacios = bool(re.search(r"\bvac[ií]os?\b", t))
                     return self._inventario_potreros(mostrar_vacios=mostrar_vacios)
             # conteos de ganado por categoría (ganado, gaando typo, animal/animales, inventario)
-            if re.search(r"\b(?:ganado|ganad|ga+ndo|animales?|inventario)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
+            if re.search(r"\b(?:ganado|ganad|ga+ndo|animales?|inventario|hato)\b", t) or re.search(r"\btotal\b.*\b(?:vaca|toro|terner|novill)", t) or re.search(r"\b(?:vaca|toro|terner|novill).*\btotal\b", t):
                 # si menciona categoría específica, delegar con filtro
                 if re.search(r"\bterner", t):
                     return self._inventario_categoria("terneros")

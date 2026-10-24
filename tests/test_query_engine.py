@@ -982,13 +982,14 @@ def test_vacas_lactancia_larga(db):
     db.registrar_parto(vaca_tag="12", fecha="2026-08-20")
 
     qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    # "Para secar" responde la lista de Tareas → Secar (misma que la app).
     resp = qe.responder("vacas que debo secar este mes")
     assert "No entendí" not in resp
-    assert "47" in resp
-    assert "12" not in resp
+    assert "Vacas para secar" in resp
 
     resp2 = qe.responder("vacas con más de 200 días de lactancia")
     assert "47" in resp2
+    assert "12" not in resp2
 
 
 def test_partos_atrasados(db):

@@ -187,7 +187,9 @@ class ReproduccionQueryMixin:
             detalle += ")"
             pendientes.append(detalle)
         if not pendientes:
-            return "No hay vacas pendientes de inseminación."
+            # Sin IA programada (regla AM-PM), mostrar las vacas que Tareas
+            # marca para servir, que es lo que el ganadero quiere saber.
+            return "No hay vacas pendientes de inseminación programada.\n\n" + self._lista_tareas("servir")
         return "Vacas para inseminar: " + "; ".join(pendientes) + "."
 
     def _franja_inseminacion(self, descripcion) -> str:
