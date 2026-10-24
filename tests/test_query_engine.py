@@ -982,13 +982,14 @@ def test_vacas_lactancia_larga(db):
     db.registrar_parto(vaca_tag="12", fecha="2026-08-20")
 
     qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    # "Para secar" responde la lista de Tareas → Secar (misma que la app).
     resp = qe.responder("vacas que debo secar este mes")
     assert "No entendí" not in resp
-    assert "47" in resp
-    assert "12" not in resp
+    assert "Vacas para secar" in resp
 
     resp2 = qe.responder("vacas con más de 200 días de lactancia")
     assert "47" in resp2
+    assert "12" not in resp2
 
 
 def test_partos_atrasados(db):
@@ -1461,3 +1462,35 @@ def test_ficha_telegram_seca_segun_lote_de_ordeno(db):
     assert "VACA SECA" in qe.responder("ficha FRESCA")
     r_a048 = qe.responder("ficha A048")
     assert "CRÍA HEMBRA" in r_a048 and "Vaca A048" not in r_a048
+
+
+def test_terneros_machos_para_destetar_cuenta_activos_no_partos(db):
+    # Reportado: "cuántos terneros machos hay para destetar" respondía el total
+    # histórico de crías machos nacidas (303) en vez de los terneros activos en
+    # edad de destete.
+    from src.engine.query_engine import QueryEngine
+    db.registrar_animal("V1", sexo="Hembra", estado="ACTIVO")
+    # Macho en edad de destete (~300 días): cuenta.
+    db.registrar_animal("C1", sexo="Macho", estado="ACTIVO", madre_tag="V1", fecha_nacimiento="2025-11-05")
+    # Hembra en edad de destete: no cuenta al pedir machos.
+    db.registrar_animal("C2", sexo="Hembra", estado="ACTIVO", madre_tag="V1", fecha_nacimiento="2025-11-05")
+    # Macho muy joven (~60 días): no cuenta.
+    db.registrar_animal("C3", sexo="Macho", estado="ACTIVO", madre_tag="V1", fecha_nacimiento="2026-07-03")
+    # Macho en edad de destete pero vendido: no cuenta.
+    db.registrar_animal("C4", sexo="Macho", estado="VENDIDO", madre_tag="V1", fecha_nacimiento="2025-11-05")
+    # Partos históricos de machos: no deben sumarse.
+    for i in range(5):
+        db.registrar_parto(vaca_tag="V1", fecha=f"202{i}-01-01", sexo_cria="Macho")
+
+    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    resp = qe.responder("cuantos terneros machos hay para destetar")
+    assert "para destetar: 1" in resp
+    assert "C1" in resp
+    assert "C2" not in resp and "C3" not in resp and "C4" not in resp
+    assert "nacidas" not in resp
+
+    resp_h = qe.responder("cuántas terneras hembras hay para destetar")
+    assert "para destetar: 1" in resp_h and "C2" in resp_h
+
+    resp_todas = qe.responder("cuántas crías hay pendientes de destete")
+    assert "para destetar: 2" in resp_todas

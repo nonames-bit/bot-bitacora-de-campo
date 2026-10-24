@@ -187,7 +187,9 @@ class ReproduccionQueryMixin:
             detalle += ")"
             pendientes.append(detalle)
         if not pendientes:
-            return "No hay vacas pendientes de inseminación."
+            # Sin IA programada (regla AM-PM), mostrar las vacas que Tareas
+            # marca para servir, que es lo que el ganadero quiere saber.
+            return "No hay vacas pendientes de inseminación programada.\n\n" + self._lista_tareas("servir")
         return "Vacas para inseminar: " + "; ".join(pendientes) + "."
 
     def _franja_inseminacion(self, descripcion) -> str:
@@ -286,6 +288,28 @@ class ReproduccionQueryMixin:
         etiqueta_periodo = f" {etiqueta}" if etiqueta else ""
         plural = "machos" if sexo_norm == "macho" else "hembras"
         return f"🐮 Crías {plural} nacidas{etiqueta_periodo}: <b>{len(crias)}</b>."
+
+    def _crias_para_destetar(self, sexo: str | None = None) -> str:
+        """Crías activas en edad de destete y aún sin destetar: mismo criterio que
+        la lista de trabajo "Destetar" de Tareas (engine/tareas.py)."""
+        from ..tareas import EDAD_DESTETE, datos_tareas
+
+        lista = datos_tareas(self.db, self.hoy)["destetar"]
+        if sexo:
+            inicial = "m" if sexo.lower().startswith("m") else "h"
+            lista = [c for c in lista if str(c.get("sexo") or "").strip().lower().startswith(inicial)]
+        quienes = {"m": "Terneros machos", "h": "Terneras hembras"}.get((sexo or " ")[0].lower(), "Crías")
+        criterio = (f"activos, de {EDAD_DESTETE[0] // 30} a {EDAD_DESTETE[1] // 30} meses "
+                    f"({EDAD_DESTETE[0]}–{EDAD_DESTETE[1]} días), con madre registrada y sin destete registrado")
+        if not lista:
+            return f"🐮 No hay {quienes.lower()} para destetar.\n<i>Criterio: {criterio}.</i>"
+        lineas = [f"🐮 <b>{quienes} para destetar: {len(lista)}</b>", f"<i>Criterio: {criterio}.</i>"]
+        for c in lista[:20]:
+            madre = f" · madre {c['madre']}" if c.get("madre") else ""
+            lineas.append(f"• {c['tag']} — {c['edad_dias'] // 30} meses · {c['potrero']}{madre}")
+        if len(lista) > 20:
+            lineas.append(f"<i>... y {len(lista) - 20} más (ver Tareas → Destetar).</i>")
+        return "\n".join(lineas)
 
     def _servicio_vigente(self, s) -> bool:
         """True si el servicio sigue siendo una gestación en curso: no está
