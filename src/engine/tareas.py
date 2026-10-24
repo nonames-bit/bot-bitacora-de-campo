@@ -329,7 +329,7 @@ def _manejo_y_categoria(out: dict, datos: dict, info: dict, hoy: date) -> None:
         hembra, macho = _es_hembra(a["sexo"]), _es_macho(a["sexo"])
         if edad is not None:
             if a["madre_id"] and EDAD_DESTETE[0] <= edad <= EDAD_DESTETE[1] and aid not in datos["destetados"]:
-                out["destetar"].append({**base, "madre": a["madre"], "edad_dias": edad})
+                out["destetar"].append({**base, "madre": a["madre"], "edad_dias": edad, "sexo": a["sexo"]})
             if EDAD_TOPIZAR[0] <= edad <= EDAD_TOPIZAR[1] and "TOPIZADO" not in m:
                 out["topizar"].append({**base, "edad_dias": edad})
             if (macho and EDAD_CASTRAR[0] <= edad <= EDAD_CASTRAR[1] and not a["reproductor"]

@@ -151,6 +151,12 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._muertes_periodo(rango[0], rango[1], rango[2])
+        # Crías pendientes de destete hoy ("cuántos terneros machos hay para
+        # destetar"): animales activos en edad de destete, no destetes pasados.
+        if re.search(r"\bdestetar\b|\b(?:para|por|pendientes?\s+de|edad\s+de)\s+destete\b", t):
+            sexo_dest = "hembra" if re.search(r"\bhembras?\b|\bternera", t) else (
+                "macho" if re.search(r"\bmachos?\b|\btoretes?\b", t) else None)
+            return self._crias_para_destetar(sexo_dest)
         if re.search(r"\bdestet[eé]s?\b", t) and re.search(_TIENE_PERIODO, t):
             rango = self._rango_periodo(t)
             if rango:
