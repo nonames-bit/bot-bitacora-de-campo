@@ -176,3 +176,56 @@ def test_endpoint_verificar_registro(tmp_path):
     d = Database(ruta)
     assert d.query_one("SELECT COUNT(*) n FROM partos")["n"] == 0
     d.close()
+
+
+def test_alertas_extra_en_lista(db):
+    _a(db, "ABUELA")
+    _a(db, "TORO_P", sexo="Macho", madre_tag="ABUELA")
+    _a(db, "NIETA", madre_tag="ABUELA")
+    db.registrar_servicio("NIETA", fecha=_d(-30), tipo_servicio="MONTA", toro_pajilla="TORO_P")
+    _a(db, "PRONTO")
+    db.registrar_parto("PRONTO", fecha=_d(-60), sexo_cria="Macho")
+    db.registrar_servicio("PRONTO", fecha=_d(-35), tipo_servicio="IA")
+    _a(db, "DOBLE")
+    db.registrar_parto("DOBLE", fecha=_d(-500), sexo_cria="Macho")
+    db.insert("partos", {"vaca_id": db.animal_id("DOBLE"), "fecha": _d(-500), "tipo_evento": "PARTO"})
+    _a(db, "SALTO", sexo="Macho")
+    db.registrar_pesaje("SALTO", fecha=_d(-40), peso_kg=300)
+    db.registrar_pesaje("SALTO", fecha=_d(-10), peso_kg=420)
+    _a(db, "SECA")
+    db.registrar_parto("SECA", fecha=_d(-300), sexo_cria="Macho")
+    db.registrar_diagnostico("SECA", fecha=_d(-100), resultado="VACIA")
+    db.registrar_secado("SECA", fecha=_d(-5), motivo="Fin de lactancia")
+    _a(db, "SECA_OK")
+    db.registrar_parto("SECA_OK", fecha=_d(-300), sexo_cria="Macho")
+    db.registrar_diagnostico("SECA_OK", fecha=_d(-100), resultado="PREÑADA", dias_gestacion=60)
+    db.registrar_secado("SECA_OK", fecha=_d(-5), motivo="Fin de lactancia")
+    _a(db, "SECA_DESCARTE")
+    db.registrar_secado("SECA_DESCARTE", fecha=_d(-5), motivo="Baja producción")
+    _a(db, "CRECE", sexo="Macho")
+    db.registrar_pesaje("CRECE", fecha=_d(-60), peso_kg=200)
+    db.registrar_pesaje("CRECE", fecha=_d(-10), peso_kg=245)
+    t = _por_tipo(db)
+    assert t["toro_pariente"] == {"NIETA"}
+    assert t["servicio_postparto"] == {"PRONTO"}
+    assert t["evento_duplicado"] == {"DOBLE"}
+    assert t["peso_salto"] == {"SALTO"}
+    assert t["secado_no_prenada"] == {"SECA"}
+    todos = set().union(*t.values())
+    assert not {"SECA_OK", "SECA_DESCARTE", "CRECE"} & todos
+
+
+def test_alertas_extra_al_guardar(db):
+    _a(db, "R1", sexo="Macho")
+    db.registrar_tratamiento("R1", fecha=_d(-2), producto="Ivermectina", dias_retiro_carne=30)
+    av = avisos_al_guardar(db, "venta", "R1", _d(0), {}, HOY)
+    assert any("retiro de carne" in a and "Ivermectina" in a for a in av)
+    db.registrar_pesaje("R1", fecha=_d(-20), peso_kg=300)
+    assert any("subió" in a for a in avisos_al_guardar(db, "pesaje", "R1", _d(0), {"peso_kg": 380}, HOY))
+    assert avisos_al_guardar(db, "pesaje", "R1", _d(0), {"peso_kg": 320}, HOY) == []
+    assert any("Ya hay un pesaje" in a for a in avisos_al_guardar(db, "pesaje", "R1", _d(-20), {"peso_kg": 300}, HOY))
+    _a(db, "V5")
+    db.registrar_parto("V5", fecha=_d(-20), sexo_cria="Macho")
+    assert any("20 días después del parto" in a for a in avisos_al_guardar(db, "servicio", "V5", _d(0), {}, HOY))
+    assert any("palpación" in a for a in avisos_al_guardar(db, "secado", "V5", _d(0), {"motivo": "Fin de lactancia"}, HOY))
+    assert avisos_al_guardar(db, "secado", "V5", _d(0), {"motivo": "Mastitis"}, HOY) == []

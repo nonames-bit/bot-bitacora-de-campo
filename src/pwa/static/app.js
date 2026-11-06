@@ -8850,7 +8850,7 @@
       });
     });
 
-    var TIPOS_CON_AVISO = ["parto", "celo", "servicio", "palpacion"];
+    var TIPOS_CON_AVISO = ["parto", "celo", "servicio", "palpacion", "pesaje", "secado", "venta"];
     function verificarAntesDeGuardar(tipo, payload, fecha) {
       return new Promise(function (resolve) {
         var listo = false;
