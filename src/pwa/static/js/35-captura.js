@@ -207,7 +207,9 @@
         + "<div style='flex:1;'><label>Peso al destete (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 120' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero nuevo de la Cría: <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
-        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional, solo informativo -- el destete NO seca a la vaca; si dejó de ordeñarse use el botón <b>Secado</b> aparte):</p>"
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-secar-madre' style='width:20px; height:20px;'> Secar también la madre (opcional)</label>"
+        + "<div id='cap-secar-madre-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional). El destete no seca a la vaca: si también dejó de ordeñarse, marque la casilla de arriba y se guarda el Secado aparte.</p>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso de la Madre (kg): <input type='number' step='0.5' id='cap-peso-madre' placeholder='ej. 410' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Cond. Corporal Madre (1-5): <select id='cap-cc-madre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
@@ -234,7 +236,9 @@
         + "</div>"
         + "<label>Motivo: <select id='cap-motivo-secado' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Fin de lactancia'>Fin de lactancia (programado)</option><option value='Baja producción'>Baja producción</option><option value='Mastitis'>Mastitis / problema de ubre</option><option value='Preparación para el parto'>Preparación para el próximo parto</option><option value='Otro'>Otro</option></select></label>"
         + "<label>Observaciones: <input id='cap-notas' placeholder='ej. Se secó sola, sin problema' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0;'>Evento independiente del destete de la cría: registra que esta vaca dejó de ordeñarse de verdad.</p>";
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-destetar-cria' style='width:20px; height:20px;'> Destetar también la cría (opcional)</label>"
+        + "<div id='cap-destetar-cria-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Registra que esta vaca dejó de ordeñarse. Si marca la casilla, el destete de su cría se guarda como otro evento aparte.</p>";
     } else if (tipo === "pesaje") {
       h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"

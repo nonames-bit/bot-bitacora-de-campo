@@ -259,6 +259,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 ## 📍 Estado Actual
 
 ### ✅ Completado
+- [x] Registrar: casillas opcionales "Destetar también la cría" (en Secado) y "Secar también la madre" (en Destete); cada uno se guarda como su propio evento y no se duplica (2026-11-06)
 - [x] Modelos y base SQLite (`src/db/`): animales, partos, celos, servicios, tratamientos, pesajes, potreros, traslados, alertas y fotos
 - [x] Motores (`src/engine/`): reproductivo, sanitario, pasturas, crecimiento y consultas (Q&A con soporte de fotos)
 - [x] Parser NLU de 8 eventos + manejador multimodal de voz/foto/texto (`src/parsers/`)

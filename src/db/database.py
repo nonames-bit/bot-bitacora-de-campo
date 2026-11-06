@@ -1699,6 +1699,71 @@ class Database:
         )
         return dict(fila) if fila else None
 
+    def vaca_ya_secada(self, vaca_tag) -> bool:
+        """True si la vaca ya tiene un secado registrado desde su último
+        parto (o cualquier secado si no tiene partos). Evita duplicar el
+        secado cuando se marca "Secar también la madre" en un destete."""
+        vaca_id = self.resolve_animal(vaca_tag)
+        if vaca_id is None:
+            return False
+        parto = self.ultimo_parto(vaca_id)
+        desde = parto["fecha"] if parto and parto["fecha"] else "0001-01-01"
+        fila = self.query_one(
+            "SELECT 1 AS ok FROM secados WHERE animal_id = ? AND fecha >= ? LIMIT 1",
+            (vaca_id, desde),
+        )
+        return fila is not None
+
+    def destetar_cria_al_secar(self, vaca_tag, fecha=None, cria_tag=None,
+                               registrado_por=None) -> Optional[str]:
+        """Casilla "Destetar también la cría" del Secado: registra el destete
+        (evento aparte) de la cría activa sin destetar de la vaca. Devuelve
+        el arete de la cría destetada, o None si no había ninguna. No
+        duplica: una cría ya destetada no se vuelve a destetar."""
+        tag = str(cria_tag or "").strip()
+        if tag:
+            cria_id = self.resolve_animal(tag)
+            fila = self.get_animal(cria_id) if cria_id is not None else None
+            madre_id = self.resolve_animal(vaca_tag)
+            ya = cria_id is not None and self.query_one(
+                "SELECT 1 AS ok FROM destetes WHERE animal_id = ? LIMIT 1", (cria_id,))
+            # Solo la cría que el operario vio en pantalla, si sigue siendo
+            # de esta vaca, activa y sin destetar; si no, se busca de nuevo.
+            if not fila or ya or fila["madre_id"] != madre_id or fila["estado"] != "ACTIVO":
+                tag = ""
+        if not tag:
+            cria = self.cria_activa_de_madre(vaca_tag)
+            tag = cria["tag"] if cria else ""
+        if not tag:
+            return None
+        self.registrar_destete(tag, fecha=fecha, notas="Destetada junto con el secado de la madre",
+                               registrado_por=registrado_por)
+        return tag
+
+    def secar_madre_al_destetar(self, cria_tag, fecha=None, vaca_tag=None,
+                                potrero_destino=None, cond_corporal=None,
+                                registrado_por=None) -> Optional[str]:
+        """Casilla "Secar también la madre" del Destete: registra el secado
+        (evento aparte) de la madre. Devuelve el arete de la vaca secada, o
+        None si no se encontró la madre o ya estaba secada desde su último
+        parto."""
+        madre_tag = None
+        cria_id = self.resolve_animal(cria_tag) if cria_tag else None
+        fila_cria = self.get_animal(cria_id) if cria_id is not None else None
+        if fila_cria and fila_cria["madre_id"]:
+            madre = self.get_animal(fila_cria["madre_id"])
+            madre_tag = madre["tag"] if madre else None
+        if not madre_tag and vaca_tag:
+            vid = self.resolve_animal(vaca_tag)
+            madre_tag = str(vaca_tag).strip() if vid is not None else None
+        if not madre_tag or self.vaca_ya_secada(madre_tag):
+            return None
+        self.registrar_secado(madre_tag, fecha=fecha, potrero_destino=potrero_destino,
+                              cond_corporal=cond_corporal, motivo="Destete de la cría",
+                              notas="Secada junto con el destete de la cría",
+                              registrado_por=registrado_por)
+        return madre_tag
+
     def animales_activos_en_potrero(self, potrero_id: int) -> list[str]:
         """Tags de los animales ACTIVOS cuyo potrero vigente es `potrero_id`
         (último traslado por fecha/id, o potrero_id si no tiene traslados)."""
