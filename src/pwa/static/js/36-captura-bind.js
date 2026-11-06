@@ -591,6 +591,15 @@
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
+      var chkJunto = _capTipo === "secado" ? q("#cap-destetar-cria") : (_capTipo === "destete" ? q("#cap-secar-madre") : null);
+      if (chkJunto && chkJunto.checked) {
+        h += "<div style='margin-top:6px; font-size:13px; background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:6px 10px; border-radius:6px;'>"
+          + icon("checkCircle", 14)
+          + (_capTipo === "secado"
+            ? ("También se registra el <b>destete</b> de la cría" + (_criaSecado ? (" <b>" + esc(_criaSecado) + "</b>") : "") + " (evento aparte).")
+            : "También se registra el <b>secado</b> de la madre (evento aparte).")
+          + "</div>";
+      }
       // Simulador 1-toque (Fase 5.2): en Servicio/IA con vaca y toro se
       // evalúa consanguinidad 3G antes de guardar. Solo avisa, no bloquea.
       if (_capTipo === "servicio") {
@@ -685,6 +694,7 @@
       bindCamposFinanza();
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
+      bindSecadoDesteteJuntos();
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
       bindToroParto();
@@ -1328,6 +1338,57 @@
       });
     }
 
+    // Secado <-> Destete juntos: casillas opcionales "Destetar también la
+    // cría" (en Secado) y "Secar también la madre" (en Destete). Cada uno
+    // se guarda como su propio evento en el servidor; aquí solo se le
+    // muestra al operario qué animal se va a incluir.
+    var _criaSecado = null;
+    function bindSecadoDesteteJuntos() {
+      _criaSecado = null;
+      var fVaca = document.getElementById("cap-tag");
+      if (_tipoCapturaActual === "secado") {
+        var chk = document.getElementById("cap-destetar-cria");
+        var info = document.getElementById("cap-destetar-cria-info");
+        if (!chk || !info || !fVaca) return;
+        var timer = null;
+        var actualizar = function () {
+          _criaSecado = null;
+          var vaca = fVaca.value.trim();
+          if (!chk.checked) { info.textContent = ""; return; }
+          if (!vaca) { info.textContent = "Escriba primero el arete de la vaca."; return; }
+          if (!navigator.onLine) { info.textContent = "Sin señal: la cría sin destetar se busca al sincronizar."; return; }
+          info.textContent = "Buscando cría de " + vaca + "...";
+          fetch("/api/cria-activa?vaca=" + encodeURIComponent(vaca))
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (fVaca.value.trim() !== vaca) return;
+              if (res && res.encontrada) {
+                _criaSecado = res.cria_tag;
+                info.textContent = "Se destetará también la cría " + res.cria_tag + ".";
+              } else {
+                info.textContent = "Esta vaca no tiene cría sin destetar: solo se guardará el secado.";
+              }
+            })
+            .catch(function () { info.textContent = "No se pudo buscar la cría ahora; se busca al guardar."; });
+        };
+        chk.addEventListener("change", actualizar);
+        fVaca.addEventListener("blur", actualizar);
+        fVaca.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(actualizar, 600); });
+      } else if (_tipoCapturaActual === "destete") {
+        var chkM = document.getElementById("cap-secar-madre");
+        var infoM = document.getElementById("cap-secar-madre-info");
+        if (!chkM || !infoM || !fVaca) return;
+        var mostrar = function () {
+          var vaca = fVaca.value.trim();
+          infoM.textContent = !chkM.checked ? ""
+            : (vaca ? "Se guardará también el secado de la vaca " + vaca + " (si no estaba secada ya)."
+              : "Se guardará también el secado de la madre de la cría.");
+        };
+        chkM.addEventListener("change", mostrar);
+        fVaca.addEventListener("input", mostrar);
+      }
+    }
+
     // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
     // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
     var TIPOS_EVENTO_SIN_CRIA = ["ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"];
@@ -1555,6 +1616,8 @@
           payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
+          payload.secar_madre = !!(q("#cap-secar-madre") && q("#cap-secar-madre").checked);
         } else if (_tipoCapturaActual === "manejo") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.tipo_manejo = (q("#cap-tipo-manejo") && q("#cap-tipo-manejo").value) || null;
@@ -1567,6 +1630,8 @@
           payload.potrero_destino = (q("#cap-pot-secado") && q("#cap-pot-secado").value || "").trim() || null;
           payload.motivo = (q("#cap-motivo-secado") && q("#cap-motivo-secado").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.destetar_cria = !!(q("#cap-destetar-cria") && q("#cap-destetar-cria").checked);
+          if (payload.destetar_cria && _criaSecado) payload.cria_tag = _criaSecado;
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;

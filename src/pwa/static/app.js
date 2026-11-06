@@ -7081,7 +7081,9 @@
         + "<div style='flex:1;'><label>Peso al destete (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 120' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero nuevo de la Cría: <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
-        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional, solo informativo -- el destete NO seca a la vaca; si dejó de ordeñarse use el botón <b>Secado</b> aparte):</p>"
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-secar-madre' style='width:20px; height:20px;'> Secar también la madre (opcional)</label>"
+        + "<div id='cap-secar-madre-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional). El destete no seca a la vaca: si también dejó de ordeñarse, marque la casilla de arriba y se guarda el Secado aparte.</p>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso de la Madre (kg): <input type='number' step='0.5' id='cap-peso-madre' placeholder='ej. 410' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Cond. Corporal Madre (1-5): <select id='cap-cc-madre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
@@ -7108,7 +7110,9 @@
         + "</div>"
         + "<label>Motivo: <select id='cap-motivo-secado' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Fin de lactancia'>Fin de lactancia (programado)</option><option value='Baja producción'>Baja producción</option><option value='Mastitis'>Mastitis / problema de ubre</option><option value='Preparación para el parto'>Preparación para el próximo parto</option><option value='Otro'>Otro</option></select></label>"
         + "<label>Observaciones: <input id='cap-notas' placeholder='ej. Se secó sola, sin problema' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0;'>Evento independiente del destete de la cría: registra que esta vaca dejó de ordeñarse de verdad.</p>";
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-destetar-cria' style='width:20px; height:20px;'> Destetar también la cría (opcional)</label>"
+        + "<div id='cap-destetar-cria-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Registra que esta vaca dejó de ordeñarse. Si marca la casilla, el destete de su cría se guarda como otro evento aparte.</p>";
     } else if (tipo === "pesaje") {
       h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -7948,6 +7952,15 @@
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
+      var chkJunto = _capTipo === "secado" ? q("#cap-destetar-cria") : (_capTipo === "destete" ? q("#cap-secar-madre") : null);
+      if (chkJunto && chkJunto.checked) {
+        h += "<div style='margin-top:6px; font-size:13px; background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:6px 10px; border-radius:6px;'>"
+          + icon("checkCircle", 14)
+          + (_capTipo === "secado"
+            ? ("También se registra el <b>destete</b> de la cría" + (_criaSecado ? (" <b>" + esc(_criaSecado) + "</b>") : "") + " (evento aparte).")
+            : "También se registra el <b>secado</b> de la madre (evento aparte).")
+          + "</div>";
+      }
       // Simulador 1-toque (Fase 5.2): en Servicio/IA con vaca y toro se
       // evalúa consanguinidad 3G antes de guardar. Solo avisa, no bloquea.
       if (_capTipo === "servicio") {
@@ -8042,6 +8055,7 @@
       bindCamposFinanza();
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
+      bindSecadoDesteteJuntos();
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
       bindToroParto();
@@ -8685,6 +8699,57 @@
       });
     }
 
+    // Secado <-> Destete juntos: casillas opcionales "Destetar también la
+    // cría" (en Secado) y "Secar también la madre" (en Destete). Cada uno
+    // se guarda como su propio evento en el servidor; aquí solo se le
+    // muestra al operario qué animal se va a incluir.
+    var _criaSecado = null;
+    function bindSecadoDesteteJuntos() {
+      _criaSecado = null;
+      var fVaca = document.getElementById("cap-tag");
+      if (_tipoCapturaActual === "secado") {
+        var chk = document.getElementById("cap-destetar-cria");
+        var info = document.getElementById("cap-destetar-cria-info");
+        if (!chk || !info || !fVaca) return;
+        var timer = null;
+        var actualizar = function () {
+          _criaSecado = null;
+          var vaca = fVaca.value.trim();
+          if (!chk.checked) { info.textContent = ""; return; }
+          if (!vaca) { info.textContent = "Escriba primero el arete de la vaca."; return; }
+          if (!navigator.onLine) { info.textContent = "Sin señal: la cría sin destetar se busca al sincronizar."; return; }
+          info.textContent = "Buscando cría de " + vaca + "...";
+          fetch("/api/cria-activa?vaca=" + encodeURIComponent(vaca))
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (fVaca.value.trim() !== vaca) return;
+              if (res && res.encontrada) {
+                _criaSecado = res.cria_tag;
+                info.textContent = "Se destetará también la cría " + res.cria_tag + ".";
+              } else {
+                info.textContent = "Esta vaca no tiene cría sin destetar: solo se guardará el secado.";
+              }
+            })
+            .catch(function () { info.textContent = "No se pudo buscar la cría ahora; se busca al guardar."; });
+        };
+        chk.addEventListener("change", actualizar);
+        fVaca.addEventListener("blur", actualizar);
+        fVaca.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(actualizar, 600); });
+      } else if (_tipoCapturaActual === "destete") {
+        var chkM = document.getElementById("cap-secar-madre");
+        var infoM = document.getElementById("cap-secar-madre-info");
+        if (!chkM || !infoM || !fVaca) return;
+        var mostrar = function () {
+          var vaca = fVaca.value.trim();
+          infoM.textContent = !chkM.checked ? ""
+            : (vaca ? "Se guardará también el secado de la vaca " + vaca + " (si no estaba secada ya)."
+              : "Se guardará también el secado de la madre de la cría.");
+        };
+        chkM.addEventListener("change", mostrar);
+        fVaca.addEventListener("input", mostrar);
+      }
+    }
+
     // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
     // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
     var TIPOS_EVENTO_SIN_CRIA = ["ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"];
@@ -8912,6 +8977,8 @@
           payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
+          payload.secar_madre = !!(q("#cap-secar-madre") && q("#cap-secar-madre").checked);
         } else if (_tipoCapturaActual === "manejo") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.tipo_manejo = (q("#cap-tipo-manejo") && q("#cap-tipo-manejo").value) || null;
@@ -8924,6 +8991,8 @@
           payload.potrero_destino = (q("#cap-pot-secado") && q("#cap-pot-secado").value || "").trim() || null;
           payload.motivo = (q("#cap-motivo-secado") && q("#cap-motivo-secado").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.destetar_cria = !!(q("#cap-destetar-cria") && q("#cap-destetar-cria").checked);
+          if (payload.destetar_cria && _criaSecado) payload.cria_tag = _criaSecado;
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
