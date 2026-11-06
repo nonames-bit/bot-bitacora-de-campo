@@ -90,3 +90,89 @@ def test_ficha_e_inventario_muestran_los_problemas(db):
     assert any("4500" in a for a in f["avisos_datos"])
     inv = datos_inventario(db)
     assert [p["tag"] for p in inv["datos_revisar"]] == ["GORDO"]
+
+
+# ── Reproducción: gestación, celo en preñada, palpación que no cuadra ──
+from src.engine.calidad_datos import avisos_al_guardar  # noqa: E402
+
+
+def test_repro_en_lista(db):
+    _a(db, "CORTA")
+    db.registrar_servicio("CORTA", fecha=_d(-200), tipo_servicio="IA")
+    db.registrar_parto("CORTA", fecha=_d(-80), sexo_cria="Macho")  # 120 días
+    _a(db, "LARGA")
+    db.registrar_servicio("LARGA", fecha=_d(-340), tipo_servicio="IA")
+    db.registrar_parto("LARGA", fecha=_d(-10), sexo_cria="Macho")  # 330 días
+    _a(db, "BIEN")
+    db.registrar_servicio("BIEN", fecha=_d(-300), tipo_servicio="IA")
+    db.registrar_parto("BIEN", fecha=_d(-18), sexo_cria="Macho")  # 282 días
+    _a(db, "CELOPRE")
+    db.registrar_servicio("CELOPRE", fecha=_d(-120), tipo_servicio="IA")
+    db.registrar_diagnostico("CELOPRE", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=40)
+    db.registrar_celo("CELOPRE", fecha=_d(-20))
+    _a(db, "ABORTO_OK")
+    db.registrar_diagnostico("ABORTO_OK", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=40)
+    db.registrar_diagnostico("ABORTO_OK", fecha=_d(-40), resultado="VACIA")
+    db.registrar_servicio("ABORTO_OK", fecha=_d(-20), tipo_servicio="IA")
+    _a(db, "PALP")
+    db.registrar_servicio("PALP", fecha=_d(-50), tipo_servicio="IA")
+    db.registrar_diagnostico("PALP", fecha=_d(-5), resultado="PREÑADA", dias_gestacion=120)
+    t = _por_tipo(db)
+    assert t["gestacion_corta"] == {"CORTA"}
+    assert t["gestacion_larga"] == {"LARGA"}
+    assert t["celo_en_prenada"] == {"CELOPRE"}
+    assert t["palpacion_no_cuadra"] == {"PALP"}
+    todos = set().union(*t.values())
+    assert "BIEN" not in todos and "ABORTO_OK" not in todos
+
+
+def test_aviso_al_guardar(db):
+    _a(db, "V1")
+    db.registrar_servicio("V1", fecha=_d(-120), tipo_servicio="IA")
+    av = avisos_al_guardar(db, "parto", "V1", _d(0), {"tipo_evento": "PARTO"}, HOY)
+    assert any("120 días" in a for a in av)
+    # Como aborto no avisa por gestación corta.
+    assert avisos_al_guardar(db, "parto", "V1", _d(0), {"tipo_evento": "ABORTO"}, HOY) == []
+    # Parto con cría de 5 meses.
+    _a(db, "V2")
+    db.registrar_parto("V2", fecha=_d(-150), sexo_cria="Macho")
+    av = avisos_al_guardar(db, "parto", "V2", _d(0), {}, HOY)
+    assert any("150 días" in a for a in av)
+    # Celo y servicio en preñada.
+    db.registrar_diagnostico("V1", fecha=_d(-60), resultado="PREÑADA", dias_gestacion=60)
+    assert avisos_al_guardar(db, "celo", "V1", _d(0), {}, HOY)
+    assert avisos_al_guardar(db, "servicio", "V1", _d(0), {}, HOY)
+    # Arete inexistente, macho y fecha futura.
+    assert any("se va a crear" in a for a in avisos_al_guardar(db, "celo", "NOEXISTE", _d(0), {}, HOY))
+    _a(db, "T1", sexo="Macho")
+    assert any("macho" in a for a in avisos_al_guardar(db, "servicio", "T1", _d(0), {}, HOY))
+    assert any("futuro" in a for a in avisos_al_guardar(db, "celo", "V2", _d(5), {}, HOY))
+    assert not any("futuro" in a for a in avisos_al_guardar(db, "celo", "V2", _d(1), {}, HOY))
+    # Palpación coherente con el servicio: sin avisos.
+    _a(db, "V3")
+    db.registrar_servicio("V3", fecha=_d(-45), tipo_servicio="IA")
+    assert avisos_al_guardar(db, "palpacion", "V3", _d(0), {"resultado": "PREÑADA", "dias_gestacion": 45}, HOY) == []
+    assert avisos_al_guardar(db, "palpacion", "V3", _d(0), {"resultado": "PREÑADA", "dias_gestacion": 150}, HOY)
+    # Tipos sin aviso.
+    assert avisos_al_guardar(db, "pesaje", "V3", _d(0), {}, HOY) == []
+
+
+def test_endpoint_verificar_registro(tmp_path):
+    from src.pwa.app import crear_app
+    ruta = str(tmp_path / "v.db")
+    d = Database(ruta).create_tables()
+    d.registrar_animal("V9", sexo="Hembra", estado="ACTIVO", fecha_nacimiento=_d(-2000))
+    d.registrar_servicio("V9", fecha=_d(-120), tipo_servicio="IA")
+    d.close()
+    app = crear_app(ruta, password="clave")
+    app.config.update({"TESTING": True})
+    c = app.test_client()
+    c.post("/login", data={"password": "clave"})
+    r = c.post("/api/verificar-registro", json={"tipo": "parto", "fecha": HOY.isoformat(),
+                                                 "payload": {"vaca_tag": "V9"}}).get_json()
+    assert r["ok"] and any("120 días" in a for a in r["avisos"])
+    r = c.post("/api/verificar-registro", json={"tipo": "pesaje", "payload": {"animal_tag": "V9"}}).get_json()
+    assert r["avisos"] == []
+    d = Database(ruta)
+    assert d.query_one("SELECT COUNT(*) n FROM partos")["n"] == 0
+    d.close()
