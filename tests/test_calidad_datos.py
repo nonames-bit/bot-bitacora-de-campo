@@ -90,3 +90,142 @@ def test_ficha_e_inventario_muestran_los_problemas(db):
     assert any("4500" in a for a in f["avisos_datos"])
     inv = datos_inventario(db)
     assert [p["tag"] for p in inv["datos_revisar"]] == ["GORDO"]
+
+
+# ── Reproducción: gestación, celo en preñada, palpación que no cuadra ──
+from src.engine.calidad_datos import avisos_al_guardar  # noqa: E402
+
+
+def test_repro_en_lista(db):
+    _a(db, "CORTA")
+    db.registrar_servicio("CORTA", fecha=_d(-200), tipo_servicio="IA")
+    db.registrar_parto("CORTA", fecha=_d(-80), sexo_cria="Macho")  # 120 días
+    _a(db, "LARGA")
+    db.registrar_servicio("LARGA", fecha=_d(-340), tipo_servicio="IA")
+    db.registrar_parto("LARGA", fecha=_d(-10), sexo_cria="Macho")  # 330 días
+    _a(db, "BIEN")
+    db.registrar_servicio("BIEN", fecha=_d(-300), tipo_servicio="IA")
+    db.registrar_parto("BIEN", fecha=_d(-18), sexo_cria="Macho")  # 282 días
+    _a(db, "CELOPRE")
+    db.registrar_servicio("CELOPRE", fecha=_d(-120), tipo_servicio="IA")
+    db.registrar_diagnostico("CELOPRE", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=40)
+    db.registrar_celo("CELOPRE", fecha=_d(-20))
+    _a(db, "ABORTO_OK")
+    db.registrar_diagnostico("ABORTO_OK", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=40)
+    db.registrar_diagnostico("ABORTO_OK", fecha=_d(-40), resultado="VACIA")
+    db.registrar_servicio("ABORTO_OK", fecha=_d(-20), tipo_servicio="IA")
+    _a(db, "PALP")
+    db.registrar_servicio("PALP", fecha=_d(-50), tipo_servicio="IA")
+    db.registrar_diagnostico("PALP", fecha=_d(-5), resultado="PREÑADA", dias_gestacion=120)
+    t = _por_tipo(db)
+    assert t["gestacion_corta"] == {"CORTA"}
+    assert t["gestacion_larga"] == {"LARGA"}
+    assert t["celo_en_prenada"] == {"CELOPRE"}
+    assert t["palpacion_no_cuadra"] == {"PALP"}
+    todos = set().union(*t.values())
+    assert "BIEN" not in todos and "ABORTO_OK" not in todos
+
+
+def test_aviso_al_guardar(db):
+    _a(db, "V1")
+    db.registrar_servicio("V1", fecha=_d(-120), tipo_servicio="IA")
+    av = avisos_al_guardar(db, "parto", "V1", _d(0), {"tipo_evento": "PARTO"}, HOY)
+    assert any("120 días" in a for a in av)
+    # Como aborto no avisa por gestación corta.
+    assert avisos_al_guardar(db, "parto", "V1", _d(0), {"tipo_evento": "ABORTO"}, HOY) == []
+    # Parto con cría de 5 meses.
+    _a(db, "V2")
+    db.registrar_parto("V2", fecha=_d(-150), sexo_cria="Macho")
+    av = avisos_al_guardar(db, "parto", "V2", _d(0), {}, HOY)
+    assert any("150 días" in a for a in av)
+    # Celo y servicio en preñada.
+    db.registrar_diagnostico("V1", fecha=_d(-60), resultado="PREÑADA", dias_gestacion=60)
+    assert avisos_al_guardar(db, "celo", "V1", _d(0), {}, HOY)
+    assert avisos_al_guardar(db, "servicio", "V1", _d(0), {}, HOY)
+    # Arete inexistente, macho y fecha futura.
+    assert any("se va a crear" in a for a in avisos_al_guardar(db, "celo", "NOEXISTE", _d(0), {}, HOY))
+    _a(db, "T1", sexo="Macho")
+    assert any("macho" in a for a in avisos_al_guardar(db, "servicio", "T1", _d(0), {}, HOY))
+    assert any("futuro" in a for a in avisos_al_guardar(db, "celo", "V2", _d(5), {}, HOY))
+    assert not any("futuro" in a for a in avisos_al_guardar(db, "celo", "V2", _d(1), {}, HOY))
+    # Palpación coherente con el servicio: sin avisos.
+    _a(db, "V3")
+    db.registrar_servicio("V3", fecha=_d(-45), tipo_servicio="IA")
+    assert avisos_al_guardar(db, "palpacion", "V3", _d(0), {"resultado": "PREÑADA", "dias_gestacion": 45}, HOY) == []
+    assert avisos_al_guardar(db, "palpacion", "V3", _d(0), {"resultado": "PREÑADA", "dias_gestacion": 150}, HOY)
+    # Tipos sin aviso.
+    assert avisos_al_guardar(db, "pesaje", "V3", _d(0), {}, HOY) == []
+
+
+def test_endpoint_verificar_registro(tmp_path):
+    from src.pwa.app import crear_app
+    ruta = str(tmp_path / "v.db")
+    d = Database(ruta).create_tables()
+    d.registrar_animal("V9", sexo="Hembra", estado="ACTIVO", fecha_nacimiento=_d(-2000))
+    d.registrar_servicio("V9", fecha=_d(-120), tipo_servicio="IA")
+    d.close()
+    app = crear_app(ruta, password="clave")
+    app.config.update({"TESTING": True})
+    c = app.test_client()
+    c.post("/login", data={"password": "clave"})
+    r = c.post("/api/verificar-registro", json={"tipo": "parto", "fecha": HOY.isoformat(),
+                                                 "payload": {"vaca_tag": "V9"}}).get_json()
+    assert r["ok"] and any("120 días" in a for a in r["avisos"])
+    r = c.post("/api/verificar-registro", json={"tipo": "pesaje", "payload": {"animal_tag": "V9"}}).get_json()
+    assert r["avisos"] == []
+    d = Database(ruta)
+    assert d.query_one("SELECT COUNT(*) n FROM partos")["n"] == 0
+    d.close()
+
+
+def test_alertas_extra_en_lista(db):
+    _a(db, "ABUELA")
+    _a(db, "TORO_P", sexo="Macho", madre_tag="ABUELA")
+    _a(db, "NIETA", madre_tag="ABUELA")
+    db.registrar_servicio("NIETA", fecha=_d(-30), tipo_servicio="MONTA", toro_pajilla="TORO_P")
+    _a(db, "PRONTO")
+    db.registrar_parto("PRONTO", fecha=_d(-60), sexo_cria="Macho")
+    db.registrar_servicio("PRONTO", fecha=_d(-35), tipo_servicio="IA")
+    _a(db, "DOBLE")
+    db.registrar_parto("DOBLE", fecha=_d(-500), sexo_cria="Macho")
+    db.insert("partos", {"vaca_id": db.animal_id("DOBLE"), "fecha": _d(-500), "tipo_evento": "PARTO"})
+    _a(db, "SALTO", sexo="Macho")
+    db.registrar_pesaje("SALTO", fecha=_d(-40), peso_kg=300)
+    db.registrar_pesaje("SALTO", fecha=_d(-10), peso_kg=420)
+    _a(db, "SECA")
+    db.registrar_parto("SECA", fecha=_d(-300), sexo_cria="Macho")
+    db.registrar_diagnostico("SECA", fecha=_d(-100), resultado="VACIA")
+    db.registrar_secado("SECA", fecha=_d(-5), motivo="Fin de lactancia")
+    _a(db, "SECA_OK")
+    db.registrar_parto("SECA_OK", fecha=_d(-300), sexo_cria="Macho")
+    db.registrar_diagnostico("SECA_OK", fecha=_d(-100), resultado="PREÑADA", dias_gestacion=60)
+    db.registrar_secado("SECA_OK", fecha=_d(-5), motivo="Fin de lactancia")
+    _a(db, "SECA_DESCARTE")
+    db.registrar_secado("SECA_DESCARTE", fecha=_d(-5), motivo="Baja producción")
+    _a(db, "CRECE", sexo="Macho")
+    db.registrar_pesaje("CRECE", fecha=_d(-60), peso_kg=200)
+    db.registrar_pesaje("CRECE", fecha=_d(-10), peso_kg=245)
+    t = _por_tipo(db)
+    assert t["toro_pariente"] == {"NIETA"}
+    assert t["servicio_postparto"] == {"PRONTO"}
+    assert t["evento_duplicado"] == {"DOBLE"}
+    assert t["peso_salto"] == {"SALTO"}
+    assert t["secado_no_prenada"] == {"SECA"}
+    todos = set().union(*t.values())
+    assert not {"SECA_OK", "SECA_DESCARTE", "CRECE"} & todos
+
+
+def test_alertas_extra_al_guardar(db):
+    _a(db, "R1", sexo="Macho")
+    db.registrar_tratamiento("R1", fecha=_d(-2), producto="Ivermectina", dias_retiro_carne=30)
+    av = avisos_al_guardar(db, "venta", "R1", _d(0), {}, HOY)
+    assert any("retiro de carne" in a and "Ivermectina" in a for a in av)
+    db.registrar_pesaje("R1", fecha=_d(-20), peso_kg=300)
+    assert any("subió" in a for a in avisos_al_guardar(db, "pesaje", "R1", _d(0), {"peso_kg": 380}, HOY))
+    assert avisos_al_guardar(db, "pesaje", "R1", _d(0), {"peso_kg": 320}, HOY) == []
+    assert any("Ya hay un pesaje" in a for a in avisos_al_guardar(db, "pesaje", "R1", _d(-20), {"peso_kg": 300}, HOY))
+    _a(db, "V5")
+    db.registrar_parto("V5", fecha=_d(-20), sexo_cria="Macho")
+    assert any("20 días después del parto" in a for a in avisos_al_guardar(db, "servicio", "V5", _d(0), {}, HOY))
+    assert any("palpación" in a for a in avisos_al_guardar(db, "secado", "V5", _d(0), {"motivo": "Fin de lactancia"}, HOY))
+    assert avisos_al_guardar(db, "secado", "V5", _d(0), {"motivo": "Mastitis"}, HOY) == []

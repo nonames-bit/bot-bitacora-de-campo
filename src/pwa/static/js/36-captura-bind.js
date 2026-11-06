@@ -1554,6 +1554,38 @@
       });
     });
 
+    var TIPOS_CON_AVISO = ["parto", "celo", "servicio", "palpacion", "pesaje", "secado", "venta"];
+    function verificarAntesDeGuardar(tipo, payload, fecha) {
+      return new Promise(function (resolve) {
+        var listo = false;
+        function fin(av) { if (!listo) { listo = true; resolve(av || []); } }
+        setTimeout(function () { fin([]); }, 5000);
+        fetch("/api/verificar-registro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: tipo, payload: payload, fecha: fecha })
+        }).then(function (r) { return r.json(); })
+          .then(function (res) { fin((res && res.avisos) || []); })
+          .catch(function () { fin([]); });
+      });
+    }
+    function mostrarAvisosRegistro(feed, avisos, alGuardar, alCorregir) {
+      if (!feed) { if (window.confirm("Revise antes de guardar:\n\n- " + avisos.join("\n- ") + "\n\n¿Guardar igual?")) alGuardar(); return; }
+      var h = "<div class='card aviso-registro' style='border:2px solid var(--naranja, #f59e0b); padding:12px;'>"
+        + "<h4 style='margin:0 0 6px;'>" + icon("alertTriangle", 16) + "Revise antes de guardar</h4><ul style='margin:0 0 10px; padding-left:18px;'>";
+      avisos.forEach(function (a) { h += "<li style='margin-bottom:4px;'>" + esc(a) + "</li>"; });
+      h += "</ul><div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-corregir'>" + icon("pencil", 14) + "Corregir</button>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-guardar' style='background:var(--verde-marca); color:#fff; border:none; font-weight:700;'>" + icon("save", 14) + "Guardar igual</button>"
+        + "</div></div>";
+      feed.innerHTML = h;
+      try { feed.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eScr) { /* navegador viejo */ }
+      var bG = document.getElementById("btn-aviso-guardar");
+      var bC = document.getElementById("btn-aviso-corregir");
+      if (bG) bG.addEventListener("click", function () { bG.disabled = true; feed.innerHTML = ""; alGuardar(); });
+      if (bC) bC.addEventListener("click", function () { feed.innerHTML = ""; alCorregir(); });
+    }
+
     var form = document.getElementById("form-captura");
     if (form) {
       form.addEventListener("submit", function (e) {
@@ -1811,26 +1843,41 @@
           mostrarPasoCap(1);
         }
 
-        if (navigator.onLine === false) {
-          encolarOffline(tipoEnvio, payload, fecha).then(function () {
-            mostrarExito(false);
-          });
-          return;
+        function enviarRegistro() {
+          if (navigator.onLine === false) {
+            encolarOffline(tipoEnvio, payload, fecha).then(function () {
+              mostrarExito(false);
+            });
+            return;
+          }
+
+          fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
+          }).then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
+              else {
+                encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+              }
+            }).catch(function () {
+              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+            });
         }
 
-        fetch("/api/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
-        }).then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
-            else {
-              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-            }
-          }).catch(function () {
-            encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-          });
+        // Datos que no cuadran (gestación corta/larga, celo en preñada,
+        // arete que no existe...): se avisa y la persona decide si guarda
+        // igual. Sin señal, o si la revisión tarda, se guarda sin avisar
+        // (la lista "Datos a revisar" del Inventario lo encuentra después).
+        if (TIPOS_CON_AVISO.indexOf(_tipoCapturaActual) === -1 || navigator.onLine === false) {
+          enviarRegistro();
+          return;
+        }
+        verificarAntesDeGuardar(_tipoCapturaActual, payload, fecha).then(function (avisos) {
+          if (!avisos.length) { enviarRegistro(); return; }
+          mostrarAvisosRegistro(feed, avisos, enviarRegistro, function () { mostrarPasoCap(2); });
+        });
       });
     }
   }

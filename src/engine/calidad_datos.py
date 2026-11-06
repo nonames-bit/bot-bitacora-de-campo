@@ -9,7 +9,7 @@ Pesos, Editar...), que ya tiene esas acciones.
 """
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Optional
 
 try:
@@ -32,6 +32,15 @@ TIPOS = {
     "fecha_futura": ("Fecha en el futuro", "alta"),
     "evento_antes_de_nacer": ("Evento antes de nacer", "alta"),
     "partos_muy_seguidos": ("Partos muy seguidos", "media"),
+    "gestacion_corta": ("Gestación muy corta", "media"),
+    "gestacion_larga": ("Gestación muy larga", "media"),
+    "celo_en_prenada": ("Celo o servicio estando preñada", "media"),
+    "palpacion_no_cuadra": ("Palpación que no cuadra", "media"),
+    "toro_pariente": ("Servicio con toro pariente", "media"),
+    "evento_duplicado": ("Registro repetido el mismo día", "media"),
+    "peso_salto": ("Peso que no cuadra con el anterior", "media"),
+    "servicio_postparto": ("Servicio muy pronto tras el parto", "baja"),
+    "secado_no_prenada": ("Secado sin estar preñada", "baja"),
     "madre_imposible": ("Madre imposible", "media"),
     "peso_absurdo": ("Peso imposible", "media"),
     "edad_absurda": ("Edad imposible", "baja"),
@@ -159,9 +168,372 @@ def revisar_datos(db, hoy: Optional[date] = None, animal_id: Optional[int] = Non
     for r in db.query(cte + f"SELECT act.* FROM act WHERE TRIM(COALESCE(act.sexo, '')) = ''{solo}", p_solo):
         agregar("sin_sexo", r, "No tiene sexo registrado: no entra en las listas de hembras ni de machos.")
 
+    # Reproducción: gestación vs. servicio, celo/servicio en preñada y
+    # palpaciones con días que no cuadran (ver _revisar_repro).
+    for r in db.query(cte + f"SELECT act.* FROM act WHERE NOT {_MACHO.format(a='act')}{solo}", p_solo):
+        ev = _eventos_repro(db, r["id_animal"])
+        if not (ev["partos"] or ev["servicios"] or ev["celos"] or ev["diags"]):
+            continue
+        for tipo, detalle, fecha in _revisar_repro(ev):
+            agregar(tipo, r, detalle, fecha)
+        for tipo, detalle, fecha in _revisar_repro_extra(db, r["id_animal"], r["tag"], ev):
+            agregar(tipo, r, detalle, fecha)
+
+    # Registros repetidos el mismo día y pesos que saltan.
+    for r in db.query(cte + f"SELECT act.* FROM act WHERE 1=1{solo}", p_solo):
+        for tipo, detalle, fecha in _revisar_duplicados_y_pesos(db, r["id_animal"]):
+            agregar(tipo, r, detalle, fecha)
+
     orden = {"alta": 0, "media": 1, "baja": 2}
     out.sort(key=lambda x: (orden[x["gravedad"]], x["tipo"], str(x["tag"])))
     return out
+
+
+# ── Reproducción ──────────────────────────────────────────────────────
+# Gestación bovina ~283 días; lo normal va de ~270 a ~295. Fuera de este
+# rango (con servicio registrado) casi siempre falta o sobra un registro.
+GESTACION_MIN_DIAS = 260
+GESTACION_MAX_DIAS = 300
+# Más allá de esto no se compara: falta el servicio real (monta natural).
+GESTACION_SIN_DATO_DIAS = 365
+# Margen entre los días de gestación de la palpación y los del servicio.
+PALPACION_MARGEN_DIAS = 30
+PERDIDAS = ("ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL")
+
+
+def _f(valor) -> Optional[date]:
+    try:
+        return date.fromisoformat(str(valor)[:10]) if valor else None
+    except ValueError:
+        return None
+
+
+def _fc(d: date) -> str:
+    """Fecha corta legible: 12/08/2026."""
+    return d.strftime("%d/%m/%Y")
+
+
+def _eventos_repro(db, vaca_id: int) -> dict:
+    """Partos, servicios, celos y palpaciones de la vaca, con fechas date."""
+    partos = [(f, (r["tipo_evento"] or "PARTO").upper()) for r in db.query(
+        "SELECT fecha, tipo_evento FROM partos WHERE vaca_id = ?", (vaca_id,)) if (f := _f(r["fecha"]))]
+    servicios = [f for r in db.query("SELECT fecha FROM servicios WHERE vaca_id = ?", (vaca_id,))
+                 if (f := _f(r["fecha"]))]
+    celos = [f for r in db.query("SELECT fecha FROM celos WHERE vaca_id = ?", (vaca_id,)) if (f := _f(r["fecha"]))]
+    diags = [(f, (r["resultado"] or "").upper(), r["dias_gestacion"]) for r in db.query(
+        "SELECT fecha, resultado, dias_gestacion FROM diagnosticos_gestacion WHERE vaca_id = ?", (vaca_id,))
+        if (f := _f(r["fecha"]))]
+    return {"partos": sorted(partos), "servicios": sorted(servicios), "celos": sorted(celos), "diags": sorted(diags)}
+
+
+def _fin_gestacion_previa(ev: dict, antes_de: date) -> Optional[date]:
+    """Último parto o pérdida antes de la fecha (cierra la gestación anterior)."""
+    previos = [f for f, _t in ev["partos"] if f < antes_de]
+    return max(previos) if previos else None
+
+
+def _servicio_de(ev: dict, antes_de: date) -> Optional[date]:
+    """Último servicio antes de la fecha y después del parto/pérdida anterior."""
+    desde = _fin_gestacion_previa(ev, antes_de)
+    cands = [s for s in ev["servicios"] if s < antes_de and (desde is None or s > desde)]
+    return max(cands) if cands else None
+
+
+def revisar_parto(ev: dict, fecha: date) -> list[tuple[str, str]]:
+    """Gestación fuera de rango según el último servicio: [(tipo, detalle)]."""
+    s = _servicio_de(ev, fecha)
+    if s is None:
+        return []
+    d = (fecha - s).days
+    if d < GESTACION_MIN_DIAS:
+        return [("gestacion_corta", f"Parto el {_fc(fecha)}, solo {d} días después del servicio del {_fc(s)} "
+                 f"(una gestación dura ~283). Si se perdió la cría, regístrelo como Aborto; si no, "
+                 f"revise la fecha del parto o del servicio.")]
+    if GESTACION_MAX_DIAS < d <= GESTACION_SIN_DATO_DIAS:
+        return [("gestacion_larga", f"Parto el {_fc(fecha)}, {d} días después del servicio del {_fc(s)} "
+                 f"(una gestación dura ~283). Seguramente falta un servicio más reciente o la fecha está mal.")]
+    return []
+
+
+def revisar_celo_servicio(ev: dict, fecha: date, legible: str) -> list[tuple[str, str]]:
+    """Celo o servicio con la vaca confirmada preñada (sin parto ni pérdida
+    ni palpación vacía después de la palpación positiva)."""
+    positivas = [(f, dias) for f, res, dias in ev["diags"] if res == "PREÑADA" and f < fecha]
+    if not positivas:
+        return []
+    f_diag, dias = max(positivas)
+    if any(f_diag <= p < fecha for p, _t in ev["partos"]):
+        return []
+    if any(f_diag < f < fecha and res == "VACIA" for f, res, _d in ev["diags"]):
+        return []
+    concepcion = (f_diag - timedelta(days=int(dias))) if dias else (_servicio_de(ev, f_diag) or f_diag - timedelta(days=60))
+    gest = (fecha - concepcion).days
+    if gest > GESTACION_MAX_DIAS - 5:
+        return []  # ya debió parir: falta el parto, no es este registro
+    return [("celo_en_prenada", f"{legible} el {_fc(fecha)}, pero fue palpada preñada el {_fc(f_diag)} "
+             f"(tendría unos {gest} días de gestación). Si abortó, registre el aborto o una palpación vacía; "
+             f"si no, revise la vaca o la fecha.")]
+
+
+def revisar_palpacion(ev: dict, fecha: date, resultado: str, dias: Optional[int]) -> list[tuple[str, str]]:
+    """Días de preñez de la palpación contra el servicio y el último parto."""
+    if (resultado or "").upper() != "PREÑADA" or not dias:
+        return []
+    dias = int(dias)
+    if dias > GESTACION_MAX_DIAS:
+        return [("palpacion_no_cuadra", f"Palpación del {_fc(fecha)} con {dias} días de preñez: "
+                 f"una gestación no pasa de ~295.")]
+    previo = _fin_gestacion_previa(ev, fecha)
+    if previo is not None and (fecha - previo).days + 15 < dias:
+        return [("palpacion_no_cuadra", f"Palpación del {_fc(fecha)} con {dias} días de preñez, pero parió o "
+                 f"abortó el {_fc(previo)} (hace {(fecha - previo).days} días). No alcanza: revise los días o la fecha.")]
+    s = _servicio_de(ev, fecha)
+    if s is not None:
+        segun = (fecha - s).days
+        if abs(segun - dias) > PALPACION_MARGEN_DIAS:
+            return [("palpacion_no_cuadra", f"Palpación del {_fc(fecha)} con {dias} días de preñez, pero el "
+                     f"último servicio fue el {_fc(s)} ({segun} días). Falta un servicio o los días están mal.")]
+    return []
+
+
+def _revisar_repro(ev: dict) -> list[tuple[str, str, str]]:
+    out: list[tuple[str, str, str]] = []
+    for f, tipo in ev["partos"]:
+        if tipo not in PERDIDAS:
+            out += [(t, d, f.isoformat()) for t, d in revisar_parto(ev, f)]
+    for f in ev["servicios"]:
+        out += [(t, d, f.isoformat()) for t, d in revisar_celo_servicio(ev, f, "Servicio")]
+    for f in ev["celos"]:
+        out += [(t, d, f.isoformat()) for t, d in revisar_celo_servicio(ev, f, "Celo")]
+    for f, res, dias in ev["diags"]:
+        out += [(t, d, f.isoformat()) for t, d in revisar_palpacion(ev, f, res, dias)]
+    return out
+
+
+# Servicio antes de este plazo tras el parto: el útero no se ha recuperado
+# (periodo de espera voluntario 45-60 días).
+DIAS_MIN_SERVICIO_POSTPARTO = 40
+# Ganancia máxima creíble (kg/día) y caída sospechosa entre pesajes.
+GMD_MAX_KG = 2.5
+PESO_SALTO_MIN_KG = 30
+CAIDA_MAX_PCT = 0.15
+# Motivos de secado que suponen una vaca preñada.
+MOTIVOS_SECADO_PRENADA = ("FIN DE LACTANCIA", "PREPARACIÓN PARA EL PARTO", "PREPARACION PARA EL PARTO")
+
+
+def revisar_servicio_postparto(ev: dict, fecha: date) -> list[tuple[str, str]]:
+    previos = [p for p, t in ev["partos"] if p < fecha and t not in PERDIDAS]
+    if not previos:
+        return []
+    p = max(previos)
+    d = (fecha - p).days
+    if d < DIAS_MIN_SERVICIO_POSTPARTO:
+        return [("servicio_postparto", f"Servicio el {_fc(fecha)}, solo {d} días después del parto del {_fc(p)} "
+                 f"(lo mínimo son {DIAS_MIN_SERVICIO_POSTPARTO}-45). Revise la fecha o la vaca.")]
+    return []
+
+
+def revisar_toro_pariente(db, vaca_tag: str, toro: Optional[str], fecha: date) -> list[tuple[str, str]]:
+    toro = str(toro or "").strip()
+    if not toro or db.animal_id(toro) is None:
+        return []  # pajuela comercial o toro externo: sin pedigrí
+    try:
+        sim = db.simular_cruzamiento(vaca_tag, toro)
+    except Exception:
+        return []
+    if sim.get("evaluable") and not sim.get("apto"):
+        return [("toro_pariente", f"Servicio el {_fc(fecha)} con el toro {toro}, que es pariente de la vaca. "
+                 f"{sim.get('detalle') or ''}".strip())]
+    return []
+
+
+def _prenada_en(ev: dict, fecha: date) -> Optional[tuple[date, str]]:
+    """Última palpación desde el último parto/pérdida: (fecha, resultado) o None."""
+    desde = _fin_gestacion_previa(ev, fecha + timedelta(days=1))
+    diags = [(f, res) for f, res, _d in ev["diags"] if f <= fecha and (desde is None or f >= desde)]
+    return max(diags) if diags else None
+
+
+def revisar_secado(ev: dict, fecha: date, motivo: Optional[str]) -> list[tuple[str, str]]:
+    if str(motivo or "").strip().upper() not in MOTIVOS_SECADO_PRENADA:
+        return []
+    ult = _prenada_en(ev, fecha)
+    if ult and ult[1] == "PREÑADA":
+        return []
+    porque = (f"la última palpación ({_fc(ult[0])}) salió vacía" if ult
+              else "no tiene palpación de preñez desde el último parto")
+    return [("secado_no_prenada", f"Secado el {_fc(fecha)} por \"{motivo}\", pero {porque}. "
+             f"Si la vaca está preñada, registre la palpación; si no, cambie el motivo.")]
+
+
+def _revisar_repro_extra(db, vaca_id: int, vaca_tag: str, ev: dict) -> list[tuple[str, str, str]]:
+    out: list[tuple[str, str, str]] = []
+    for f in ev["servicios"]:
+        out += [(t, d, f.isoformat()) for t, d in revisar_servicio_postparto(ev, f)]
+    for r in db.query("SELECT fecha, toro_pajilla FROM servicios WHERE vaca_id = ? AND toro_pajilla IS NOT NULL "
+                      "AND TRIM(toro_pajilla) != ''", (vaca_id,)):
+        f = _f(r["fecha"])
+        if f:
+            out += [(t, d, f.isoformat()) for t, d in revisar_toro_pariente(db, vaca_tag, r["toro_pajilla"], f)]
+    for r in db.query("SELECT fecha, motivo FROM secados WHERE animal_id = ?", (vaca_id,)):
+        f = _f(r["fecha"])
+        if f:
+            out += [(t, d, f.isoformat()) for t, d in revisar_secado(ev, f, r["motivo"])]
+    return out
+
+
+# Tablas donde dos registros del mismo animal el mismo día casi siempre
+# son un doble registro (gemelos y pesajes iguales ya se excluyen).
+_DUPLICABLES = (
+    ("partos", "vaca_id", "partos", "AND COALESCE(tipo_evento, 'PARTO') != 'GEMELAR'"),
+    ("servicios", "vaca_id", "servicios", ""),
+    ("diagnosticos_gestacion", "vaca_id", "palpaciones", ""),
+    ("pesajes", "animal_id", "pesajes", ""),
+    ("secados", "animal_id", "secados", ""),
+)
+
+
+def revisar_peso(prev: Optional[tuple[date, float]], fecha: date, peso: float) -> list[tuple[str, str]]:
+    if prev is None or not peso:
+        return []
+    f0, p0 = prev
+    d = (fecha - f0).days
+    if d <= 0 or not p0:
+        return []
+    delta = peso - p0
+    if delta > max(PESO_SALTO_MIN_KG, GMD_MAX_KG * d):
+        return [("peso_salto", f"Pesó {peso:g} kg el {_fc(fecha)} y {p0:g} kg el {_fc(f0)}: subió {delta:g} kg "
+                 f"en {d} días ({delta / d:.1f} kg/día, lo máximo creíble es ~{GMD_MAX_KG:g}).")]
+    if -delta > max(PESO_SALTO_MIN_KG, CAIDA_MAX_PCT * p0):
+        return [("peso_salto", f"Pesó {peso:g} kg el {_fc(fecha)} y {p0:g} kg el {_fc(f0)}: bajó {-delta:g} kg "
+                 f"en {d} días. Revise el peso o el arete (o si el animal está enfermo).")]
+    return []
+
+
+def _revisar_duplicados_y_pesos(db, animal_id: int) -> list[tuple[str, str, str]]:
+    out: list[tuple[str, str, str]] = []
+    for tabla, col, legible, extra in _DUPLICABLES:
+        for r in db.query(f"SELECT fecha, COUNT(*) n FROM {tabla} WHERE {col} = ? AND fecha IS NOT NULL {extra} "
+                          f"GROUP BY substr(fecha, 1, 10) HAVING COUNT(*) > 1", (animal_id,)):
+            if tabla == "pesajes" and db.query_one(
+                    "SELECT COUNT(DISTINCT peso_kg) n FROM pesajes WHERE animal_id = ? AND substr(fecha, 1, 10) = ?",
+                    (animal_id, str(r["fecha"])[:10]))["n"] <= 1:
+                continue
+            out.append(("evento_duplicado", f"{r['n']} {legible} el mismo día ({str(r['fecha'])[:10]}). "
+                        f"Seguramente se registró dos veces: borre el que sobra.", str(r["fecha"])[:10]))
+    prev = None
+    for r in db.query("SELECT fecha, peso_kg FROM pesajes WHERE animal_id = ? AND peso_kg IS NOT NULL "
+                      "AND fecha IS NOT NULL ORDER BY fecha", (animal_id,)):
+        f = _f(r["fecha"])
+        if not f:
+            continue
+        p = float(r["peso_kg"])
+        out += [(t, d, f.isoformat()) for t, d in revisar_peso(prev, f, p)]
+        prev = (f, p)
+    return out
+
+
+def _ya_registrado(db, tipo: str, animal_id: int, f: date) -> Optional[str]:
+    tablas = {"parto": ("partos", "vaca_id", "un parto"), "servicio": ("servicios", "vaca_id", "un servicio"),
+              "celo": ("celos", "vaca_id", "un celo"), "palpacion": ("diagnosticos_gestacion", "vaca_id", "una palpación"),
+              "pesaje": ("pesajes", "animal_id", "un pesaje"), "secado": ("secados", "animal_id", "un secado")}
+    if tipo not in tablas:
+        return None
+    tabla, col, legible = tablas[tipo]
+    if db.query_one(f"SELECT 1 ok FROM {tabla} WHERE {col} = ? AND substr(fecha, 1, 10) = ? LIMIT 1",
+                    (animal_id, f.isoformat())):
+        return f"Ya hay {legible} de este animal el {_fc(f)}. ¿No lo registró ya?"
+    return None
+
+
+# ── Aviso al guardar ──────────────────────────────────────────────────
+TIPOS_CON_AVISO = ("parto", "celo", "servicio", "palpacion", "pesaje", "secado", "venta")
+
+
+def avisos_al_guardar(db, tipo: str, tag: str, fecha: Optional[str], datos: Optional[dict] = None,
+                      hoy: Optional[date] = None) -> list[str]:
+    """Avisos para el registro que se está por guardar (no lo guarda ni lo
+    bloquea: la persona decide si lo guarda igual)."""
+    tipo = (tipo or "").lower()
+    datos = datos or {}
+    tag = str(tag or "").strip()
+    if tipo not in TIPOS_CON_AVISO or not tag:
+        return []
+    hoy = hoy or date.today()
+    f = _f(fecha) or hoy
+    avisos: list[str] = []
+    # Un día de margen: el formulario puede poner la fecha en UTC y de
+    # noche en Colombia ya es "mañana".
+    if f > hoy + timedelta(days=1):
+        avisos.append(f"La fecha ({_fc(f)}) está en el futuro.")
+    aid = db.animal_id(tag)
+    a = db.query_one("SELECT id_animal, sexo, estado, fecha_nacimiento FROM animales WHERE id_animal = ?",
+                     (aid,)) if aid is not None else None
+    if a is None:
+        return avisos + [f"No hay ningún animal con el arete {tag}: se va a crear uno nuevo. ¿Está bien escrito?"]
+    estado = str(a["estado"] or "").upper()
+    if estado and estado != "ACTIVO":
+        avisos.append(f"El animal {tag} figura como {estado.lower()}, no está en el hato activo.")
+    if tipo in ("parto", "celo", "servicio", "palpacion", "secado") and str(a["sexo"] or "").strip().lower().startswith("m"):
+        avisos.append(f"El animal {tag} está registrado como macho.")
+    nac = _f(a["fecha_nacimiento"])
+    if nac and f < nac:
+        avisos.append(f"La fecha es anterior al nacimiento del animal ({_fc(nac)}).")
+    ev = _eventos_repro(db, a["id_animal"])
+    dup = _ya_registrado(db, tipo, a["id_animal"], f)
+    if dup and not (tipo == "parto" and str(datos.get("tipo_evento") or "").upper() == "GEMELAR"):
+        avisos.append(dup)
+    if tipo == "parto":
+        tipo_ev = str(datos.get("tipo_evento") or "PARTO").upper()
+        if nac and tipo_ev not in PERDIDAS and (f - nac).days < EDAD_MIN_PARTO_DIAS:
+            avisos.append(f"El animal tiene apenas {round((f - nac).days / 30.44, 1)} meses: muy joven para parir. "
+                          f"¿No será el parto de la madre?")
+        previos = [(p, t) for p, t in ev["partos"] if p < f and t not in PERDIDAS]
+        if previos and tipo_ev not in PERDIDAS:
+            p = max(previos)[0]
+            if (f - p).days < DIAS_MIN_ENTRE_PARTOS:
+                avisos.append(f"Ya tiene un parto el {_fc(p)}, hace solo {(f - p).days} días (su cría tendría "
+                              f"{round((f - p).days / 30.44, 1)} meses).")
+        if tipo_ev not in PERDIDAS:
+            avisos += [d for _t, d in revisar_parto(ev, f)]
+    elif tipo in ("celo", "servicio"):
+        avisos += [d for _t, d in revisar_celo_servicio(ev, f, "Celo" if tipo == "celo" else "Servicio")]
+        if tipo == "servicio":
+            avisos += [d for _t, d in revisar_servicio_postparto(ev, f)]
+            avisos += [d for _t, d in revisar_toro_pariente(db, tag, datos.get("toro_pajilla") or datos.get("toro"), f)]
+    elif tipo == "secado":
+        avisos += [d for _t, d in revisar_secado(ev, f, datos.get("motivo"))]
+    elif tipo == "pesaje":
+        try:
+            peso = float(datos.get("peso_kg") or 0)
+        except (TypeError, ValueError):
+            peso = 0
+        if peso:
+            ant = db.query_one("SELECT fecha, peso_kg FROM pesajes WHERE animal_id = ? AND peso_kg IS NOT NULL "
+                               "AND fecha < ? ORDER BY fecha DESC LIMIT 1", (a["id_animal"], f.isoformat()))
+            prev = (_f(ant["fecha"]), float(ant["peso_kg"])) if ant and _f(ant["fecha"]) else None
+            avisos += [d for _t, d in revisar_peso(prev, f, peso)]
+            if peso > PESO_MAX_KG or peso < PESO_MIN_KG:
+                avisos.append(f"{peso:g} kg no es un peso posible para un bovino.")
+    elif tipo == "venta":
+        r = db.query_one("SELECT MAX(fecha_fin_retiro_carne) fin FROM tratamientos WHERE animal_id = ?",
+                         (a["id_animal"],))
+        fin = _f(r["fin"]) if r else None
+        if fin and fin > f:
+            prod = db.query_one("SELECT producto FROM tratamientos WHERE animal_id = ? AND fecha_fin_retiro_carne = ?",
+                                (a["id_animal"], r["fin"]))
+            avisos.append(f"Tiene retiro de carne hasta el {_fc(fin)}"
+                          + (f" por {prod['producto']}" if prod and prod["producto"] else "")
+                          + ". No debería venderse para sacrificio antes de esa fecha.")
+    elif tipo == "palpacion":
+        dias = datos.get("dias_gestacion")
+        try:
+            dias = int(dias) if dias not in (None, "") else None
+        except (TypeError, ValueError):
+            dias = None
+        res = str(datos.get("resultado") or "PREÑADA").upper().replace("PRENADA", "PREÑADA")
+        avisos += [d for _t, d in revisar_palpacion(ev, f, res, dias)]
+    return avisos
 
 
 def problemas_de_animal(db, animal_id: int, hoy: Optional[date] = None) -> list[dict[str, Any]]:
