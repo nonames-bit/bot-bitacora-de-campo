@@ -56,6 +56,30 @@ def registrar(app, ctx, h):
         out["rol"] = _rol_actual()
         return jsonify(out)
 
+    @app.get("/api/indicadores")
+    def api_indicadores():
+        """Más → Indicadores: todos los indicadores del hato con meta y
+        semáforo (engine/indicadores.py). Solo OWNER y ADMIN."""
+        if _rol_actual() not in ("OWNER", "ADMIN", "ADMINISTRADOR"):
+            return jsonify({"error": "Solo el propietario o un administrador ven los indicadores."}), 403
+        try:
+            from ...engine.indicadores import indicadores_hato
+        except ImportError:  # ejecución directa
+            from src.engine.indicadores import indicadores_hato  # type: ignore
+        db = _db(db_path)
+        try:
+            out = indicadores_hato(db)
+        except Exception:
+            logger.exception("api_indicadores fallo")
+            return _error_interno()
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+        out["rol"] = _rol_actual()
+        return jsonify(out)
+
     @app.get("/api/carne")
     def api_carne():
         """Reportes de carne estilo Software Ganadero (solo lectura, PWA)."""

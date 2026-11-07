@@ -19,6 +19,7 @@
     mercado:   { kpis: 3, graf: 0, tabla: 8 },
     usuarios:  { kpis: 0, graf: 0, tabla: 5 },
     revision:  { kpis: 0, graf: 0, tabla: 4 },
+    indicadores: { kpis: 6, graf: 0, tabla: 4 },
     reportes:  { kpis: 0, graf: 0, tabla: 8 },
     potreros:  { kpis: 0, graf: 0, tabla: 8 }
   };

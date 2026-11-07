@@ -4972,3 +4972,29 @@ button:active,
   width: 46px;
   cursor: pointer;
 }
+
+/* ---------- Indicadores (Más → Indicadores, 47-indicadores.js) ---------- */
+.ind-resumen { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+.ind-chip { font-size: 12.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid currentColor; }
+.ind-chip.ind-verde { color: var(--color-verde-txt); }
+.ind-chip.ind-ambar { color: var(--color-ambar-txt); }
+.ind-chip.ind-rojo { color: var(--color-rojo-txt); }
+.ind-chip.ind-gris { color: var(--texto-suave); }
+.ind-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ind-card { padding: 9px 10px; margin: 0; border-left: 5px solid var(--borde-suave); min-width: 0; }
+.ind-card.ind-verde { border-left-color: var(--color-verde-txt); }
+.ind-card.ind-ambar { border-left-color: var(--color-ambar-txt); }
+.ind-card.ind-rojo { border-left-color: var(--color-rojo-txt); }
+.ind-card summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.ind-card summary::-webkit-details-marker { display: none; }
+.ind-nombre { font-size: 12.5px; font-weight: 600; color: var(--texto-suave); line-height: 1.25; }
+.ind-valor { font-size: 20px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.ind-meta { font-size: 11.5px; color: var(--texto-suave); line-height: 1.3; }
+.ind-ayuda { font-size: 12px; color: var(--texto); margin: 8px 0 0; line-height: 1.4; }
+.ind-lista { padding: 12px 14px; margin-bottom: 12px; }
+.ind-lista-tit { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.ind-lista ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.ind-lista li { padding: 5px 0; border-top: 1px solid var(--borde-suave); display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; }
+.ind-lista li small { color: var(--texto-suave); }
+.ind-ficha { background: none; border: none; padding: 0; font-weight: 700; color: var(--verde-marca); text-decoration: underline; cursor: pointer; font-size: 14px; }
+.ind-motivo { font-size: 12.5px; color: var(--texto-suave); flex-basis: 100%; }

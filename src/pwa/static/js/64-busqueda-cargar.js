@@ -397,6 +397,18 @@
       return;
     }
 
+    if (actual === "indicadores") {
+      // Cálculo pesado (12 meses de historia): solo al entrar, no en el refresco silencioso.
+      if (!animar) return;
+      skeleton(vista, "indicadores");
+      fetchJSON("/api/indicadores", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderIndicadores(d), true);
+        bindIndicadores();
+      }, vista);
+      return;
+    }
+
     if (actual === "reportes") {
       // No pide datos: la lista es fija y los archivos se arman al descargar.
       if (!animar) return;
