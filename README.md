@@ -260,6 +260,7 @@ y `--imagen ruta.jpg`, además de `--db` para elegir la base SQLite destino.
 
 ### ✅ Completado
 - [x] Registrar: casillas opcionales "Destetar también la cría" (en Secado) y "Secar también la madre" (en Destete); cada uno se guarda como su propio evento y no se duplica (2026-11-06)
+- [x] Reproducción → pestaña "Calculadora": de fecha de servicio a parto probable (283 d), celo de repetición, ecografía, palpación y secado; de fecha de parto a servicio probable; de meses de preñez a parto y secado. No guarda nada. La lista "Secar" ahora avisa 2 meses antes del parto (antes 7 meses de preñez) (2026-11-07)
 - [x] Modelos y base SQLite (`src/db/`): animales, partos, celos, servicios, tratamientos, pesajes, potreros, traslados, alertas y fotos
 - [x] Motores (`src/engine/`): reproductivo, sanitario, pasturas, crecimiento y consultas (Q&A con soporte de fotos)
 - [x] Parser NLU de 8 eventos + manejador multimodal de voz/foto/texto (`src/parsers/`)

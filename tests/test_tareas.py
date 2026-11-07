@@ -167,17 +167,23 @@ def test_manejo_tipo_invalido(db):
         db.registrar_manejo("X", "OTRA_COSA")
 
 
-def test_secar_preñez_7_meses_y_una_fila_si_cumple_ambas(db):
+def test_secar_2_meses_antes_del_parto_y_una_fila_si_cumple_ambas(db):
     db.registrar_potrero(nombre="ORDENO", codigo="P1")
     _a(db, "P212", potrero="ORDENO")
     db.registrar_parto("P212", fecha=_d(-280), sexo_cria="Macho")
-    db.registrar_diagnostico("P212", fecha=_d(-62), resultado="PREÑADA", dias_gestacion=150)
+    db.registrar_diagnostico("P212", fecha=_d(-75), resultado="PREÑADA", dias_gestacion=150)
+    # Día 222 de preñez (faltan 61 días para el parto): todavía no se seca.
+    _a(db, "P222", potrero="ORDENO")
+    db.registrar_parto("P222", fecha=_d(-280), sexo_cria="Macho")
+    db.registrar_diagnostico("P222", fecha=_d(-72), resultado="PREÑADA", dias_gestacion=150)
     _a(db, "AMBAS", potrero="ORDENO")
     db.registrar_parto("AMBAS", fecha=_d(-400), sexo_cria="Macho")
-    db.registrar_diagnostico("AMBAS", fecha=_d(-70), resultado="PREÑADA", dias_gestacion=150)
+    db.registrar_diagnostico("AMBAS", fecha=_d(-80), resultado="PREÑADA", dias_gestacion=150)
     t = datos_tareas(db, HOY)
     secar = {f["tag"]: f for f in t["secar"]}
     assert "Preñez" in secar["P212"]["motivo"]
+    assert secar["P212"]["dias_para_parto"] == 58
+    assert "P222" not in secar
     assert [f["tag"] for f in t["secar"]].count("AMBAS") == 1
     assert "Preñez" in secar["AMBAS"]["motivo"] and "Lactancia larga" in secar["AMBAS"]["motivo"]
 

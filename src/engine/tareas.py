@@ -49,7 +49,9 @@ logger = logging.getLogger(__name__)
 GESTACION = 283
 DIAS_DATO_VIGENTE = 365
 DIAS_PALPAR_MIN = 35
-DIAS_SECAR = 210  # 7 meses de preñez
+# Secar 2 meses antes del parto (se ordeña hasta ese momento; Jaime, 2026-11-07).
+# Igual que reproductive_engine.fecha_secado: FEP - 60 = día 223 de preñez.
+DIAS_SECAR = GESTACION - 60
 DIAS_GESTACION_MAX = 300
 DIAS_SERVIR_POSPARTO = 45
 DIAS_SERVICIO_RECIENTE = 21
