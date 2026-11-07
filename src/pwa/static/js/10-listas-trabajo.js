@@ -2,7 +2,7 @@
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
     palpar: { nombre: "Palpar", icono: "hand", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
+    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (a 2 meses del parto o más de 305 días en leche)." },
     servir: { nombre: "Servir", icono: "syringe", vacio: "Ninguna vaca parida pendiente de servir." },
     novillas: { nombre: "Novillas a entorar", icono: "cow", vacio: "Ninguna novilla lista para entorar." },
     partos: { nombre: "Partos", icono: "parto", vacio: "Ningún parto próximo ni atrasado." },

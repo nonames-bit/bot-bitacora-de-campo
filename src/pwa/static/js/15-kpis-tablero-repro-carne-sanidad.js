@@ -548,11 +548,13 @@
         ["motivo", "Motivo"],
         ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
+    h += marcaPestana("calculadora") + renderCalculadoraRepro();
     return armarPestanas("repro", h, [
       { k: "hoy", t: "Hoy", icono: "calendar" },
       { k: "indicadores", t: "Indicadores", icono: "chartBar" },
       { k: "termo", t: "Termo e IATF", icono: "snowflake" },
-      { k: "servicios", t: "Servicios y toros", icono: "sperm" }
+      { k: "servicios", t: "Servicios y toros", icono: "sperm" },
+      { k: "calculadora", t: "Calculadora", icono: "hourglass" }
     ]);
   }
   // Rangos de fecha de la prueba de comportamiento (Carne) y de servicios
