@@ -4399,6 +4399,19 @@ textarea.ronda-campo { resize: vertical; min-height: 64px; }
 .chk-seca input { width: 20px; height: 20px; }
 .fila-chk.hecha { opacity: .75; }
 .chk-ok { margin-top: 4px; font-weight: 700; color: var(--color-verde-txt); font-size: 13px; }
+/* Calculadora de fechas (Reproducción → Calculadora) */
+.calc-card { padding: 16px; margin-bottom: 14px; background: var(--superficie); border-left: 5px solid var(--verde-marca); }
+.calc-campos { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 12px; }
+.calc-campos label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; flex: 1 1 150px; min-width: 0; }
+.calc-campos input, .calc-campos select { width: 100%; min-height: 44px; padding: 8px; border-radius: 6px; border: 1px solid var(--borde-fuerte); background: var(--fondo-card); color: var(--texto); font-size: 16px; box-sizing: border-box; }
+.calc-filas { display: flex; flex-direction: column; gap: 8px; }
+.calc-fila { padding: 10px 12px; border: 1px solid var(--borde-fuerte); border-radius: 8px; background: var(--fondo-card); }
+.calc-destacada { border: 2px solid var(--verde-marca); }
+.calc-destacada .calc-fecha b { font-size: 17px; color: var(--verde-marca); }
+.calc-nombre { font-size: 12.5px; font-weight: 600; opacity: .8; }
+.calc-fecha { font-size: 15px; margin-top: 2px; }
+.calc-rel, .calc-nota { font-size: 12.5px; opacity: .75; }
+.calc-nota { margin-top: 2px; }
 .lt-card-tablero { padding: 12px 16px; margin-bottom: 14px; background: var(--superficie); border-left: 5px solid var(--verde-marca); }
 .lt-card-tablero .chip { cursor: pointer; min-height: 36px; padding: 4px 12px; border: 1px solid var(--borde-fuerte); background: var(--superficie); color: var(--texto); }
 .lt-grupo-accion { padding: 6px 10px 2px 14px; margin-left: 6px; }

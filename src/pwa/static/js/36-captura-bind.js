@@ -591,6 +591,15 @@
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
+      var chkJunto = _capTipo === "secado" ? q("#cap-destetar-cria") : (_capTipo === "destete" ? q("#cap-secar-madre") : null);
+      if (chkJunto && chkJunto.checked) {
+        h += "<div style='margin-top:6px; font-size:13px; background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:6px 10px; border-radius:6px;'>"
+          + icon("checkCircle", 14)
+          + (_capTipo === "secado"
+            ? ("También se registra el <b>destete</b> de la cría" + (_criaSecado ? (" <b>" + esc(_criaSecado) + "</b>") : "") + " (evento aparte).")
+            : "También se registra el <b>secado</b> de la madre (evento aparte).")
+          + "</div>";
+      }
       // Simulador 1-toque (Fase 5.2): en Servicio/IA con vaca y toro se
       // evalúa consanguinidad 3G antes de guardar. Solo avisa, no bloquea.
       if (_capTipo === "servicio") {
@@ -685,6 +694,7 @@
       bindCamposFinanza();
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
+      bindSecadoDesteteJuntos();
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
       bindToroParto();
@@ -1328,6 +1338,57 @@
       });
     }
 
+    // Secado <-> Destete juntos: casillas opcionales "Destetar también la
+    // cría" (en Secado) y "Secar también la madre" (en Destete). Cada uno
+    // se guarda como su propio evento en el servidor; aquí solo se le
+    // muestra al operario qué animal se va a incluir.
+    var _criaSecado = null;
+    function bindSecadoDesteteJuntos() {
+      _criaSecado = null;
+      var fVaca = document.getElementById("cap-tag");
+      if (_tipoCapturaActual === "secado") {
+        var chk = document.getElementById("cap-destetar-cria");
+        var info = document.getElementById("cap-destetar-cria-info");
+        if (!chk || !info || !fVaca) return;
+        var timer = null;
+        var actualizar = function () {
+          _criaSecado = null;
+          var vaca = fVaca.value.trim();
+          if (!chk.checked) { info.textContent = ""; return; }
+          if (!vaca) { info.textContent = "Escriba primero el arete de la vaca."; return; }
+          if (!navigator.onLine) { info.textContent = "Sin señal: la cría sin destetar se busca al sincronizar."; return; }
+          info.textContent = "Buscando cría de " + vaca + "...";
+          fetch("/api/cria-activa?vaca=" + encodeURIComponent(vaca))
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (fVaca.value.trim() !== vaca) return;
+              if (res && res.encontrada) {
+                _criaSecado = res.cria_tag;
+                info.textContent = "Se destetará también la cría " + res.cria_tag + ".";
+              } else {
+                info.textContent = "Esta vaca no tiene cría sin destetar: solo se guardará el secado.";
+              }
+            })
+            .catch(function () { info.textContent = "No se pudo buscar la cría ahora; se busca al guardar."; });
+        };
+        chk.addEventListener("change", actualizar);
+        fVaca.addEventListener("blur", actualizar);
+        fVaca.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(actualizar, 600); });
+      } else if (_tipoCapturaActual === "destete") {
+        var chkM = document.getElementById("cap-secar-madre");
+        var infoM = document.getElementById("cap-secar-madre-info");
+        if (!chkM || !infoM || !fVaca) return;
+        var mostrar = function () {
+          var vaca = fVaca.value.trim();
+          infoM.textContent = !chkM.checked ? ""
+            : (vaca ? "Se guardará también el secado de la vaca " + vaca + " (si no estaba secada ya)."
+              : "Se guardará también el secado de la madre de la cría.");
+        };
+        chkM.addEventListener("change", mostrar);
+        fVaca.addEventListener("input", mostrar);
+      }
+    }
+
     // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
     // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
     var TIPOS_EVENTO_SIN_CRIA = ["ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"];
@@ -1493,6 +1554,38 @@
       });
     });
 
+    var TIPOS_CON_AVISO = ["parto", "celo", "servicio", "palpacion", "pesaje", "secado", "venta"];
+    function verificarAntesDeGuardar(tipo, payload, fecha) {
+      return new Promise(function (resolve) {
+        var listo = false;
+        function fin(av) { if (!listo) { listo = true; resolve(av || []); } }
+        setTimeout(function () { fin([]); }, 5000);
+        fetch("/api/verificar-registro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: tipo, payload: payload, fecha: fecha })
+        }).then(function (r) { return r.json(); })
+          .then(function (res) { fin((res && res.avisos) || []); })
+          .catch(function () { fin([]); });
+      });
+    }
+    function mostrarAvisosRegistro(feed, avisos, alGuardar, alCorregir) {
+      if (!feed) { if (window.confirm("Revise antes de guardar:\n\n- " + avisos.join("\n- ") + "\n\n¿Guardar igual?")) alGuardar(); return; }
+      var h = "<div class='card aviso-registro' style='border:2px solid var(--naranja, #f59e0b); padding:12px;'>"
+        + "<h4 style='margin:0 0 6px;'>" + icon("alertTriangle", 16) + "Revise antes de guardar</h4><ul style='margin:0 0 10px; padding-left:18px;'>";
+      avisos.forEach(function (a) { h += "<li style='margin-bottom:4px;'>" + esc(a) + "</li>"; });
+      h += "</ul><div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-corregir'>" + icon("pencil", 14) + "Corregir</button>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-guardar' style='background:var(--verde-marca); color:#fff; border:none; font-weight:700;'>" + icon("save", 14) + "Guardar igual</button>"
+        + "</div></div>";
+      feed.innerHTML = h;
+      try { feed.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eScr) { /* navegador viejo */ }
+      var bG = document.getElementById("btn-aviso-guardar");
+      var bC = document.getElementById("btn-aviso-corregir");
+      if (bG) bG.addEventListener("click", function () { bG.disabled = true; feed.innerHTML = ""; alGuardar(); });
+      if (bC) bC.addEventListener("click", function () { feed.innerHTML = ""; alCorregir(); });
+    }
+
     var form = document.getElementById("form-captura");
     if (form) {
       form.addEventListener("submit", function (e) {
@@ -1555,6 +1648,8 @@
           payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
+          payload.secar_madre = !!(q("#cap-secar-madre") && q("#cap-secar-madre").checked);
         } else if (_tipoCapturaActual === "manejo") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.tipo_manejo = (q("#cap-tipo-manejo") && q("#cap-tipo-manejo").value) || null;
@@ -1567,6 +1662,8 @@
           payload.potrero_destino = (q("#cap-pot-secado") && q("#cap-pot-secado").value || "").trim() || null;
           payload.motivo = (q("#cap-motivo-secado") && q("#cap-motivo-secado").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.destetar_cria = !!(q("#cap-destetar-cria") && q("#cap-destetar-cria").checked);
+          if (payload.destetar_cria && _criaSecado) payload.cria_tag = _criaSecado;
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
@@ -1746,26 +1843,41 @@
           mostrarPasoCap(1);
         }
 
-        if (navigator.onLine === false) {
-          encolarOffline(tipoEnvio, payload, fecha).then(function () {
-            mostrarExito(false);
-          });
-          return;
+        function enviarRegistro() {
+          if (navigator.onLine === false) {
+            encolarOffline(tipoEnvio, payload, fecha).then(function () {
+              mostrarExito(false);
+            });
+            return;
+          }
+
+          fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
+          }).then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
+              else {
+                encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+              }
+            }).catch(function () {
+              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+            });
         }
 
-        fetch("/api/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
-        }).then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
-            else {
-              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-            }
-          }).catch(function () {
-            encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-          });
+        // Datos que no cuadran (gestación corta/larga, celo en preñada,
+        // arete que no existe...): se avisa y la persona decide si guarda
+        // igual. Sin señal, o si la revisión tarda, se guarda sin avisar
+        // (la lista "Datos a revisar" del Inventario lo encuentra después).
+        if (TIPOS_CON_AVISO.indexOf(_tipoCapturaActual) === -1 || navigator.onLine === false) {
+          enviarRegistro();
+          return;
+        }
+        verificarAntesDeGuardar(_tipoCapturaActual, payload, fecha).then(function (avisos) {
+          if (!avisos.length) { enviarRegistro(); return; }
+          mostrarAvisosRegistro(feed, avisos, enviarRegistro, function () { mostrarPasoCap(2); });
+        });
       });
     }
   }

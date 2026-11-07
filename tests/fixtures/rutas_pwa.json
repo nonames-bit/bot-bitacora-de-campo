@@ -883,6 +883,13 @@
 ]
 ],
 [
+"/api/verificar-registro",
+"api_verificar_registro",
+[
+"POST"
+]
+],
+[
 "/api/version",
 "version_app",
 [

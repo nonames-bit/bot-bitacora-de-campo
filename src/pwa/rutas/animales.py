@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 from flask import jsonify, request, session
 from ...engine import lactancia as _lactancia
+from ...engine.calidad_datos import avisos_al_guardar as _avisos_al_guardar
 from ...engine.genetic_engine import CATALOGO_RAZAS_PREDEFINIDAS as _CATALOGO_RAZAS_PREDEFINIDAS
 from ...engine.genetic_engine import generar_resumen_zootecnico as _generar_resumen_zootecnico
 from ...engine.genetic_engine import normalizar_nombre_raza as _normalizar_nombre_raza
@@ -457,5 +458,26 @@ def registrar(app, ctx, h):
         finally:
             try:
                 db_a.close()
+            except Exception:
+                pass
+
+    @app.post("/api/verificar-registro")
+    def api_verificar_registro():
+        """Avisos antes de guardar un parto, celo, servicio o palpación que
+        no cuadra (engine/calidad_datos.py). Solo avisa: no guarda ni
+        bloquea. Si algo falla responde sin avisos para no frenar el registro."""
+        datos = request.get_json(silent=True) or {}
+        payload = datos.get("payload") or {}
+        tag = payload.get("vaca_tag") or payload.get("animal_tag") or payload.get("tag")
+        db_v = _db(db_path)
+        try:
+            avisos = _avisos_al_guardar(db_v, datos.get("tipo"), tag, datos.get("fecha"), payload)
+            return jsonify({"ok": True, "avisos": avisos})
+        except Exception:
+            logger.error("verificar-registro fallo", exc_info=True)
+            return jsonify({"ok": True, "avisos": []})
+        finally:
+            try:
+                db_v.close()
             except Exception:
                 pass

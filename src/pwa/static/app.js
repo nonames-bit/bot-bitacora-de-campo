@@ -864,7 +864,7 @@
   // manejo: tipo que registra el botón "Hecho" (evento "manejo" en /api/sync).
   var LT_INFO = {
     palpar: { nombre: "Palpar", icono: "hand", vacio: "Ninguna vaca servida pendiente de palpar." },
-    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (preñez ≥ 7 meses o más de 305 días en leche)." },
+    secar: { nombre: "Secar", icono: "milk", vacio: "Ninguna vaca en ordeño para secar (a 2 meses del parto o más de 305 días en leche)." },
     servir: { nombre: "Servir", icono: "syringe", vacio: "Ninguna vaca parida pendiente de servir." },
     novillas: { nombre: "Novillas a entorar", icono: "cow", vacio: "Ninguna novilla lista para entorar." },
     partos: { nombre: "Partos", icono: "parto", vacio: "Ningún parto próximo ni atrasado." },
@@ -1746,11 +1746,13 @@
         ["motivo", "Motivo"],
         ["tag", "", "text", function (v, t) { return botonToroEstado(t); }]
       ], "Sin reproductores registrados.");
+    h += marcaPestana("calculadora") + renderCalculadoraRepro();
     return armarPestanas("repro", h, [
       { k: "hoy", t: "Hoy", icono: "calendar" },
       { k: "indicadores", t: "Indicadores", icono: "chartBar" },
       { k: "termo", t: "Termo e IATF", icono: "snowflake" },
-      { k: "servicios", t: "Servicios y toros", icono: "sperm" }
+      { k: "servicios", t: "Servicios y toros", icono: "sperm" },
+      { k: "calculadora", t: "Calculadora", icono: "hourglass" }
     ]);
   }
   // Rangos de fecha de la prueba de comportamiento (Carne) y de servicios
@@ -2052,6 +2054,147 @@
       });
     }
   }
+  // ---------- Calculadora reproductiva (Reproducción → pestaña "Calculadora") ----------
+  // Cuentas de fechas para cuando no hay registro: "se sirvió hoy, ¿cuándo pare?",
+  // "parió hoy, ¿cuándo la sirvieron?", "está preñada de X meses". No guarda nada:
+  // todo se calcula en el celular. Mismas reglas que engine/reproductive_engine.py
+  // y engine/tareas.py: gestación 283 d, celo cada 21 d, ecografía día 35,
+  // palpación día 60, secar 2 meses antes del parto (Jaime, 2026-11-07: se ordeña
+  // hasta ese momento), servir desde 45 d posparto.
+  var CALC_GESTACION = 283;
+  var CALC_RANGO_PARTO = 10;  // un parto normal cae ±10 días de la fecha probable
+  var CALC_SECAR_ANTES = 60;
+  var CALC_CELO = 21;
+  var CALC_ECOGRAFIA = 35;
+  var CALC_PALPACION = 60;
+  var CALC_SERVIR_POSPARTO = 45;
+  var CALC_DIAS_MES = 30;
+  var CALC_MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  var CALC_DIAS_SEM = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+  var _calcModo = "servicio";
+
+  function calcHoyIso() {
+    var d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  // Fechas a mediodía local para que el cambio de hora nunca corra un día.
+  function calcFecha(iso) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+    return m ? new Date(+m[1], +m[2] - 1, +m[3], 12) : null;
+  }
+  function calcSumar(f, dias) { return new Date(f.getFullYear(), f.getMonth(), f.getDate() + dias, 12); }
+  function calcDiasEntre(a, b) { return Math.round((b - a) / 86400000); }
+  function calcTexto(f) {
+    return CALC_DIAS_SEM[f.getDay()] + " " + f.getDate() + " " + CALC_MESES[f.getMonth()] + " " + f.getFullYear();
+  }
+  function calcRelativo(f) {
+    var n = calcDiasEntre(calcFecha(calcHoyIso()), f);
+    if (n === 0) return "hoy";
+    if (n === 1) return "mañana";
+    if (n === -1) return "ayer";
+    return n > 0 ? "en " + n + " días" : "hace " + (-n) + " días";
+  }
+
+  // Filas del resultado: [nombre, fecha, nota, destacada]. Pura, sin DOM.
+  function calcularFechasRepro(modo, fechaIso, meses) {
+    var f = calcFecha(fechaIso);
+    if (!f) return null;
+    var filas = [];
+    if (modo === "servicio") {
+      var parto = calcSumar(f, CALC_GESTACION);
+      filas.push(["Si no quedó preñada, vuelve a calentar", calcSumar(f, CALC_CELO), "y otra vez el " + calcTexto(calcSumar(f, 2 * CALC_CELO)), false]);
+      filas.push(["Ecografía", calcSumar(f, CALC_ECOGRAFIA), "día " + CALC_ECOGRAFIA, false]);
+      filas.push(["Palpación", calcSumar(f, CALC_PALPACION), "día " + CALC_PALPACION, false]);
+      filas.push(["Secar", calcSumar(parto, -CALC_SECAR_ANTES), "2 meses antes del parto", false]);
+      filas.push(["Parto probable", parto, "entre el " + calcTexto(calcSumar(parto, -CALC_RANGO_PARTO)) + " y el " + calcTexto(calcSumar(parto, CALC_RANGO_PARTO)), true]);
+    } else if (modo === "parto") {
+      var serv = calcSumar(f, -CALC_GESTACION);
+      filas.push(["Servicio probable", serv, "entre el " + calcTexto(calcSumar(serv, -CALC_RANGO_PARTO)) + " y el " + calcTexto(calcSumar(serv, CALC_RANGO_PARTO)), true]);
+      filas.push(["Se puede volver a servir desde", calcSumar(f, CALC_SERVIR_POSPARTO), CALC_SERVIR_POSPARTO + " días después del parto", false]);
+      filas.push(["Para un ternero por año, preñarla antes del", calcSumar(f, 365 - CALC_GESTACION), "a los " + (365 - CALC_GESTACION) + " días del parto", false]);
+    } else if (modo === "prenada") {
+      var m = parseInt(meses, 10);
+      if (!(m >= 1 && m <= 9)) return null;
+      var gest = m * CALC_DIAS_MES;
+      var partoP = calcSumar(f, CALC_GESTACION - gest);
+      var secar = calcSumar(partoP, -CALC_SECAR_ANTES);
+      filas.push(["Servicio aproximado", calcSumar(f, -gest), "hace unos " + m + (m === 1 ? " mes" : " meses"), false]);
+      filas.push(["Secar", secar, secar < calcFecha(calcHoyIso()) ? "ya debería estar seca" : "2 meses antes del parto", false]);
+      filas.push(["Parto probable", partoP, "entre el " + calcTexto(calcSumar(partoP, -15)) + " y el " + calcTexto(calcSumar(partoP, 15)), true]);
+    } else {
+      return null;
+    }
+    return filas;
+  }
+
+  function calcResultadoHtml(fecha, meses) {
+    var filas = calcularFechasRepro(_calcModo, fecha, meses);
+    if (!filas) return "<p class='aviso'>Escoja una fecha.</p>";
+    var h = "<div class='calc-filas'>";
+    filas.forEach(function (r) {
+      h += "<div class='calc-fila" + (r[3] ? " calc-destacada" : "") + "'>"
+        + "<div class='calc-nombre'>" + esc(r[0]) + "</div>"
+        + "<div class='calc-fecha'><b>" + esc(calcTexto(r[1])) + "</b> <span class='calc-rel'>· " + esc(calcRelativo(r[1])) + "</span></div>"
+        + (r[2] ? "<div class='calc-nota'>" + esc(r[2]) + "</div>" : "")
+        + "</div>";
+    });
+    h += "</div>";
+    if (_calcModo === "prenada") h += "<p class='aviso'>La palpación por meses tiene margen de 2 semanas. Con ecografía o la fecha del servicio sale más exacto.</p>";
+    return h;
+  }
+
+  function renderCalculadoraRepro(fecha) {
+    fecha = fecha || calcHoyIso();
+    var modos = [
+      ["servicio", "Se sirvió / inseminó"],
+      ["parto", "Parió"],
+      ["prenada", "Está preñada de…"]
+    ];
+    var etiqueta = { servicio: "Fecha del servicio", parto: "Fecha del parto", prenada: "Fecha de la palpación" }[_calcModo];
+    var h = "<div class='card calc-card'>"
+      + "<div class='lt-titulo'>" + icon("hourglass", 16) + "Calculadora de fechas</div>"
+      + "<p class='aviso' style='margin:0 0 8px;'>Para sacar cuentas rápidas. No guarda nada en el registro.</p>"
+      + "<div class='gen-filtros' role='group' aria-label='Qué pasó'>";
+    modos.forEach(function (m) {
+      h += "<button type='button' class='chip calc-modo" + (_calcModo === m[0] ? " act" : "") + "' data-calc-modo='" + m[0] + "'>" + esc(m[1]) + "</button>";
+    });
+    h += "</div><div class='calc-campos'>"
+      + "<label>" + esc(etiqueta) + "<input type='date' id='calc-fecha' value='" + esc(fecha) + "'></label>";
+    if (_calcModo === "prenada") {
+      h += "<label>Meses de preñez<select id='calc-meses'>";
+      for (var i = 1; i <= 9; i++) h += "<option value='" + i + "'" + (i === 3 ? " selected" : "") + ">" + i + (i === 1 ? " mes" : " meses") + "</option>";
+      h += "</select></label>";
+    }
+    h += "</div><div id='calc-resultado'>" + calcResultadoHtml(fecha, 3) + "</div></div>";
+    return h;
+  }
+
+  function calcRefrescar() {
+    var out = document.getElementById("calc-resultado");
+    var fEl = document.getElementById("calc-fecha");
+    var mEl = document.getElementById("calc-meses");
+    if (out) out.innerHTML = calcResultadoHtml(fEl && fEl.value, mEl && mEl.value);
+  }
+  function calcCambiarModo(modo) {
+    var card = document.querySelector(".calc-card");
+    if (!card) return;
+    var fEl = document.getElementById("calc-fecha");
+    var fecha = fEl && fEl.value;
+    _calcModo = modo;
+    var tmp = document.createElement("div");
+    tmp.innerHTML = renderCalculadoraRepro(fecha);
+    card.parentNode.replaceChild(tmp.firstChild, card);
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target && e.target.closest ? e.target.closest("[data-calc-modo]") : null;
+    if (b) calcCambiarModo(b.getAttribute("data-calc-modo"));
+  });
+  ["input", "change"].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      var id = e.target && e.target.id;
+      if (id === "calc-fecha" || id === "calc-meses") calcRefrescar();
+    });
+  });
   // Modo Simple (default) vs Técnico para SPI y Monitoreo Satelital en Pasturas:
   // los números crudos (NDVI, RVI, SPI, kg/ha) son ilegibles para un ganadero
   // que no es agrónomo -- Simple muestra solo el semáforo/palabra clave,
@@ -7082,7 +7225,9 @@
         + "<div style='flex:1;'><label>Peso al destete (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 120' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Potrero nuevo de la Cría: <input id='cap-pot-cria' placeholder='ej. Levante' list='dl-potreros' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "</div>"
-        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional, solo informativo -- el destete NO seca a la vaca; si dejó de ordeñarse use el botón <b>Secado</b> aparte):</p>"
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-secar-madre' style='width:20px; height:20px;'> Secar también la madre (opcional)</label>"
+        + "<div id='cap-secar-madre-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Datos de la madre en este mismo momento (opcional). El destete no seca a la vaca: si también dejó de ordeñarse, marque la casilla de arriba y se guarda el Secado aparte.</p>"
         + "<div style='display:flex; gap:10px; flex-wrap:wrap;'>"
         + "<div style='flex:1;'><label>Peso de la Madre (kg): <input type='number' step='0.5' id='cap-peso-madre' placeholder='ej. 410' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label></div>"
         + "<div style='flex:1;'><label>Cond. Corporal Madre (1-5): <select id='cap-cc-madre' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value=''>CC (Opcional)</option><option value='2.0'>2.0 (Flaca)</option><option value='2.5'>2.5</option><option value='3.0'>3.0 (Óptima)</option><option value='3.5'>3.5</option><option value='4.0'>4.0</option></select></label></div>"
@@ -7109,7 +7254,9 @@
         + "</div>"
         + "<label>Motivo: <select id='cap-motivo-secado' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'><option value='Fin de lactancia'>Fin de lactancia (programado)</option><option value='Baja producción'>Baja producción</option><option value='Mastitis'>Mastitis / problema de ubre</option><option value='Preparación para el parto'>Preparación para el próximo parto</option><option value='Otro'>Otro</option></select></label>"
         + "<label>Observaciones: <input id='cap-notas' placeholder='ej. Se secó sola, sin problema' style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
-        + "<p class='aviso' style='margin:2px 0;'>Evento independiente del destete de la cría: registra que esta vaca dejó de ordeñarse de verdad.</p>";
+        + "<label style='display:flex; align-items:center; gap:8px; font-weight:600; margin:6px 0 2px 0; cursor:pointer;'><input type='checkbox' id='cap-destetar-cria' style='width:20px; height:20px;'> Destetar también la cría (opcional)</label>"
+        + "<div id='cap-destetar-cria-info' style='font-size:12.5px; color:var(--texto-suave); margin:-2px 0 2px 2px; min-height:16px;'></div>"
+        + "<p class='aviso' style='margin:2px 0;'>Registra que esta vaca dejó de ordeñarse. Si marca la casilla, el destete de su cría se guarda como otro evento aparte.</p>";
     } else if (tipo === "pesaje") {
       h += "<label>Arete / Tag del animal: <input id='cap-tag' placeholder='ej. 47' list='dl-tags' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
         + "<label>Peso (kg): <input type='number' step='0.5' id='cap-peso' placeholder='ej. 430' required style='width:100%; padding:8px; border-radius:6px; border:1px solid var(--borde-fuerte);'></label>"
@@ -7949,6 +8096,15 @@
         if (k === "cap-tag" || k === "cap-fecha" || k === "cap-cria-tag" || k === "cap-cria2-tag") return;
         h += "<br>" + esc(k.replace(/^cap-/, "").replace(/-/g, " ")) + ": <b>" + esc(d[k]) + "</b>";
       });
+      var chkJunto = _capTipo === "secado" ? q("#cap-destetar-cria") : (_capTipo === "destete" ? q("#cap-secar-madre") : null);
+      if (chkJunto && chkJunto.checked) {
+        h += "<div style='margin-top:6px; font-size:13px; background:rgba(34,197,94,0.09); border-left:4px solid #22c55e; padding:6px 10px; border-radius:6px;'>"
+          + icon("checkCircle", 14)
+          + (_capTipo === "secado"
+            ? ("También se registra el <b>destete</b> de la cría" + (_criaSecado ? (" <b>" + esc(_criaSecado) + "</b>") : "") + " (evento aparte).")
+            : "También se registra el <b>secado</b> de la madre (evento aparte).")
+          + "</div>";
+      }
       // Simulador 1-toque (Fase 5.2): en Servicio/IA con vaca y toro se
       // evalúa consanguinidad 3G antes de guardar. Solo avisa, no bloquea.
       if (_capTipo === "servicio") {
@@ -8043,6 +8199,7 @@
       bindCamposFinanza();
       bindTrasladoMasivo();
       bindDesteteBusquedaCria();
+      bindSecadoDesteteJuntos();
       bindTipoEventoParto();
       bindSugerenciaTagCriaParto();
       bindToroParto();
@@ -8686,6 +8843,57 @@
       });
     }
 
+    // Secado <-> Destete juntos: casillas opcionales "Destetar también la
+    // cría" (en Secado) y "Secar también la madre" (en Destete). Cada uno
+    // se guarda como su propio evento en el servidor; aquí solo se le
+    // muestra al operario qué animal se va a incluir.
+    var _criaSecado = null;
+    function bindSecadoDesteteJuntos() {
+      _criaSecado = null;
+      var fVaca = document.getElementById("cap-tag");
+      if (_tipoCapturaActual === "secado") {
+        var chk = document.getElementById("cap-destetar-cria");
+        var info = document.getElementById("cap-destetar-cria-info");
+        if (!chk || !info || !fVaca) return;
+        var timer = null;
+        var actualizar = function () {
+          _criaSecado = null;
+          var vaca = fVaca.value.trim();
+          if (!chk.checked) { info.textContent = ""; return; }
+          if (!vaca) { info.textContent = "Escriba primero el arete de la vaca."; return; }
+          if (!navigator.onLine) { info.textContent = "Sin señal: la cría sin destetar se busca al sincronizar."; return; }
+          info.textContent = "Buscando cría de " + vaca + "...";
+          fetch("/api/cria-activa?vaca=" + encodeURIComponent(vaca))
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (fVaca.value.trim() !== vaca) return;
+              if (res && res.encontrada) {
+                _criaSecado = res.cria_tag;
+                info.textContent = "Se destetará también la cría " + res.cria_tag + ".";
+              } else {
+                info.textContent = "Esta vaca no tiene cría sin destetar: solo se guardará el secado.";
+              }
+            })
+            .catch(function () { info.textContent = "No se pudo buscar la cría ahora; se busca al guardar."; });
+        };
+        chk.addEventListener("change", actualizar);
+        fVaca.addEventListener("blur", actualizar);
+        fVaca.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(actualizar, 600); });
+      } else if (_tipoCapturaActual === "destete") {
+        var chkM = document.getElementById("cap-secar-madre");
+        var infoM = document.getElementById("cap-secar-madre-info");
+        if (!chkM || !infoM || !fVaca) return;
+        var mostrar = function () {
+          var vaca = fVaca.value.trim();
+          infoM.textContent = !chkM.checked ? ""
+            : (vaca ? "Se guardará también el secado de la vaca " + vaca + " (si no estaba secada ya)."
+              : "Se guardará también el secado de la madre de la cría.");
+        };
+        chkM.addEventListener("change", mostrar);
+        fVaca.addEventListener("input", mostrar);
+      }
+    }
+
     // Parto: alterna el bloque de "Cría 2" cuando el tipo elegido es
     // GEMELAR (parto múltiple), ver camposHtmlCaptura('parto').
     var TIPOS_EVENTO_SIN_CRIA = ["ABORTO", "REABSORCION", "MOMIFICACION", "MACERACION", "MUERTE_FETAL"];
@@ -8851,6 +9059,38 @@
       });
     });
 
+    var TIPOS_CON_AVISO = ["parto", "celo", "servicio", "palpacion", "pesaje", "secado", "venta"];
+    function verificarAntesDeGuardar(tipo, payload, fecha) {
+      return new Promise(function (resolve) {
+        var listo = false;
+        function fin(av) { if (!listo) { listo = true; resolve(av || []); } }
+        setTimeout(function () { fin([]); }, 5000);
+        fetch("/api/verificar-registro", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: tipo, payload: payload, fecha: fecha })
+        }).then(function (r) { return r.json(); })
+          .then(function (res) { fin((res && res.avisos) || []); })
+          .catch(function () { fin([]); });
+      });
+    }
+    function mostrarAvisosRegistro(feed, avisos, alGuardar, alCorregir) {
+      if (!feed) { if (window.confirm("Revise antes de guardar:\n\n- " + avisos.join("\n- ") + "\n\n¿Guardar igual?")) alGuardar(); return; }
+      var h = "<div class='card aviso-registro' style='border:2px solid var(--naranja, #f59e0b); padding:12px;'>"
+        + "<h4 style='margin:0 0 6px;'>" + icon("alertTriangle", 16) + "Revise antes de guardar</h4><ul style='margin:0 0 10px; padding-left:18px;'>";
+      avisos.forEach(function (a) { h += "<li style='margin-bottom:4px;'>" + esc(a) + "</li>"; });
+      h += "</ul><div style='display:flex; gap:8px; flex-wrap:wrap;'>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-corregir'>" + icon("pencil", 14) + "Corregir</button>"
+        + "<button type='button' class='tema-btn' id='btn-aviso-guardar' style='background:var(--verde-marca); color:#fff; border:none; font-weight:700;'>" + icon("save", 14) + "Guardar igual</button>"
+        + "</div></div>";
+      feed.innerHTML = h;
+      try { feed.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (eScr) { /* navegador viejo */ }
+      var bG = document.getElementById("btn-aviso-guardar");
+      var bC = document.getElementById("btn-aviso-corregir");
+      if (bG) bG.addEventListener("click", function () { bG.disabled = true; feed.innerHTML = ""; alGuardar(); });
+      if (bC) bC.addEventListener("click", function () { feed.innerHTML = ""; alCorregir(); });
+    }
+
     var form = document.getElementById("form-captura");
     if (form) {
       form.addEventListener("submit", function (e) {
@@ -8913,6 +9153,8 @@
           payload.cond_corporal_madre = parseFloat(q("#cap-cc-madre") && q("#cap-cc-madre").value) || null;
           payload.potrero_madre = (q("#cap-pot-madre") && q("#cap-pot-madre").value || "").trim() || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.vaca_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim() || null;
+          payload.secar_madre = !!(q("#cap-secar-madre") && q("#cap-secar-madre").checked);
         } else if (_tipoCapturaActual === "manejo") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.tipo_manejo = (q("#cap-tipo-manejo") && q("#cap-tipo-manejo").value) || null;
@@ -8925,6 +9167,8 @@
           payload.potrero_destino = (q("#cap-pot-secado") && q("#cap-pot-secado").value || "").trim() || null;
           payload.motivo = (q("#cap-motivo-secado") && q("#cap-motivo-secado").value) || null;
           payload.notas = (q("#cap-notas") && q("#cap-notas").value) || "";
+          payload.destetar_cria = !!(q("#cap-destetar-cria") && q("#cap-destetar-cria").checked);
+          if (payload.destetar_cria && _criaSecado) payload.cria_tag = _criaSecado;
         } else if (_tipoCapturaActual === "pesaje") {
           payload.animal_tag = (q("#cap-tag") && q("#cap-tag").value || "").trim();
           payload.peso_kg = parseFloat(q("#cap-peso") && q("#cap-peso").value) || null;
@@ -9104,26 +9348,41 @@
           mostrarPasoCap(1);
         }
 
-        if (navigator.onLine === false) {
-          encolarOffline(tipoEnvio, payload, fecha).then(function () {
-            mostrarExito(false);
-          });
-          return;
+        function enviarRegistro() {
+          if (navigator.onLine === false) {
+            encolarOffline(tipoEnvio, payload, fecha).then(function () {
+              mostrarExito(false);
+            });
+            return;
+          }
+
+          fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
+          }).then(function (r) { return r.json(); })
+            .then(function (res) {
+              if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
+              else {
+                encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+              }
+            }).catch(function () {
+              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
+            });
         }
 
-        fetch("/api/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventos: [{ tipo: tipoEnvio, payload: payload, fecha: fecha }] })
-        }).then(function (r) { return r.json(); })
-          .then(function (res) {
-            if (res.ok && res.procesados > 0) mostrarExito(true, res.en_revision > 0);
-            else {
-              encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-            }
-          }).catch(function () {
-            encolarOffline(tipoEnvio, payload, fecha).then(function () { mostrarExito(false); });
-          });
+        // Datos que no cuadran (gestación corta/larga, celo en preñada,
+        // arete que no existe...): se avisa y la persona decide si guarda
+        // igual. Sin señal, o si la revisión tarda, se guarda sin avisar
+        // (la lista "Datos a revisar" del Inventario lo encuentra después).
+        if (TIPOS_CON_AVISO.indexOf(_tipoCapturaActual) === -1 || navigator.onLine === false) {
+          enviarRegistro();
+          return;
+        }
+        verificarAntesDeGuardar(_tipoCapturaActual, payload, fecha).then(function (avisos) {
+          if (!avisos.length) { enviarRegistro(); return; }
+          mostrarAvisosRegistro(feed, avisos, enviarRegistro, function () { mostrarPasoCap(2); });
+        });
       });
     }
   }

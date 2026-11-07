@@ -227,6 +227,17 @@ def registrar(app, ctx, h):
                         notas=payload.get("notas"),
                         registrado_por=uid,
                     )
+                    # Casilla opcional "Secar también la madre": el secado
+                    # queda como su propio evento (no duplica si ya se secó).
+                    if payload.get("secar_madre"):
+                        db_sync.secar_madre_al_destetar(
+                            cria_tag=payload.get("cria_tag") or payload.get("animal_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            vaca_tag=payload.get("vaca_tag"),
+                            potrero_destino=payload.get("potrero_madre"),
+                            cond_corporal=payload.get("cond_corporal_madre"),
+                            registrado_por=uid,
+                        )
                     _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                     procesados += 1
                     if id_local:
@@ -256,6 +267,15 @@ def registrar(app, ctx, h):
                         notas=payload.get("notas"),
                         registrado_por=uid,
                     )
+                    # Casilla opcional "Destetar también la cría": el destete
+                    # queda como su propio evento (solo si hay cría sin destetar).
+                    if payload.get("destetar_cria"):
+                        db_sync.destetar_cria_al_secar(
+                            vaca_tag=payload.get("animal_tag") or payload.get("vaca_tag") or payload.get("tag"),
+                            fecha=fecha,
+                            cria_tag=payload.get("cria_tag"),
+                            registrado_por=uid,
+                        )
                     _guardar_foto_evento(db_sync, payload, tipo, fecha, uid)
                     procesados += 1
                     if id_local:
