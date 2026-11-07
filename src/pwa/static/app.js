@@ -1564,7 +1564,8 @@
     var pm = d.perdidas || {};
     h += "<div class='kpis'>"
       + kpiIr(kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio"), { sec: "Intervalo Entre Partos" })
-      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos: parto a preñez (" + (k.dias_abiertos_n || 0) + " preñeces)", k.dias_abiertos_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_vacias_hoy_promedio != null ? k.dias_vacias_hoy_promedio + "d" : "—", "Paridas sin servir hoy (" + (k.dias_vacias_hoy_n || 0) + " vaca(s))", k.dias_vacias_hoy_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
       + kpiIr(kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto"), { sec: "Novillas entoradas" })
@@ -3211,7 +3212,7 @@
       + kpiIr(kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok"), { sec: "Curva de Producción Diaria" })
       + (pico ? kpiIr(kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
       + (piso ? kpiIr(kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
-      + (litrosPorVaca != null ? kpiIr(kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Promedio litros/vaca/día"), { sec: "Vacas paridas" }) : "")
+      + (litrosPorVaca != null ? kpiIr(kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Litros/vaca/día (últimos " + (res.litros_por_vaca_dias || 15) + " días registrados" + (res.promedio_reciente_hasta ? ", hasta " + fechaCorta(res.promedio_reciente_hasta) : "") + ")"), { sec: "Vacas paridas" }) : "")
       + "</div>";
 
     // 1b. Vacas en ordeño vs realmente ordeñándose -- el "litros/vaca/día"
@@ -3233,7 +3234,7 @@
         + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
         + "<div>"
         + "<div style='font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("milk", 16) + "Días En Leche (DEL) &amp; Curva de Lactancia</div>"
-        + "<small style='color:var(--texto-suave); font-size:11.5px;'>Promedio del lote activo: <b>" + delInfo.promedio_del + " días</b> (" + delInfo.total_vacas + " vacas evaluadas)</small>"
+        + "<small style='color:var(--texto-suave); font-size:11.5px;'>Promedio de las vacas en ordeño: <b>" + delInfo.promedio_del + " días</b> (" + delInfo.total_vacas + " vacas evaluadas)</small>"
         + "</div>"
         + "</div>"
         + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;'>";
@@ -11325,6 +11326,78 @@
     });
   }
 
+  /* ---------- Indicadores (Más → Indicadores) ----------
+     Todos los indicadores del hato con su meta y color (verde = cumple,
+     ámbar = cerca, rojo = lejos, gris = sin datos). Los calcula
+     /api/indicadores (engine/indicadores.py) con los últimos 12 meses.
+     Solo OWNER y ADMIN. Arriba van las listas para actuar: vacas problema
+     y lactancias largas. Tocar una tarjeta muestra cómo se calcula. */
+  var IND_ICONOS = { reproduccion: "sperm", leche: "milk", carne: "cow", sanidad: "shieldPlus", pasturas: "sprout" };
+  var IND_COLOR = { verde: "var(--color-verde-txt)", ambar: "var(--color-ambar-txt)", rojo: "var(--color-rojo-txt)", gris: "var(--texto-suave)" };
+  var IND_PALABRA = { verde: "Cumple", ambar: "Cerca", rojo: "Lejos", gris: "Sin datos" };
+
+  function indTarjeta(it) {
+    var c = it.color || "gris";
+    var base = it.n ? "Con " + it.n + " dato" + (it.n === 1 ? "" : "s") : "Sin datos todavía";
+    return "<details class='card ind-card ind-" + esc(c) + "'>"
+      + "<summary>"
+      + "<span class='ind-nombre'>" + esc(it.nombre) + "</span>"
+      + "<span class='ind-valor' style='color:" + IND_COLOR[c] + "'>" + esc(it.texto) + "</span>"
+      + "<span class='ind-meta'>" + (it.meta
+        ? esc(it.meta) + (it.valor != null ? " · <b style='color:" + IND_COLOR[c] + "'>" + IND_PALABRA[c] + "</b>" : "")
+        : (it.valor != null ? "Dato para seguir (sin meta)" : "")) + "</span>"
+      + (it.detalle ? "<span class='ind-meta'>" + esc(it.detalle) + "</span>" : "")
+      + "</summary>"
+      + "<p class='ind-ayuda'>" + esc(it.ayuda || "") + " " + esc(base) + ".</p>"
+      + "</details>";
+  }
+
+  function indLista(titulo, ico, filas, vacioTxt) {
+    var h = "<div class='card ind-lista'><div class='ind-lista-tit'>" + icon(ico, 16) + esc(titulo)
+      + " <span class='chip'>" + filas.length + "</span></div>";
+    if (!filas.length) return h + "<p class='ind-ayuda'>" + esc(vacioTxt) + "</p></div>";
+    h += "<ul>";
+    filas.slice(0, 30).forEach(function (f) {
+      h += "<li><button type='button' class='ind-ficha' data-tag='" + esc(f.tag) + "'>" + esc(f.tag) + "</button>"
+        + (f.nombre ? " <small>" + esc(f.nombre) + "</small>" : "")
+        + "<div class='ind-motivo'>" + esc(f.motivo) + "</div></li>";
+    });
+    if (filas.length > 30) h += "<li><small>y " + (filas.length - 30) + " más…</small></li>";
+    return h + "</ul></div>";
+  }
+
+  function renderIndicadores(d) {
+    var h = "<h3>" + icon("chartBar", 20) + "Indicadores del hato</h3>";
+    if (d && d.error) return h + "<p class='aviso'>" + esc(d.error) + "</p>";
+    h += erroresHtml(d);
+    var r = d.resumen || {};
+    h += "<p class='aviso'>Últimos 12 meses (" + esc(fechaCorta(d.desde)) + " a " + esc(fechaCorta(d.hasta)) + "). "
+      + "Toque una tarjeta para ver cómo se calcula. Las metas son de referencia para doble propósito.</p>";
+    h += "<div class='ind-resumen'>"
+      + "<span class='ind-chip ind-verde'>" + (r.verde || 0) + " cumplen</span>"
+      + "<span class='ind-chip ind-ambar'>" + (r.ambar || 0) + " cerca</span>"
+      + "<span class='ind-chip ind-rojo'>" + (r.rojo || 0) + " lejos</span>"
+      + "<span class='ind-chip ind-gris'>" + (r.gris || 0) + " sin datos</span>"
+      + "</div>";
+    h += indLista("Vacas problema", "alertTriangle", d.vacas_problema || [],
+      "Ninguna vaca vacía con más de 150 días de parida ni con 3 servicios o más.");
+    h += indLista("Lactancias largas (vacías)", "milk", d.lactancias_largas || [],
+      "Ninguna vaca vacía con más de 305 días en leche.");
+    (d.grupos || []).forEach(function (g) {
+      h += "<h4>" + icon(IND_ICONOS[g.k] || "chartBar", 18) + esc(g.titulo) + "</h4>";
+      h += "<div class='ind-grid'>" + (g.items || []).map(indTarjeta).join("") + "</div>";
+    });
+    return h;
+  }
+
+  function bindIndicadores() {
+    qa(".ind-ficha").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var tag = b.getAttribute("data-tag");
+        if (tag) abrirFichaDesdeTag(tag);
+      });
+    });
+  }
   /* ---------- Reportes (Fase E): todos los PDF y Excel en una pantalla ----------
      Cada pantalla tiene un solo botón "Descargar" (botonDescargar) que trae
      aquí con su reporte resaltado. Los archivos los arman /api/reporte.pdf,
@@ -14251,6 +14324,7 @@
     mercado:   { kpis: 3, graf: 0, tabla: 8 },
     usuarios:  { kpis: 0, graf: 0, tabla: 5 },
     revision:  { kpis: 0, graf: 0, tabla: 4 },
+    indicadores: { kpis: 6, graf: 0, tabla: 4 },
     reportes:  { kpis: 0, graf: 0, tabla: 8 },
     potreros:  { kpis: 0, graf: 0, tabla: 8 }
   };
@@ -16040,6 +16114,18 @@
       return;
     }
 
+    if (actual === "indicadores") {
+      // Cálculo pesado (12 meses de historia): solo al entrar, no en el refresco silencioso.
+      if (!animar) return;
+      skeleton(vista, "indicadores");
+      fetchJSON("/api/indicadores", function (d) {
+        if (!vista) return;
+        montarVista(vista, renderIndicadores(d), true);
+        bindIndicadores();
+      }, vista);
+      return;
+    }
+
     if (actual === "reportes") {
       // No pide datos: la lista es fija y los archivos se arman al descargar.
       if (!animar) return;
@@ -16356,6 +16442,7 @@
     usuarios: "Usuarios",
     sistema: "Sistema",
     revision: "Por revisar",
+    indicadores: "Indicadores",
     reportes: "Reportes",
     potreros: "Potreros",
     mercado: "Subastas",

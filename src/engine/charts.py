@@ -789,22 +789,9 @@ def generar_grafico_gmd_hato(db, output_dir: str = "data/reportes",
 
 
 def _calcular_ieps(db) -> list[int]:
-    """Intervalos (en días) entre partos consecutivos de cada vaca."""
-    vacas = db.query(
-        "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL AND (id_cria IS NULL OR id_cria != vaca_id)"
-    )
-    ieps: list[int] = []
-    for v in vacas:
-        partos = db.query(
-            "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL "
-            "AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY fecha", (v["vaca_id"],),
-        )
-        fechas = [to_date(p["fecha"]) for p in partos if to_date(p["fecha"])]
-        for i in range(1, len(fechas)):
-            dias = (fechas[i] - fechas[i - 1]).days
-            if dias > 0:
-                ieps.append(dias)
-    return ieps
+    """Intervalos (en días) entre partos consecutivos de cada vaca (sin
+    contar abortos como parto; misma fuente que ``Database.iep_promedio_hato``)."""
+    return db.intervalos_entre_partos()
 
 
 def generar_grafico_iep_boxplot(db, output_dir: str = "data/reportes",

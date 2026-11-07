@@ -367,7 +367,8 @@
     var pm = d.perdidas || {};
     h += "<div class='kpis'>"
       + kpiIr(kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio"), { sec: "Intervalo Entre Partos" })
-      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos: parto a preñez (" + (k.dias_abiertos_n || 0) + " preñeces)", k.dias_abiertos_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_vacias_hoy_promedio != null ? k.dias_vacias_hoy_promedio + "d" : "—", "Paridas sin servir hoy (" + (k.dias_vacias_hoy_n || 0) + " vaca(s))", k.dias_vacias_hoy_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
       + kpiIr(kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto"), { sec: "Novillas entoradas" })

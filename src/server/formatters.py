@@ -738,7 +738,7 @@ def formatear_poblacion_panel(db: Database, hoy: Optional[date] = None) -> str:
         "📈 <b>INDICADORES REPRODUCTIVOS:</b>",
     ]
     if dias_abiertos_prom is not None:
-        lineas.append(f"• <b>Días Abiertos (promedio del hato):</b> {dias_abiertos_prom} días ({n_dias_abiertos} vaca(s) sin servicio tras su último parto)")
+        lineas.append(f"• <b>Paridas sin servir:</b> {dias_abiertos_prom} días promedio desde el parto ({n_dias_abiertos} vaca(s))")
     else:
         lineas.append("• <b>Días Abiertos:</b> sin datos suficientes (no hay vacas paridas activas sin servicio posterior)")
     return "\n".join(lineas)

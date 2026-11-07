@@ -351,6 +351,13 @@
 ]
 ],
 [
+"/api/indicadores",
+"api_indicadores",
+[
+"GET"
+]
+],
+[
 "/api/inseminadores",
 "api_inseminadores",
 [

@@ -45,6 +45,9 @@ _FALLBACK_SIN_GEOM = (
 )
 SQL_POTRERO_REAL = f"(geom_wkt_4326 IS NOT NULL{_FALLBACK_SIN_GEOM})"
 SIN_POTRERO_LABEL = "Sin potrero"
+# Filtro SQL de partos de verdad (excluye abortos, reabsorciones, etc.).
+SQL_PARTO_REAL = "(tipo_evento IS NULL OR tipo_evento NOT IN (" + ", ".join(
+    "'" + t + "'" for t in TIPOS_EVENTO_SIN_CRIA) + "))"
 ULT_TRASLADO_CTE = (
     "ult_traslado AS ("
     "SELECT animal_id, potrero_destino, fecha, "
@@ -3474,72 +3477,151 @@ class Database:
             (aid,),
         )
 
-    def kpis_reproductivos_concepcion(self, toro_pajilla: Optional[str] = None) -> dict:
-        """Calcula Tasa de Concepción (%) y Servicios por Concepción (S/C)."""
-        where_serv = ""
-        params_serv: list = []
-        if toro_pajilla:
-            where_serv = "WHERE UPPER(toro_pajilla) = UPPER(?) OR toro_pajilla LIKE ?"
-            params_serv = [toro_pajilla.strip(), f"%{toro_pajilla.strip()}%"]
+    # Estados de servicio que ya traen su resultado (los pone registrar_diagnostico).
+    _ESTADOS_SERV_PRENADA = ("CONFIRMADA", "PREÑADA", "PRENADA", "PREÑADA_ECO", "PREÑADA_PALP")
+    _ESTADOS_SERV_VACIA = ("FALLIDO", "VACIA", "VACÍA", "ABIERTA")
+    # Dos servicios con menos de esto entre sí son el mismo celo (doble IA).
+    _DIAS_MISMO_CELO = 3
+    # Un parto en esta ventana después del servicio confirma que ese servicio preñó.
+    _VENTANA_PARTO_DEL_SERVICIO = (255, 305)
 
+    def resultados_servicios(self) -> list[dict]:
+        """Resultado de cada servicio (todas las vacas, es historia):
+        ``PRENADA`` / ``VACIA`` / ``None`` (todavía sin saber).
+
+        - Si el servicio ya tiene estado (confirmado o fallido por palpación), ese manda.
+        - Si la vaca se volvió a servir después sin parir en medio, ese servicio
+          falló (repitió celo), aunque nadie la haya palpado vacía.
+        - Si parió 255-305 días después, ese servicio la preñó.
+        - Servicios del mismo celo (menos de 3 días entre sí) cuentan como uno.
+        Cada palpación o eco NO suma una preñez: la preñez es del servicio."""
         servicios = self.query(
-            f"SELECT s.*, a.tag FROM servicios s JOIN animales a ON a.id_animal = s.vaca_id {where_serv} ORDER BY s.fecha DESC",
-            tuple(params_serv),
+            "SELECT s.id, s.vaca_id, s.fecha, s.estado, s.toro_pajilla FROM servicios s "
+            "WHERE s.vaca_id IS NOT NULL AND s.fecha IS NOT NULL ORDER BY s.vaca_id, s.fecha, s.id"
         )
-
-        total_servicios = len(servicios)
-        prenadas_serv = sum(1 for s in servicios if (s["estado"] or "").upper() in ("CONFIRMADA", "PREÑADA", "PRENADA", "PREÑADA_ECO", "PREÑADA_PALP"))
-        vacias_serv = sum(1 for s in servicios if (s["estado"] or "").upper() in ("FALLIDO", "VACIA", "VACÍA", "ABIERTA"))
-
-        diagnosticos = self.query("SELECT * FROM diagnosticos_gestacion")
-        diag_prenadas = sum(1 for d in diagnosticos if (d["resultado"] or "").upper() in ("PREÑADA", "PRENADA", "CONFIRMADA", "POSITIVA"))
-        diag_vacias = sum(1 for d in diagnosticos if (d["resultado"] or "").upper() in ("VACIA", "VACÍA", "ABIERTA", "NEGATIVA"))
-
-        total_prenadas = prenadas_serv if toro_pajilla else max(prenadas_serv, diag_prenadas)
-        total_vacias = vacias_serv if toro_pajilla else max(vacias_serv, diag_vacias)
-        total_evaluados = total_prenadas + total_vacias
-
-        tasa_concepcion = round((total_prenadas / total_evaluados) * 100.0, 1) if total_evaluados > 0 else 0.0
-        sc = round(total_servicios / total_prenadas, 2) if total_prenadas > 0 else None
-
-        toros_rows = self.query(
-            """
-            SELECT DISTINCT toro_pajilla FROM servicios
-            WHERE toro_pajilla IS NOT NULL AND toro_pajilla != ''
-            ORDER BY toro_pajilla ASC
-            """
+        partos = self.query(
+            "SELECT vaca_id, fecha FROM partos WHERE vaca_id IS NOT NULL AND fecha IS NOT NULL "
+            f"AND (id_cria IS NULL OR id_cria != vaca_id) AND {SQL_PARTO_REAL}"
         )
-        por_toro = []
-        for tr in toros_rows:
-            t_nom = tr["toro_pajilla"]
-            servs_t = [s for s in servicios if (s["toro_pajilla"] or "").strip().upper() == t_nom.strip().upper()]
-            if not servs_t:
+        partos_vaca: dict = {}
+        for p in partos:
+            d = to_date(p["fecha"])
+            if d:
+                partos_vaca.setdefault(p["vaca_id"], []).append(d)
+        por_vaca: dict = {}
+        for sv in servicios:
+            d = to_date(sv["fecha"])
+            if not d:
                 continue
-            n_serv = len(servs_t)
-            n_pre = sum(1 for s in servs_t if (s["estado"] or "").upper() in ("CONFIRMADA", "PREÑADA", "PRENADA"))
-            n_vac = sum(1 for s in servs_t if (s["estado"] or "").upper() in ("FALLIDO", "VACIA", "VACÍA"))
-            n_eval = n_pre + n_vac
-            tc = round((n_pre / n_eval) * 100.0, 1) if n_eval > 0 else 0.0
-            sc_t = round(n_serv / n_pre, 2) if n_pre > 0 else None
-            por_toro.append({
-                "toro": t_nom,
-                "servicios": n_serv,
-                "evaluados": n_eval,
-                "prenadas": n_pre,
-                "vacias": n_vac,
-                "tasa_concepcion": tc,
-                "sc": sc_t,
-            })
+            lista = por_vaca.setdefault(sv["vaca_id"], [])
+            estado = (sv["estado"] or "").upper()
+            if lista and (d - lista[-1]["fecha_d"]).days < self._DIAS_MISMO_CELO:
+                # Mismo celo: un solo servicio; se queda con el estado más informativo.
+                if estado and not lista[-1]["estado"]:
+                    lista[-1]["estado"] = estado
+                continue
+            lista.append({"id": sv["id"], "vaca_id": sv["vaca_id"], "fecha": iso(d), "fecha_d": d,
+                          "estado": estado, "toro_pajilla": sv["toro_pajilla"]})
+        lo, hi = self._VENTANA_PARTO_DEL_SERVICIO
+        out: list[dict] = []
+        for vid, lista in por_vaca.items():
+            pv = sorted(partos_vaca.get(vid, []))
+            for i, sv in enumerate(lista):
+                d = sv["fecha_d"]
+                sig = lista[i + 1]["fecha_d"] if i + 1 < len(lista) else None
+                # El parto es de este servicio solo si no hubo otro servicio entre los dos.
+                parto_ok = any(lo <= (p - d).days <= hi and (sig is None or sig >= p) for p in pv)
+                if sv["estado"] in self._ESTADOS_SERV_PRENADA:
+                    res = "PRENADA"
+                elif sv["estado"] in self._ESTADOS_SERV_VACIA:
+                    res = "VACIA"
+                elif parto_ok:
+                    res = "PRENADA"
+                elif sig is not None and not any(d < p <= sig for p in pv):
+                    res = "VACIA"  # repitió servicio sin parir en medio
+                else:
+                    res = None
+                sv["resultado"] = res
+                out.append(sv)
+        return out
+
+    def kpis_reproductivos_concepcion(self, toro_pajilla: Optional[str] = None,
+                                      desde: Optional[str] = None) -> dict:
+        """Tasa de Concepción (%) y Servicios por Concepción (S/C), contando
+        cada servicio una vez con su resultado (``resultados_servicios``).
+
+        Tasa = servicios que preñaron / servicios con resultado conocido.
+        S/C = servicios con resultado conocido / servicios que preñaron
+        (así S/C y tasa siempre cuadran: 50 % = 2,0). Los servicios recientes
+        sin resultado todavía no cuentan en ninguno de los dos."""
+        todos = self.resultados_servicios()
+        if desde:
+            todos = [r for r in todos if r["fecha"] >= str(desde)[:10]]
+
+        def _resumen(lista: list[dict]) -> dict:
+            pre = sum(1 for r in lista if r["resultado"] == "PRENADA")
+            vac = sum(1 for r in lista if r["resultado"] == "VACIA")
+            ev = pre + vac
+            return {
+                "servicios": len(lista), "evaluados": ev, "prenadas": pre, "vacias": vac,
+                "tasa_concepcion": round(pre * 100.0 / ev, 1) if ev else 0.0,
+                "sc": round(ev / pre, 2) if pre else None,
+            }
+
+        servicios = todos
+        if toro_pajilla:
+            t = toro_pajilla.strip().upper()
+            servicios = [r for r in todos if t and t in (r["toro_pajilla"] or "").strip().upper()]
+        g = _resumen(servicios)
+
+        por_nombre: dict = {}
+        for r in todos:
+            nom = (r["toro_pajilla"] or "").strip()
+            if nom:
+                por_nombre.setdefault(nom.upper(), (nom, []))[1].append(r)
+        por_toro = []
+        for _clave, (nom, lista) in sorted(por_nombre.items()):
+            rt = _resumen(lista)
+            por_toro.append({"toro": nom, **rt})
 
         return {
-            "total_servicios": total_servicios,
-            "total_evaluados": total_evaluados,
-            "total_prenadas": total_prenadas,
-            "total_vacias": total_vacias,
-            "tasa_concepcion": tasa_concepcion,
-            "servicios_por_concepcion": sc,
+            "total_servicios": g["servicios"],
+            "total_evaluados": g["evaluados"],
+            "total_prenadas": g["prenadas"],
+            "total_vacias": g["vacias"],
+            "tasa_concepcion": g["tasa_concepcion"],
+            "servicios_por_concepcion": g["sc"],
             "por_toro": por_toro,
         }
+
+    def dias_abiertos_concepcion(self, desde: Optional[str] = None,
+                                 hoy: Optional[date] = None) -> Optional[dict]:
+        """Días abiertos de verdad: del parto al servicio que la preñó, para
+        cada preñez (``resultados_servicios``). Si se da ``desde``, solo las
+        preñeces con servicio desde esa fecha. Se descartan valores fuera de
+        20-600 días (casi siempre un parto que no se anotó)."""
+        partos = self.query(
+            "SELECT vaca_id, fecha FROM partos WHERE vaca_id IS NOT NULL AND fecha IS NOT NULL "
+            f"AND (id_cria IS NULL OR id_cria != vaca_id) AND {SQL_PARTO_REAL}"
+        )
+        pv: dict = {}
+        for p in partos:
+            d = to_date(p["fecha"])
+            if d:
+                pv.setdefault(p["vaca_id"], []).append(d)
+        valores = []
+        for r in self.resultados_servicios():
+            if r["resultado"] != "PRENADA" or (desde and r["fecha"] < str(desde)[:10]):
+                continue
+            previos = [p for p in pv.get(r["vaca_id"], []) if p < r["fecha_d"]]
+            if not previos:
+                continue  # novilla: no tiene días abiertos
+            da = (r["fecha_d"] - max(previos)).days
+            if 20 <= da <= 600:
+                valores.append(da)
+        if not valores:
+            return None
+        return {"dias_abiertos_promedio": round(sum(valores) / len(valores)), "n": len(valores)}
 
     def dias_abiertos_promedio_hato(self, hoy: Optional[date] = None) -> Optional[dict]:
         """Días abiertos promedio del hato: vacas ACTIVAS paridas cuyo último
@@ -3574,6 +3656,30 @@ class Database:
             "n": len(dias_lista),
         }
 
+    def intervalos_entre_partos(self) -> list[int]:
+        """Días entre partos consecutivos de cada vaca (todas, también las ya
+        vendidas o muertas: es historia). Solo cuentan partos de verdad: un
+        aborto o reabsorción no es un parto, así que no parte el intervalo en
+        dos (parto -> aborto -> parto es UN intervalo, del primero al último
+        parto). Gemelos (2 filas el mismo día) cuentan una vez."""
+        filas = self.query(
+            "SELECT vaca_id, fecha FROM partos WHERE vaca_id IS NOT NULL AND fecha IS NOT NULL "
+            "AND (id_cria IS NULL OR id_cria != vaca_id) "
+            f"AND {SQL_PARTO_REAL} ORDER BY vaca_id, fecha"
+        )
+        por_vaca: dict = {}
+        for f in filas:
+            d = to_date(f["fecha"])
+            if d:
+                por_vaca.setdefault(f["vaca_id"], []).append(d)
+        out: list[int] = []
+        for fechas in por_vaca.values():
+            for i in range(1, len(fechas)):
+                dias = (fechas[i] - fechas[i - 1]).days
+                if dias > 0:
+                    out.append(dias)
+        return out
+
     def iep_promedio_hato(self, umbral_max_dias: Optional[int] = 730) -> Optional[dict]:
         """IEP (Intervalo Entre Partos) promedio del hato: para cada vaca con
         2+ partos registrados, promedia la diferencia en días entre partos
@@ -3582,22 +3688,10 @@ class Database:
         ``engine.charts.generar_grafico_iep_boxplot`` (excluye intervalos
         >730 días -- casi siempre huecos de registro, no gestaciones reales)
         para que el número acá y el boxplot coincidan."""
-        vacas = self.query(
-            "SELECT DISTINCT vaca_id FROM partos WHERE vaca_id IS NOT NULL "
-            "AND (id_cria IS NULL OR id_cria != vaca_id)"
-        )
-        intervalos = []
-        for v in vacas:
-            partos = self.query(
-                "SELECT fecha FROM partos WHERE vaca_id = ? AND fecha IS NOT NULL "
-                "AND (id_cria IS NULL OR id_cria != vaca_id) ORDER BY fecha",
-                (v["vaca_id"],),
-            )
-            fechas = [to_date(p["fecha"]) for p in partos if to_date(p["fecha"])]
-            for i in range(1, len(fechas)):
-                dias = (fechas[i] - fechas[i - 1]).days
-                if dias > 0 and (umbral_max_dias is None or dias <= umbral_max_dias):
-                    intervalos.append(dias)
+        intervalos = [
+            d for d in self.intervalos_entre_partos()
+            if umbral_max_dias is None or d <= umbral_max_dias
+        ]
         if not intervalos:
             return None
         return {

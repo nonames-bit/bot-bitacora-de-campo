@@ -187,6 +187,7 @@
     usuarios: "Usuarios",
     sistema: "Sistema",
     revision: "Por revisar",
+    indicadores: "Indicadores",
     reportes: "Reportes",
     potreros: "Potreros",
     mercado: "Subastas",
