@@ -108,8 +108,10 @@ def test_litros_por_vaca_dia_divide_entre_vacas_ordenandose(tmp_path):
         res = datos_leche(db)
         assert res["resumen"]["promedio_diario"] == PROMEDIO_DIARIO
         assert res["resumen_ordeno"] == {"en_ordeno": 1, "en_pausa": 0, "ordenandose": 1}
-        # 318,2 L/día entre 1 vaca ordeñándose.
-        assert res["resumen"]["litros_por_vaca_dia"] == PROMEDIO_DIARIO
+        # Litros/vaca/día usa solo los últimos 15 días registrados (17-31 ago),
+        # entre 1 vaca ordeñándose.
+        ult15 = [lt for _f, lt in DIAS_RECIBO[-15:]]
+        assert res["resumen"]["litros_por_vaca_dia"] == round(round(sum(ult15) / 15, 1), 1)
 
         db.registrar_pausa_ordeno("K01", motivo="Ternero flaco")
         res = datos_leche(db)

@@ -1564,7 +1564,8 @@
     var pm = d.perdidas || {};
     h += "<div class='kpis'>"
       + kpiIr(kpi(k.iep_promedio_dias != null ? k.iep_promedio_dias + "d" : "—", "IEP promedio"), { sec: "Intervalo Entre Partos" })
-      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos (" + (k.dias_abiertos_n || 0) + " vaca(s))", k.dias_abiertos_promedio > 150 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_abiertos_promedio != null ? k.dias_abiertos_promedio + "d" : "—", "Días abiertos: parto a preñez (" + (k.dias_abiertos_n || 0) + " preñeces)", k.dias_abiertos_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
+      + kpiIr(kpi(k.dias_vacias_hoy_promedio != null ? k.dias_vacias_hoy_promedio + "d" : "—", "Paridas sin servir hoy (" + (k.dias_vacias_hoy_n || 0) + " vaca(s))", k.dias_vacias_hoy_promedio > 120 ? "alerta" : ""), { sec: "Días Abiertos" })
       + kpiIr(kpi(k.servicios_por_concepcion != null ? k.servicios_por_concepcion : "—", "Servicios/Concepción"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.tasa_concepcion != null ? k.tasa_concepcion + "%" : "—", "Tasa de concepción", k.tasa_concepcion != null && k.tasa_concepcion < 50 ? "alerta" : "ok"), { sec: "Efectividad de Inseminadores" })
       + kpiIr(kpi(k.edad_primer_parto_meses != null ? k.edad_primer_parto_meses + "m" : "—", "Edad 1er parto"), { sec: "Novillas entoradas" })
@@ -3068,7 +3069,7 @@
       + kpiIr(kpi(promDiario.toLocaleString("es-CO") + " L/d", "Promedio diario", "ok"), { sec: "Curva de Producción Diaria" })
       + (pico ? kpiIr(kpi(pico.litros + " L", "Pico más alto (" + fechaCorta(pico.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
       + (piso ? kpiIr(kpi(piso.litros + " L", "Piso más bajo (" + fechaCorta(piso.fecha) + ")"), { sec: "Curva de Producción Diaria" }) : "")
-      + (litrosPorVaca != null ? kpiIr(kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Promedio litros/vaca/día"), { sec: "Vacas paridas" }) : "")
+      + (litrosPorVaca != null ? kpiIr(kpi(litrosPorVaca.toLocaleString("es-CO") + " L", "Litros/vaca/día (últimos " + (res.litros_por_vaca_dias || 15) + " días registrados" + (res.promedio_reciente_hasta ? ", hasta " + fechaCorta(res.promedio_reciente_hasta) : "") + ")"), { sec: "Vacas paridas" }) : "")
       + "</div>";
 
     // 1b. Vacas en ordeño vs realmente ordeñándose -- el "litros/vaca/día"
@@ -3090,7 +3091,7 @@
         + "<div style='display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;'>"
         + "<div>"
         + "<div style='font-size:13.5px; font-weight:700; display:flex; align-items:center; gap:6px;'>" + icon("milk", 16) + "Días En Leche (DEL) &amp; Curva de Lactancia</div>"
-        + "<small style='color:var(--texto-suave); font-size:11.5px;'>Promedio del lote activo: <b>" + delInfo.promedio_del + " días</b> (" + delInfo.total_vacas + " vacas evaluadas)</small>"
+        + "<small style='color:var(--texto-suave); font-size:11.5px;'>Promedio de las vacas en ordeño: <b>" + delInfo.promedio_del + " días</b> (" + delInfo.total_vacas + " vacas evaluadas)</small>"
         + "</div>"
         + "</div>"
         + "<div style='display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:8px;'>";

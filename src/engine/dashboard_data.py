@@ -24,6 +24,7 @@ try:
         POTRERO_ACTUAL_EXPR,
         POTRERO_VIGENTE_SUBQUERY,
         SIN_POTRERO_LABEL,
+        SQL_PARTO_REAL,
         SQL_POTRERO_REAL,
         ULT_TRASLADO_CTE,
         Database,
@@ -45,6 +46,7 @@ except ImportError:  # ejecución directa
         POTRERO_ACTUAL_EXPR,
         POTRERO_VIGENTE_SUBQUERY,
         SIN_POTRERO_LABEL,
+        SQL_PARTO_REAL,
         SQL_POTRERO_REAL,
         ULT_TRASLADO_CTE,
         Database,
@@ -930,11 +932,19 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         errores["kpis_concepcion"] = str(e)
         conc = None
     try:
-        dias_ab = db.dias_abiertos_promedio_hato(hoy)
+        # Días abiertos de verdad: parto -> servicio que la preñó.
+        dias_ab = db.dias_abiertos_concepcion(hoy=hoy)
     except Exception as e:
         logger.error("seccion dias_abiertos fallo", exc_info=True)
         errores["dias_abiertos"] = str(e)
         dias_ab = None
+    try:
+        # Aparte: vacas paridas que siguen sin servir, días desde el parto a hoy.
+        dias_vacias = db.dias_abiertos_promedio_hato(hoy)
+    except Exception as e:
+        logger.error("seccion dias_vacias fallo", exc_info=True)
+        errores["dias_vacias"] = str(e)
+        dias_vacias = None
     try:
         iep = db.iep_promedio_hato()
     except Exception as e:
@@ -952,10 +962,11 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
     indice_fert = None
     dist_da = []
     try:
-        sql_vientres = """
+        sql_vientres = f"""
             SELECT a.id_animal, a.tag, a.fecha_nacimiento,
-                   (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) AS ult_parto,
+                   (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal AND {SQL_PARTO_REAL}) AS ult_parto,
                    (SELECT dg.resultado FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal ORDER BY dg.fecha DESC, dg.id DESC LIMIT 1) AS ult_diag_res,
+                   (SELECT MAX(dg.fecha) FROM diagnosticos_gestacion dg WHERE dg.vaca_id = a.id_animal) AS ult_diag_fecha,
                    (SELECT MAX(s.fecha) FROM servicios s WHERE s.vaca_id = a.id_animal) AS ult_serv_fecha,
                    (SELECT MAX(c.fecha) FROM celos c WHERE c.vaca_id = a.id_animal) AS ult_celo_fecha
             FROM animales a
@@ -990,6 +1001,11 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
             # Evaluar preñez
             res_diag = str(r["ult_diag_res"] or "").upper()
             esta_prenada = "PREÑADA" in res_diag or "POSITIV" in res_diag
+            # Un diagnóstico de preñez anterior al último parto ya no vale:
+            # esa preñez terminó en ese parto.
+            f_diag = str(r["ult_diag_fecha"] or "")[:10]
+            if esta_prenada and ult_p and f_diag and f_diag <= str(ult_p)[:10]:
+                esta_prenada = False
 
             if esta_prenada:
                 total_prenadas += 1
@@ -1019,18 +1035,7 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
     # Distribución de IEP por tramos (Software Ganadero)
     dist_iep = []
     try:
-        sql_iep_pares = """
-            WITH partos_ord AS (
-                SELECT vaca_id, fecha,
-                       LAG(fecha) OVER (PARTITION BY vaca_id ORDER BY fecha) as prev_fecha
-                FROM partos
-                WHERE vaca_id IS NOT NULL AND (tipo_evento IS NULL OR tipo_evento NOT IN ('ABORTO', 'REABSORCION'))
-            )
-            SELECT (julianday(fecha) - julianday(prev_fecha)) as iep_dias
-            FROM partos_ord
-            WHERE prev_fecha IS NOT NULL
-        """
-        iep_filas = db.query(sql_iep_pares)
+        iep_filas = [{"iep_dias": d} for d in db.intervalos_entre_partos()]
         tramos_iep_order = ["<365", "365-395", "396-425", "426-455", "456-485", ">485"]
         conteo_iep = {t: 0 for t in tramos_iep_order}
         total_obs_iep = 0
@@ -1053,6 +1058,8 @@ def datos_reproduccion(db: Database, desde: Optional[str] = None, hasta: Optiona
         "iep_promedio_dias": iep["iep_promedio_dias"] if iep else None,
         "dias_abiertos_promedio": dias_ab["dias_abiertos_promedio"] if dias_ab else None,
         "dias_abiertos_n": dias_ab["n"] if dias_ab else 0,
+        "dias_vacias_hoy_promedio": dias_vacias["dias_abiertos_promedio"] if dias_vacias else None,
+        "dias_vacias_hoy_n": dias_vacias["n"] if dias_vacias else 0,
         "servicios_por_concepcion": conc["servicios_por_concepcion"] if conc else None,
         "tasa_concepcion": conc["tasa_concepcion"] if conc else None,
         "edad_primer_parto_meses": edad_1p["edad_primer_parto_meses"] if edad_1p else None,
@@ -2335,6 +2342,9 @@ def _control_lechero(db: Database) -> dict:
         return {"vacas": [], "resumen": None}
 
 
+DIAS_LITROS_VACA = 15
+
+
 def datos_leche(db: Database) -> dict:
     """Leche: producción total diaria de la finca (tanque / recibos de quincena) +
     controles zootécnicos.
@@ -2404,8 +2414,21 @@ def datos_leche(db: Database) -> dict:
         errores["resumen_ordeno"] = str(e)
         resumen_ordeno = {"en_ordeno": 0, "en_pausa": 0, "ordenandose": 0}
 
+    # Litros/vaca/día: solo con los litros de los últimos DIAS_LITROS_VACA días
+    # (las vacas que se ordeñan hoy no son las de hace un año; antes se dividía
+    # el promedio de toda la serie desde 2024 entre las vacas de hoy).
     ordenandose = resumen_ordeno.get("ordenandose") or 0
-    litros_por_vaca_dia = round(promedio_diario / ordenandose, 1) if ordenandose > 0 else None
+    # Los recibos de quincena llegan con atraso, así que la ventana se cuenta
+    # hacia atrás desde el último día registrado, no desde hoy.
+    recientes = []
+    if serie:
+        ult_f = to_date_safe(serie[-1]["fecha"])
+        if ult_f:
+            lim_reciente = (ult_f - timedelta(days=DIAS_LITROS_VACA - 1)).isoformat()
+            recientes = [r for r in serie if str(r["fecha"])[:10] >= lim_reciente]
+    promedio_reciente = round(sum(r["litros"] for r in recientes) / len(recientes), 1) if recientes else None
+    litros_por_vaca_dia = (round(promedio_reciente / ordenandose, 1)
+                           if (promedio_reciente is not None and ordenandose > 0) else None)
 
     resumen = {
         "total_litros": total_litros,
@@ -2417,6 +2440,9 @@ def datos_leche(db: Database) -> dict:
         "fecha_fin": serie[-1]["fecha"] if serie else None,
         "periodo_notas": serie[0].get("notas") if (serie and serie[0].get("notas")) else None,
         "litros_por_vaca_dia": litros_por_vaca_dia,
+        "litros_por_vaca_dias": DIAS_LITROS_VACA,
+        "promedio_diario_reciente": promedio_reciente,
+        "promedio_reciente_hasta": serie[-1]["fecha"] if serie else None,
     }
 
     # 3. Controles individuales y ranking (solo si hay datos modernos con tag)
@@ -2476,35 +2502,24 @@ def datos_leche(db: Database) -> dict:
     # 6. Análisis DEL (Días En Leche) y etapas de lactancia (Software Ganadero)
     del_resumen = {"promedio_del": 0, "total_vacas": 0, "etapas": []}
     try:
-        sql_del = """
-            SELECT a.id_animal, a.tag,
-                   (SELECT MAX(p.fecha) FROM partos p WHERE p.vaca_id = a.id_animal AND (p.tipo_evento IS NULL OR p.tipo_evento NOT IN ('ABORTO', 'REABSORCION'))) as ult_parto
-            FROM animales a
-            WHERE a.estado = 'ACTIVO' AND (a.sexo IS NULL OR LOWER(SUBSTR(a.sexo, 1, 1)) = 'h')
-              AND (
-                  a.id_animal IN (SELECT DISTINCT animal_id FROM produccion_leche WHERE fecha >= '2024-01-01')
-                  OR a.id_animal IN (SELECT DISTINCT vaca_id FROM partos WHERE fecha >= date('now', '-450 days'))
-              )
-        """
-        vacas_lact = db.query(sql_del)
+        # Solo vacas que se están ordeñando (o en pausa) según la regla única
+        # de lactancia; antes entraban también las secas y subían el promedio.
+        estados_del = _estados_lactancia(db)
         tramos_del_order = ["0-100 (Pico)", "101-200 (Meseta)", "201-340 (Descenso)", ">340 (Prolongada)"]
         conteo_del = {t: 0 for t in tramos_del_order}
         dias_del_total = 0
         n_del = 0
-        hoy_del = date.today()
-        for vl in vacas_lact:
-            up = vl["ult_parto"]
-            if up and len(str(up)) >= 10:
-                try:
-                    d_del = (hoy_del - date.fromisoformat(str(up)[:10])).days
-                except Exception:
-                    d_del = None
-                if d_del is not None and d_del >= 0:
-                    dias_del_total += d_del
-                    n_del += 1
-                    tr = tramo_del(d_del)
-                    if tr in conteo_del:
-                        conteo_del[tr] += 1
+        for e_del in estados_del.values():
+            if e_del.get("estado") not in ("EN_ORDENO", "PAUSADA"):
+                continue
+            d_del = e_del.get("del_dias")
+            if d_del is None or d_del < 0:
+                continue
+            dias_del_total += d_del
+            n_del += 1
+            tr = tramo_del(d_del)
+            if tr in conteo_del:
+                conteo_del[tr] += 1
 
         etapas = []
         for t in tramos_del_order:
