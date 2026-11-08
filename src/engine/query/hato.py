@@ -13,7 +13,7 @@ from ...utils import iso, to_date
 from ..dashboard_data import SQL_VIENTRES_ACTIVOS
 from ..lactancia import estados_lactancia
 from ..tareas import EDAD_ADULTA_DIAS, _es_reproductor, _estado_actual, datos_tareas
-from .helpers import _fmt_es_co
+from .helpers import RE_MES_NOMBRE, _fmt_es_co
 
 # Listas de Tareas que el asistente sabe nombrar: clave -> (título, detalle).
 LISTAS_TAREAS: dict[str, tuple[str, str]] = {
@@ -44,8 +44,16 @@ _RE_NO_HATO = re.compile(
     r"|\bpalpac|\bpendientes?\b|\bsecado\b|\blactancia\b|\bdias\b|\bretiro\b|\btratamiento|\bmedicamento"
     r"|\bperdiendo\b|\bbajando\b|\batrasad|\bdebian\b|\bproxim|\bvan\s+a\s+parir\b|\bdonde\b|\bpotreros?\b"
     r"|\b(?:holstein|gyr|brahman|cebu|pardo|ayrshire|normando|simental|angus|charolais|nelore|guzerat|romosinuano)\b"
+    r"|" + RE_MES_NOMBRE
 )
 _RE_CONTEO = re.compile(r"\bcuant|\bhay\b|\btotal\b|\bnumero\b|\bque\b|\bcual(?:es)?\b|\blista")
+# Pregunta corta que es solo la categoría ("vacas en ordeño", "vacas secas",
+# "terneras"): se responde como conteo aunque no diga "cuántas".
+_RE_SOLO_CATEGORIA = re.compile(
+    r"(?:las?\s+|los\s+)?(?:vacas?|toros?|terner[oa]s?|novill[oa]s?|machos?|hembras?|crias?|becerr[oa]s?|toretes?)"
+    r"(?:\s+(?:en|de|ordeno|ordenando|produccion|secas?|paridas?|lecheras?|prenadas?|vacias?|machos?|hembras?"
+    r"|levante|horras?|abiertas?|gestantes?|cargadas?|activ[oa]s?))*"
+)
 
 # (patrón, claves de _categorias_hato, título). El orden importa: lo más
 # específico primero ("terneros machos" antes que "machos").
@@ -125,7 +133,8 @@ class HatoQueryMixin:
         if re.search(r"\btareas?\b|\bque\s+(?:hay|toca)\s+(?:que\s+)?hacer\b|\bpendientes\s+(?:de|para)\s+hoy\b", t):
             return self._resumen_tareas()
 
-        if _RE_NO_HATO.search(t) or not _RE_CONTEO.search(t):
+        t_corto = re.sub(r"[?!.,;:¿¡]", "", t).strip()
+        if _RE_NO_HATO.search(t) or not (_RE_CONTEO.search(t) or _RE_SOLO_CATEGORIA.fullmatch(t_corto)):
             return None
         # Con un potrero mencionado, la rama de potreros da la composición.
         if re.search(r"\bpotreros?\b|\bcorral\b|\blote\b", t) or self._potrero_mencionado(t):

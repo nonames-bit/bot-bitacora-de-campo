@@ -7,10 +7,10 @@ import os
 import re
 from datetime import date, datetime, timedelta
 
-from ...db.database import Database
+from ...db.database import SQL_POTRERO_REAL, Database
 from ...parsers import nlp_engine as nlu
 from ...utils import iso, normalizar
-from .helpers import _potrero_variantes, extraer_nombre_potrero
+from .helpers import MESES, NOMBRE_MES, RE_MES_NOMBRE, RE_TIENE_PERIODO, _potrero_variantes, extraer_nombre_potrero
 from .hato import HatoQueryMixin
 from .historial import HistorialQueryMixin
 from .inventario import InventarioQueryMixin
@@ -54,14 +54,13 @@ class QueryEngine(
     def _rango_periodo(self, t: str) -> tuple[str, str, str] | None:
         """Detecta una frase de periodo en el texto normalizado y devuelve
         (fecha_desde_iso, fecha_hasta_iso, etiqueta_legible), o None si no
-        hay ninguna. Cubre tanto ventanas móviles desde hoy (este mes, esta
-        semana, últimos N días, este año) como meses/años de calendario ya
-        cerrados (mes pasado, año pasado)."""
+        hay ninguna. "Este mes" y "este año" son de calendario (desde el día
+        1 hasta hoy), igual que un mes con nombre ("octubre", "octubre de
+        2025"); "esta semana" y "últimos N días" son ventanas desde hoy."""
         if re.search(r"\bmes\s+pasado\b", t):
             primer_dia_actual = self.hoy.replace(day=1)
             ultimo_dia_pasado = primer_dia_actual - timedelta(days=1)
-            primer_dia_pasado = ultimo_dia_pasado.replace(day=1)
-            return iso(primer_dia_pasado), iso(ultimo_dia_pasado), f"el mes pasado ({iso(primer_dia_pasado)} a {iso(ultimo_dia_pasado)})"
+            return self._rango_mes(ultimo_dia_pasado.year, ultimo_dia_pasado.month, "el mes pasado")
         if re.search(r"\ba[nñ]o\s+pasado\b", t):
             desde = date(self.hoy.year - 1, 1, 1)
             hasta = date(self.hoy.year - 1, 12, 31)
@@ -71,12 +70,29 @@ class QueryEngine(
         if re.search(r"\besta\s+semana\b", t):
             return iso(self.hoy - timedelta(days=7)), iso(self.hoy), "esta semana"
         if re.search(r"\beste\s+mes\b", t):
-            return iso(self.hoy - timedelta(days=30)), iso(self.hoy), "este mes"
+            return self._rango_mes(self.hoy.year, self.hoy.month, "este mes")
         m = re.search(r"ultimos?\s+(\d+)\s+dias", t)
         if m:
             n = int(m.group(1))
             return iso(self.hoy - timedelta(days=n)), iso(self.hoy), f"los últimos {n} días"
+        m = re.search(RE_MES_NOMBRE, t)
+        if m:
+            mes = MESES[m.group(1)]
+            anio = int(m.group(2)) if m.group(2) else (
+                self.hoy.year if mes <= self.hoy.month else self.hoy.year - 1)
+            return self._rango_mes(anio, mes, f"en {NOMBRE_MES[mes]} {anio}")
         return None
+
+    def _rango_mes(self, anio: int, mes: int, etiqueta: str) -> tuple[str, str, str]:
+        """Mes de calendario completo (o hasta hoy si es el mes en curso)."""
+        desde = date(anio, mes, 1)
+        siguiente = date(anio + (mes == 12), mes % 12 + 1, 1)
+        hasta = min(siguiente - timedelta(days=1), self.hoy)
+        if etiqueta == "este mes":
+            etiqueta = f"este mes ({NOMBRE_MES[mes]}, del 1 al {hasta.day})"
+        elif etiqueta == "el mes pasado":
+            etiqueta = f"el mes pasado ({NOMBRE_MES[mes]} {anio})"
+        return iso(desde), iso(hasta), etiqueta
 
     def responder(self, texto: str) -> str:
         t = normalizar(texto)
@@ -137,16 +153,16 @@ class QueryEngine(
 
         # Cualquier frase de periodo reconocida (este mes, esta semana, últimos
         # N días, este año, mes pasado, año pasado).
-        _TIENE_PERIODO = r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b|\beste\s+a[nñ]o\b|\bmes\s+pasado\b|\ba[nñ]o\s+pasado\b"
+        _TIENE_PERIODO = RE_TIENE_PERIODO
 
         # Ventas/compras/entradas/salidas acotadas a un periodo (ej. "vendieron
         # este mes") usan la tabla movimientos (con fecha real); van antes del
         # conteo histórico sin fecha para no perder el filtro de tiempo.
-        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b", t) and re.search(_TIENE_PERIODO, t):
+        if re.search(r"\bvendid[oa]s?\b|\bvend[ií][oó]\b|\bvendieron\b|\bventas?\b", t) and re.search(_TIENE_PERIODO, t):
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("VENTA", rango[0], rango[1], rango[2])
-        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b|\bcompramos\b", t) and re.search(_TIENE_PERIODO, t):
+        if re.search(r"\bcomprad[oa]s?\b|\bcompr[oó]\b|\bcompraron\b|\bcompramos\b|\bcompras?\b", t) and re.search(_TIENE_PERIODO, t):
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("COMPRA", rango[0], rango[1], rango[2])
@@ -158,7 +174,7 @@ class QueryEngine(
             rango = self._rango_periodo(t)
             if rango:
                 return self._movimientos_periodo("SALIDA", rango[0], rango[1], rango[2])
-        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b", t) and re.search(_TIENE_PERIODO, t) and not tag_con_digito:
+        if re.search(r"\bmuert[oa]s?\b|\bmuri[oó]\b|\bmurieron\b|\bmuertes?\b", t) and re.search(_TIENE_PERIODO, t) and not tag_con_digito:
             rango = self._rango_periodo(t)
             if rango:
                 return self._muertes_periodo(rango[0], rango[1], rango[2])
@@ -212,16 +228,24 @@ class QueryEngine(
             m = re.search(r"(\d+)\s*dias?\s+abiert[oa]s?", t) or re.search(r"mas\s+de\s+(\d+)", t)
             umbral = int(m.group(1)) if m else 90
             return self._dias_abiertos_mayor(umbral)
-        if re.search(r"\bpartos?\b", t) and re.search(_TIENE_PERIODO, t):
+        # Partos de un periodo: "partos este mes", "partos de octubre", "vacas
+        # paridas este mes", "cuántas vacas parieron en octubre". Sin periodo,
+        # "cuántas vacas parieron" se entiende como el mes en curso.
+        _RE_PARIERON = r"\bpartos?\b|\bparid[ao]s\b|\bparieron\b|\bpariero\b"
+        if re.search(_RE_PARIERON, t) and re.search(_TIENE_PERIODO, t) and not tag_con_digito:
             rango = self._rango_periodo(t)
             if rango:
                 return self._partos_periodo(rango[0], rango[1], rango[2])
-        if re.search(r"\btern|\bcrias?\b|\banimales?\b|\bnacimientos?\b|\bbecerr", t) and re.search(r"\bnaci", t) and not re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t):
+        if re.search(r"\bparieron\b", t) and not tag_con_digito:
+            return self._partos_periodo(*self._rango_mes(self.hoy.year, self.hoy.month, "este mes"))
+        # "terneras nacidas este mes" = crías hembra; "terneros machos" = machos.
+        _RE_CRIA_HEMBRA = r"\bhembra[s]?\b|\bterneras?\b|\bbecerras?\b|\bterneritas?\b"
+        if re.search(r"\btern|\bcrias?\b|\banimales?\b|\bnacimientos?\b|\bbecerr", t) and re.search(r"\bnaci", t) and not re.search(r"\bmacho[s]?\b|" + _RE_CRIA_HEMBRA, t):
             rango_crias = self._rango_periodo(t) if re.search(_TIENE_PERIODO, t) else None
             if rango_crias:
                 return self._partos_periodo(rango_crias[0], rango_crias[1], rango_crias[2])
             return self._partos_periodo("0001-01-01", iso(self.hoy), "en total (histórico)")
-        if re.search(r"\btern|\bcrias?\b", t) and re.search(r"\bmacho[s]?\b|\bhembra[s]?\b", t) and re.search(r"\bnaci", t):
+        if re.search(r"\btern|\bcrias?\b|\bbecerr", t) and re.search(r"\bmacho[s]?\b|" + _RE_CRIA_HEMBRA, t) and re.search(r"\bnaci", t):
             sexo = "macho" if re.search(r"\bmacho", t) else "hembra"
             rango_crias = self._rango_periodo(t) if re.search(_TIENE_PERIODO, t) else None
             if rango_crias:
@@ -453,7 +477,14 @@ class QueryEngine(
         _registrar_consulta_sin_entender(texto)
         return self._ayuda(texto)
 
-    _PALABRAS_GENERICAS_POTRERO = {"potrero", "potreros", "corral", "lote", "del", "los", "las"}
+    # Palabras que no identifican un potrero al buscarlo por parecido: si no,
+    # "cuántas vacas hay en ordeño" caía en un potrero viejo "VACAS TODA LECHE".
+    _PALABRAS_GENERICAS_POTRERO = {
+        "potrero", "potreros", "corral", "lote", "del", "los", "las",
+        "vacas", "vaca", "toros", "terneros", "terneras", "novillas", "novillos",
+        "animales", "ganado", "leche", "lecheras", "ordeno", "secas", "paridas",
+        "hembras", "machos", "cuantas", "cuantos",
+    }
 
     def _potrero_mencionado(self, t: str) -> str | None:
         """Busca si el texto normalizado menciona el nombre o código de un
@@ -464,7 +495,9 @@ class QueryEngine(
         palabras_texto = [w for w in t.split() if len(w) >= 4]
         if not palabras_texto:
             return None
-        potreros = self.db.query("SELECT nombre, codigo FROM potreros")
+        # Solo potreros reales: los códigos viejos del import (legacy) no son
+        # inventario presente y la respuesta diría que "no existen".
+        potreros = self.db.query(f"SELECT nombre, codigo FROM potreros WHERE {SQL_POTRERO_REAL}")
         mejor_campo = None
         mejor_score = 0.0
         for p in potreros:

@@ -690,6 +690,21 @@ def _normalizar_potrero_key(s: str) -> str:
     return t
 
 
+# Meses con nombre para preguntas como "partos de octubre".
+MESES = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4, "mayo": 5, "junio": 6, "julio": 7,
+    "agosto": 8, "septiembre": 9, "setiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
+}
+NOMBRE_MES = {n: m for m, n in MESES.items() if m != "setiembre"}
+# Mes con nombre, con año opcional: "octubre", "octubre de 2025", "octubre 2025".
+RE_MES_NOMBRE = r"\b(" + "|".join(MESES) + r")\b(?:\s+(?:de(?:l)?\s+)?(20\d\d))?"
+# Cualquier frase de periodo que entiende _rango_periodo.
+RE_TIENE_PERIODO = (
+    r"\beste\s+mes\b|\besta\s+semana\b|\bultimos?\s+\d+\s+dias\b|\beste\s+a[nñ]o\b"
+    r"|\bmes\s+pasado\b|\ba[nñ]o\s+pasado\b|" + RE_MES_NOMBRE
+)
+
+
 def _potrero_variantes(nombre: str) -> set[str]:
     """Genera variantes de un nombre de potrero para matching (I<->1)."""
     base = normalizar(nombre).strip()

@@ -934,7 +934,7 @@ def test_partos_periodo(db):
     db.registrar_animal("12", sexo="Hembra", estado="ACTIVO")
     db.registrar_parto(vaca_tag="12", fecha="2026-07-20", sexo_cria="Hembra")
 
-    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))  # "este mes" = mes de calendario (agosto)
     resp = qe.responder("¿qué partos hubo este mes?")
     assert "No entendí" not in resp
     assert "47" in resp
@@ -1216,7 +1216,7 @@ def test_movimientos_venta_periodo(db):
     db.registrar_animal("48", sexo="Hembra", estado="VENDIDO")
     db.registrar_movimiento("48", fecha="2026-01-01", tipo_movimiento="VENTA", precio=1200000)
 
-    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))  # "este mes" = mes de calendario (agosto)
     resp = qe.responder("cuantos animales vendieron este mes")
     assert "No entendí" not in resp
     assert "47" in resp
@@ -1275,7 +1275,7 @@ def test_movimientos_entrada_periodo(db):
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
     db.registrar_movimiento("47", fecha="2026-08-20", tipo_movimiento="ENTRADA")
 
-    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))  # "este mes" = mes de calendario (agosto)
     resp = qe.responder("cuantos animales entraron este mes")
     assert "No entendí" not in resp
     assert "47" in resp
@@ -1307,7 +1307,7 @@ def test_muertes_por_periodo(db):
     db.registrar_animal("48", sexo="Hembra", estado="MUERTO")
     db.registrar_muerte("48", fecha="2025-01-01", causa_presunta="Vieja")
 
-    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))  # "este mes" = mes de calendario (agosto)
     resp = qe.responder("animales muertos este mes")
     assert "No entendí" not in resp
     assert "47" in resp and "48" not in resp
@@ -1324,7 +1324,7 @@ def test_destetes_por_periodo_y_total(db):
     db.registrar_animal("47", sexo="Hembra", estado="ACTIVO")
     db.registrar_pesaje("47", fecha="2026-08-15", peso_kg=180, evento="DESTETE")
 
-    qe = QueryEngine(db, hoy=date(2026, 9, 1))
+    qe = QueryEngine(db, hoy=date(2026, 8, 31))  # "este mes" = mes de calendario (agosto)
     resp_semana = qe.responder("cuantos destetes hubo esta semana")
     assert "No hay destetes" in resp_semana
 

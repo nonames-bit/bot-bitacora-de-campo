@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from typing import Optional
 
+from ...db.models import TIPOS_EVENTO_SIN_CRIA
 from ...utils import add_days, iso, to_date
 from ..reproductive_engine import GESTACION_DIAS, fecha_palpacion, fecha_secado
 
@@ -248,29 +249,35 @@ class ReproduccionQueryMixin:
         return "\n".join(lineas)
 
     def _partos_periodo(self, desde: str, hasta: str, etiqueta: str = "en el periodo") -> str:
-        """Lista de partos ocurridos entre desde y hasta (fechas ISO), con conteo por sexo de cría."""
-        partos = self.db.query(
+        """Lista de partos ocurridos entre desde y hasta (fechas ISO), con conteo
+        por sexo de cría. Los abortos y otras pérdidas no son partos: se
+        cuentan aparte en una línea."""
+        filas = self.db.query(
             """
             SELECT p.*, a.tag, a.nombre
             FROM partos p
             JOIN animales a ON a.id_animal = p.vaca_id
             WHERE p.fecha >= ? AND p.fecha <= ? AND (p.id_cria IS NULL OR p.id_cria != a.id_animal)
-            ORDER BY p.fecha DESC
+            ORDER BY p.fecha DESC, p.id DESC
             """,
             (desde, hasta),
         )
+        partos = [p for p in filas if (p["tipo_evento"] or "PARTO") not in TIPOS_EVENTO_SIN_CRIA]
+        perdidas = len(filas) - len(partos)
+        nota_perdidas = f"\n<i>Además {perdidas} aborto(s) o pérdida(s) en el mismo periodo (no cuentan como parto).</i>" if perdidas else ""
         if not partos:
-            return f"No hubo partos registrados {etiqueta}."
+            return f"No hubo partos registrados {etiqueta}.{nota_perdidas}"
         machos = sum(1 for p in partos if (p["sexo_cria"] or "").strip().lower().startswith("m"))
         hembras = sum(1 for p in partos if (p["sexo_cria"] or "").strip().lower().startswith("h"))
         lineas = [f"🍼 <b>Partos {etiqueta} ({len(partos)}):</b> {hembras} hembra(s), {machos} macho(s)"]
-        for p in partos[:15]:
+        limite = 30
+        for p in partos[:limite]:
             nom = f" ({p['nombre']})" if p["nombre"] else ""
             sexo = f" · cría {p['sexo_cria']}" if p["sexo_cria"] else ""
             lineas.append(f"• {p['fecha']} — {p['tag']}{nom}{sexo}")
-        if len(partos) > 15:
-            lineas.append(f"<i>... y {len(partos) - 15} más.</i>")
-        return "\n".join(lineas)
+        if len(partos) > limite:
+            lineas.append(f"<i>... y {len(partos) - limite} más.</i>")
+        return "\n".join(lineas) + nota_perdidas
 
     def _crias_por_sexo(self, sexo: str, desde: str | None = None, hasta: str | None = None, etiqueta: str = "") -> str:
         """Cuenta crías nacidas (vivas o no) filtradas por sexo, opcionalmente en un rango de fechas."""
