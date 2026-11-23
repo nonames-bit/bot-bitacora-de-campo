@@ -83,7 +83,7 @@
   var LT_VISTAS = [
     { vista: "repro", nombre: "Reproducción", claves: ["palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras"] },
     { vista: "leche", nombre: "Leche", claves: ["secar", "pausas", "control_leche"] },
-    { vista: "carne", nombre: "Carne", claves: ["destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
+    { vista: "carne", nombre: "Carne", claves: ["huerfanas", "destetar", "topizar", "castrar", "marcar", "bajo_peso", "venta", "descarte", "categoria"] },
     { vista: "sanidad", nombre: "Sanidad", claves: ["vac_brucelosis", "vac_aftosa", "tratamientos"] }
   ];
   function ltClaves(vista) {
@@ -97,6 +97,7 @@
       var n = v.claves.reduce(function (s, k) { return s + (c[k] || 0); }, 0);
       h += "<button type='button' class='chip btn-ir-tareas' data-vista='" + v.vista + "'>" + esc(v.nombre) + " <b>" + n + "</b></button>";
     });
+    if (c.huerfanas) h += "<button type='button' class='chip rojo btn-ir-tareas' data-vista='carne'>" + icon("alertTriangle", 14) + "Crías huérfanas <b>" + esc(c.huerfanas) + "</b></button>";
     if (c.chequeo) h += "<button type='button' class='chip btn-ir-tareas' data-vista='repro'>" + icon("alertTriangle", 14) + "Chequeo <b>" + esc(c.chequeo) + "</b></button>";
     if (nRevisar) h += "<button type='button' class='chip btn-ir-tareas' data-vista='inventario' data-sec='Datos a revisar'>" + icon("eraser", 14) + "Datos a revisar <b>" + esc(nRevisar) + "</b></button>";
     return h + "</div></div>";

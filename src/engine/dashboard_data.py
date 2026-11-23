@@ -3269,6 +3269,18 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
     base["edad_str"] = edad_str
     base["edad_dias"] = edad_dias
 
+    # Cría huérfana: activa, sin destetar, menor de 1 año y con la madre muerta.
+    base["huerfana"] = None
+    try:
+        if (madre_info and str(madre_info.get("estado") or "").upper() == "MUERTO"
+                and str(an.get("estado") or "").upper() == "ACTIVO"
+                and edad_dias is not None and edad_dias <= 365
+                and not db.query_one("SELECT 1 FROM destetes WHERE animal_id = ? LIMIT 1", (aid,))):
+            m = db.query_one("SELECT MAX(fecha) f FROM muertes WHERE animal_id = ?", (madre_info["id_animal"],))
+            base["huerfana"] = {"madre": madre_info["tag"], "fecha_muerte": (m["f"] if m else None)}
+    except Exception:
+        logger.error("seccion huerfana fallo", exc_info=True)
+
     # 4. Categoría Zootécnica SG
     categoria_sg = "Sin clasificar"
     s_raw = str(an.get("sexo") or "").strip().lower()
@@ -3471,6 +3483,27 @@ def datos_ficha_animal(db: Database, tag: str) -> dict:
         logger.error("seccion muerte fallo", exc_info=True)
         errores["muerte"] = str(e)
     base["muerte"] = muerte_info
+    _baja = str(an.get("estado") or "").upper()
+    if _baja in ("MUERTO", "VENDIDO", "DESCARTADO"):
+        # Un animal dado de baja ya no se ordeña ni tiene ciclo reproductivo:
+        # no mostrar "En ordeño" ni "Vacía (N d abiertos)" como si siguiera en el hato.
+        _txt = {"MUERTO": "Murió", "VENDIDO": "Vendido", "DESCARTADO": "Descartado"}[_baja]
+        _f = (base.get("muerte") or {}).get("fecha") if _baja == "MUERTO" else (base.get("venta") or {}).get("fecha")
+        _det = f"{_txt}{' el ' + str(_f)[:10] if _f else ''}: ya no está en el hato."
+        base["estado_fisiologico"] = {"codigo": "BAJA", "titulo": f"Dado de baja ({_txt.lower()})",
+                                      "badge": "", "color": "gris", "icono": "cow", "detalle": _det}
+        base["estado_reproductivo"] = {"codigo": "BAJA", "titulo": "Sin ciclo reproductivo",
+                                       "badge": "", "color": "gris", "detalle": _det}
+        if isinstance(base.get("lactancia"), dict):
+            base["lactancia"] = {**base["lactancia"], "estado": _txt, "del_dias": None}
+    if base.get("huerfana") and isinstance(base.get("estado_fisiologico"), dict):
+        _h = base["huerfana"]
+        base["estado_fisiologico"] = {
+            **base["estado_fisiologico"],
+            "detalle": f"Huérfana: su madre {_h['madre']} murió"
+                       + (f" el {str(_h['fecha_muerte'])[:10]}" if _h.get("fecha_muerte") else "")
+                       + ". Necesita tetero o vaca nodriza.",
+        }
 
     # 12. Historial consolidado de bajas y movimientos
     historial_bajas: list[dict[str, Any]] = []
