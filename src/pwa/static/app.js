@@ -13623,7 +13623,15 @@
           + "</div>";
       }
       var colsPartos = [
-        ["fecha", "Fecha"], ["cria_tag", "Cría"], ["sexo_cria", "Sexo"],
+        ["fecha", "Fecha"],
+        ["cria_tag", "Cría", "text", function (v) {
+          // La cría solo es enlace si existe en el inventario (nacido muerto → sin arete).
+          if (!v) return "—";
+          return "<a href='#' class='ficha-link' data-ir-ficha=\"" + esc(v) + "\" title='Ver ficha de la cría'"
+            + " style='font-weight:bold; text-decoration:underline; display:inline-flex; align-items:center; gap:4px; padding:4px 0;'>"
+            + icon("calf", 13) + "<span>" + esc(v) + "</span></a>";
+        }],
+        ["sexo_cria", "Sexo"],
         ["peso_nacimiento", "Peso nac.", "num"],
         ["estado_cria", "Estado", "text", function (v) {
           return String(v || "").toUpperCase() === "MUERTO"
