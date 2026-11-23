@@ -86,6 +86,7 @@ CLAVES = (
     "chequeo", "palpar", "secar", "servir", "novillas", "partos", "celos", "repetidoras",
     "destetar", "topizar", "castrar", "marcar", "vac_brucelosis", "vac_aftosa",
     "tratamientos", "pausas", "bajo_peso", "venta", "descarte", "categoria", "control_leche",
+    "huerfanas",
 )
 
 _RE_REPRODUCTOR = re.compile(r"\b(?:TORO|REPRODUCTOR|PADRON|SEMEN|PAJILLA)\b")
@@ -184,7 +185,7 @@ def _cargar(db: Database) -> dict[str, Any]:
     animales = _filas_dict(db.query(f"""
         WITH {ULT_TRASLADO_CTE}
         SELECT a.id_animal, a.tag, a.nombre, a.sexo, a.fecha_nacimiento, a.hierro, a.notas,
-               a.madre_id, m.tag AS madre, pt.nombre AS potrero
+               a.madre_id, m.tag AS madre, m.estado AS madre_estado, pt.nombre AS potrero
         FROM animales a
         LEFT JOIN animales m ON m.id_animal = a.madre_id
         LEFT JOIN ult_traslado ut ON ut.animal_id = a.id_animal AND ut.rn = 1
@@ -218,6 +219,8 @@ def _cargar(db: Database) -> dict[str, Any]:
         "animales": animales,
         "vientres": _vientres_sin_partos_imposibles(_filas_dict(db.query(SQL_VIENTRES_ACTIVOS))),
         "destetados": {r["animal_id"] for r in db.query("SELECT DISTINCT animal_id FROM destetes")},
+        "muertes": {r["animal_id"]: r["f"] for r in db.query(
+            "SELECT animal_id, MAX(fecha) f FROM muertes GROUP BY animal_id")},
         "manejos": manejos,
         "pesos": pesos,
         "servicios": servicios,
@@ -332,6 +335,11 @@ def _manejo_y_categoria(out: dict, datos: dict, info: dict, hoy: date) -> None:
         if edad is not None:
             if a["madre_id"] and EDAD_DESTETE[0] <= edad <= EDAD_DESTETE[1] and aid not in datos["destetados"]:
                 out["destetar"].append({**base, "madre": a["madre"], "edad_dias": edad, "sexo": a["sexo"]})
+            # Cría huérfana: su madre murió y la cría aún no se ha destetado.
+            if (a["madre_id"] and str(a.get("madre_estado") or "").upper() == "MUERTO"
+                    and edad <= EDAD_DESTETE[1] and aid not in datos["destetados"]):
+                out["huerfanas"].append({**base, "madre": a["madre"], "edad_dias": edad, "sexo": a["sexo"],
+                                         "muerte_madre": datos["muertes"].get(a["madre_id"])})
             if EDAD_TOPIZAR[0] <= edad <= EDAD_TOPIZAR[1] and "TOPIZADO" not in m:
                 out["topizar"].append({**base, "edad_dias": edad})
             if (macho and EDAD_CASTRAR[0] <= edad <= EDAD_CASTRAR[1] and not a["reproductor"]
@@ -524,6 +532,7 @@ def datos_tareas(db: Database, hoy: Optional[date] = None, usar_cache: bool = Fa
     out["partos"].sort(key=lambda x: x["en_dias"])
     out["celos"].sort(key=lambda x: x["en_dias"])
     out["destetar"].sort(key=lambda x: -(x["edad_dias"] or 0))
+    out["huerfanas"].sort(key=lambda x: x["edad_dias"] or 0)
     out["bajo_peso"].sort(key=lambda x: x["gmd_g"])
     out["venta"].sort(key=lambda x: -x["peso_kg"])
     out["chequeo"].sort(key=lambda x: (x["potrero"], x["tag"]))

@@ -169,6 +169,11 @@
 
     var potChip = f.potrero ? "<span class='chip gris' style='display:inline-flex; align-items:center; gap:4px;'>" + icon("grass", 12) + "<span>" + esc(f.potrero) + "</span></span>" : "";
     var hierroChip = f.hierro ? ("<span class='chip ambar' style='font-weight:600; display:inline-flex; align-items:center; gap:3px;' title='Hierro / Marca de la ganadería'>" + icon("flame", 12) + "<span>Hierro <b>" + esc(f.hierro) + "</b></span></span>") : "";
+    var huerfanaChip = f.huerfana
+      ? "<a href='#' class='chip ambar ficha-link' data-ir-ficha=\"" + esc(f.huerfana.madre) + "\" style='font-weight:700; display:inline-flex; align-items:center; gap:4px; text-decoration:none; max-width:100%; white-space:normal;' title='Su madre murió. Toca para ver la ficha de la madre.'>"
+        + icon("alertTriangle", 12) + "<span>" + (String(f.sexo || "").toLowerCase().indexOf("m") === 0 ? "Huérfano" : "Huérfana") + " · madre " + esc(f.huerfana.madre) + " murió"
+        + (f.huerfana.fecha_muerte ? " " + esc(fechaCorta(f.huerfana.fecha_muerte)) : "") + "</span></a>"
+      : "";
     var retiroChip = f.en_retiro ? "<span class='chip rojo' style='font-weight:bold; display:inline-flex; align-items:center; gap:4px;'>" + icon("alert", 12) + "<span>EN RETIRO</span></span>" : "";
 
     head += "<div class='datos' style='flex:1; min-width:0;'>"
@@ -177,7 +182,7 @@
       + estadoChip + retiroChip
       + "</div>"
       + "<div style='display:flex; flex-wrap:wrap; gap:5px; align-items:center; margin-bottom:5px;'>"
-      + fisioChip + reproChip + potChip + hierroChip
+      + fisioChip + huerfanaChip + reproChip + potChip + hierroChip
       + "</div>"
       + "<span class='meta' style='font-size:12px; color:var(--texto-suave);'>"
       + esc(f.sexo || "") + " · " + esc(f.raza || "S/D")
@@ -620,7 +625,7 @@
     }
 
     if (esHembra && (f.edad_dias == null || f.edad_dias >= 365 || (f.partos && f.partos.length))) {
-      var reproKpiVal = er.badge ? esc(er.badge) : "Sin datos";
+      var reproKpiVal = er.badge ? esc(er.badge) : (er.codigo === "BAJA" ? "—" : "Sin datos");
       var reproKpiClase = er.color === "verde" ? "ok" : (er.color === "rojo" || er.color === "ambar" ? "alerta" : "");
 
       var daOgestVal = "—";
@@ -639,7 +644,7 @@
       } else if (ef.codigo === "VACA_SECA") {
         lacKpiVal = "Seca";
       } else {
-        lacKpiVal = esc(ef.badge);
+        lacKpiVal = esc(ef.badge) || "—";
       }
 
       h += "<div class='kpis' style='margin-bottom:14px;'>"
@@ -685,7 +690,7 @@
                    : er.color === "ambar" ? "var(--color-ambar-txt)"
                    : "var(--verde-marca)";
 
-    var fisioBadgeHtml = "<span class='chip " + (ef.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + fisioIcon + "<span>" + esc(ef.badge) + "</span></span>";
+    var fisioBadgeHtml = ef.badge ? ("<span class='chip " + (ef.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + fisioIcon + "<span>" + esc(ef.badge) + "</span></span>") : "";
     var reproBadgeHtml = er.badge ? ("<span class='chip " + (er.color || "gris") + "' style='font-weight:700; display:inline-flex; align-items:center; gap:4px;'>" + reproIcon + "<span>" + esc(er.badge) + "</span></span>") : "";
 
     h += "<div class='card card-estado-zootecnico' style='padding:16px; margin-bottom:16px; border-left:5px solid " + bordeColor + ";'>";

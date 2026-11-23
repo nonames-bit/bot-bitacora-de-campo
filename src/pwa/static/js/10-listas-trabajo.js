@@ -8,6 +8,7 @@
     partos: { nombre: "Partos", icono: "parto", vacio: "Ningún parto próximo ni atrasado." },
     celos: { nombre: "Celos", icono: "heart", vacio: "Ningún celo esperado en los próximos días." },
     repetidoras: { nombre: "Repetidoras", icono: "alertTriangle", vacio: "Ninguna vaca con problema reproductivo." },
+    huerfanas: { nombre: "Crías huérfanas", icono: "alertTriangle", vacio: "Ninguna cría sin destetar con la madre muerta." },
     destetar: { nombre: "Destetar", icono: "destete", vacio: "Ninguna cría pendiente de destete." },
     topizar: { nombre: "Topizar", icono: "scissors", vacio: "Ningún ternero pendiente de topizar.", manejo: "TOPIZADO" },
     castrar: { nombre: "Castrar", icono: "scissors", vacio: "Ningún macho pendiente de castrar.", manejo: "CASTRACION" },
@@ -36,6 +37,7 @@
       case "celos": return "Celo " + (a.en_dias === 0 ? "hoy" : a.en_dias < 0 ? "ayer" : "en " + esc(a.en_dias) + " d") + " (" + esc(fechaCorta(a.proximo_celo)) + ") · AM → inseminar PM";
       case "repetidoras": case "descarte": return esc(a.motivo);
       case "destetar": return edad + (a.madre ? " · madre " + esc(a.madre) : "");
+      case "huerfanas": return edad + " · madre " + esc(a.madre) + " murió" + (a.muerte_madre ? " " + esc(fechaCorta(a.muerte_madre)) : "");
       case "vac_aftosa": return a.ultima ? "Última aftosa " + esc(fechaCorta(a.ultima)) : "Sin aftosa registrada";
       case "tratamientos": return esc(a.detalle);
       case "control_leche": return esc(a.motivo) + (a.del_dias != null ? " · " + esc(a.del_dias) + " DEL" : "");
